@@ -317,8 +317,10 @@ export default function MemoryViewer({ tagUid: propTag, token: propToken, onClos
               </h3>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-300">Tiêu đề kỷ niệm</label>
+                <label htmlFor="memory-title" className="text-xs font-medium text-slate-300">Tiêu đề kỷ niệm</label>
                 <input
+                  id="memory-title"
+                  name="title"
                   type="text"
                   required
                   value={editTitle}
@@ -329,8 +331,10 @@ export default function MemoryViewer({ tagUid: propTag, token: propToken, onClos
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-300">Câu trích dẫn ngắn (Quote)</label>
+                <label htmlFor="memory-quote" className="text-xs font-medium text-slate-300">Câu trích dẫn ngắn (Quote)</label>
                 <input
+                  id="memory-quote"
+                  name="quote"
                   type="text"
                   value={editQuote}
                   onChange={(e) => setEditQuote(e.target.value)}
@@ -340,8 +344,10 @@ export default function MemoryViewer({ tagUid: propTag, token: propToken, onClos
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-300">Thư gửi bí mật / Thông điệp đầy đủ</label>
+                <label htmlFor="memory-message" className="text-xs font-medium text-slate-300">Thư gửi bí mật / Thông điệp đầy đủ</label>
                 <textarea
+                  id="memory-message"
+                  name="message"
                   rows={4}
                   value={editMessage}
                   onChange={(e) => setEditMessage(e.target.value)}
@@ -383,6 +389,8 @@ export default function MemoryViewer({ tagUid: propTag, token: propToken, onClos
                   )}
                 </button>
                 <input
+                  id="memory-file-input"
+                  name="mediaFiles"
                   ref={fileInputRef}
                   type="file"
                   multiple

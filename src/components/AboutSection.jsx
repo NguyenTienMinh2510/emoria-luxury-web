@@ -19,7 +19,7 @@ export default function AboutSection({ onOpenNfcDemo }) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="font-serif text-4xl sm:text-6xl font-normal text-slate-100 tracking-wider mb-3"
+          className="font-cinzel text-4xl sm:text-6xl font-medium text-slate-100 tracking-wider mb-3"
         >
           ABOUT EMORIA
         </motion.h2>
@@ -30,7 +30,7 @@ export default function AboutSection({ onOpenNfcDemo }) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="font-serif text-base sm:text-xl text-slate-200 tracking-wide font-normal mb-10 sm:mb-14"
+          className="font-sans font-light italic text-base sm:text-xl text-neutral-300 tracking-wide mb-10 sm:mb-14"
         >
           Giao Thoa Giữa Nghệ Thuật Chế Tác &amp; Công Nghệ Cảm Xúc
         </motion.p>

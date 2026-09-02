@@ -185,8 +185,10 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, currentUser
               {!isLogin && (
                 <>
                   <div className="space-y-1">
-                    <label className="text-xs text-slate-300 ml-2">Họ và tên</label>
+                    <label htmlFor="auth-fullname" className="text-xs text-slate-300 ml-2">Họ và tên</label>
                     <input
+                      id="auth-fullname"
+                      name="fullName"
                       type="text"
                       required
                       placeholder="Nguyễn Văn A"
@@ -196,8 +198,10 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, currentUser
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-slate-300 ml-2">Email</label>
+                    <label htmlFor="auth-email" className="text-xs text-slate-300 ml-2">Email</label>
                     <input
+                      id="auth-email"
+                      name="email"
                       type="email"
                       required
                       placeholder="member@emoria.vn"
@@ -210,10 +214,12 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, currentUser
               )}
 
               <div className="space-y-1">
-                <label className="text-xs text-slate-300 ml-2">
+                <label htmlFor="auth-username" className="text-xs text-slate-300 ml-2">
                   {isLogin ? 'Email hoặc Tên đăng nhập' : 'Tên đăng nhập'}
                 </label>
                 <input
+                  id="auth-username"
+                  name="username"
                   type="text"
                   required
                   placeholder={isLogin ? 'member@emoria.vn hoặc emoria_user' : 'emoria_user'}
@@ -224,8 +230,10 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, currentUser
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs text-slate-300 ml-2">Mật khẩu</label>
+                <label htmlFor="auth-password" className="text-xs text-slate-300 ml-2">Mật khẩu</label>
                 <input
+                  id="auth-password"
+                  name="password"
                   type="password"
                   required
                   placeholder="••••••••"

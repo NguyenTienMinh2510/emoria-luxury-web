@@ -92,6 +92,8 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
                 }`}
             >
               <input
+                id="search-input"
+                name="search"
                 type="text"
                 placeholder="Tìm trang sức..."
                 value={searchQuery}
@@ -172,6 +174,8 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
             >
               <form onSubmit={handleSearchSubmit} className="relative mb-3">
                 <input
+                  id="search-input-mobile"
+                  name="search_mobile"
                   type="text"
                   placeholder="Tìm kiếm sản phẩm..."
                   value={searchQuery}

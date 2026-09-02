@@ -29,13 +29,13 @@ export default function ContactSection() {
       <div className="max-w-6xl mx-auto w-full relative z-10">
         
         {/* Section Title & Subtitle matching Mockup 7 */}
-        <div className="text-center max-w-4xl mx-auto mb-14 space-y-3">
+        <div className="text-center max-w-4xl mx-auto mb-14 space-y-4">
           <motion.h2 
             initial={{ opacity: 0, y: 15 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="font-serif text-3xl sm:text-4xl lg:text-5xl font-normal text-slate-100 tracking-wide"
+            className="font-serif text-2xl sm:text-4xl lg:text-5xl font-normal text-slate-100 tracking-wide leading-snug"
           >
             EMORIA sẵn sàng lắng nghe câu chuyện của bạn.
           </motion.h2>
@@ -45,7 +45,7 @@ export default function ContactSection() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-serif italic text-sm sm:text-lg text-slate-300 leading-relaxed max-w-3xl mx-auto font-light"
+            className="font-sans font-light italic text-sm sm:text-base text-neutral-300 leading-relaxed tracking-wider max-w-3xl mx-auto px-4"
           >
             Dù bạn cần tư vấn chọn món quà phù hợp, hỗ trợ kỹ thuật nạp ký ức NFC, hay mong muốn hợp tác cùng EMORIA - đội ngũ của chúng tôi luôn ở đây để đồng hành cùng bạn.
           </motion.p>
@@ -228,6 +228,8 @@ export default function ContactSection() {
                 <form onSubmit={handleSubmit} className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
+                      id="contact-name"
+                      name="name"
                       type="text"
                       required
                       placeholder="Tên của bạn"
@@ -236,6 +238,8 @@ export default function ContactSection() {
                       className="w-full h-10 px-3.5 rounded-xl glass-input text-xs"
                     />
                     <input
+                      id="contact-phone"
+                      name="phone"
                       type="tel"
                       required
                       placeholder="Số điện thoại / Zalo"
@@ -245,6 +249,8 @@ export default function ContactSection() {
                     />
                   </div>
                   <input
+                    id="contact-note"
+                    name="note"
                     type="text"
                     placeholder="Mẫu trang sức hoặc câu chuyện bạn muốn tư vấn..."
                     value={formData.note}

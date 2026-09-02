@@ -28,9 +28,10 @@ export default {
         }
       },
       fontFamily: {
-        serif: ['Cinzel', 'Playfair Display', 'serif'],
-        cursive: ['"Great Vibes"', '"Alex Brush"', '"Playfair Display"', 'cursive'],
-        sans: ['Montserrat', 'Inter', 'sans-serif'],
+        serif: ['"Playfair Display"', '"Cormorant Garamond"', 'serif'],
+        cinzel: ['"Cinzel"', 'serif'],
+        sans: ['"Montserrat"', 'system-ui', '-apple-system', 'sans-serif'],
+        cursive: ['"Great Vibes"', '"Alex Brush"', 'cursive'],
       },
       backgroundImage: {
         'glass-gradient': 'linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.01) 100%)',

@@ -43,12 +43,12 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
 
           {/* Slogan & Details */}
           <div className="mt-4 sm:mt-6 space-y-4">
-            <h3 className="font-serif text-lg sm:text-2xl font-bold tracking-[0.35em] text-slate-200 uppercase flex items-center gap-3">
+            <h3 className="font-cinzel text-lg sm:text-2xl font-bold tracking-[0.35em] text-slate-200 uppercase flex items-center gap-3">
               <span>NEW COLLECTION</span>
               <span className="h-[1px] w-16 bg-gradient-to-r from-slate-400 to-transparent" />
             </h3>
             
-            <p className="text-sm sm:text-base text-slate-300 max-w-lg leading-relaxed font-light">
+            <p className="font-sans text-sm sm:text-base text-slate-300 max-w-lg leading-relaxed font-light">
               Lấy cảm hứng từ những vì tinh tú mùa hạ và dải ngân hà vĩnh cửu. Bộ đôi vòng tay bạc S925 tích hợp vi chip NFC kép, kết nối câu chuyện tình yêu và lưu giữ mọi khoảnh khắc bí mật chỉ thuộc về hai người.
             </p>
           </div>

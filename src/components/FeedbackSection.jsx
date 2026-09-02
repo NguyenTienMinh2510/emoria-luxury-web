@@ -27,7 +27,7 @@ export default function FeedbackSection({ onOpenNfcDemo }) {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="font-serif text-3xl sm:text-5xl font-normal text-slate-100 tracking-wider"
+            className="font-cinzel text-3xl sm:text-5xl font-medium text-slate-100 tracking-wider"
           >
             FEEDBACK
           </motion.h2>
@@ -37,7 +37,7 @@ export default function FeedbackSection({ onOpenNfcDemo }) {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.15 }}
-            className="font-serif italic text-sm sm:text-lg text-slate-300 leading-relaxed font-light px-4 max-w-3xl mx-auto"
+            className="font-sans font-light italic text-sm sm:text-base md:text-lg text-neutral-300 leading-relaxed tracking-wider px-4 max-w-3xl mx-auto"
           >
             "Tôn vinh cảm xúc cá nhân và ký ức độc bản, EMORIA trở thành điểm chạm đồng hành cùng những người nổi tiếng trong việc lưu giữ và khẳng định câu chuyện của chính họ."
           </motion.p>

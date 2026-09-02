@@ -359,8 +359,10 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
                 <form onSubmit={handleSubmit} className="space-y-3">
                   {authState === 'register' && (
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-300 ml-2">Họ và tên</label>
+                      <label htmlFor="hero-fullname" className="text-xs font-medium text-slate-300 ml-2">Họ và tên</label>
                       <input
+                        id="hero-fullname"
+                        name="fullName"
                         type="text"
                         required
                         placeholder="Nguyễn Văn A"
@@ -372,8 +374,10 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
                   )}
 
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-300 ml-2">Tên đăng nhập hoặc Email</label>
+                    <label htmlFor="hero-username" className="text-xs font-medium text-slate-300 ml-2">Tên đăng nhập hoặc Email</label>
                     <input
+                      id="hero-username"
+                      name="username"
                       type="text"
                       required
                       placeholder="tên_đăng_nhập hoặc email"
@@ -384,8 +388,10 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-300 ml-2">Mật khẩu</label>
+                    <label htmlFor="hero-password" className="text-xs font-medium text-slate-300 ml-2">Mật khẩu</label>
                     <input
+                      id="hero-password"
+                      name="password"
                       type="password"
                       required
                       placeholder="••••••••"
