@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Diamond Pattern Background */
+.bg-diamond-pattern {
+  background-image: 
+    linear-gradient(45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.03) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.03) 75%);
+  background-size: 60px 60px;
+  background-position: 0 0, 0 30px, 30px -30px, -30px 0px;
+}
+
+/* Glassmorphism Styles */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-panel-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass-panel-hover:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 10px 30px -10px rgba(255, 255, 255, 0.1);
+}
+
+.glass-input {
+  background: rgba(120, 120, 128, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  transition: all 0.25s ease;
+}
+.glass-input:focus {
+  outline: none;
+  background: rgba(140, 140, 150, 0.45);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+/* Shimmer Border / Metallic Sweep */
+.shimmer-border {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-border::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    60deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 60%
+  );
+  transform: rotate(30deg);
+  animation: shimmerEffect 4s infinite linear;
+  pointer-events: none;
+}
+
+@keyframes shimmerEffect {
+  0% { transform: translateX(-100%) rotate(30deg); }
+  100% { transform: translateX(100%) rotate(30deg); }
+}
+
+/* Metallic Text Gradient */
+.text-metallic {
+  background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 40%, #94a3b8 70%, #f1f5f9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-chrome-gothic {
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 25%, #cbd5e1 45%, #64748b 52%, #94a3b8 68%, #e2e8f0 88%, #ffffff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 12px rgba(255, 255, 255, 0.35)) drop-shadow(0 0 30px rgba(148, 163, 184, 0.4));
+}
+
+.text-metallic-gold {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef08a 40%, #ca8a04 80%, #fde047 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Decorative Flourish Underline (Matching Mockup Nav active item) */
+.flourish-bracket {
+  position: relative;
+  display: inline-block;
+}
+.flourish-bracket::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  min-width: 48px;
+  height: 8px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 12' fill='none'%3E%3Ccircle cx='4' cy='6' r='2' fill='%23e2e8f0'/%3E%3Cpath d='M8 6 Q 50 11 92 6' stroke='%23e2e8f0' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='96' cy='6' r='2' fill='%23e2e8f0'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
