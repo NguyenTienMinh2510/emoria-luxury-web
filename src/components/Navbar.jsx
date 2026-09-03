@@ -83,12 +83,12 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
           </nav>
 
           {/* Right Action Bar: Search, NFC Experience Button, Cart, User Profile */}
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-3">
 
-            {/* Search Input Bar matching Mockup 3, 4, 5 */}
+            {/* Search Input Bar matching Mockup 3, 4, 5 (Hidden on mobile & small tablet, visible from md:) */}
             <form
               onSubmit={handleSearchSubmit}
-              className={`relative hidden sm:flex items-center transition-all duration-300 ${searchFocused ? 'w-56 lg:w-64' : 'w-44 lg:w-52'
+              className={`relative hidden md:flex items-center transition-all duration-300 ${searchFocused ? 'w-56 lg:w-64' : 'w-44 lg:w-52'
                 }`}
             >
               <input
@@ -128,11 +128,11 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
             <button
               onClick={onOpenCart}
               aria-label="Giỏ hàng"
-              className="relative p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+              className="relative p-2.5 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center min-w-[44px] min-h-[44px]"
             >
               <ShoppingBag className="w-5 h-5" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-100 text-dark-950 font-bold text-[10px] flex items-center justify-center shadow-lg">
+                <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-slate-100 text-dark-950 font-bold text-[10px] flex items-center justify-center shadow-lg">
                   {cartCount}
                 </span>
               )}
@@ -141,7 +141,7 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
             {/* "You" User Profile Button matching Mockup */}
             <button
               onClick={onOpenAuth}
-              className="flex flex-col items-center justify-center p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors group"
+              className="flex flex-col items-center justify-center p-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors group min-w-[40px] min-h-[44px]"
             >
               <div className="w-7 h-7 rounded-full bg-white/10 border border-white/20 flex items-center justify-center group-hover:border-white/50 transition-all">
                 <User className="w-4 h-4" />
@@ -154,7 +154,7 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
             {/* Mobile Hamburger Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center min-w-[44px] min-h-[44px]"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -162,7 +162,7 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
           </div>
         </div>
 
-        {/* Mobile Dropdown Menu */}
+        {/* Mobile Dropdown Menu Drawer */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
@@ -170,33 +170,33 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.25 }}
-              className="md:hidden overflow-hidden mt-3 pt-3 pb-4 border-t border-white/10 bg-dark-950/95 backdrop-blur-2xl rounded-2xl px-4 space-y-3"
+              className="md:hidden overflow-hidden mt-3 pt-3 pb-4 border-t border-white/10 bg-dark-950/95 backdrop-blur-2xl rounded-2xl px-4 space-y-3 shadow-2xl"
             >
               <form onSubmit={handleSearchSubmit} className="relative mb-3">
                 <input
                   id="search-input-mobile"
                   name="search_mobile"
                   type="text"
-                  placeholder="Tìm kiếm sản phẩm..."
+                  placeholder="Tìm kiếm trang sức..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     if (onSearch) onSearch(e.target.value);
                   }}
-                  className="w-full h-10 pl-4 pr-10 rounded-full text-sm glass-input"
+                  className="w-full h-11 pl-4 pr-10 rounded-xl text-base sm:text-sm glass-input placeholder-slate-400 focus:border-white/40 focus:outline-none"
                 />
-                <button type="submit" className="absolute right-3 top-2.5 text-slate-300">
+                <button type="submit" aria-label="Tìm kiếm" className="absolute right-3 top-3 text-slate-300">
                   <Search className="w-5 h-5" />
                 </button>
               </form>
 
-              <div className="flex flex-col space-y-2">
+              <div className="flex flex-col space-y-1.5">
                 {navItems.map((item) => (
                   <a
                     key={item.id}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${activeSection === item.id
+                    className={`px-4 py-3 min-h-[44px] flex items-center rounded-xl text-sm font-medium transition-colors ${activeSection === item.id
                         ? 'bg-white/10 text-white font-semibold'
                         : 'text-slate-300 hover:bg-white/5 hover:text-white'
                       }`}
@@ -206,13 +206,13 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
                 ))}
               </div>
 
-              <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+              <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false);
                     onOpenNfcDemo();
                   }}
-                  className="flex items-center gap-2 text-sm text-slate-200 py-2 px-3 rounded-lg hover:bg-white/10"
+                  className="h-11 min-h-[44px] flex items-center justify-center gap-2 text-sm text-slate-200 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer"
                 >
                   <SmartphoneNfc className="w-4 h-4 text-slate-300" />
                   <span>Trải nghiệm chạm NFC</span>
@@ -222,7 +222,7 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
                     setMobileMenuOpen(false);
                     onOpenAuth();
                   }}
-                  className="text-sm font-medium text-white px-4 py-2 rounded-full bg-white/10 border border-white/20"
+                  className="h-11 min-h-[44px] flex items-center justify-center text-sm font-medium text-white px-5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 cursor-pointer"
                 >
                   Tài khoản
                 </button>

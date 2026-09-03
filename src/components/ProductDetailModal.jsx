@@ -119,7 +119,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
 
                 <button
                   onClick={handleAdd}
-                  className="flex-1 py-3 px-6 rounded-2xl bg-white text-dark-950 font-bold text-sm hover:bg-slate-200 transition-all flex items-center justify-center gap-2 shadow-silver-glow active:scale-[0.98]"
+                  className="flex-1 h-11 min-h-[44px] px-6 rounded-2xl bg-white text-dark-950 font-bold text-sm hover:bg-slate-200 transition-all flex items-center justify-center gap-2 shadow-silver-glow active:scale-[0.98] cursor-pointer"
                 >
                   {added ? (
                     <>

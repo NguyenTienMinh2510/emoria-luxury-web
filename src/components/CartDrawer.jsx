@@ -136,7 +136,7 @@ export default function CartDrawer({ isOpen, onClose, cartItems, onUpdateQuantit
               <button
                 onClick={handleCheckout}
                 disabled={isCheckingOut}
-                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-slate-200 via-white to-slate-300 text-dark-950 font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-silver-glow"
+                className="w-full h-11 min-h-[44px] rounded-2xl bg-gradient-to-r from-slate-200 via-white to-slate-300 text-dark-950 font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-silver-glow cursor-pointer"
               >
                 {isCheckingOut ? (
                   <div className="w-5 h-5 border-2 border-dark-950 border-t-transparent rounded-full animate-spin" />

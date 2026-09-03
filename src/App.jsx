@@ -141,7 +141,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-dark-950 text-slate-100 relative selection:bg-slate-200 selection:text-dark-950">
+    <div className="min-h-screen bg-dark-950 text-slate-100 relative selection:bg-slate-200 selection:text-dark-950 overflow-x-hidden w-full max-w-[100vw]">
       
       {/* Top Fixed Navigation */}
       <Navbar
@@ -204,7 +204,7 @@ export default function App() {
       {/* Floating Action Button for NFC Experience */}
       <button
         onClick={() => handleOpenNfcDemo('emoria-pulse')}
-        className="fixed bottom-6 right-6 z-40 px-4 py-3 rounded-full bg-white text-dark-950 font-bold text-xs shadow-2xl hover:scale-105 hover:bg-slate-200 active:scale-95 transition-all flex items-center gap-2 border border-white/40 cursor-pointer"
+        className="fixed bottom-6 right-6 z-40 px-4 py-2.5 h-11 rounded-full bg-white text-dark-950 font-bold text-xs shadow-2xl hover:scale-105 hover:bg-slate-200 active:scale-95 transition-all flex items-center gap-2 border border-white/40 cursor-pointer min-h-[44px]"
         title="Trải nghiệm chạm NFC"
       >
         <SmartphoneNfc className="w-4 h-4 animate-bounce" />

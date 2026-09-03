@@ -196,7 +196,7 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
   return (
     <section
       id="hero"
-      className="relative h-screen min-h-[640px] max-h-screen w-full flex flex-col items-center justify-between pt-20 sm:pt-24 pb-6 px-4 sm:px-6 overflow-hidden bg-dark-950 select-none"
+      className="relative min-h-[100dvh] lg:h-screen w-full flex flex-col items-center justify-between pt-20 sm:pt-24 pb-6 px-4 sm:px-6 overflow-hidden bg-dark-950 select-none"
     >
       {/* Dynamic Canvas Background for Ambient Silver Dust */}
       <canvas
@@ -206,6 +206,9 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
 
       {/* Subtle Diamond Pattern Overlay */}
       <div className="absolute inset-0 bg-diamond-pattern opacity-25 pointer-events-none z-0" />
+
+      {/* Mobile Protective Dark Overlay for maximum text contrast */}
+      <div className="absolute inset-0 bg-black/35 backdrop-blur-[1px] md:bg-transparent md:backdrop-blur-none pointer-events-none z-0" />
 
       {/* Ambient Lighting Glows */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] sm:w-[950px] h-[500px] bg-gradient-to-b from-white/10 via-slate-300/5 to-transparent rounded-full blur-3xl pointer-events-none z-0" />
@@ -227,7 +230,7 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
             <img
               src="/assets/background_neck.png"
               alt="EMORIA S925 Necklace Background"
-              className="w-[85vw] max-w-[900px] h-auto object-contain blur-[4px] contrast-125 brightness-110 drop-shadow-[0_0_50px_rgba(255,255,255,0.3)] select-none"
+              className="w-[85vw] max-w-[900px] h-auto object-contain bg-cover bg-center bg-no-repeat blur-[4px] contrast-125 brightness-110 drop-shadow-[0_0_50px_rgba(255,255,255,0.3)] select-none"
             />
           </motion.div>
         </motion.div>
@@ -368,7 +371,7 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
                         placeholder="Nguyễn Văn A"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        className="w-full h-10 px-3.5 rounded-xl bg-white/[0.08] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/40 transition-all font-sans"
+                        className="w-full h-11 px-3.5 rounded-xl bg-white/[0.08] border border-white/15 text-base sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/40 transition-all font-sans"
                       />
                     </div>
                   )}
@@ -383,7 +386,7 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
                       placeholder="tên_đăng_nhập hoặc email"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      className="w-full h-10 px-3.5 rounded-xl bg-white/[0.08] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/40 transition-all font-sans"
+                      className="w-full h-11 px-3.5 rounded-xl bg-white/[0.08] border border-white/15 text-base sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/40 transition-all font-sans"
                     />
                   </div>
 
@@ -397,7 +400,7 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full h-10 px-3.5 rounded-xl bg-white/[0.08] border border-white/15 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/40 transition-all font-sans"
+                      className="w-full h-11 px-3.5 rounded-xl bg-white/[0.08] border border-white/15 text-base sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/40 transition-all font-sans"
                     />
                   </div>
 
@@ -405,7 +408,7 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full h-10 mt-2 rounded-xl bg-gradient-to-r from-slate-200 via-white to-slate-300 text-slate-950 font-sans font-bold text-xs sm:text-sm shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full h-11 min-h-[44px] mt-2 rounded-xl bg-gradient-to-r from-slate-200 via-white to-slate-300 text-slate-950 font-sans font-bold text-sm shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isSubmitting ? (
                       <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />

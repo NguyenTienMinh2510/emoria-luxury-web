@@ -15,7 +15,7 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
       <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-[450px] h-[450px] bg-slate-400/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-1/2 right-1/4 -translate-y-1/2 w-[550px] h-[550px] bg-blue-950/20 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
+      <div className="max-w-7xl mx-auto w-full flex flex-col lg:flex-row items-center justify-between gap-8 px-4 sm:px-8 relative z-10">
         
         {/* Left Column: Cursive "Emoria Summer" & Editorial Typography (Mockup 3) */}
         <motion.div 
@@ -23,7 +23,7 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="lg:col-span-6 flex flex-col justify-center text-left py-6 lg:py-12"
+          className="w-full lg:w-1/2 flex flex-col justify-center text-left py-4 sm:py-6 lg:py-12"
         >
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/15 backdrop-blur-md w-fit mb-4">
@@ -35,9 +35,9 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
 
           {/* Large Cursive "Emoria Summer" matching Mockup 3 */}
           <div className="relative my-2 select-none">
-            <h2 className="font-cursive text-7xl sm:text-8xl md:text-9xl text-metallic font-normal leading-[0.95] tracking-wide drop-shadow-[0_4px_25px_rgba(255,255,255,0.2)]">
+            <h2 className="font-cursive text-5xl sm:text-7xl md:text-8xl lg:text-9xl text-metallic font-normal leading-tight tracking-wide drop-shadow-[0_4px_25px_rgba(255,255,255,0.2)]">
               Emoria<br />
-              <span className="pl-6 sm:pl-10">Summer</span>
+              <span className="pl-4 sm:pl-8 lg:pl-10">Summer</span>
             </h2>
           </div>
 
@@ -53,11 +53,11 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
             </p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="mt-8 flex flex-wrap items-center gap-4">
+          {/* Action Buttons: Responsive h-11 full-width on mobile */}
+          <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full">
             <a
               href="#products"
-              className="px-8 py-3.5 rounded-full bg-white text-dark-950 font-bold text-sm tracking-wider uppercase hover:bg-slate-200 transition-all duration-300 shadow-[0_0_25px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 flex items-center gap-2"
+              className="h-11 min-h-[44px] px-8 rounded-full bg-white text-dark-950 font-bold text-sm tracking-wider uppercase hover:bg-slate-200 transition-all duration-300 shadow-[0_0_25px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer"
             >
               <span>Xem Sản Phẩm</span>
               <ArrowUpRight className="w-4 h-4" />
@@ -65,7 +65,7 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
 
             <button
               onClick={() => onOpenNfcDemo && onOpenNfcDemo('emoria-celestial-duo')}
-              className="px-6 py-3.5 rounded-full glass-panel glass-panel-hover text-slate-200 font-medium text-sm tracking-wider hover:text-white transition-all flex items-center gap-2"
+              className="h-11 min-h-[44px] px-6 rounded-full glass-panel glass-panel-hover text-slate-200 font-medium text-sm tracking-wider hover:text-white transition-all flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer"
             >
               <SmartphoneNfc className="w-4 h-4 text-slate-300" />
               <span>Chạm Thử NFC</span>
@@ -79,10 +79,10 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
           whileInView={{ opacity: 1, scale: 1, x: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
-          className="lg:col-span-6 relative flex items-center justify-center"
+          className="w-full lg:w-1/2 relative flex items-center justify-center"
         >
           {/* Outer Glass Card Frame */}
-          <div className="relative w-full rounded-3xl overflow-hidden glass-panel p-2 sm:p-4 shadow-2xl border border-white/20 group">
+          <div className="relative w-full max-w-sm sm:max-w-md lg:max-w-xl mx-auto rounded-3xl overflow-hidden glass-panel p-2 sm:p-4 shadow-silver-glow border border-white/20 group">
             
             {/* Main Showcase Image */}
             <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-dark-950/80">
