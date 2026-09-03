@@ -220,7 +220,7 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
           initial={{ opacity: 0, scale: 0.85 }}
           animate={{ opacity: 0.52, scale: 1.0 }}
           transition={{ duration: 2, ease: "easeOut" }}
-          className="flex items-center justify-center w-full max-w-[900px] px-4"
+          className="flex items-center justify-center w-full max-w-[900px] px-4 [mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_72%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_72%)]"
         >
           <motion.div
             animate={{ y: [-6, 6, -6] }}
@@ -230,7 +230,7 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
             <img
               src="/assets/background_neck.png"
               alt="EMORIA S925 Necklace Background"
-              className="w-[85vw] max-w-[900px] h-auto object-contain bg-cover bg-center bg-no-repeat blur-[4px] contrast-125 brightness-110 drop-shadow-[0_0_50px_rgba(255,255,255,0.3)] select-none"
+              className="w-[90vw] sm:w-[85vw] max-w-[900px] h-auto object-contain mix-blend-screen contrast-125 brightness-110 select-none pointer-events-none"
             />
           </motion.div>
         </motion.div>
