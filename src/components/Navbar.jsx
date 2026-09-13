@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, User, ShoppingBag, Menu, X, Sparkles, SmartphoneNfc } from 'lucide-react';
+import { Search, User, ShoppingBag, Menu, X, Sparkles, SmartphoneNfc, Store, Compass } from 'lucide-react';
 import { navItems } from '../data/navigation';
 
-export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartCount = 0, onOpenCart, onSearch }) {
+export default function Navbar({ 
+  activeSection, 
+  onOpenAuth, 
+  onOpenNfcDemo, 
+  cartCount = 0, 
+  onOpenCart, 
+  onSearch,
+  currentView = 'shop',
+  onSelectView,
+}) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,72 +33,88 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
     }
   };
 
+  const handleSwitchView = (view) => {
+    if (onSelectView) {
+      onSelectView(view);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    setMobileMenuOpen(false);
+  };
+
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled
-          ? 'bg-dark-950/85 backdrop-blur-xl border-b border-white/10 shadow-2xl py-3'
-          : 'bg-gradient-to-b from-dark-950/90 via-dark-950/40 to-transparent backdrop-blur-md py-4'
-        }`}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled
+          ? 'bg-dark-950/90 backdrop-blur-xl border-b border-white/10 shadow-2xl py-2.5'
+          : 'bg-gradient-to-b from-dark-950/95 via-dark-950/60 to-transparent backdrop-blur-md py-3.5'
+      }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-4">
 
           {/* Logo */}
-          <a
-            href="#hero"
-            className="flex items-center gap-2.5 group relative"
+          <div 
+            onClick={() => handleSwitchView('shop')}
+            className="flex items-center gap-2.5 group relative cursor-pointer"
           >
-            <div className="relative">
-              {/* Fallback stylized logo text & pendant icon */}
-              <div className="flex items-center gap-1.5">
-                <span className="font-serif text-2xl sm:text-3xl font-bold tracking-[0.2em] text-metallic group-hover:brightness-125 transition-all">
-                  EMORIA
-                </span>
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/10 border border-white/30 text-[10px] text-white/90 shadow-silver-glow animate-pulse">
-                  ✦
-                </span>
-              </div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-serif text-2xl sm:text-3xl font-bold tracking-[0.2em] text-metallic group-hover:brightness-125 transition-all">
+                EMORIA
+              </span>
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/10 border border-white/30 text-[10px] text-white/90 shadow-silver-glow animate-pulse">
+                ✦
+              </span>
             </div>
-          </a>
+          </div>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-1 lg:space-x-4">
-            {navItems.map((item) => {
-              const isActive = activeSection === item.id;
-              return (
-                <a
-                  key={item.id}
-                  href={item.href}
-                  className={`relative px-3.5 py-2 text-sm lg:text-base font-medium transition-colors duration-200 ${isActive
-                      ? 'text-white font-semibold'
-                      : 'text-slate-300 hover:text-white'
-                    }`}
-                >
-                  <span className="relative z-10">{item.label}</span>
+          {/* Desktop Center: Space Switcher Pill (Shop vs Memory vs Story) */}
+          <div className="hidden md:flex items-center p-1 rounded-full bg-black/60 border border-white/15 backdrop-blur-xl shadow-inner">
+            <button
+              onClick={() => handleSwitchView('shop')}
+              className={`relative px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+                currentView === 'shop'
+                  ? 'bg-white text-dark-950 shadow-silver-glow'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Cửa Hàng</span>
+            </button>
 
-                  {/* Active Flourish Underline matching Mockup */}
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeNavBracket"
-                      className="absolute -bottom-1 left-0 right-0 h-4 flex items-center justify-center pointer-events-none"
-                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                    >
-                      <div className="flourish-bracket w-full h-full" />
-                    </motion.div>
-                  )}
-                </a>
-              );
-            })}
-          </nav>
+            <button
+              onClick={() => handleSwitchView('memory')}
+              className={`relative px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+                currentView === 'memory'
+                  ? 'bg-white text-dark-950 shadow-silver-glow'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <SmartphoneNfc className="w-3.5 h-3.5" />
+              <span>Không Gian Kỷ Niệm</span>
+            </button>
 
-          {/* Right Action Bar: Search, NFC Experience Button, Cart, User Profile */}
-          <div className="flex items-center gap-1.5 sm:gap-3">
+            <button
+              onClick={() => handleSwitchView('home')}
+              className={`relative px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+                currentView === 'home'
+                  ? 'bg-white text-dark-950 shadow-silver-glow'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>Trang Chủ</span>
+            </button>
+          </div>
 
-            {/* Search Input Bar matching Mockup 3, 4, 5 (Hidden on mobile & small tablet, visible from md:) */}
+          {/* Right Action Bar: Search, Cart, User Profile */}
+          <div className="flex items-center gap-2 sm:gap-3">
+
+            {/* Search Input Bar (Visible from lg) */}
             <form
               onSubmit={handleSearchSubmit}
-              className={`relative hidden md:flex items-center transition-all duration-300 ${searchFocused ? 'w-56 lg:w-64' : 'w-44 lg:w-52'
-                }`}
+              className={`relative hidden lg:flex items-center transition-all duration-300 ${
+                searchFocused ? 'w-56' : 'w-40'
+              }`}
             >
               <input
                 id="search-input"
@@ -103,58 +128,46 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
                 }}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
-                className="w-full h-9 pl-3.5 pr-8 rounded-full text-xs lg:text-sm glass-input placeholder-slate-400 focus:border-white/40 focus:ring-1 focus:ring-white/30 transition-all"
+                className="w-full h-8 pl-3 pr-7 rounded-full text-xs bg-black/40 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:border-white/50 transition-all"
               />
               <button
                 type="submit"
                 aria-label="Tìm kiếm"
-                className="absolute right-2.5 text-slate-300 hover:text-white transition-colors"
+                className="absolute right-2 text-slate-400 hover:text-white transition-colors"
               >
-                <Search className="w-4 h-4" />
+                <Search className="w-3.5 h-3.5" />
               </button>
             </form>
-
-            {/* NFC Simulation Quick Trigger Button */}
-            <button
-              onClick={onOpenNfcDemo}
-              title="Mô phỏng trải nghiệm chạm NFC"
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 hover:bg-white/15 border border-white/20 text-slate-200 transition-all hover:border-white/40 shadow-sm"
-            >
-              <SmartphoneNfc className="w-3.5 h-3.5 text-slate-300 animate-pulse" />
-              <span>Chạm NFC</span>
-            </button>
 
             {/* Shopping Cart Button */}
             <button
               onClick={onOpenCart}
               aria-label="Giỏ hàng"
-              className="relative p-2.5 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center min-w-[44px] min-h-[44px]"
+              className="relative p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center cursor-pointer min-w-[38px] min-h-[38px]"
             >
-              <ShoppingBag className="w-5 h-5" />
+              <ShoppingBag className="w-5 h-5 stroke-[1.5]" />
               {cartCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-slate-100 text-dark-950 font-bold text-[10px] flex items-center justify-center shadow-lg">
+                <span className="absolute -top-1 -right-1 bg-white text-dark-950 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-md animate-pulse">
                   {cartCount}
                 </span>
               )}
             </button>
 
-            {/* "You" User Profile Button matching Mockup */}
+            {/* Auth / Account Profile Button */}
             <button
               onClick={onOpenAuth}
-              className="flex flex-col items-center justify-center p-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors group min-w-[40px] min-h-[44px]"
+              aria-label="Tài khoản"
+              className="p-1.5 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer min-h-[38px]"
             >
-              <div className="w-7 h-7 rounded-full bg-white/10 border border-white/20 flex items-center justify-center group-hover:border-white/50 transition-all">
+              <div className="w-7 h-7 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-slate-200">
                 <User className="w-4 h-4" />
               </div>
-              <span className="text-[10px] tracking-wider uppercase font-semibold mt-0.5 text-slate-300 group-hover:text-white">
-                You
-              </span>
             </button>
 
             {/* Mobile Hamburger Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center min-w-[44px] min-h-[44px]"
+              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center min-w-[40px] min-h-[40px]"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -172,7 +185,47 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
               transition={{ duration: 0.25 }}
               className="md:hidden overflow-hidden mt-3 pt-3 pb-4 border-t border-white/10 bg-dark-950/95 backdrop-blur-2xl rounded-2xl px-4 space-y-3 shadow-2xl"
             >
-              <form onSubmit={handleSearchSubmit} className="relative mb-3">
+              {/* Mobile View Switcher Buttons */}
+              <div className="grid grid-cols-3 gap-2 pb-3 border-b border-white/10">
+                <button
+                  onClick={() => handleSwitchView('shop')}
+                  className={`py-2 px-1 rounded-xl text-xs font-bold uppercase flex flex-col items-center gap-1 transition-all ${
+                    currentView === 'shop'
+                      ? 'bg-white text-dark-950'
+                      : 'bg-white/5 text-slate-300 border border-white/10'
+                  }`}
+                >
+                  <Store className="w-4 h-4" />
+                  <span>Cửa Hàng</span>
+                </button>
+
+                <button
+                  onClick={() => handleSwitchView('memory')}
+                  className={`py-2 px-1 rounded-xl text-xs font-bold uppercase flex flex-col items-center gap-1 transition-all ${
+                    currentView === 'memory'
+                      ? 'bg-white text-dark-950'
+                      : 'bg-white/5 text-slate-300 border border-white/10'
+                  }`}
+                >
+                  <SmartphoneNfc className="w-4 h-4" />
+                  <span>Kỷ Niệm</span>
+                </button>
+
+                <button
+                  onClick={() => handleSwitchView('home')}
+                  className={`py-2 px-1 rounded-xl text-xs font-bold uppercase flex flex-col items-center gap-1 transition-all ${
+                    currentView === 'home'
+                      ? 'bg-white text-dark-950'
+                      : 'bg-white/5 text-slate-300 border border-white/10'
+                  }`}
+                >
+                  <Compass className="w-4 h-4" />
+                  <span>Trang Chủ</span>
+                </button>
+              </div>
+
+              {/* Mobile Search */}
+              <form onSubmit={handleSearchSubmit} className="relative mb-2">
                 <input
                   id="search-input-mobile"
                   name="search_mobile"
@@ -183,46 +236,31 @@ export default function Navbar({ activeSection, onOpenAuth, onOpenNfcDemo, cartC
                     setSearchQuery(e.target.value);
                     if (onSearch) onSearch(e.target.value);
                   }}
-                  className="w-full h-11 pl-4 pr-10 rounded-xl text-base sm:text-sm glass-input placeholder-slate-400 focus:border-white/40 focus:outline-none"
+                  className="w-full h-10 pl-3 pr-8 rounded-xl text-sm bg-black/40 border border-white/20 text-white placeholder-slate-400 focus:outline-none"
                 />
-                <button type="submit" aria-label="Tìm kiếm" className="absolute right-3 top-3 text-slate-300">
-                  <Search className="w-5 h-5" />
+                <button type="submit" aria-label="Tìm kiếm" className="absolute right-3 top-2.5 text-slate-300">
+                  <Search className="w-4 h-4" />
                 </button>
               </form>
 
-              <div className="flex flex-col space-y-1.5">
-                {navItems.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`px-4 py-3 min-h-[44px] flex items-center rounded-xl text-sm font-medium transition-colors ${activeSection === item.id
-                        ? 'bg-white/10 text-white font-semibold'
-                        : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                      }`}
-                  >
-                    {item.label}
-                  </a>
-                ))}
-              </div>
-
-              <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+              {/* Quick NFC Trigger */}
+              <div className="pt-2 flex items-center justify-between gap-2">
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false);
                     onOpenNfcDemo();
                   }}
-                  className="h-11 min-h-[44px] flex items-center justify-center gap-2 text-sm text-slate-200 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer"
+                  className="flex-1 h-10 flex items-center justify-center gap-2 text-xs font-medium text-slate-200 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer"
                 >
-                  <SmartphoneNfc className="w-4 h-4 text-slate-300" />
-                  <span>Trải nghiệm chạm NFC</span>
+                  <SmartphoneNfc className="w-3.5 h-3.5 text-white" />
+                  <span>Thử Chạm NFC</span>
                 </button>
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false);
                     onOpenAuth();
                   }}
-                  className="h-11 min-h-[44px] flex items-center justify-center text-sm font-medium text-white px-5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 cursor-pointer"
+                  className="h-10 flex items-center justify-center text-xs font-medium text-white px-4 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 cursor-pointer"
                 >
                   Tài khoản
                 </button>

@@ -56,7 +56,7 @@ const DEFAULT_MEMORIES = {
       {
         url: '/assets/product_halo.png',
         type: 'image',
-        caption: 'Nhẫn bạc S925 Halo đá Swarovski',
+        caption: 'Vòng tay bạc S925 Halo men lam ngọc',
       },
     ],
     ownerEmail: 'owner@emoria.vn',

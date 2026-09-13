@@ -1,17 +1,36 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Star, ShoppingBag, SmartphoneNfc, Shield, Check, Plus, Minus } from 'lucide-react';
+import { X, Star, ShoppingBag, SmartphoneNfc, Shield, Check, Plus, Minus, Gift } from 'lucide-react';
 import { products } from '../data/products';
 
 export default function ProductDetailModal({ productId, onClose, onAddToCart, onOpenNfcDemo }) {
+  const product = products.find(p => p.id === productId);
+
+  // Derive default sizes based on product category
+  const defaultSizes = product?.category === 'Nhẫn'
+    ? ['Size 6', 'Size 7', 'Size 8']
+    : product?.category === 'Vòng tay'
+    ? ['15cm (Nhỏ)', '16.5cm (Vừa)', '18cm (Lớn)']
+    : ['Dây 45cm'];
+
   const [quantity, setQuantity] = useState(1);
+  const [selectedSize, setSelectedSize] = useState(defaultSizes[0]);
+  const [isGift, setIsGift] = useState(false);
   const [added, setAdded] = useState(false);
 
-  const product = products.find(p => p.id === productId);
   if (!product) return null;
 
   const handleAdd = () => {
-    if (onAddToCart) onAddToCart(product, quantity);
+    if (onAddToCart) {
+      onAddToCart(
+        {
+          ...product,
+          size: selectedSize,
+          isGift
+        },
+        quantity
+      );
+    }
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   };
@@ -27,12 +46,13 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ type: "spring", damping: 25 }}
-          className="relative w-full max-w-3xl rounded-3xl glass-panel p-6 sm:p-8 border border-white/20 shadow-2xl bg-dark-900/95 overflow-hidden max-h-[90vh] overflow-y-auto"
+          className="relative w-full max-w-3xl rounded-3xl glass-panel p-6 sm:p-8 border border-white/20 shadow-2xl bg-dark-900/95 overflow-hidden max-h-[90vh] overflow-y-auto text-slate-100"
           onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors z-20"
+            className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors z-20 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Đóng"
           >
             <X className="w-5 h-5" />
           </button>
@@ -79,13 +99,52 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                 {product.description}
               </p>
 
+              {/* Size selection */}
+              {defaultSizes.length > 1 && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-xs font-semibold text-slate-300 block">
+                    Chọn kích cỡ:
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {defaultSizes.map((sz) => (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => setSelectedSize(sz)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                          selectedSize === sz
+                            ? 'bg-white text-dark-950 border-white font-bold shadow-sm'
+                            : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
+                        }`}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Gift option toggle */}
+              <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={isGift}
+                  onChange={(e) => setIsGift(e.target.checked)}
+                  className="rounded text-white focus:ring-0"
+                />
+                <div className="flex items-center gap-2 text-xs">
+                  <Gift className="w-4 h-4 text-slate-200" />
+                  <span>Kèm hộp quà sơn mài & thiệp chúc mừng (+35.000 VNĐ)</span>
+                </div>
+              </label>
+
               {/* NFC Micro-Feature Callout */}
               <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <SmartphoneNfc className="w-5 h-5 text-slate-200 shrink-0" />
                   <div>
                     <p className="text-xs font-semibold text-white">Tích hợp chip Memory Space NFC</p>
-                    <p className="text-[11px] text-slate-400">Không cần cài ứng dụng, tương thích iOS & Android</p>
+                    <p className="text-[11px] text-slate-400">Chạm mở ảnh & lời chúc, tương thích iOS & Android</p>
                   </div>
                 </div>
                 <button
@@ -93,7 +152,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                     onClose();
                     if (onOpenNfcDemo) onOpenNfcDemo(product.id);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors"
+                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors min-h-[36px]"
                 >
                   Chạm thử
                 </button>
@@ -105,6 +164,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     className="p-1.5 text-slate-400 hover:text-white"
+                    aria-label="Giảm số lượng"
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
@@ -112,6 +172,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                   <button
                     onClick={() => setQuantity(quantity + 1)}
                     className="p-1.5 text-slate-400 hover:text-white"
+                    aria-label="Tăng số lượng"
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
