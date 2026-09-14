@@ -597,12 +597,30 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                     onClick={() => setFullScreenImage(media)}
                     className="group relative aspect-4/3 rounded-2xl overflow-hidden bg-black/50 border border-white/15 cursor-pointer hover:border-white/50 transition-all"
                   >
-                    <img
-                      src={media.url}
-                      alt={media.caption}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end">
+                    {media.type === 'video' ? (
+                      <div className="w-full h-full relative">
+                        <video
+                          src={media.url}
+                          muted
+                          loop
+                          playsInline
+                          onMouseOver={(e) => e.target.play().catch(() => {})}
+                          onMouseOut={(e) => { e.target.pause(); e.target.currentTime = 0; }}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-black/70 border border-white/20 text-[10px] text-white flex items-center gap-1 backdrop-blur-md">
+                          <Play className="w-2.5 h-2.5 fill-white" />
+                          <span className="font-semibold tracking-wider">VIDEO</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <img
+                        src={media.url}
+                        alt={media.caption}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end pointer-events-none">
                       <p className="text-[11px] text-white line-clamp-2">{media.caption}</p>
                     </div>
                   </div>
@@ -933,15 +951,36 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
       {fullScreenImage && (
         <div
           onClick={() => setFullScreenImage(null)}
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 cursor-pointer"
         >
-          <div className="max-w-4xl max-h-[90vh] flex flex-col items-center">
-            <img
-              src={fullScreenImage.url}
-              alt={fullScreenImage.caption}
-              className="max-h-[80vh] w-auto object-contain rounded-2xl border border-white/20 shadow-2xl"
-            />
-            <p className="text-xs sm:text-sm text-slate-200 mt-4 text-center font-light">
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-4xl w-full max-h-[90vh] flex flex-col items-center relative"
+          >
+            <button
+              onClick={() => setFullScreenImage(null)}
+              className="absolute -top-10 right-0 p-1.5 rounded-full bg-white/10 hover:bg-white text-white hover:text-dark-950 transition-all cursor-pointer"
+              title="Đóng (ESC)"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {fullScreenImage.type === 'video' ? (
+              <video
+                src={fullScreenImage.url}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[75vh] w-auto max-w-full rounded-2xl border border-white/20 shadow-2xl bg-black"
+              />
+            ) : (
+              <img
+                src={fullScreenImage.url}
+                alt={fullScreenImage.caption}
+                className="max-h-[80vh] w-auto object-contain rounded-2xl border border-white/20 shadow-2xl"
+              />
+            )}
+            <p className="text-xs sm:text-sm text-slate-200 mt-4 text-center font-light px-4">
               {fullScreenImage.caption}
             </p>
           </div>

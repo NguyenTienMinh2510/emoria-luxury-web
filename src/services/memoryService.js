@@ -80,6 +80,18 @@ const OFFLINE_SEED_MEMORIES = {
         url: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=1200&q=85',
         type: 'image',
         caption: 'Hoàng hôn tuyệt mỹ trên vịnh biển Santorini',
+      },
+      {
+        id: 'med-2',
+        url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+        type: 'video',
+        caption: 'Khoảnh khắc hoa nở rộ cùng lời ước nguyện dưới ánh chiều',
+      },
+      {
+        id: 'med-3',
+        url: 'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?auto=format&fit=crop&w=1200&q=85',
+        type: 'image',
+        caption: 'Tay trong tay và lời hẹn ước trăm năm',
       }
     ],
     guestbook: [
@@ -89,6 +101,13 @@ const OFFLINE_SEED_MEMORIES = {
         relationship: 'Người tặng',
         message: 'Mãi mãi bên nhau em nhé!',
         created_at: '14/02/2025 18:30'
+      },
+      {
+        id: 'gb-2',
+        author: 'Hồng Ánh',
+        relationship: 'Bạn thân',
+        message: 'Chúc hai bạn mãi hạnh phúc và ngọt ngào như ngày đầu!',
+        created_at: '15/02/2025 09:15'
       }
     ]
   },
@@ -113,9 +132,23 @@ const OFFLINE_SEED_MEMORIES = {
         url: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=85',
         type: 'image',
         caption: 'Nụ cười rạng rỡ của em ngày đầu đông'
+      },
+      {
+        id: 'med-p2',
+        url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+        type: 'video',
+        caption: 'Thước phim kỷ niệm 1000 ngày yêu thương'
       }
     ],
-    guestbook: []
+    guestbook: [
+      {
+        id: 'gb-p1',
+        author: 'Khánh An',
+        relationship: 'Người tặng',
+        message: 'Mỗi nhịp đập nơi cổ tay sẽ luôn có anh kề bên em.',
+        created_at: '20/10/2024 20:00'
+      }
+    ]
   },
   'emoria-horizon': {
     tag_uid: 'emoria-horizon',

@@ -146,3 +146,9 @@
   background-size: contain;
 }
 
+@layer components {
+ .store-input { @apply block w-full mt-2 rounded-xl bg-black/40 border border-white/20 px-3 py-3 text-sm text-white focus:outline-none focus:border-white/60; }
+ .store-label { @apply block text-sm text-slate-300; }
+ .store-button { @apply px-5 py-3 rounded-xl bg-white text-slate-950 font-semibold text-sm hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed; }
+}
+button:focus-visible, a:focus-visible { outline: 2px solid #e2e8f0; outline-offset: 3px; }

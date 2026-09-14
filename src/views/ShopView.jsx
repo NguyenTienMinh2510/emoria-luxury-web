@@ -1,19 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, Filter, ShoppingBag, Eye, SmartphoneNfc, Sparkles, 
   CheckCircle2, Package, Truck, Clock, ShieldCheck, Heart, RefreshCw, X
 } from 'lucide-react';
-import { products } from '../data/products';
-import { getOrderById, getOrdersByPhone } from '../services/orderBackendService';
+import { useStore } from '../components/StoreProvider';
+import { trackOrderSecure } from '../services/orderBackendService';
 
 export default function ShopView({
+  initialSearch = '',
   onSelectProduct,
   onAddToCart,
   onOpenNfcDemo,
   onOpenCart,
 }) {
+  const { products, settings, loading: catalogLoading, error: catalogError } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
+  useEffect(() => { setSearchQuery(initialSearch); }, [initialSearch]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
   const [sortBy, setSortBy] = useState('popular');
@@ -21,6 +24,7 @@ export default function ShopView({
   
   // Order Tracking State
   const [trackingInput, setTrackingInput] = useState('');
+  const [trackingToken, setTrackingToken] = useState('');
   const [trackingResults, setTrackingResults] = useState(null);
   const [trackingError, setTrackingError] = useState('');
   const [isSearchingOrder, setIsSearchingOrder] = useState(false);
@@ -55,41 +59,13 @@ export default function ShopView({
         if (sortBy === 'rating') return (b.rating || 5) - (a.rating || 5);
         return 0; // Default popular
       });
-  }, [selectedCategory, searchQuery, priceFilter, sortBy]);
+  }, [products, selectedCategory, searchQuery, priceFilter, sortBy]);
 
   // Xử lý tra cứu đơn hàng
-  const handleTrackOrder = (e) => {
-    e.preventDefault();
-    setTrackingError('');
-    setTrackingResults(null);
-
-    const query = trackingInput.trim();
-    if (!query) {
-      setTrackingError('Vui lòng nhập mã đơn hàng (EMO-XXXXXX) hoặc số điện thoại.');
-      return;
-    }
-
-    setIsSearchingOrder(true);
-    setTimeout(() => {
-      // Tra cứu theo mã đơn trước
-      if (query.toUpperCase().startsWith('EMO-')) {
-        const order = getOrderById(query);
-        if (order) {
-          setTrackingResults([order]);
-        } else {
-          setTrackingError(`Không tìm thấy đơn hàng nào với mã "${query}".`);
-        }
-      } else {
-        // Tra cứu theo số điện thoại
-        const orders = getOrdersByPhone(query);
-        if (orders && orders.length > 0) {
-          setTrackingResults(orders);
-        } else {
-          setTrackingError(`Không tìm thấy đơn hàng nào thuộc số điện thoại "${query}".`);
-        }
-      }
-      setIsSearchingOrder(false);
-    }, 400);
+  const handleTrackOrder = async (e) => {
+    e.preventDefault();setTrackingError('');setTrackingResults(null);setIsSearchingOrder(true);
+    try { const order=await trackOrderSecure(trackingInput,trackingToken);setTrackingResults([order]); }
+    catch(error){setTrackingError(error.message);}finally{setIsSearchingOrder(false);}
   };
 
   const getStatusBadge = (status) => {
@@ -282,7 +258,7 @@ export default function ShopView({
             </div>
 
             {/* Product Grid */}
-            {filteredProducts.length === 0 ? (
+            {catalogLoading ? <p role="status">Đang tải sản phẩm…</p> : catalogError ? <p role="alert">{catalogError}</p> : filteredProducts.length === 0 ? (
               <div className="py-20 text-center rounded-3xl bg-white/[0.02] border border-white/10">
                 <Package className="w-12 h-12 text-slate-500 mx-auto mb-3 stroke-1" />
                 <h3 className="font-serif text-lg font-semibold text-white mb-1">Không tìm thấy sản phẩm phù hợp</h3>
@@ -418,14 +394,15 @@ export default function ShopView({
                 Tra Cứu Tiến Độ Đơn Hàng
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto mb-6">
-                Nhập mã đơn hàng (ví dụ: <span className="font-mono text-white">EMO-849201</span>) hoặc số điện thoại bạn đã dùng khi đặt hàng tại Emoria.
+                Nhập mã đơn và mã tra cứu riêng nhận được sau khi đặt hàng. Nếu đã đăng nhập đúng tài khoản đặt đơn, có thể bỏ trống mã tra cứu.
               </p>
 
-              <form onSubmit={handleTrackOrder} className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
+              <form onSubmit={handleTrackOrder} className="flex flex-col gap-3 max-w-lg mx-auto">
+                <input aria-label="Mã tra cứu riêng" type="password" placeholder="Mã tra cứu riêng (UUID)" value={trackingToken} onChange={e=>setTrackingToken(e.target.value)} className="store-input" />
                 <div className="relative flex-1">
                   <input
                     type="text"
-                    placeholder="Nhập mã EMO-XXXXXX hoặc Số điện thoại..."
+                    placeholder="Mã đơn EMO-…"
                     value={trackingInput}
                     onChange={(e) => setTrackingInput(e.target.value)}
                     className="w-full px-4 py-3 text-sm rounded-xl bg-black/50 border border-white/20 text-white placeholder-slate-500 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/30 uppercase"

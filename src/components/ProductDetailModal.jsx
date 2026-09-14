@@ -1,26 +1,24 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star, ShoppingBag, SmartphoneNfc, Shield, Check, Plus, Minus, Gift } from 'lucide-react';
-import { products } from '../data/products';
+import { useStore } from '../components/StoreProvider';
 
 export default function ProductDetailModal({ productId, onClose, onAddToCart, onOpenNfcDemo }) {
+  const { products, settings, loading: catalogLoading, error: catalogError } = useStore();
   const product = products.find(p => p.id === productId);
 
-  // Derive default sizes based on product category
-  const defaultSizes = product?.category === 'Nhẫn'
-    ? ['Size 6', 'Size 7', 'Size 8']
-    : product?.category === 'Vòng tay'
-    ? ['15cm (Nhỏ)', '16.5cm (Vừa)', '18cm (Lớn)']
-    : ['Dây 45cm'];
-
+  const defaultSizes = (product?.variants || []).map(v => v.size);
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState(defaultSizes[0]);
   const [isGift, setIsGift] = useState(false);
   const [added, setAdded] = useState(false);
 
+  const selectedVariant = product?.variants?.find(v => v.size === selectedSize);
+  const canBuy = settings?.sales_enabled && product?.active && selectedVariant?.stock >= quantity;
   if (!product) return null;
 
   const handleAdd = () => {
+    if (!canBuy) return;
     if (onAddToCart) {
       onAddToCart(
         {
@@ -110,7 +108,8 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                       <button
                         key={sz}
                         type="button"
-                        onClick={() => setSelectedSize(sz)}
+                        disabled={!product.variants.find(v => v.size === sz)?.stock}
+                        onClick={() => { setSelectedSize(sz); setQuantity(1); }}
                         className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
                           selectedSize === sz
                             ? 'bg-white text-dark-950 border-white font-bold shadow-sm'
@@ -134,7 +133,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                 />
                 <div className="flex items-center gap-2 text-xs">
                   <Gift className="w-4 h-4 text-slate-200" />
-                  <span>Kèm hộp quà sơn mài & thiệp chúc mừng (+35.000 VNĐ)</span>
+                  <span>Hộp quà & thiệp (+{new Intl.NumberFormat('vi-VN').format(settings?.gift_fee || 0)} đ / đơn)</span>
                 </div>
               </label>
 
@@ -170,7 +169,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                   </button>
                   <span className="px-3 text-sm font-semibold text-white">{quantity}</span>
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => setQuantity(Math.min(selectedVariant?.stock || 1, quantity + 1))}
                     className="p-1.5 text-slate-400 hover:text-white"
                     aria-label="Tăng số lượng"
                   >
@@ -180,6 +179,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
 
                 <button
                   onClick={handleAdd}
+                  disabled={!canBuy}
                   className="flex-1 h-11 min-h-[44px] px-6 rounded-2xl bg-white text-dark-950 font-bold text-sm hover:bg-slate-200 transition-all flex items-center justify-center gap-2 shadow-silver-glow active:scale-[0.98] cursor-pointer"
                 >
                   {added ? (
@@ -190,7 +190,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                   ) : (
                     <>
                       <ShoppingBag className="w-4 h-4" />
-                      <span>Thêm Vào Giỏ Hàng</span>
+                      <span>{canBuy ? 'Thêm Vào Giỏ Hàng' : 'Chưa có hàng để bán'}</span>
                     </>
                   )}
                 </button>

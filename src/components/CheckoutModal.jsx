@@ -2,9 +2,12 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShieldCheck, Truck, Banknote, QrCode, CheckCircle2, ArrowRight, Package, Clock, MapPin, Phone, Copy, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useStore } from './StoreProvider';
 import { createOrder } from '../services/orderBackendService';
 
 export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderComplete }) {
+  const { settings } = useStore();
+  const [submitError, setSubmitError] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -18,16 +21,16 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
   const [copiedAccount, setCopiedAccount] = useState(false);
   const checkoutRequest = useRef(null);
   const submitting = useRef(false);
-  const bankName = import.meta.env.VITE_PAYMENT_BANK_NAME || '';
-  const bankAccount = import.meta.env.VITE_PAYMENT_ACCOUNT_NUMBER || '';
-  const bankOwner = import.meta.env.VITE_PAYMENT_ACCOUNT_NAME || '';
-  const paymentConfigured = Boolean(bankName && bankAccount && bankOwner);
+  const bankName = settings?.bank_bin || '';
+  const bankAccount = settings?.bank_account || '';
+  const bankOwner = settings?.bank_owner || '';
+  const paymentConfigured = Boolean(!settings?.sandbox && bankName && bankAccount && bankOwner);
 
   if (!isOpen) return null;
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const giftWrapFee = cartItems.some(i => i.isGift) ? 35000 : 0;
-  const shippingFee = subtotal >= 1000000 || subtotal === 0 ? 0 : 30000;
+  const giftWrapFee = cartItems.some(i => i.isGift) ? (settings?.gift_fee || 0) : 0;
+  const shippingFee = subtotal >= (settings?.free_shipping_from || 0) || subtotal === 0 ? 0 : (settings?.shipping_fee || 0);
   const total = subtotal + giftWrapFee + shippingFee;
   const formattedTotal = new Intl.NumberFormat('vi-VN').format(total) + ' VNĐ';
 
@@ -50,6 +53,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
     submitting.current = true;
 
     setIsSubmitting(true);
+    setSubmitError('');
 
     try {
       const payload = {
@@ -82,7 +86,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
         onOrderComplete(result.order);
       }
     } catch (err) {
-      alert(err.message || 'Đã xảy ra lỗi khi tạo đơn hàng');
+      setSubmitError(err.message || 'Đã xảy ra lỗi khi tạo đơn hàng');
     } finally {
       submitting.current = false;
       setIsSubmitting(false);
@@ -97,7 +101,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
 
   return (
     <AnimatePresence>
-      <div 
+      <div role="dialog" aria-modal="true" aria-label="Đặt hàng"
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/85 backdrop-blur-xl"
         onClick={onClose}
       >
@@ -126,7 +130,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
 
               <div className="space-y-1">
                 <h3 className="font-serif text-2xl sm:text-3xl font-bold text-white">
-                  {completedOrder.paymentMethod === 'vietqr' ? 'Đã Ghi Nhận Đơn Hàng' : 'Đặt Hàng Thành Công!'}
+                  {completedOrder.isTest ? 'Đã lưu đơn thử nghiệm' : completedOrder.paymentMethod === 'vietqr' ? 'Đã Ghi Nhận Đơn Hàng' : 'Đặt Hàng Thành Công!'}
                 </h3>
                 <p className="text-xs text-slate-300">
                   Mã đơn hàng:{' '}
@@ -134,6 +138,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                 </p>
               </div>
 
+              {completedOrder.lookupToken && <div className="rounded-xl p-4 bg-white/5 text-left text-sm space-y-2"><p>Mã tra cứu riêng — hãy lưu lại:</p><code className="break-all select-all">{completedOrder.lookupToken}</code><p className="text-slate-400 text-xs">Dùng cùng mã đơn ở mục Tra cứu. Không chia sẻ mã này công khai.</p></div>}
               {/* Bank transfer info if selected */}
               {completedOrder.paymentMethod === 'vietqr' && (
                 <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-left space-y-3">
@@ -186,7 +191,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-300">Thông tin tài khoản nhận tiền đang được cập nhật. Vui lòng liên hệ EMORIA và cung cấp mã đơn để nhận hướng dẫn; đơn chưa được xác nhận thanh toán.</p>
+                    <p className="text-xs text-slate-300">{settings?.sandbox ? 'Thanh toán thử nghiệm: quản trị viên xác nhận trong mục Đơn hàng. Không chuyển tiền thật.' : 'Chưa có thông tin nhận chuyển khoản. Đơn chưa được xác nhận thanh toán.'}</p>
                   )}
                 </div>
               )}
@@ -217,6 +222,8 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
           ) : (
             /* --- CHECKOUT FORM SCREEN --- */
             <form onSubmit={handlePlaceOrder} className="space-y-6">
+              {submitError && <p role="alert" className="text-red-300 bg-red-500/10 p-3 rounded-xl text-sm">{submitError}</p>}
+              {settings?.sandbox && <p className="text-amber-200 text-sm">Đơn thử nghiệm. Dùng thông tin giả lập; không chuyển tiền.</p>}
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <ShieldCheck className="w-4 h-4 text-slate-300" />
@@ -260,7 +267,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
 
                   <div>
                     <label className="text-xs text-slate-300 font-medium block mb-1">
-                      Email nhận mã đơn (Tùy chọn)
+                      Email liên hệ (Tùy chọn)
                     </label>
                     <input
                       type="email"
@@ -372,7 +379,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
 
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !settings?.sales_enabled || !cartItems.length || (paymentMethod === 'cod' ? !settings?.cod_enabled : !settings?.transfer_enabled)}
                 className="w-full h-12 rounded-2xl bg-gradient-to-r from-slate-200 via-white to-slate-300 text-dark-950 font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-silver-glow cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? (

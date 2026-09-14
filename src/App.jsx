@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
+import { useStore } from './components/StoreProvider';
 import ShopView from './views/ShopView';
 import MemorySpaceView from './views/MemorySpaceView';
 import ArticlesView from './views/ArticlesView';
@@ -35,8 +36,11 @@ import {
 } from './services/authRoleService';
 
 export default function App() {
+  const store = useStore();
   // Navigation View: Mặc định là 'home' (Trang chủ & Câu chuyện thương hiệu)
   const [currentView, setCurrentView] = useState('home');
+  const [recovery, setRecovery] = useState(false);
+  const [routeReady, setRouteReady] = useState(false);
   const [currentTag, setCurrentTag] = useState('emoria-lumen');
   const [selectedArticleSlug, setSelectedArticleSlug] = useState('nghe-thuat-che-tac-da-quy-emoria');
   const [activeSection, setActiveSection] = useState('collection');
@@ -107,8 +111,9 @@ export default function App() {
     refreshSessionRole();
 
     if (isSupabaseConfigured()) {
-      const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-        refreshSessionRole();
+      const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') { setRecovery(true); setIsAuthOpen(true); }
+        setTimeout(refreshSessionRole, 0);
       });
 
       return () => {
@@ -117,40 +122,40 @@ export default function App() {
     }
   }, []);
 
-  // Check URL query parameters on initial load - TRANG CHỦ LÀ MẶC ĐỊNH
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const viewParam = urlParams.get('view');
-    const tagParam = urlParams.get('tag') || urlParams.get('memory');
-    const articleParam = urlParams.get('article');
-
-    if (articleParam) {
-      setSelectedArticleSlug(articleParam);
-      setCurrentView('article-detail');
-    } else if (tagParam) {
-      setCurrentView('memory');
-      setCurrentTag(tagParam);
-    } else if (viewParam === 'memory') {
-      setCurrentView('memory');
-    } else if (viewParam === 'shop') {
-      setCurrentView('shop');
-    } else if (viewParam === 'articles') {
-      setCurrentView('articles');
-    } else {
-      // MẶC ĐỊNH LÀ TRANG CHỦ (HOME)
-      setCurrentView('home');
-    }
-  }, []);
+    const readRoute = () => {
+      const q=new URLSearchParams(window.location.search);
+      if(q.get('article')) { setSelectedArticleSlug(q.get('article'));setCurrentView('article-detail'); }
+      else if(q.get('tag') || q.get('memory')) {setCurrentTag(q.get('tag') || q.get('memory'));setCurrentView('memory');}
+      else setCurrentView(['home','shop','memory','articles'].includes(q.get('view')) ? q.get('view') : 'home');
+      setRouteReady(true);
+    };
+    readRoute();window.addEventListener('popstate',readRoute);
+    return ()=>window.removeEventListener('popstate',readRoute);
+  },[]);
+  useEffect(()=>{
+    if(!routeReady)return;
+    const url=new URL(window.location.href);
+    ['view','tag','memory','article'].forEach(key=>url.searchParams.delete(key));
+    if(currentView==='article-detail')url.searchParams.set('article',selectedArticleSlug);
+    else if(currentView==='memory')url.searchParams.set('tag',currentTag);
+    else if(currentView!=='home')url.searchParams.set('view',currentView);
+    if(url.href!==window.location.href)window.history.pushState({},'',url);
+  },[currentView,currentTag,selectedArticleSlug,routeReady]);
 
   // Cart Handlers
   const handleAddToCart = (product, quantity = 1) => {
+    const real = store.products.find(p => p.id === product.id);
+    const variant = real?.variants?.find(v => v.size === product.size);
+    if (!real?.available || !variant || !Number.isInteger(quantity) || quantity < 1 || quantity > variant.stock) { setSelectedProductId(product.id); return; }
+    product = { ...real, size: product.size, isGift: product.isGift };
     setCartItems((prev) => {
       const sizeKey = product.size || 'Tiêu chuẩn';
       const existing = prev.find(item => item.id === product.id && item.size === sizeKey);
       if (existing) {
         return prev.map(item =>
           item.id === product.id && item.size === sizeKey
-            ? { ...item, quantity: item.quantity + quantity, isGift: product.isGift || item.isGift }
+            ? { ...item, quantity: Math.min(variant.stock, item.quantity + quantity), isGift: product.isGift || item.isGift }
             : item
         );
       }
@@ -170,7 +175,8 @@ export default function App() {
   const handleUpdateCartQuantity = (id, quantity, size) => {
     setCartItems(prev => prev.map(item => {
       if (item.id === id && (!size || item.size === size)) {
-        return { ...item, quantity };
+        const stock = store.products.find(p => p.id === id)?.variants?.find(v => v.size === item.size)?.stock || 0;
+        return { ...item, quantity: Math.max(1, Math.min(stock, Number(quantity) || 1)) };
       }
       return item;
     }));
@@ -182,6 +188,7 @@ export default function App() {
 
   const handleClearCart = () => {
     setCartItems([]);
+    store.refresh();
   };
 
   const handleOpenNfcDemo = (productId = 'emoria-lumen') => {
@@ -248,7 +255,7 @@ export default function App() {
           <form onSubmit={handleVipSubmit} className="space-y-3 max-w-xs mx-auto mb-6">
             <input
               type="text"
-              placeholder="Nhập Mã Mời VIP (Gợi ý: EMORIAVIP)"
+              placeholder="Nhập mã mời VIP"
               value={vipInput}
               onChange={(e) => setVipInput(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs text-center font-mono uppercase focus:outline-none focus:border-white/50"
@@ -272,6 +279,7 @@ export default function App() {
             </button>
           </div>
         </div>
+        <AuthModal isOpen={isAuthOpen} recovery={recovery} onClose={() => setIsAuthOpen(false)} onLoginSuccess={refreshSessionRole} currentUser={currentUser} />
       </div>
     );
   }
@@ -290,9 +298,7 @@ export default function App() {
         currentView={currentView}
         onSelectView={(view) => {
           setCurrentView(view);
-          const newUrl = new URL(window.location.href);
-          newUrl.searchParams.set('view', view);
-          window.history.replaceState({}, '', newUrl.toString());
+
         }}
         onSearch={(query) => {
           setSearchQuery(query);
@@ -302,6 +308,7 @@ export default function App() {
         }}
       />
 
+      {store.settings?.sandbox && <div className="fixed top-0 inset-x-0 z-[60] bg-amber-200 text-black text-center text-xs py-1">CỬA HÀNG THỬ NGHIỆM · Dữ liệu được lưu thật · Không thu tiền / giao hàng</div>}
       {/* Main Dynamic View Area */}
       <main>
         {/* VIEW 1: TRANG CHỦ & CÂU CHUYỆN THƯƠNG HIỆU (MẶC ĐỊNH) */}
@@ -343,6 +350,7 @@ export default function App() {
         {/* VIEW 2: DEDICATED STOREFRONT / SHOPPING INTERFACE */}
         {currentView === 'shop' && (
           <ShopView
+            initialSearch={searchQuery}
             onSelectProduct={(id) => setSelectedProductId(id)}
             onAddToCart={handleAddToCart}
             onOpenNfcDemo={handleOpenNfcDemo}
@@ -392,7 +400,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer />
+      {currentView !== 'memory' && <Footer />}
 
       {/* SECURITY & SESSION STATUS BADGE (Góc dưới bên trái) */}
       <div className="fixed bottom-6 left-6 z-40">
@@ -513,6 +521,7 @@ export default function App() {
 
       {/* Product Detail Modal */}
       <ProductDetailModal
+          key={selectedProductId}
         productId={selectedProductId}
         onClose={() => setSelectedProductId(null)}
         onAddToCart={handleAddToCart}
@@ -539,6 +548,7 @@ export default function App() {
 
       {/* Auth Modal */}
       <AuthModal
+        recovery={recovery}
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onLoginSuccess={(name) => setCurrentUser(name)}

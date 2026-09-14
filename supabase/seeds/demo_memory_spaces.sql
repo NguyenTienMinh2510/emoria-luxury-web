@@ -59,3 +59,49 @@ INSERT INTO public.memory_spaces (
   '2026-10-20T18:00:00.000Z'
 )
 ON CONFLICT (tag_uid) DO NOTHING;
+
+-- ==============================================================================
+-- 2. DỮ LIỆU MEDIA ẢNH & VIDEO KỶ NIỆM (public.memory_media)
+-- ==============================================================================
+INSERT INTO public.memory_media (memory_id, url, type, caption, order_index, is_private)
+SELECT id, 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=1200&q=85', 'image', 'Hoàng hôn tuyệt mỹ trên vịnh biển Santorini', 1, false
+FROM public.memory_spaces WHERE tag_uid = 'emoria-lumen'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.memory_media (memory_id, url, type, caption, order_index, is_private)
+SELECT id, 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', 'video', 'Khoảnh khắc hoa nở rộ cùng lời ước nguyện dưới ánh chiều', 2, false
+FROM public.memory_spaces WHERE tag_uid = 'emoria-lumen'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.memory_media (memory_id, url, type, caption, order_index, is_private)
+SELECT id, 'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?auto=format&fit=crop&w=1200&q=85', 'image', 'Tay trong tay và lời hẹn ước trăm năm', 3, false
+FROM public.memory_spaces WHERE tag_uid = 'emoria-lumen'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.memory_media (memory_id, url, type, caption, order_index, is_private)
+SELECT id, 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=85', 'image', 'Nụ cười rạng rỡ của em ngày đầu đông', 1, false
+FROM public.memory_spaces WHERE tag_uid = 'emoria-pulse'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.memory_media (memory_id, url, type, caption, order_index, is_private)
+SELECT id, 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', 'video', 'Thước phim kỷ niệm 1000 ngày yêu thương', 2, false
+FROM public.memory_spaces WHERE tag_uid = 'emoria-pulse'
+ON CONFLICT DO NOTHING;
+
+-- ==============================================================================
+-- 3. DỮ LIỆU SỔ LƯU NIỆM (public.guestbook_entries)
+-- ==============================================================================
+INSERT INTO public.guestbook_entries (memory_id, author_name, relationship, message)
+SELECT id, 'Minh Hoàng', 'Người tặng', 'Mãi mãi bên nhau em nhé!'
+FROM public.memory_spaces WHERE tag_uid = 'emoria-lumen'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.guestbook_entries (memory_id, author_name, relationship, message)
+SELECT id, 'Hồng Ánh', 'Bạn thân', 'Chúc hai bạn mãi hạnh phúc và ngọt ngào như ngày đầu!'
+FROM public.memory_spaces WHERE tag_uid = 'emoria-lumen'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.guestbook_entries (memory_id, author_name, relationship, message)
+SELECT id, 'Khánh An', 'Người tặng', 'Mỗi nhịp đập nơi cổ tay sẽ luôn có anh kề bên em.'
+FROM public.memory_spaces WHERE tag_uid = 'emoria-pulse'
+ON CONFLICT DO NOTHING;

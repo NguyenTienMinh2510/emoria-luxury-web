@@ -116,7 +116,7 @@ export async function createOrder(orderPayload) {
         status: initialStatus,
         time: new Date().toISOString(),
         description: paymentMethod === 'vietqr'
-          ? 'Đơn hàng được tạo thành công. Đang chờ chuyển khoản VietQR vào tài khoản MB Bank.'
+          ? 'Đơn hàng được tạo thành công. Đang chờ đối soát chuyển khoản.'
           : 'Đơn hàng đã được tiếp nhận (Thanh toán khi nhận hàng COD). EMORIA đang chuẩn bị trang sức.',
       }
     ]
@@ -181,54 +181,11 @@ export async function createOrder(orderPayload) {
  * @param {string} orderId 
  * @param {string} phone 
  */
-export async function trackOrderSecure(orderId, phone) {
-  if (!orderId?.trim()) {
-    throw new Error('Vui lòng cung cấp mã đơn hàng (EMO-XXXXXX).');
-  }
-
-  const cleanId = String(orderId).toUpperCase().trim();
-  const cleanPhone = phone ? String(phone).replace(/\D/g, '') : null;
-
-  // 1. Tìm trên Supabase nếu có kết nối
-  if (isSupabaseConfigured()) {
-    try {
-      let query = supabase.from('orders').select('*, order_items(*)').eq('id', cleanId);
-      if (cleanPhone) {
-        query = query.eq('phone', cleanPhone);
-      }
-      const { data, error } = await query.single();
-      if (!error && data) {
-        return {
-          id: data.id,
-          customerName: data.customer_name,
-          phone: data.phone,
-          address: data.address,
-          status: data.status,
-          totals: { finalTotal: data.final_total },
-          createdAt: data.created_at,
-          items: data.order_items || [],
-        };
-      }
-    } catch (e) {
-      console.warn('[Order Tracking Notice]', e.message);
-    }
-  }
-
-  // 2. Tra cứu trong Local cache của phiên
-  try {
-    if (typeof window !== 'undefined') {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const orders = JSON.parse(raw);
-        const match = orders.find(o => o.id === cleanId && (!cleanPhone || o.phone.includes(cleanPhone)));
-        if (match) return match;
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
-
-  return null;
+export async function trackOrderSecure(orderId, token) {
+  if (!isSupabaseConfigured()) throw new Error('Chưa kết nối máy chủ.');
+  const {data,error}=await supabase.rpc('rpc_track_order',{p_order_id:orderId.trim(),p_token:token?.trim() || null});
+  if(error || !data?.success) throw new Error(error?.message || data?.message || 'Không thể tra cứu đơn.');
+  return data.order;
 }
 
 /**
@@ -236,37 +193,11 @@ export async function trackOrderSecure(orderId, phone) {
  * @param {string} orderId 
  * @param {string} nextStatus 
  */
-export async function updateOrderStatus(orderId, nextStatus) {
-  if (isSupabaseConfigured()) {
-    try {
-      await supabase.from('orders').update({ status: nextStatus, updated_at: new Date().toISOString() }).eq('id', orderId);
-    } catch (e) {
-      console.warn('[Order Update Status Notice]', e.message);
-    }
-  }
-
-  try {
-    if (typeof window !== 'undefined') {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const orders = JSON.parse(raw);
-        const idx = orders.findIndex(o => o.id === orderId);
-        if (idx !== -1) {
-          orders[idx].status = nextStatus;
-          orders[idx].statusTimeline.push({
-            status: nextStatus,
-            time: new Date().toISOString(),
-            description: `Trạng thái cập nhật: ${nextStatus}`,
-          });
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-        }
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
-
-  return { success: true };
+export async function updateOrderStatus(orderId, nextStatus, tracking = null) {
+  if (!isSupabaseConfigured()) throw new Error('Chưa kết nối máy chủ.');
+  const {data,error}=await supabase.rpc('rpc_order_status',{p_order_id:orderId,p_status:nextStatus,p_tracking:tracking});
+  if(error || !data?.success)throw new Error(error?.message || data?.message || 'Không thể cập nhật đơn.');
+  return data;
 }
 
 /**
@@ -316,15 +247,16 @@ export function getOrdersByPhone(phone) {
  * Lấy toàn bộ danh sách đơn hàng phục vụ bảng Quản trị viên (Admin)
  * @returns {Promise<Array>}
  */
-export async function listOrdersForAdmin() {
+export async function listOrdersForAdmin(page = 0, search = '') {
   if (isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase
         .from('orders')
         .select('*, order_items(*)')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).ilike('id', `%${search}%`).range(page * 25, page * 25 + 24);
 
-      if (!error && data && data.length > 0) {
+      if (error) throw new Error(error.message);
+      if (data) {
         return data.map(o => ({
           id: o.id,
           customerName: o.customer_name,
@@ -349,7 +281,7 @@ export async function listOrdersForAdmin() {
         }));
       }
     } catch (e) {
-      console.warn('[Admin list orders Notice]', e.message);
+      throw e;
     }
   }
 

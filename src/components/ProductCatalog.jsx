@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SlidersHorizontal, Star, ShoppingBag, SmartphoneNfc, Eye, Check } from 'lucide-react';
-import { products, categories } from '../data/products';
+import { categories } from '../data/products';
+import { useStore } from './StoreProvider';
 
 export default function ProductCatalog({ 
   onSelectProduct, 
@@ -9,6 +10,7 @@ export default function ProductCatalog({
   onOpenNfcDemo,
   searchQuery = '' 
 }) {
+  const { products, settings, loading: catalogLoading, error: catalogError } = useStore();
   const [activeCategory, setActiveCategory] = useState('Tất cả');
   const [sortBy, setSortBy] = useState('default');
   const [addedIds, setAddedIds] = useState([]);
@@ -28,11 +30,12 @@ export default function ProductCatalog({
       if (sortBy === 'rating') return b.rating - a.rating;
       return 0;
     });
-  }, [activeCategory, searchQuery, sortBy]);
+  }, [products, activeCategory, searchQuery, sortBy]);
 
   const handleAddToCart = (product, e) => {
     e.stopPropagation();
-    if (onAddToCart) onAddToCart(product);
+    if (onSelectProduct) onSelectProduct(product.id);
+    return;
     setAddedIds((prev) => [...prev, product.id]);
     setTimeout(() => {
       setAddedIds((prev) => prev.filter((id) => id !== product.id));
@@ -99,7 +102,7 @@ export default function ProductCatalog({
         </div>
 
         {/* Product Grid - 4 Columns matching Mockup 4 */}
-        {filteredProducts.length === 0 ? (
+        {catalogLoading ? <p role="status">Đang tải sản phẩm…</p> : catalogError ? <p role="alert">{catalogError}</p> : filteredProducts.length === 0 ? (
           <div className="py-20 text-center glass-panel rounded-3xl p-8 border border-white/10">
             <p className="text-slate-300 text-base">Không tìm thấy sản phẩm phù hợp trong danh mục này.</p>
             <button
