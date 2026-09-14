@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, User, ShoppingBag, Menu, X, Sparkles, SmartphoneNfc, Store, Compass } from 'lucide-react';
+import { Search, User, ShoppingBag, Menu, X, Sparkles, SmartphoneNfc, Store, Compass, BookOpen } from 'lucide-react';
 import { navItems } from '../data/navigation';
 
 export default function Navbar({ 
@@ -54,7 +54,7 @@ export default function Navbar({
 
           {/* Logo */}
           <div 
-            onClick={() => handleSwitchView('shop')}
+            onClick={() => handleSwitchView('home')}
             className="flex items-center gap-2.5 group relative cursor-pointer"
           >
             <div className="flex items-center gap-1.5">
@@ -67,8 +67,20 @@ export default function Navbar({
             </div>
           </div>
 
-          {/* Desktop Center: Space Switcher Pill (Shop vs Memory vs Story) */}
+          {/* Desktop Center: Space Switcher Pill (Shop vs Memory vs Articles vs Home) */}
           <div className="hidden md:flex items-center p-1 rounded-full bg-black/60 border border-white/15 backdrop-blur-xl shadow-inner">
+            <button
+              onClick={() => handleSwitchView('home')}
+              className={`relative px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+                currentView === 'home'
+                  ? 'bg-white text-dark-950 shadow-silver-glow'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>Trang Chủ</span>
+            </button>
+
             <button
               onClick={() => handleSwitchView('shop')}
               className={`relative px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
@@ -90,19 +102,19 @@ export default function Navbar({
               }`}
             >
               <SmartphoneNfc className="w-3.5 h-3.5" />
-              <span>Không Gian Kỷ Niệm</span>
+              <span>Kỷ Niệm</span>
             </button>
 
             <button
-              onClick={() => handleSwitchView('home')}
+              onClick={() => handleSwitchView('articles')}
               className={`relative px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
-                currentView === 'home'
+                currentView === 'articles' || currentView === 'article-detail'
                   ? 'bg-white text-dark-950 shadow-silver-glow'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Trang Chủ</span>
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Bài Viết</span>
             </button>
           </div>
 
@@ -186,41 +198,53 @@ export default function Navbar({
               className="md:hidden overflow-hidden mt-3 pt-3 pb-4 border-t border-white/10 bg-dark-950/95 backdrop-blur-2xl rounded-2xl px-4 space-y-3 shadow-2xl"
             >
               {/* Mobile View Switcher Buttons */}
-              <div className="grid grid-cols-3 gap-2 pb-3 border-b border-white/10">
-                <button
-                  onClick={() => handleSwitchView('shop')}
-                  className={`py-2 px-1 rounded-xl text-xs font-bold uppercase flex flex-col items-center gap-1 transition-all ${
-                    currentView === 'shop'
-                      ? 'bg-white text-dark-950'
-                      : 'bg-white/5 text-slate-300 border border-white/10'
-                  }`}
-                >
-                  <Store className="w-4 h-4" />
-                  <span>Cửa Hàng</span>
-                </button>
-
-                <button
-                  onClick={() => handleSwitchView('memory')}
-                  className={`py-2 px-1 rounded-xl text-xs font-bold uppercase flex flex-col items-center gap-1 transition-all ${
-                    currentView === 'memory'
-                      ? 'bg-white text-dark-950'
-                      : 'bg-white/5 text-slate-300 border border-white/10'
-                  }`}
-                >
-                  <SmartphoneNfc className="w-4 h-4" />
-                  <span>Kỷ Niệm</span>
-                </button>
-
+              <div className="grid grid-cols-4 gap-2 pb-3 border-b border-white/10">
                 <button
                   onClick={() => handleSwitchView('home')}
-                  className={`py-2 px-1 rounded-xl text-xs font-bold uppercase flex flex-col items-center gap-1 transition-all ${
+                  className={`py-2 px-1 rounded-xl text-[11px] font-bold uppercase flex flex-col items-center gap-1 transition-all ${
                     currentView === 'home'
                       ? 'bg-white text-dark-950'
                       : 'bg-white/5 text-slate-300 border border-white/10'
                   }`}
                 >
-                  <Compass className="w-4 h-4" />
+                  <Compass className="w-3.5 h-3.5" />
                   <span>Trang Chủ</span>
+                </button>
+
+                <button
+                  onClick={() => handleSwitchView('shop')}
+                  className={`py-2 px-1 rounded-xl text-[11px] font-bold uppercase flex flex-col items-center gap-1 transition-all ${
+                    currentView === 'shop'
+                      ? 'bg-white text-dark-950'
+                      : 'bg-white/5 text-slate-300 border border-white/10'
+                  }`}
+                >
+                  <Store className="w-3.5 h-3.5" />
+                  <span>Cửa Hàng</span>
+                </button>
+
+                <button
+                  onClick={() => handleSwitchView('memory')}
+                  className={`py-2 px-1 rounded-xl text-[11px] font-bold uppercase flex flex-col items-center gap-1 transition-all ${
+                    currentView === 'memory'
+                      ? 'bg-white text-dark-950'
+                      : 'bg-white/5 text-slate-300 border border-white/10'
+                  }`}
+                >
+                  <SmartphoneNfc className="w-3.5 h-3.5" />
+                  <span>Kỷ Niệm</span>
+                </button>
+
+                <button
+                  onClick={() => handleSwitchView('articles')}
+                  className={`py-2 px-1 rounded-xl text-[11px] font-bold uppercase flex flex-col items-center gap-1 transition-all ${
+                    currentView === 'articles' || currentView === 'article-detail'
+                      ? 'bg-white text-dark-950'
+                      : 'bg-white/5 text-slate-300 border border-white/10'
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Bài Viết</span>
                 </button>
               </div>
 

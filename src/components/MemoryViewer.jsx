@@ -24,7 +24,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { getMemoryByTag, updateMemory } from '../services/nfcService';
+import { getMemoryByTag, updateMemory } from '../services/memoryViewerService';
 import { uploadMedia } from '../services/storageService';
 import { supabase } from '../lib/supabaseClient';
 

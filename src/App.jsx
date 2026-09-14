@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import ShopView from './views/ShopView';
 import MemorySpaceView from './views/MemorySpaceView';
+import ArticlesView from './views/ArticlesView';
+import ArticleDetailView from './views/ArticleDetailView';
+import ArticlesSection from './components/ArticlesSection';
 import HeroSection from './components/HeroSection';
 import CollectionShowcase from './components/CollectionShowcase';
 import ProductCatalog from './components/ProductCatalog';
@@ -24,22 +27,29 @@ import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
 import { 
   ROLES, 
   getCurrentAuthSession, 
-  switchRole, 
+  resolveCurrentSessionRole,
   getSystemAvailability, 
-  updateSystemAvailability 
+  fetchSystemStatus,
+  updateSystemAvailability,
+  signOutUser
 } from './services/authRoleService';
 
 export default function App() {
   // Navigation View: Mặc định là 'home' (Trang chủ & Câu chuyện thương hiệu)
   const [currentView, setCurrentView] = useState('home');
   const [currentTag, setCurrentTag] = useState('emoria-lumen');
+  const [selectedArticleSlug, setSelectedArticleSlug] = useState('nghe-thuat-che-tac-da-quy-emoria');
   const [activeSection, setActiveSection] = useState('collection');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Role Session State (RBAC)
-  const [authSession, setAuthSession] = useState(getCurrentAuthSession());
+  // Real RBAC Session State
+  const [authSession, setAuthSession] = useState({
+    role: ROLES.GUEST,
+    user: null,
+    isAdmin: false,
+  });
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
-  const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
+  const [isSessionInfoOpen, setIsSessionInfoOpen] = useState(false);
 
   // System Availability (Maintenance Gate) State
   const [systemConfig, setSystemConfig] = useState(getSystemAvailability());
@@ -65,6 +75,17 @@ export default function App() {
   const [nfcModalState, setNfcModalState] = useState({ isOpen: false, productId: 'emoria-pulse' });
   const [memoryViewerState, setMemoryViewerState] = useState({ isOpen: false, tagUid: 'emoria-lumen', token: null });
 
+  // Refresh Real Session Role
+  const refreshSessionRole = async () => {
+    const resolved = await resolveCurrentSessionRole();
+    setAuthSession(resolved);
+    if (resolved.user) {
+      setCurrentUser(resolved.user.fullName || resolved.user.email);
+    } else {
+      setCurrentUser(null);
+    }
+  };
+
   // Save cart changes to localStorage
   useEffect(() => {
     try {
@@ -76,19 +97,18 @@ export default function App() {
 
   // Listen to Supabase Auth State on mount
   useEffect(() => {
-    if (isSupabaseConfigured()) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          setCurrentUser(session.user.user_metadata?.full_name || session.user.email);
-        }
-      });
+    let active = true;
+    fetchSystemStatus().then(() => { if (active) setSystemConfig(getSystemAvailability()); });
+    return () => { active = false; };
+  }, []);
 
-      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-        if (session?.user) {
-          setCurrentUser(session.user.user_metadata?.full_name || session.user.email);
-        } else {
-          setCurrentUser(null);
-        }
+  // Listen to Supabase Auth State on mount
+  useEffect(() => {
+    refreshSessionRole();
+
+    if (isSupabaseConfigured()) {
+      const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+        refreshSessionRole();
       });
 
       return () => {
@@ -102,57 +122,25 @@ export default function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const viewParam = urlParams.get('view');
     const tagParam = urlParams.get('tag') || urlParams.get('memory');
-    const token = urlParams.get('token');
+    const articleParam = urlParams.get('article');
 
-    if (tagParam) {
+    if (articleParam) {
+      setSelectedArticleSlug(articleParam);
+      setCurrentView('article-detail');
+    } else if (tagParam) {
       setCurrentView('memory');
       setCurrentTag(tagParam);
-      // Khi quét tag hoặc vào link kỷ niệm, vai trò tự động nhận diện là Memory Viewer
-      setAuthSession(switchRole(ROLES.MEMORY_VIEWER, { tagUid: tagParam }));
     } else if (viewParam === 'memory') {
       setCurrentView('memory');
     } else if (viewParam === 'shop') {
       setCurrentView('shop');
+    } else if (viewParam === 'articles') {
+      setCurrentView('articles');
     } else {
       // MẶC ĐỊNH LÀ TRANG CHỦ (HOME)
       setCurrentView('home');
     }
   }, []);
-
-  // Scrollspy when on home view
-  useEffect(() => {
-    if (currentView !== 'home') return;
-
-    const handleScroll = () => {
-      const sections = ['collection', 'products', 'feedback', 'about', 'contact'];
-      const scrollPos = window.scrollY + 200;
-
-      for (const sectionId of sections) {
-        const element = document.getElementById(sectionId);
-        if (element) {
-          const top = element.offsetTop;
-          const height = element.offsetHeight;
-          if (scrollPos >= top && scrollPos < top + height) {
-            setActiveSection(sectionId);
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [currentView]);
-
-  // Switch Role Handler
-  const handleSelectRole = (roleKey) => {
-    const newSession = switchRole(roleKey);
-    setAuthSession(newSession);
-    setIsRoleMenuOpen(false);
-    if (roleKey === ROLES.ADMIN) {
-      setIsAdminPanelOpen(true);
-    }
-  };
 
   // Cart Handlers
   const handleAddToCart = (product, quantity = 1) => {
@@ -227,7 +215,7 @@ export default function App() {
   const handleVipSubmit = (e) => {
     e.preventDefault();
     setVipError('');
-    if (vipInput.trim().toUpperCase() === systemConfig.vipPasscode.toUpperCase()) {
+    if (!isSupabaseConfigured() && systemConfig.vipPasscode && vipInput.trim().toUpperCase() === systemConfig.vipPasscode.toUpperCase()) {
       setVipBypassed(true);
     } else {
       setVipError('Mã VIP Passcode không chính xác.');
@@ -277,10 +265,10 @@ export default function App() {
           <div className="pt-4 border-t border-white/10 text-xs text-slate-400">
             <span>Dành cho Quản trị viên: </span>
             <button
-              onClick={() => handleSelectRole(ROLES.ADMIN)}
+              onClick={() => setIsAuthOpen(true)}
               className="text-white underline underline-offset-4 hover:text-slate-200 cursor-pointer font-semibold"
             >
-              Đăng nhập quyền Admin
+              Đăng nhập tài khoản Quản trị viên
             </button>
           </div>
         </div>
@@ -335,6 +323,17 @@ export default function App() {
               onAddToCart={handleAddToCart}
               onOpenNfcDemo={handleOpenNfcDemo}
             />
+            <ArticlesSection
+              onSelectArticle={(slug) => {
+                setSelectedArticleSlug(slug);
+                setCurrentView('article-detail');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateToArticles={() => {
+                setCurrentView('articles');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
             <FeedbackSection onOpenNfcDemo={handleOpenNfcDemo} />
             <AboutSection onOpenNfcDemo={handleOpenNfcDemo} />
             <ContactSection />
@@ -361,87 +360,115 @@ export default function App() {
             }}
           />
         )}
+
+        {/* VIEW 4: DEDICATED ARTICLES & BLOG MAGAZINE */}
+        {currentView === 'articles' && (
+          <ArticlesView
+            onSelectArticle={(slug) => {
+              setSelectedArticleSlug(slug);
+              setCurrentView('article-detail');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToShop={() => {
+              setCurrentView('shop');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
+        {/* VIEW 5: ARTICLE DETAIL & COMMUNITY COMMENTS */}
+        {currentView === 'article-detail' && (
+          <ArticleDetailView
+            slug={selectedArticleSlug}
+            onBack={() => {
+              setCurrentView('articles');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onSelectProduct={(id) => setSelectedProductId(id)}
+            onOpenAuth={() => setIsAuthOpen(true)}
+            currentUser={currentUser ? { name: currentUser } : null}
+          />
+        )}
       </main>
 
       {/* Footer */}
       <Footer />
 
-      {/* ROLE SWITCHER FLOATING BADGE (Góc dưới bên trái) */}
+      {/* SECURITY & SESSION STATUS BADGE (Góc dưới bên trái) */}
       <div className="fixed bottom-6 left-6 z-40">
         <div className="relative">
           <button
-            onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
-            className="px-3.5 py-2 rounded-full bg-black/80 border border-white/25 backdrop-blur-xl text-slate-200 text-xs font-semibold shadow-2xl hover:border-white/50 flex items-center gap-2 cursor-pointer"
-            title="Nhấn để đổi vai trò thử nghiệm"
+            onClick={() => setIsSessionInfoOpen(!isSessionInfoOpen)}
+            className="px-3.5 py-2 rounded-full bg-black/85 border border-white/20 backdrop-blur-xl text-slate-200 text-xs font-semibold shadow-2xl hover:border-white/40 flex items-center gap-2 cursor-pointer transition-all"
+            title="Nhấn để xem trạng thái phân quyền và bảo mật"
           >
-            <Shield className="w-3.5 h-3.5 text-white" />
-            <span className="hidden sm:inline">Vai trò:</span>
+            <Shield className="w-3.5 h-3.5 text-slate-300" />
+            <span className="hidden sm:inline text-slate-400">Phiên:</span>
             <span className="font-bold text-white uppercase">
-              {authSession.role === ROLES.ADMIN ? 'Admin' : 
-               authSession.role === ROLES.NFC_OWNER ? 'Chủ Sở Hữu NFC' : 
-               authSession.role === ROLES.MEMORY_VIEWER ? 'Người Xem Kỷ Niệm' : 'Khách (Guest)'}
+              {authSession.isAdmin ? 'Quản Trị Viên (Admin)' : 
+               currentUser ? `Khách Đã Đăng Nhập` : 'Khách Vãng Lai (Guest)'}
             </span>
-            {isRoleMenuOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            {isSessionInfoOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
           </button>
 
-          {/* Role Selection Dropdown Menu */}
-          {isRoleMenuOpen && (
-            <div className="absolute bottom-12 left-0 w-64 p-2 rounded-2xl bg-dark-900 border border-white/20 shadow-2xl backdrop-blur-2xl space-y-1 text-xs">
-              <p className="px-3 py-1 text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
-                Chọn Vai Trò Trải Nghiệm:
-              </p>
+          {/* Session Detail Dropdown */}
+          {isSessionInfoOpen && (
+            <div className="absolute bottom-12 left-0 w-72 p-4 rounded-2xl bg-dark-900 border border-white/20 shadow-2xl backdrop-blur-2xl space-y-3 text-xs">
+              <div className="border-b border-white/10 pb-2">
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">
+                  Thông Tin Phiên & Phân Quyền
+                </p>
+                <p className="text-white font-bold mt-1 truncate">
+                  {currentUser ? currentUser : 'Chưa đăng nhập tài khoản'}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Vai trò RBAC: <span className="text-white font-medium">{authSession.isAdmin ? 'Admin' : 'Guest / Viewer'}</span>
+                </p>
+              </div>
 
-              <button
-                onClick={() => handleSelectRole(ROLES.ADMIN)}
-                className={`w-full text-left px-3 py-2 rounded-xl flex items-center gap-2 transition-colors cursor-pointer ${
-                  authSession.role === ROLES.ADMIN ? 'bg-white text-dark-950 font-bold' : 'hover:bg-white/10 text-slate-200'
-                }`}
-              >
-                <Shield className="w-3.5 h-3.5 text-amber-400" />
-                <div>
-                  <p className="font-bold">1. Quản Trị Viên (Admin)</p>
-                  <p className="text-[10px] opacity-70">Quản lý đơn, bảo trì & chip NFC</p>
-                </div>
-              </button>
+              {/* Action Buttons */}
+              <div className="space-y-1.5 pt-1">
+                {authSession.isAdmin ? (
+                  <button
+                    onClick={() => {
+                      setIsAdminPanelOpen(true);
+                      setIsSessionInfoOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl bg-white text-dark-950 font-bold flex items-center gap-2 transition-all cursor-pointer hover:bg-slate-200"
+                  >
+                    <Shield className="w-3.5 h-3.5 text-dark-950" />
+                    <span>Mở Bảng Quản Trị Hệ Thống</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setIsAuthOpen(true);
+                      setIsSessionInfoOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium flex items-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Key className="w-3.5 h-3.5 text-slate-300" />
+                    <span>{currentUser ? 'Đăng nhập tài khoản khác' : 'Đăng nhập Quản Trị Viên'}</span>
+                  </button>
+                )}
 
-              <button
-                onClick={() => handleSelectRole(ROLES.NFC_OWNER)}
-                className={`w-full text-left px-3 py-2 rounded-xl flex items-center gap-2 transition-colors cursor-pointer ${
-                  authSession.role === ROLES.NFC_OWNER ? 'bg-white text-dark-950 font-bold' : 'hover:bg-white/10 text-slate-200'
-                }`}
-              >
-                <Key className="w-3.5 h-3.5 text-emerald-400" />
-                <div>
-                  <p className="font-bold">2. Chủ Sở Hữu NFC</p>
-                  <p className="text-[10px] opacity-70">Toàn quyền sửa thư tay & mã PIN</p>
-                </div>
-              </button>
+                {currentUser && (
+                  <button
+                    onClick={async () => {
+                      await signOutUser();
+                      await refreshSessionRole();
+                      setIsSessionInfoOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-red-500/20 text-red-400 font-medium transition-all cursor-pointer text-[11px]"
+                  >
+                    Đăng xuất khỏi thiết bị
+                  </button>
+                )}
+              </div>
 
-              <button
-                onClick={() => handleSelectRole(ROLES.MEMORY_VIEWER)}
-                className={`w-full text-left px-3 py-2 rounded-xl flex items-center gap-2 transition-colors cursor-pointer ${
-                  authSession.role === ROLES.MEMORY_VIEWER ? 'bg-white text-dark-950 font-bold' : 'hover:bg-white/10 text-slate-200'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                <div>
-                  <p className="font-bold">3. Người Xem Kỷ Niệm</p>
-                  <p className="text-[10px] opacity-70">Chạm NFC, nghe nhạc & gửi lời chúc</p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleSelectRole(ROLES.GUEST)}
-                className={`w-full text-left px-3 py-2 rounded-xl flex items-center gap-2 transition-colors cursor-pointer ${
-                  authSession.role === ROLES.GUEST ? 'bg-white text-dark-950 font-bold' : 'hover:bg-white/10 text-slate-200'
-                }`}
-              >
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                <div>
-                  <p className="font-bold">4. Khách Vãng Lai (Guest)</p>
-                  <p className="text-[10px] opacity-70">Xem trang chủ & mua sắm</p>
-                </div>
-              </button>
+              <div className="pt-2 border-t border-white/10 text-[10px] text-slate-500 leading-tight">
+                Chế độ bảo mật RBAC kích hoạt. Vai trò chỉ được cấp từ máy chủ Supabase Auth, không thể tự sửa phía client.
+              </div>
             </div>
           )}
         </div>

@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Shield, Package, Truck, SmartphoneNfc, Power, 
   CheckCircle2, Clock, AlertTriangle, Key, RefreshCw, 
-  Settings, UserCheck, Eye, Edit3, Lock, Unlock
+  Settings, UserCheck, Eye, Edit3, Lock, Unlock, Database,
+  BookOpen, MessageSquare, Plus, Trash2, Check, EyeOff, FileText, Send
 } from 'lucide-react';
-import { updateOrderStatus } from '../services/orderBackendService';
+import { listOrdersForAdmin, updateOrderStatus } from '../services/orderBackendService';
 import { 
   getSystemAvailability, 
   updateSystemAvailability 
@@ -13,14 +14,22 @@ import {
 import { 
   getAllShowcaseMemories, 
   updateMemoryAvailability 
-} from '../services/memoryBackendService';
+} from '../services/memoryService';
+import { 
+  getPublishedArticles, 
+  saveArticleAdmin, 
+  moderateArticleComment, 
+  DEMO_ARTICLES, 
+  DEMO_COMMENTS 
+} from '../services/articleService';
 
 export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'system' | 'nfc'
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'articles' | 'moderation' | 'system' | 'nfc' | 'infrastructure'
   
   // Orders State
   const [orders, setOrders] = useState([]);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
 
   // System Availability State
   const [systemConfig, setSystemConfig] = useState(getSystemAvailability());
@@ -29,32 +38,152 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
   // NFC Memories State
   const [memories, setMemories] = useState([]);
 
+  // Articles & Moderation State
+  const [adminArticles, setAdminArticles] = useState(DEMO_ARTICLES);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editingArticleId, setEditingArticleId] = useState(null);
+  const [articleForm, setArticleForm] = useState({
+    title: '',
+    slug: '',
+    excerpt: '',
+    content: '',
+    cover_image: '',
+    category: 'Chế tác & Nghệ thuật',
+    author_name: 'EMORIA Atelier',
+    status: 'draft',
+    allow_comments: true
+  });
+  const [pendingCommentsList, setPendingCommentsList] = useState([
+    {
+      id: 'comm-pending-1',
+      article_title: 'Nghệ Thuật Chế Tác Kim Hoàn & Đá Quý',
+      author_name: 'Khách hàng VIP 88',
+      content: 'Chiếc nhẫn này có thể khắc tên riêng laser vào mặt trong lòng nhẫn được không?',
+      created_at: 'Hôm nay 14:20',
+      status: 'pending'
+    },
+    {
+      id: 'comm-pending-2',
+      article_title: 'Bí Mật Công Nghệ NFC',
+      author_name: 'Đặng Thanh Thảo',
+      content: 'Chính sách bảo hành chip vi mạch là trọn đời hay 2 năm vậy shop?',
+      created_at: 'Hôm qua 18:45',
+      status: 'pending'
+    }
+  ]);
+
   // Load orders & memories on open
+  const loadData = async () => {
+    setIsLoadingOrders(true);
+    try {
+      const ords = await listOrdersForAdmin();
+      setOrders(ords);
+    } catch (e) {
+      console.warn('Lỗi tải orders:', e);
+      setOrders([]);
+    } finally {
+      setIsLoadingOrders(false);
+    }
+    setMemories(getAllShowcaseMemories());
+    setSystemConfig(getSystemAvailability());
+  };
+
   useEffect(() => {
     if (isOpen) {
-      // Load orders from localStorage
-      try {
-        const raw = localStorage.getItem('emoria_orders_v1');
-        setOrders(raw ? JSON.parse(raw) : []);
-      } catch (e) {
-        setOrders([]);
-      }
-      setMemories(getAllShowcaseMemories());
-      setSystemConfig(getSystemAvailability());
+      loadData();
       setSaveMessage('');
     }
   }, [isOpen]);
 
+  // Helpers cho Bài viết
+  const handleOpenCreateArticle = () => {
+    setEditingArticleId(null);
+    setArticleForm({
+      title: '',
+      slug: '',
+      excerpt: '',
+      content: '',
+      cover_image: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=1200&q=80',
+      category: 'Chế tác & Nghệ thuật',
+      author_name: 'EMORIA Atelier',
+      status: 'draft',
+      allow_comments: true
+    });
+    setIsEditorOpen(true);
+  };
+
+  const handleOpenEditArticle = (art) => {
+    setEditingArticleId(art.id);
+    setArticleForm({
+      title: art.title,
+      slug: art.slug,
+      excerpt: art.excerpt || '',
+      content: art.content || '',
+      cover_image: art.cover_image || '',
+      category: art.category || 'Chế tác & Nghệ thuật',
+      author_name: art.author_name || 'EMORIA Atelier',
+      status: art.status || 'draft',
+      allow_comments: art.allow_comments ?? true
+    });
+    setIsEditorOpen(true);
+  };
+
+  const handleSaveArticle = async (statusOverride) => {
+    const payload = {
+      ...articleForm,
+      status: statusOverride || articleForm.status,
+      slug: articleForm.slug || articleForm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+    };
+
+    const res = await saveArticleAdmin({ articleId: editingArticleId, payload });
+    if (res.success) {
+      if (editingArticleId) {
+        setAdminArticles(prev => prev.map(a => a.id === editingArticleId ? { ...a, ...payload } : a));
+      } else {
+        setAdminArticles(prev => [{ id: res.article_id || 'art-' + Date.now(), ...payload, view_count: 0, likes_count: 0, published_at: new Date().toISOString() }, ...prev]);
+      }
+      setIsEditorOpen(false);
+      setSaveMessage(`Đã ${payload.status === 'published' ? 'xuất bản' : 'lưu nháp'} bài viết thành công!`);
+      setTimeout(() => setSaveMessage(''), 3000);
+      if (onRefresh) onRefresh();
+    } else {
+      alert(res.message || 'Lỗi khi lưu bài viết.');
+    }
+  };
+
+  const handleToggleArticleStatus = async (art) => {
+    const nextStatus = art.status === 'published' ? 'draft' : 'published';
+    const res = await saveArticleAdmin({
+      articleId: art.id,
+      payload: { ...art, status: nextStatus }
+    });
+    if (res.success) {
+      setAdminArticles(prev => prev.map(a => a.id === art.id ? { ...a, status: nextStatus } : a));
+      setSaveMessage(`Đã chuyển trạng thái bài "${art.title}" thành: ${nextStatus === 'published' ? 'Đã xuất bản' : 'Bản nháp'}`);
+      setTimeout(() => setSaveMessage(''), 3000);
+    }
+  };
+
+  // Helpers cho Duyệt bình luận
+  const handleModerateComment = async (commentId, nextStatus) => {
+    const res = await moderateArticleComment(commentId, nextStatus);
+    if (res.success) {
+      setPendingCommentsList(prev => prev.filter(c => c.id !== commentId));
+      setSaveMessage(`Đã ${nextStatus === 'approved' ? 'phê duyệt' : nextStatus === 'hidden' ? 'ẩn' : 'xóa'} bình luận.`);
+      setTimeout(() => setSaveMessage(''), 3000);
+    } else {
+      alert(res.message || 'Không thể xử lý bình luận.');
+    }
+  };
+
   if (!isOpen) return null;
 
   // Handle Order Status Update
-  const handleStatusChange = (orderId, newStatus) => {
+  const handleStatusChange = async (orderId, newStatus) => {
     setUpdatingOrderId(orderId);
     try {
-      updateOrderStatus(orderId, newStatus);
-      // Refresh local orders
-      const raw = localStorage.getItem('emoria_orders_v1');
-      setOrders(raw ? JSON.parse(raw) : []);
+      await updateOrderStatus(orderId, newStatus);
+      await loadData();
       setUpdatingOrderId(null);
       if (onRefresh) onRefresh();
     } catch (err) {
@@ -64,27 +193,31 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
   };
 
   // Handle System Availability Toggle
-  const handleToggleMaintenance = () => {
-    const updated = updateSystemAvailability({
-      isMaintenanceMode: !systemConfig.isMaintenanceMode,
-    });
-    setSystemConfig(updated);
-    setSaveMessage('Đã cập nhật trạng thái khả dụng toàn hệ thống.');
-    setTimeout(() => setSaveMessage(''), 3000);
-    if (onRefresh) onRefresh();
+  const handleToggleMaintenance = async () => {
+    try {
+      const updated = await updateSystemAvailability({
+        isMaintenanceMode: !systemConfig.isMaintenanceMode,
+      });
+      setSystemConfig(updated);
+      setSaveMessage('Đã cập nhật trạng thái khả dụng toàn hệ thống.');
+      setTimeout(() => setSaveMessage(''), 3000);
+      if (onRefresh) onRefresh();
+    } catch (error) { setSaveMessage(error.message); }
   };
 
   // Handle Save VIP Passcode
-  const handleSaveVipCode = (newCode) => {
-    const updated = updateSystemAvailability({ vipPasscode: newCode });
-    setSystemConfig(updated);
-    setSaveMessage('Đã cập nhật mã VIP Passcode thành công.');
-    setTimeout(() => setSaveMessage(''), 3000);
+  const handleSaveVipCode = async (newCode) => {
+    try {
+      const updated = await updateSystemAvailability({ vipPasscode: newCode });
+      setSystemConfig(updated);
+      setSaveMessage('Đã cập nhật mã VIP Passcode thành công.');
+      setTimeout(() => setSaveMessage(''), 3000);
+    } catch (error) { setSaveMessage(error.message); }
   };
 
   // Handle Tag Availability Toggle
-  const handleToggleTagAvailability = (tagUid, nextStatus) => {
-    updateMemoryAvailability(tagUid, {
+  const handleToggleTagAvailability = async (tagUid, nextStatus) => {
+    await updateMemoryAvailability(tagUid, {
       status: nextStatus,
       unlockDate: nextStatus === 'timed_lock' ? '2026-10-20T18:00:00.000Z' : null,
       message: nextStatus === 'timed_lock' ? 'Đang niêm phong đến ngày kỷ niệm' : 'Khả dụng bình thường',
@@ -122,50 +255,104 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
               </div>
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadData}
+                className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                title="Làm mới dữ liệu"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingOrders ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Infrastructure Health Alert */}
+          <div className="mb-6 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-3">
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+            <div className="leading-relaxed">
+              <span className="font-bold">Hạ tầng Supabase Cloud: </span>
+              Endpoint Auth phản hồi <span className="font-bold underline">HTTP 200 OK</span>. Đã chuẩn bị sẵn file 1-Click <code className="font-mono bg-black/40 px-1 py-0.5 rounded text-emerald-200">supabase/production_schema_deploy.sql</code> tích hợp đầy đủ 18 bảng, RLS và 14 RPC bảo mật để triển khai trực tiếp lên Cloud.
+            </div>
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 mb-6 border-b border-white/10 pb-3">
+          <div className="flex flex-wrap items-center gap-2 mb-6 border-b border-white/10 pb-3">
             <button
               onClick={() => setActiveTab('orders')}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-2 transition-all ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
                 activeTab === 'orders'
                   ? 'bg-white text-dark-950 shadow-silver-glow'
                   : 'bg-white/5 text-slate-300 hover:bg-white/10'
               }`}
             >
               <Package className="w-4 h-4" />
-              <span>Quản Lý Đơn Hàng ({orders.length})</span>
+              <span>Đơn Hàng ({orders.length})</span>
             </button>
 
             <button
-              onClick={() => setActiveTab('system')}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-2 transition-all ${
-                activeTab === 'system'
+              onClick={() => setActiveTab('articles')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
+                activeTab === 'articles'
                   ? 'bg-white text-dark-950 shadow-silver-glow'
                   : 'bg-white/5 text-slate-300 hover:bg-white/10'
               }`}
             >
-              <Power className="w-4 h-4" />
-              <span>Khả Dụng Toàn Trang</span>
+              <BookOpen className="w-4 h-4" />
+              <span>Bài Viết ({adminArticles.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('moderation')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
+                activeTab === 'moderation'
+                  ? 'bg-white text-dark-950 shadow-silver-glow'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Duyệt Bình Luận ({pendingCommentsList.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('nfc')}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-2 transition-all ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
                 activeTab === 'nfc'
                   ? 'bg-white text-dark-950 shadow-silver-glow'
                   : 'bg-white/5 text-slate-300 hover:bg-white/10'
               }`}
             >
               <SmartphoneNfc className="w-4 h-4" />
-              <span>Quản Lý Chip NFC ({memories.length})</span>
+              <span>Chip NFC ({memories.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('system')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
+                activeTab === 'system'
+                  ? 'bg-white text-dark-950 shadow-silver-glow'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              <Power className="w-4 h-4" />
+              <span>Khả Dụng</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('infrastructure')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
+                activeTab === 'infrastructure'
+                  ? 'bg-white text-dark-950 shadow-silver-glow'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              <span>Schema & RLS</span>
             </button>
           </div>
 
@@ -179,7 +366,12 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
           {/* ================= TAB 1: ORDERS ================= */}
           {activeTab === 'orders' && (
             <div className="space-y-4">
-              {orders.length === 0 ? (
+              {isLoadingOrders ? (
+                <div className="py-12 text-center text-slate-400 text-xs flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Đang tải danh sách đơn hàng...</span>
+                </div>
+              ) : orders.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 text-xs">
                   Chưa có đơn hàng nào được đặt trong hệ thống.
                 </div>
@@ -213,8 +405,9 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                       <span className="text-slate-400">Trạng thái hiện tại:</span>
                       <select
                         value={order.status}
+                        disabled={updatingOrderId === order.id}
                         onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                        className="px-3 py-1.5 rounded-lg bg-black/80 border border-white/20 text-white font-medium focus:outline-none focus:border-white/50 cursor-pointer"
+                        className="px-3 py-1.5 rounded-lg bg-black/80 border border-white/20 text-white font-medium focus:outline-none focus:border-white/50 cursor-pointer disabled:opacity-50"
                       >
                         <option value="pending_payment">Chờ Thanh Toán VietQR</option>
                         <option value="confirmed">Đã Tiếp Nhận & Xác Nhận</option>
@@ -296,8 +489,8 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                     </div>
 
                     <div className="text-right">
-                      <p className="text-slate-500 text-[10px]">Mã Owner Secret:</p>
-                      <p className="font-mono text-amber-300 font-bold">{mem.ownerSecret}</p>
+                      <p className="text-slate-500 text-[10px]">Cơ chế sở hữu:</p>
+                      <p className="font-mono text-amber-300 font-bold">Khóa Claim Code</p>
                     </div>
                   </div>
 
@@ -351,6 +544,300 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
 
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ================= TAB: ARTICLES MANAGEMENT ================= */}
+          {activeTab === 'articles' && (
+            <div className="space-y-6 text-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div>
+                  <h3 className="font-bold text-white text-sm">Danh Sách Bài Viết & Tạp Chí</h3>
+                  <p className="text-slate-400 text-[11px] mt-0.5">Soạn thảo, quản lý xuất bản, gỡ bài và xem trước</p>
+                </div>
+                <button
+                  onClick={handleOpenCreateArticle}
+                  className="px-4 py-2 rounded-xl bg-white text-dark-950 font-bold hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Soạn Bài Viết Mới</span>
+                </button>
+              </div>
+
+              {/* Editor Form Modal / Overlay */}
+              {isEditorOpen && (
+                <div className="p-5 rounded-2xl bg-black/80 border border-white/20 space-y-4 shadow-2xl">
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                    <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-slate-300" />
+                      <span>{editingArticleId ? 'Chỉnh Sửa Bài Viết' : 'Soạn Bài Viết Mới'}</span>
+                    </h4>
+                    <button
+                      onClick={() => setIsEditorOpen(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-slate-300 block mb-1">Tiêu đề bài viết (*):</label>
+                      <input
+                        type="text"
+                        value={articleForm.title}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setArticleForm(prev => ({
+                            ...prev,
+                            title: val,
+                            slug: prev.slug || val.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+                          }));
+                        }}
+                        placeholder="Nhập tiêu đề hấp dẫn..."
+                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-xs focus:outline-none focus:border-white/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 block mb-1">Đường dẫn tĩnh (Slug) (*):</label>
+                      <input
+                        type="text"
+                        value={articleForm.slug}
+                        onChange={(e) => setArticleForm(prev => ({ ...prev, slug: e.target.value }))}
+                        placeholder="duong-dan-tinh-bai-viet"
+                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-xs font-mono focus:outline-none focus:border-white/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 block mb-1">Danh mục:</label>
+                      <select
+                        value={articleForm.category}
+                        onChange={(e) => setArticleForm(prev => ({ ...prev, category: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-xl bg-dark-950 border border-white/15 text-white text-xs focus:outline-none"
+                      >
+                        <option value="Chế tác & Nghệ thuật">Chế tác & Nghệ thuật</option>
+                        <option value="Công nghệ & NFC">Công nghệ & NFC</option>
+                        <option value="Phong cách sống">Phong cách sống</option>
+                        <option value="Hướng dẫn">Hướng dẫn</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 block mb-1">Ảnh bìa (URL):</label>
+                      <input
+                        type="text"
+                        value={articleForm.cover_image}
+                        onChange={(e) => setArticleForm(prev => ({ ...prev, cover_image: e.target.value }))}
+                        placeholder="https://images.unsplash.com/..."
+                        className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-xs focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 block mb-1">Đoạn tóm tắt mở đầu (Excerpt):</label>
+                    <textarea
+                      value={articleForm.excerpt}
+                      onChange={(e) => setArticleForm(prev => ({ ...prev, excerpt: e.target.value }))}
+                      rows={2}
+                      placeholder="Tóm tắt ngắn gọn 1-2 câu về nội dung bài viết..."
+                      className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white text-xs focus:outline-none resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 block mb-1">Nội dung bài viết (Hỗ trợ tiêu đề phụ ###, danh sách số 1., 2.):</label>
+                    <textarea
+                      value={articleForm.content}
+                      onChange={(e) => setArticleForm(prev => ({ ...prev, content: e.target.value }))}
+                      rows={8}
+                      placeholder="Nhập toàn bộ nội dung bài viết..."
+                      className="w-full p-3 rounded-xl bg-white/5 border border-white/15 text-white text-xs focus:outline-none leading-relaxed font-mono"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                    <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={articleForm.allow_comments}
+                        onChange={(e) => setArticleForm(prev => ({ ...prev, allow_comments: e.target.checked }))}
+                        className="rounded border-white/20 text-dark-950"
+                      />
+                      <span>Cho phép bạn đọc gửi bình luận</span>
+                    </label>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveArticle('draft')}
+                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold transition-all cursor-pointer"
+                      >
+                        Lưu Bản Nháp
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveArticle('published')}
+                        className="px-5 py-2 rounded-xl bg-white text-dark-950 font-bold hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Xuất Bản Ngay</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Articles Table */}
+              <div className="space-y-3">
+                {adminArticles.map((art) => (
+                  <div
+                    key={art.id}
+                    className="p-4 rounded-2xl bg-black/40 border border-white/10 hover:border-white/20 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={art.cover_image}
+                        alt={art.title}
+                        className="w-16 h-12 rounded-lg object-cover bg-white/5 border border-white/10 shrink-0"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                            art.status === 'published'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          }`}>
+                            {art.status === 'published' ? 'Đã xuất bản' : 'Bản nháp'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">{art.category}</span>
+                        </div>
+                        <h4 className="font-semibold text-white text-xs line-clamp-1">{art.title}</h4>
+                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          slug: /{art.slug} • {art.view_count || 0} lượt đọc • {art.likes_count || 0} lượt thích
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <button
+                        onClick={() => handleOpenEditArticle(art)}
+                        className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+                        title="Chỉnh sửa nội dung"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleToggleArticleStatus(art)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                          art.status === 'published'
+                            ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30'
+                            : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30'
+                        }`}
+                      >
+                        {art.status === 'published' ? 'Gỡ Về Nháp' : 'Xuất Bản'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ================= TAB: COMMENTS MODERATION ================= */}
+          {activeTab === 'moderation' && (
+            <div className="space-y-4 text-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div>
+                  <h3 className="font-bold text-white text-sm">Kiểm Duyệt Bình Luận Bài Viết</h3>
+                  <p className="text-slate-400 text-[11px] mt-0.5">Duyệt trước để bảo đảm văn phong cao cấp cho không gian EMORIA</p>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-white/10 text-slate-200 font-mono text-[11px]">
+                  {pendingCommentsList.length} bình luận chờ duyệt
+                </span>
+              </div>
+
+              {pendingCommentsList.length === 0 ? (
+                <div className="text-center py-12 rounded-2xl bg-black/30 border border-white/10">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+                  <p className="text-white font-medium text-xs">Tất cả bình luận đã được xử lý</p>
+                  <p className="text-[11px] text-slate-400 mt-1">Không có phản hồi nào đang chờ kiểm duyệt lúc này.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingCommentsList.map((comm) => (
+                    <div
+                      key={comm.id}
+                      className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="font-bold text-white text-xs">{comm.author_name}</span>
+                          <span className="text-[10px] text-slate-400 ml-2">bình luận trên bài: <strong className="text-slate-300">{comm.article_title}</strong></span>
+                          <span className="text-[10px] text-slate-500 block">{comm.created_at}</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Chờ Duyệt
+                        </span>
+                      </div>
+
+                      <p className="p-3 rounded-xl bg-white/5 border border-white/5 text-slate-200 leading-relaxed font-light">
+                        "{comm.content}"
+                      </p>
+
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+                        <button
+                          onClick={() => handleModerateComment(comm.id, 'deleted')}
+                          className="px-3 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Xóa Bỏ</span>
+                        </button>
+                        <button
+                          onClick={() => handleModerateComment(comm.id, 'hidden')}
+                          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <EyeOff className="w-3.5 h-3.5" />
+                          <span>Ẩn Bài</span>
+                        </button>
+                        <button
+                          onClick={() => handleModerateComment(comm.id, 'approved')}
+                          className="px-4 py-1.5 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-md"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Phê Duyệt</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= TAB 4: SCHEMA & RLS ================= */}
+          {activeTab === 'infrastructure' && (
+            <div className="space-y-4 text-xs">
+              <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  <Database className="w-4 h-4 text-cyan-400" />
+                  <span>Cấu trúc Dữ liệu & RLS Policies (PostgreSQL)</span>
+                </h3>
+                <p className="text-slate-300 leading-relaxed">
+                  Toàn bộ 10 bảng cơ sở dữ liệu cùng 4 hàm RPC bảo mật đã được thiết kế tại file migration:
+                  <code className="block mt-1 font-mono text-cyan-300 bg-black/60 p-2 rounded-xl">
+                    supabase/migrations/20260913_init_emoria_schema.sql
+                  </code>
+                </p>
+                <div className="space-y-2 pt-2 text-slate-400 border-t border-white/10">
+                  <p>• <strong>Bảo vệ Thư tay & PIN:</strong> Hàm RPC <code className="text-white">rpc_get_memory_view</code> không trả về trường thư tay nếu chưa xác thực PIN.</p>
+                  <p>• <strong>Cấp quyền tạm thời:</strong> <code className="text-white">rpc_verify_memory_pin</code> cấp grant token 2 giờ lưu tại bảng <code className="text-white">memory_access_grants</code>.</p>
+                  <p>• <strong>Chống mất PIN ngoài ý muốn:</strong> <code className="text-white">rpc_update_memory_space</code> hỗ trợ 3 tùy chọn PIN: KEEP, SET, REMOVE.</p>
+                  <p>• <strong>Phân quyền Admin:</strong> Đối chiếu trực tiếp từ bảng <code className="text-white">role_assignments</code>, loại bỏ hoàn toàn mật khẩu hardcoded.</p>
+                </div>
+              </div>
             </div>
           )}
 

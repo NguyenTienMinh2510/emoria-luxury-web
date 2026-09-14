@@ -1,3 +1,22 @@
 node_modules
 dist
 .env
+.env.*.local
+.env.local
+.local/
+local-stack/
+
+# AI Guides, Prompts, and Handoff Documentation
+01-EMORIA-GUIDE-AGENT-HOAN-THIEN.md
+02-EMORIA-THONG-TIN-CHU-DU-AN.md
+BACKEND_CONTINUATION_20260914.md
+BACKEND_HANDOFF_TO_CODEX.md
+BACKEND_VERIFICATION_20260914.md
+EMORIA-CAU-HINH-TIEP-THEO.md
+EMORIA-IMPLEMENTATION-STATUS.md
+EMORIA-PROMPT-CHUC-NANG-THUC-TE.md
+EMORIA-UX-UI-SPEC.md
+README-EMORIA.md
+TONG_QUAN_DU_AN_EMORIA.md
+scratch_*.txt
+*.prompt.txt

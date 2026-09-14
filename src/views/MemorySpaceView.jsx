@@ -4,37 +4,36 @@ import {
   SmartphoneNfc, Volume2, VolumeX, Play, Pause, Heart, Mail, 
   Share2, Lock, Unlock, Sparkles, Calendar, User, Eye, Send, 
   ChevronLeft, ChevronRight, CheckCircle2, ShieldCheck, Image as ImageIcon,
-  Edit3, Key, Clock, AlertTriangle, Save, X
+  Edit3, Key, Clock, AlertTriangle, Save, X, Loader2
 } from 'lucide-react';
 import { 
-  getAllShowcaseMemories, 
-  getMemoryByTag, 
-  verifyAccessPin, 
-  addGuestbookMessage, 
-  logNfcTap, 
-  getTapStats,
-  updateMemoryContent,
-  updateMemoryAvailability 
-} from '../services/memoryBackendService';
-import { 
-  getCurrentAuthSession, 
-  canEditMemoryTag, 
-  verifyAndLoginOwner, 
-  ROLES 
-} from '../services/authRoleService';
+  fetchMemoryView, 
+  verifyMemoryPin, 
+  claimNfcOwnership, 
+  updateMemorySpace, 
+  submitGuestbookEntry, 
+  getShowcaseMemoriesList 
+} from '../services/memoryService';
 
-export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToShop }) {
+export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToShop, currentUser }) {
   const [currentTag, setCurrentTag] = useState(initialTag);
   const [memoryData, setMemoryData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [allMemories, setAllMemories] = useState([]);
-  
-  // Auth Session State
-  const [authSession, setAuthSession] = useState(getCurrentAuthSession());
-  const [isOwnerModalOpen, setIsOwnerModalOpen] = useState(false);
-  const [ownerKeyInput, setOwnerKeyInput] = useState('');
-  const [ownerError, setOwnerError] = useState('');
 
-  // Memory Editor Modal State
+  // PIN Unlock State
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+
+  // Claim Ownership Modal State
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claimCodeInput, setClaimCodeInput] = useState('');
+  const [claimError, setClaimError] = useState('');
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  // Studio Editor Modal State
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editQuote, setEditQuote] = useState('');
@@ -42,11 +41,13 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   const [editRecipient, setEditRecipient] = useState('');
   const [editAudioTitle, setEditAudioTitle] = useState('');
   const [editAudioUrl, setEditAudioUrl] = useState('');
-  const [editIsProtected, setEditIsProtected] = useState(false);
-  const [editPinCode, setEditPinCode] = useState('');
-  const [editSaveSuccess, setEditSaveSuccess] = useState(false);
+  // 3 Hành động PIN rõ ràng: 'KEEP' | 'SET' | 'REMOVE' (Tránh xóa nhầm PIN khi update title)
+  const [pinAction, setPinAction] = useState('KEEP');
+  const [newPinCode, setNewPinCode] = useState('');
+  const [isSavingEditor, setIsSavingEditor] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Audio State
+  // Audio Player State
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioProgress, setAudioProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState('0:00');
@@ -54,16 +55,10 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   const audioRef = useRef(null);
   const progressIntervalRef = useRef(null);
 
-  // Security PIN State
-  const [isLocked, setIsLocked] = useState(false);
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState('');
-
   // Letter Reveal State
   const [isLetterOpen, setIsLetterOpen] = useState(false);
 
-  // Gallery Modal State
-  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  // Lightbox Media Preview
   const [fullScreenImage, setFullScreenImage] = useState(null);
 
   // Guestbook Form State
@@ -71,56 +66,51 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   const [guestRelation, setGuestRelation] = useState('Người thương');
   const [guestMessage, setGuestMessage] = useState('');
   const [guestSuccess, setGuestSuccess] = useState(false);
+  const [isSendingGuest, setIsSendingGuest] = useState(false);
 
-  // NFC Tap Stats
-  const [tapStats, setTapStats] = useState({ tapCount: 1, lastTappedAt: new Date().toISOString() });
-
-  // Load all showcase memories
+  // Load showcase memories list for dropdown
   useEffect(() => {
-    const list = getAllShowcaseMemories();
-    setAllMemories(list);
+    setAllMemories(getShowcaseMemoriesList());
   }, []);
 
-  // When tag changes, fetch memory details & check security
-  useEffect(() => {
-    const mem = getMemoryByTag(currentTag);
-    if (mem) {
-      setMemoryData(mem);
-      const stats = logNfcTap(currentTag);
-      setTapStats(stats);
-
-      // Check PIN lock
-      if (mem.isProtected) {
-        setIsLocked(true);
-        setPinInput('');
-        setPinError('');
+  // Fetch memory data on tag change
+  const loadMemory = async (tag) => {
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      const res = await fetchMemoryView(tag);
+      if (res.success && res.data) {
+        setMemoryData(res.data);
+        // Pre-fill editor states
+        setEditTitle(res.data.title || '');
+        setEditQuote(res.data.quote || '');
+        setEditLetter(res.data.letter || '');
+        setEditRecipient(res.data.recipient || '');
+        setEditAudioTitle(res.data.audio_title || '');
+        setEditAudioUrl(res.data.audio_url || '');
+        setPinAction('KEEP');
+        setNewPinCode('');
       } else {
-        setIsLocked(false);
+        setErrorMessage(res.message || 'Không thể tải dữ liệu kỷ vật.');
       }
-      setIsLetterOpen(false);
+    } catch (err) {
+      setErrorMessage(err.message || 'Lỗi khi tải dữ liệu.');
+    } finally {
+      setLoading(false);
       setIsPlaying(false);
       setAudioProgress(0);
-      setActiveMediaIndex(0);
-
-      // Populate editor initial values
-      setEditTitle(mem.title || '');
-      setEditQuote(mem.quote || '');
-      setEditLetter(mem.letter || '');
-      setEditRecipient(mem.recipient || '');
-      setEditAudioTitle(mem.audioTitle || '');
-      setEditAudioUrl(mem.audioUrl || '');
-      setEditIsProtected(Boolean(mem.isProtected));
-      setEditPinCode(mem.pinCode || '');
+      setIsLetterOpen(false);
     }
-  }, [currentTag]);
+  };
 
-  // Check editing privileges
-  const hasEditPermission = canEditMemoryTag(currentTag);
+  useEffect(() => {
+    loadMemory(currentTag);
+  }, [currentTag]);
 
   // Audio Play / Pause handler
   const togglePlayAudio = () => {
-    if (!audioRef.current && memoryData?.audioUrl) {
-      audioRef.current = new Audio(memoryData.audioUrl);
+    if (!audioRef.current && memoryData?.audio_url) {
+      audioRef.current = new Audio(memoryData.audio_url);
       audioRef.current.onended = () => {
         setIsPlaying(false);
         setAudioProgress(0);
@@ -140,7 +130,6 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             const current = audioRef.current.currentTime;
             const dur = audioRef.current.duration || 135;
             setAudioProgress((current / dur) * 100);
-            
             const mins = Math.floor(current / 60);
             const secs = Math.floor(current % 60);
             setCurrentTime(`${mins}:${secs < 10 ? '0' : ''}${secs}`);
@@ -164,97 +153,139 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
     };
   }, [currentTag]);
 
-  // Unlock PIN handler
-  const handleUnlockPin = (e) => {
+  // Handle PIN Unlock
+  const handleVerifyPin = async (e) => {
     e.preventDefault();
     setPinError('');
-    const result = verifyAccessPin(currentTag, pinInput);
-    if (result.success) {
-      setIsLocked(false);
-    } else {
-      setPinError(result.message);
-    }
-  };
-
-  // Submit Guestbook message
-  const handleSendGuestbook = (e) => {
-    e.preventDefault();
-    if (!guestAuthor.trim() || !guestMessage.trim()) return;
+    setIsVerifyingPin(true);
 
     try {
-      addGuestbookMessage(currentTag, {
-        author: guestAuthor,
-        relationship: guestRelation,
-        message: guestMessage,
-      });
-      const updated = getMemoryByTag(currentTag);
-      setMemoryData(updated);
-      setGuestAuthor('');
-      setGuestMessage('');
-      setGuestSuccess(true);
-      setTimeout(() => setGuestSuccess(false), 4000);
+      const result = await verifyMemoryPin(currentTag, pinInput);
+      if (result.success) {
+        // Sau khi đúng PIN -> Fetch lại dữ liệu với Grant Token để nhận nội dung thư thật
+        await loadMemory(currentTag);
+        setPinInput('');
+      } else {
+        setPinError(result.message || 'Mã PIN bảo mật không chính xác.');
+      }
     } catch (err) {
-      alert(err.message);
+      setPinError(err.message || 'Lỗi khi xác thực mã PIN.');
+    } finally {
+      setIsVerifyingPin(false);
     }
   };
 
-  // Owner Authentication
-  const handleVerifyOwner = (e) => {
+  // Handle Claim Ownership
+  const handleClaim = async (e) => {
     e.preventDefault();
-    setOwnerError('');
+    setClaimError('');
+    setIsClaiming(true);
+
     try {
-      const newSession = verifyAndLoginOwner(currentTag, ownerKeyInput);
-      setAuthSession(newSession);
-      setIsOwnerModalOpen(false);
-      setIsEditorOpen(true);
-      setOwnerKeyInput('');
+      const res = await claimNfcOwnership(currentTag, claimCodeInput);
+      if (res.success) {
+        alert(res.message);
+        setIsClaimModalOpen(false);
+        setClaimCodeInput('');
+        await loadMemory(currentTag);
+      } else {
+        setClaimError(res.message);
+      }
     } catch (err) {
-      setOwnerError(err.message);
+      setClaimError(err.message || 'Lỗi khi nhận quyền sở hữu.');
+    } finally {
+      setIsClaiming(false);
     }
   };
 
-  // Save Editor changes
-  const handleSaveEditor = (e) => {
+  // Handle Save Editor
+  const handleSaveEditor = async (e) => {
     e.preventDefault();
+    setIsSavingEditor(true);
+
     try {
-      const result = updateMemoryContent(currentTag, {
+      await updateMemorySpace(currentTag, {
         title: editTitle,
         quote: editQuote,
         letter: editLetter,
         recipient: editRecipient,
-        audioTitle: editAudioTitle,
-        audioUrl: editAudioUrl,
-        isProtected: editIsProtected,
-        pinCode: editPinCode,
+        audio_title: editAudioTitle,
+        audio_url: editAudioUrl,
+        pin_action: pinAction,
+        pin_code: pinAction === 'SET' ? newPinCode : null,
       });
-      setMemoryData(result.memory);
-      setEditSaveSuccess(true);
+
+      setSaveSuccess(true);
+      await loadMemory(currentTag);
       setTimeout(() => {
-        setEditSaveSuccess(false);
+        setSaveSuccess(false);
         setIsEditorOpen(false);
-      }, 1200);
+      }, 1000);
     } catch (err) {
-      alert(err.message);
+      alert(err.message || 'Lỗi khi lưu thay đổi.');
+    } finally {
+      setIsSavingEditor(false);
     }
   };
 
-  if (!memoryData) {
+  // Handle Submit Guestbook
+  const handleSendGuestbook = async (e) => {
+    e.preventDefault();
+    if (!guestAuthor.trim() || !guestMessage.trim()) return;
+
+    setIsSendingGuest(true);
+    try {
+      await submitGuestbookEntry(currentTag, {
+        author: guestAuthor,
+        relationship: guestRelation,
+        message: guestMessage,
+      });
+
+      setGuestAuthor('');
+      setGuestMessage('');
+      setGuestSuccess(true);
+      await loadMemory(currentTag);
+      setTimeout(() => setGuestSuccess(false), 4000);
+    } catch (err) {
+      alert(err.message || 'Lỗi khi gửi lời chúc.');
+    } finally {
+      setIsSendingGuest(false);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="w-full min-h-screen bg-dark-950 flex items-center justify-center text-slate-300">
-        <Sparkles className="w-6 h-6 animate-spin text-white mr-2" />
-        <span>Đang kết nối vi chip kỷ niệm NFC...</span>
+      <div className="w-full min-h-screen bg-dark-950 flex flex-col items-center justify-center text-slate-300 gap-3">
+        <Sparkles className="w-8 h-8 animate-spin text-white" />
+        <p className="font-serif text-sm uppercase tracking-widest">Đang kết nối vi chip kỷ niệm NFC...</p>
       </div>
     );
   }
 
-  // Check Availability Status
+  if (errorMessage || !memoryData) {
+    return (
+      <div className="w-full min-h-screen bg-dark-950 flex flex-col items-center justify-center p-4 text-center">
+        <AlertTriangle className="w-12 h-12 text-amber-400 mb-3" />
+        <h3 className="font-serif text-xl font-bold text-white mb-2">Thông Báo Truy Xuất Kỷ Vật</h3>
+        <p className="text-xs text-slate-400 max-w-md mb-6">{errorMessage || 'Không tìm thấy dữ liệu.'}</p>
+        <button
+          onClick={() => loadMemory('emoria-lumen')}
+          className="px-6 py-2.5 rounded-full bg-white text-dark-950 font-bold text-xs uppercase"
+        >
+          Trở về Kỷ Niệm Demo Mẫu
+        </button>
+      </div>
+    );
+  }
+
   const isTimedLock = memoryData.availability?.status === 'timed_lock';
   const isSuspended = memoryData.availability?.status === 'suspended';
+  const isLockedByPin = memoryData.is_protected && !memoryData.is_unlocked;
 
   return (
     <div className="w-full min-h-screen bg-dark-950 text-slate-100 pt-24 pb-24 selection:bg-white/20">
       
-      {/* 1. Header Toolbar: Tag Switcher, Role Indicator & Owner Studio Button */}
+      {/* 1. Header Toolbar */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
           
@@ -265,23 +296,23 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             <div>
               <p className="text-[11px] text-slate-400 uppercase tracking-widest font-semibold flex items-center gap-1.5">
                 <span>EMORIA MEMORY VAULT</span>
-                {authSession.role === ROLES.ADMIN && (
+                {memoryData.is_admin && (
                   <span className="px-1.5 py-0.2 rounded text-[9px] bg-red-500/20 text-red-300 border border-red-500/30">ADMIN</span>
                 )}
-                {hasEditPermission && authSession.role !== ROLES.ADMIN && (
+                {memoryData.is_owner && (
                   <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">CHỦ SỞ HỮU</span>
                 )}
               </p>
               <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                <span>{memoryData.jewelryName}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/10">
-                  Tag #{memoryData.tagUid}
+                <span>{memoryData.jewelry_name}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-slate-300 font-mono">
+                  #{memoryData.tag_uid}
                 </span>
               </h2>
             </div>
           </div>
 
-          {/* Right Actions: Quick Switch & Owner Studio Button */}
+          {/* Right Selector & Owner Studio Buttons */}
           <div className="flex items-center gap-2">
             <select
               value={currentTag}
@@ -289,29 +320,29 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               className="px-3 py-1.5 text-xs rounded-xl bg-black/60 border border-white/20 text-slate-200 focus:outline-none focus:border-white/50 cursor-pointer"
             >
               {allMemories.map((m) => (
-                <option key={m.tagUid} value={m.tagUid}>
-                  {m.title} ({m.tagUid})
+                <option key={m.tag_uid} value={m.tag_uid}>
+                  {m.title} ({m.tag_uid})
                 </option>
               ))}
             </select>
 
-            {/* Owner Edit Button */}
-            {hasEditPermission ? (
+            {/* If Owner: Show Studio Button. If Not: Show Claim Chip Button */}
+            {memoryData.is_owner || memoryData.is_admin ? (
               <button
                 onClick={() => setIsEditorOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
+                className="px-3.5 py-1.5 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                <span>Chỉnh Sửa (Owner Studio)</span>
+                <span>Chỉnh Sửa (Studio)</span>
               </button>
             ) : (
               <button
-                onClick={() => setIsOwnerModalOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Đăng nhập dành cho chủ nhân chiếc trang sức"
+                onClick={() => setIsClaimModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Đăng ký quyền sở hữu chiếc trang sức này"
               >
                 <Key className="w-3.5 h-3.5" />
-                <span>Quyền Chủ Nhân</span>
+                <span>Nhận Quyền Sở Hữu</span>
               </button>
             )}
           </div>
@@ -319,8 +350,8 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         </div>
       </div>
 
-      {/* 2. TIMED LOCK AVAILABILITY GATE (Niêm phong hẹn giờ) */}
-      {isTimedLock && !hasEditPermission ? (
+      {/* 2. TIMED LOCK AVAILABILITY GATE */}
+      {isTimedLock && !memoryData.is_owner && !memoryData.is_admin ? (
         <div className="max-w-lg mx-auto px-4 my-16 text-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -334,45 +365,21 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             <h3 className="font-serif text-2xl font-bold text-white mb-2 uppercase">
               Kỷ Vật Đang Được Niêm Phong
             </h3>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6">
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6 font-light">
               Người tặng đã cài đặt chế độ hẹn giờ mở niêm phong cho chiếc trang sức này. Thời khắc cảm xúc sẽ chính thức mở ra vào:
             </p>
 
             <div className="p-4 rounded-2xl bg-black/60 border border-amber-500/30 text-amber-300 font-mono text-sm sm:text-base font-bold mb-6">
-              ✦ 18:00 — Ngày 20 Tháng 10 Năm 2026 ✦
+              ✦ {new Date(memoryData.availability.unlock_date || '2026-10-20').toLocaleString('vi-VN')} ✦
             </div>
 
-            <p className="text-xs text-slate-400 italic mb-6">
-              “Một món quà bất ngờ luôn đáng để chờ đợi từng giây phút.”
+            <p className="text-xs text-slate-400 italic">
+              “Một món quà bất ngờ luôn xứng đáng để chờ đợi từng giây phút.”
             </p>
-
-            <button
-              onClick={() => setIsOwnerModalOpen(true)}
-              className="text-xs text-slate-300 hover:text-white underline underline-offset-4 cursor-pointer"
-            >
-              Bạn là chủ nhân muốn mở niêm phong sớm? Nhập mã Secret Key
-            </button>
           </motion.div>
         </div>
-      ) : isSuspended && !hasEditPermission ? (
-        /* 3. SUSPENDED GATE */
-        <div className="max-w-md mx-auto px-4 my-16 text-center">
-          <div className="p-8 rounded-3xl bg-white/[0.04] border border-white/15 backdrop-blur-2xl">
-            <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-3" />
-            <h3 className="font-serif text-xl font-bold text-white mb-2">Kỷ Niệm Tạm Thời Bị Khóa</h3>
-            <p className="text-xs text-slate-300 leading-relaxed mb-4">
-              Kỷ vật này hiện đang được chủ sở hữu chuyển sang chế độ lưu trữ riêng tư.
-            </p>
-            <button
-              onClick={() => setIsOwnerModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase"
-            >
-              Xác thực quyền chủ nhân
-            </button>
-          </div>
-        </div>
-      ) : isLocked ? (
-        /* 4. PIN SECURITY SCREEN (If Protected) */
+      ) : isLockedByPin ? (
+        /* 3. PIN SECURITY SCREEN (CHỐNG RÒ RỈ: KHÔNG CÓ LETTER TRONG STATE TRƯỚC KHI GIẢI MÃ) */
         <div className="max-w-md mx-auto px-4 my-16">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -386,15 +393,15 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             <h3 className="font-serif text-2xl font-bold text-white mb-2 uppercase">
               Kỷ Niệm Được Khóa Bảo Mật
             </h3>
-            <p className="text-xs text-slate-300 leading-relaxed mb-6">
-              Không gian kỷ niệm này được cài đặt mã PIN bảo vệ riêng tư giữa hai người. Vui lòng nhập mã để giải mã chip NFC.
+            <p className="text-xs text-slate-300 leading-relaxed mb-6 font-light">
+              Không gian kỷ niệm này được cài đặt mã PIN bảo vệ riêng tư. Vui lòng nhập mã để giải mã chip NFC.
             </p>
 
-            <form onSubmit={handleUnlockPin} className="space-y-4">
+            <form onSubmit={handleVerifyPin} className="space-y-4">
               <input
                 type="password"
                 maxLength={6}
-                placeholder="Nhập mã PIN (Gợi ý: 1000)"
+                placeholder="Nhập mã PIN (Gợi ý demo: 1000)"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
                 className="w-full text-center text-xl tracking-[0.4em] px-4 py-3 rounded-xl bg-black/60 border border-white/25 text-white placeholder-slate-500 focus:outline-none focus:border-white/60 font-mono"
@@ -406,16 +413,21 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-silver-glow"
+                disabled={isVerifyingPin}
+                className="w-full py-3 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-silver-glow disabled:opacity-50"
               >
-                <Unlock className="w-4 h-4" />
+                {isVerifyingPin ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Unlock className="w-4 h-4" />
+                )}
                 <span>Mở Khóa Kỷ Niệm</span>
               </button>
             </form>
           </motion.div>
         </div>
       ) : (
-        /* 5. MAIN MEMORY SPACE (Unlocked) */
+        /* 4. MAIN MEMORY SPACE (Đã mở khóa hoặc công khai) */
         <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-10">
           
           {/* A. Hero Card */}
@@ -427,18 +439,12 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             <div className="flex flex-wrap items-center justify-center gap-3 mb-6 text-xs text-slate-300">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>Kỷ niệm: {memoryData.date}</span>
+                <span>Kỷ niệm: {memoryData.date || 'Chưa cập nhật'}</span>
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20">
                 <Eye className="w-3.5 h-3.5" />
-                <span>Đã chạm {tapStats.tapCount || 1} lần</span>
+                <span>Đã chạm {memoryData.tap_count || 1} lần</span>
               </span>
-              {isTimedLock && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Chế độ hẹn giờ (Đang mở cho Chủ sở hữu)</span>
-                </span>
-              )}
             </div>
 
             <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-metallic tracking-tight uppercase mb-4 leading-tight">
@@ -446,20 +452,22 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-300 font-light mb-6 flex items-center justify-center gap-2">
-              <span>Từ: <strong className="text-white font-medium">{memoryData.author}</strong></span>
+              <span>Từ: <strong className="text-white font-medium">{memoryData.author || 'Người thương'}</strong></span>
               <span>✦</span>
               <span>Gửi đến: <strong className="text-white font-medium">{memoryData.recipient || 'Người thương'}</strong></span>
             </p>
 
-            <div className="max-w-2xl mx-auto p-6 rounded-2xl bg-black/40 border border-white/10 italic text-slate-200 text-sm sm:text-base leading-relaxed relative">
-              <span className="text-3xl text-white/30 font-serif absolute -top-3 left-4">“</span>
-              <p className="px-3">{memoryData.quote}</p>
-              <span className="text-3xl text-white/30 font-serif absolute -bottom-4 right-4">”</span>
-            </div>
+            {memoryData.quote && (
+              <div className="max-w-2xl mx-auto p-6 rounded-2xl bg-black/40 border border-white/10 italic text-slate-200 text-sm sm:text-base leading-relaxed relative">
+                <span className="text-3xl text-white/30 font-serif absolute -top-3 left-4">“</span>
+                <p className="px-3">{memoryData.quote}</p>
+                <span className="text-3xl text-white/30 font-serif absolute -bottom-4 right-4">”</span>
+              </div>
+            )}
           </motion.div>
 
-          {/* B. Audio Player */}
-          {memoryData.audioUrl && (
+          {/* B. Audio Voice & Melody Player */}
+          {memoryData.audio_url && (
             <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                 <div>
@@ -468,15 +476,16 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                     <span>Bản Ghi Âm Thanh Kỷ Niệm</span>
                   </p>
                   <h3 className="text-base font-bold text-white mt-1">
-                    {memoryData.audioTitle || 'Giai Điệu & Lời Thì Thầm'}
+                    {memoryData.audio_title || 'Giai Điệu & Lời Thì Thầm'}
                   </h3>
                 </div>
 
                 <div className="text-xs text-slate-400 font-mono">
-                  {currentTime} / {memoryData.audioDuration || durationTime}
+                  {currentTime} / {durationTime}
                 </div>
               </div>
 
+              {/* Waveform Visualizer Simulation */}
               <div className="flex items-center gap-1 h-12 my-4 px-2 bg-black/30 rounded-xl overflow-hidden">
                 {Array.from({ length: 48 }).map((_, idx) => {
                   const isActive = (idx / 48) * 100 <= audioProgress;
@@ -520,67 +529,69 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </div>
           )}
 
-          {/* C. Hand-written Secret Letter */}
-          <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-white" />
-                <h3 className="text-base font-bold text-white uppercase font-serif">
-                  Bức Thư Tay Mật Mã
-                </h3>
+          {/* C. Hand-written Secret Letter (Chỉ hiển thị khi đã mở khóa PIN thành công) */}
+          {memoryData.letter && (
+            <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-white" />
+                  <h3 className="text-base font-bold text-white uppercase font-serif">
+                    Bức Thư Tay Mật Mã
+                  </h3>
+                </div>
+
+                <button
+                  onClick={() => setIsLetterOpen(!isLetterOpen)}
+                  className="px-4 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 transition-all cursor-pointer"
+                >
+                  {isLetterOpen ? 'Gấp Thư Lại' : 'Mở Niêm Phong'}
+                </button>
               </div>
 
-              <button
-                onClick={() => setIsLetterOpen(!isLetterOpen)}
-                className="px-4 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 transition-all cursor-pointer"
-              >
-                {isLetterOpen ? 'Gấp Thư Lại' : 'Mở Niêm Phong'}
-              </button>
-            </div>
-
-            <AnimatePresence>
-              {isLetterOpen ? (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="p-6 sm:p-8 rounded-2xl bg-black/60 border border-white/15 text-slate-200 font-serif text-sm sm:text-base leading-relaxed whitespace-pre-line shadow-inner">
-                    {memoryData.letter}
-                    <div className="mt-8 pt-4 border-t border-white/10 text-right text-xs italic font-sans text-slate-400">
-                      — {memoryData.author}
+              <AnimatePresence>
+                {isLetterOpen ? (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-6 sm:p-8 rounded-2xl bg-black/60 border border-white/15 text-slate-200 font-serif text-sm sm:text-base leading-relaxed whitespace-pre-line shadow-inner">
+                      {memoryData.letter}
+                      <div className="mt-8 pt-4 border-t border-white/10 text-right text-xs italic font-sans text-slate-400">
+                        — {memoryData.author || 'Người gửi'}
+                      </div>
                     </div>
+                  </motion.div>
+                ) : (
+                  <div 
+                    onClick={() => setIsLetterOpen(true)}
+                    className="py-10 border border-dashed border-white/20 rounded-2xl text-center cursor-pointer hover:border-white/50 transition-colors bg-black/20"
+                  >
+                    <Mail className="w-8 h-8 text-white/50 mx-auto mb-2" />
+                    <p className="text-sm font-semibold text-white">Lá thư tay đã được giải mã</p>
+                    <p className="text-xs text-slate-400 mt-1">Bấm vào đây để mở đọc những dòng tâm sự vĩnh cửu</p>
                   </div>
-                </motion.div>
-              ) : (
-                <div 
-                  onClick={() => setIsLetterOpen(true)}
-                  className="py-10 border border-dashed border-white/20 rounded-2xl text-center cursor-pointer hover:border-white/50 transition-colors bg-black/20"
-                >
-                  <Mail className="w-8 h-8 text-white/50 mx-auto mb-2" />
-                  <p className="text-sm font-semibold text-white">Lá thư tay đang được niêm phong mật</p>
-                  <p className="text-xs text-slate-400 mt-1">Bấm vào đây để mở đọc những dòng tâm sự vĩnh cửu</p>
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           {/* D. Photo Gallery */}
-          {memoryData.mediaGallery && memoryData.mediaGallery.length > 0 && (
+          {memoryData.media_gallery && memoryData.media_gallery.length > 0 && (
             <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <ImageIcon className="w-4 h-4 text-white" />
                   <h3 className="text-base font-bold text-white uppercase font-serif">
-                    Khoảnh Khắc Kỷ Niệm ({memoryData.mediaGallery.length})
+                    Khoảnh Khắc Kỷ Niệm ({memoryData.media_gallery.length})
                   </h3>
                 </div>
                 <p className="text-xs text-slate-400">Độ phân giải siêu nét HD</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {memoryData.mediaGallery.map((media, idx) => (
+                {memoryData.media_gallery.map((media, idx) => (
                   <div
                     key={media.id || idx}
                     onClick={() => setFullScreenImage(media)}
@@ -600,14 +611,14 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </div>
           )}
 
-          {/* E. Guestbook */}
+          {/* E. Guestbook (Sổ Lưu Niệm) */}
           <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
             <h3 className="text-base font-bold text-white uppercase font-serif mb-2 flex items-center gap-2">
               <Heart className="w-4 h-4 text-white fill-current" />
               <span>Sổ Lưu Niệm & Lời Chúc Gửi Tới Kỷ Vật</span>
             </h3>
             <p className="text-xs text-slate-400 mb-6">
-              Mỗi lời nhắn gửi tại đây sẽ được lưu trữ vĩnh viễn trong kho dữ liệu gắn với chip NFC này.
+              Mỗi lời nhắn gửi tại đây sẽ được lưu trữ vĩnh viễn trong cơ sở dữ liệu Supabase gắn với chip NFC này.
             </p>
 
             <div className="space-y-3 mb-6">
@@ -617,7 +628,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                     <span className="font-semibold text-white">
                       {entry.author} <span className="text-slate-400 font-normal">({entry.relationship})</span>
                     </span>
-                    <span className="text-[10px] text-slate-500">{entry.createdAt}</span>
+                    <span className="text-[10px] text-slate-500">{entry.created_at}</span>
                   </div>
                   <p className="text-slate-300 leading-relaxed">{entry.message}</p>
                 </div>
@@ -660,15 +671,16 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 {guestSuccess ? (
                   <span className="text-xs text-emerald-400 flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Đã lưu lời chúc vào chip thành công!</span>
+                    <span>Đã lưu lời chúc thành công!</span>
                   </span>
                 ) : <span />}
 
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-white text-dark-950 text-xs font-bold uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
+                  disabled={isSendingGuest}
+                  className="px-4 py-2 rounded-xl bg-white text-dark-950 text-xs font-bold uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow disabled:opacity-50"
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  {isSendingGuest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                   <span>Lưu Lời Nhắn</span>
                 </button>
               </div>
@@ -689,11 +701,11 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         </div>
       )}
 
-      {/* MODAL 1: OWNER SECRET KEY LOGIN MODAL */}
-      {isOwnerModalOpen && (
+      {/* MODAL 1: CLAIM NFC OWNERSHIP (NHẬN QUYỀN SỞ HỮU CHIP) */}
+      {isClaimModalOpen && (
         <div 
           className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4"
-          onClick={() => setIsOwnerModalOpen(false)}
+          onClick={() => setIsClaimModalOpen(false)}
         >
           <div 
             className="w-full max-w-md p-6 sm:p-8 rounded-3xl bg-dark-900 border border-white/20 shadow-2xl text-slate-100"
@@ -702,43 +714,48 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
               <div className="flex items-center gap-2">
                 <Key className="w-5 h-5 text-amber-400" />
-                <h3 className="font-bold text-white text-base uppercase">Xác Thực Chủ Sở Hữu Kỷ Vật</h3>
+                <h3 className="font-bold text-white text-base uppercase">Nhận Quyền Sở Hữu Chip NFC</h3>
               </div>
-              <button onClick={() => setIsOwnerModalOpen(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setIsClaimModalOpen(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 mb-4">
-              Nhập mã khóa bí mật (Owner Secret Key) in trên thẻ bảo hành kim loại Emoria đi kèm chiếc trang sức để kích hoạt quyền chỉnh sửa.
+            <p className="text-xs text-slate-300 mb-4 font-light leading-relaxed">
+              Mỗi món trang sức Emoria đi kèm thẻ bảo hành kim loại chứa <strong>Mã Xác Nhận Claim Code</strong> một lần duy nhất. Nhập mã để gắn quyền sở hữu vào tài khoản của bạn.
             </p>
 
-            <form onSubmit={handleVerifyOwner} className="space-y-4">
+            <form onSubmit={handleClaim} className="space-y-4">
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Mã Khóa Bí Mật (Gợi ý: {memoryData.ownerSecret || '1000'}):</label>
+                <label className="text-[11px] text-slate-400 block mb-1">
+                  Mã Claim Bảo Mật (Gợi ý demo: {currentTag === 'emoria-lumen' ? 'OWNER-LUMEN-2025' : 'OWNER-PULSE-2024'}):
+                </label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: OWNER-LUMEN-2025 hoặc PIN"
-                  value={ownerKeyInput}
-                  onChange={(e) => setOwnerKeyInput(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-mono focus:outline-none focus:border-white/50 uppercase"
+                  placeholder="Ví dụ: OWNER-LUMEN-2025"
+                  value={claimCodeInput}
+                  onChange={(e) => setClaimCodeInput(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-mono uppercase focus:outline-none focus:border-white/50"
+                  required
                 />
               </div>
 
-              {ownerError && <p className="text-xs text-red-400">{ownerError}</p>}
+              {claimError && <p className="text-xs text-red-400">{claimError}</p>}
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase hover:bg-slate-200 transition-all cursor-pointer"
+                disabled={isClaiming}
+                className="w-full py-2.5 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase hover:bg-slate-200 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                Mở Studio Chỉnh Sửa
+                {isClaiming && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>Xác Nhận Quyền Sở Hữu</span>
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL 2: OWNER MEMORY STUDIO (EDITOR) */}
+      {/* MODAL 2: OWNER STUDIO (CHỈNH SỬA TOÀN DIỆN & QUẢN LÝ PIN AN TOÀN) */}
       {isEditorOpen && (
         <div 
           className="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4 overflow-y-auto"
@@ -752,8 +769,8 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               <div className="flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-white" />
                 <div>
-                  <h3 className="font-bold text-white text-lg uppercase font-serif">Studio Chỉnh Sửa Kỷ Vật</h3>
-                  <p className="text-xs text-slate-400">Quyền Chủ Sở Hữu Chip #{memoryData.tagUid}</p>
+                  <h3 className="font-bold text-white text-lg uppercase font-serif">Studio Quản Lý Kỷ Vật</h3>
+                  <p className="text-xs text-slate-400">Chủ sở hữu Chip #{memoryData.tag_uid}</p>
                 </div>
               </div>
               <button onClick={() => setIsEditorOpen(false)} className="text-slate-400 hover:text-white">
@@ -784,7 +801,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               </div>
 
               <div>
-                <label className="text-slate-300 font-semibold block mb-1">Câu trích dẫn ngắn (Golden Quote):</label>
+                <label className="text-slate-300 font-semibold block mb-1">Câu trích dẫn (Golden Quote):</label>
                 <input
                   type="text"
                   value={editQuote}
@@ -794,7 +811,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               </div>
 
               <div>
-                <label className="text-slate-300 font-semibold block mb-1">Nội dung bức thư tay tâm sự:</label>
+                <label className="text-slate-300 font-semibold block mb-1">Nội dung bức thư tay tâm sự (Riêng tư):</label>
                 <textarea
                   rows={6}
                   value={editLetter}
@@ -815,7 +832,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 </div>
 
                 <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Link âm thanh (MP3 / Audio URL):</label>
+                  <label className="text-slate-300 font-semibold block mb-1">Link âm thanh (MP3 URL):</label>
                   <input
                     type="text"
                     value={editAudioUrl}
@@ -825,40 +842,68 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 </div>
               </div>
 
-              {/* Security PIN toggle */}
+              {/* 3 HÀNH ĐỘNG PIN RÕ RÀNG: KEEP / SET / REMOVE (CHỐNG MẤT PIN KHI UPDATE TITLE) */}
               <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3 mt-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-white">Khóa Mã PIN Bảo Mật Cá Nhân</p>
-                    <p className="text-[11px] text-slate-400">Yêu cầu người xem phải nhập đúng mã PIN mới được giải mã.</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={editIsProtected}
-                    onChange={(e) => setEditIsProtected(e.target.checked)}
-                    className="w-5 h-5 rounded cursor-pointer accent-white"
-                  />
+                <p className="font-semibold text-white">Chính Sách Khóa Mã PIN Bảo Mật:</p>
+                
+                <div className="flex flex-wrap gap-4 text-xs">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pinAction"
+                      value="KEEP"
+                      checked={pinAction === 'KEEP'}
+                      onChange={() => setPinAction('KEEP')}
+                      className="accent-white"
+                    />
+                    <span>Giữ nguyên trạng thái PIN hiện tại</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pinAction"
+                      value="SET"
+                      checked={pinAction === 'SET'}
+                      onChange={() => setPinAction('SET')}
+                      className="accent-white"
+                    />
+                    <span>Đặt / Đổi Mã PIN Mới</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pinAction"
+                      value="REMOVE"
+                      checked={pinAction === 'REMOVE'}
+                      onChange={() => setPinAction('REMOVE')}
+                      className="accent-white"
+                    />
+                    <span>Gỡ bỏ PIN (Công khai)</span>
+                  </label>
                 </div>
 
-                {editIsProtected && (
-                  <div>
-                    <label className="text-[11px] text-slate-300 block mb-1">Cài đặt Mã PIN (4-6 số):</label>
+                {pinAction === 'SET' && (
+                  <div className="pt-2">
+                    <label className="text-[11px] text-slate-300 block mb-1">Nhập Mã PIN mới (4-6 chữ số):</label>
                     <input
-                      type="text"
+                      type="password"
                       maxLength={6}
-                      value={editPinCode}
-                      onChange={(e) => setEditPinCode(e.target.value)}
-                      placeholder="Ví dụ: 1000"
-                      className="w-40 px-3 py-1.5 rounded-xl bg-black/80 border border-white/30 text-white font-mono text-center tracking-widest text-sm focus:outline-none"
+                      value={newPinCode}
+                      onChange={(e) => setNewPinCode(e.target.value)}
+                      placeholder="Nhập 4-6 số..."
+                      className="w-48 px-3 py-1.5 rounded-xl bg-black/80 border border-white/30 text-white font-mono text-center tracking-widest text-sm focus:outline-none"
+                      required={pinAction === 'SET'}
                     />
                   </div>
                 )}
               </div>
 
-              {editSaveSuccess && (
+              {saveSuccess && (
                 <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Đã lưu thành công mọi thay đổi vào chip NFC!</span>
+                  <span>Đã cập nhật dữ liệu kỷ vật an toàn!</span>
                 </div>
               )}
 
@@ -872,9 +917,11 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-xl bg-white text-dark-950 font-bold uppercase tracking-wider hover:bg-slate-200 cursor-pointer shadow-silver-glow"
+                  disabled={isSavingEditor}
+                  className="px-6 py-2 rounded-xl bg-white text-dark-950 font-bold uppercase tracking-wider hover:bg-slate-200 cursor-pointer shadow-silver-glow flex items-center gap-2 disabled:opacity-50"
                 >
-                  Lưu Thay Đổi
+                  {isSavingEditor && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>Lưu Thay Đổi</span>
                 </button>
               </div>
             </form>
@@ -882,7 +929,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         </div>
       )}
 
-      {/* Fullscreen Image Preview */}
+      {/* Lightbox Preview */}
       {fullScreenImage && (
         <div
           onClick={() => setFullScreenImage(null)}

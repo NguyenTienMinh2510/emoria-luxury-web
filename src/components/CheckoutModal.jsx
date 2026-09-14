@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShieldCheck, Truck, Banknote, QrCode, CheckCircle2, ArrowRight, Package, Clock, MapPin, Phone, Copy, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -16,6 +16,12 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
   const [copiedAccount, setCopiedAccount] = useState(false);
+  const checkoutRequest = useRef(null);
+  const submitting = useRef(false);
+  const bankName = import.meta.env.VITE_PAYMENT_BANK_NAME || '';
+  const bankAccount = import.meta.env.VITE_PAYMENT_ACCOUNT_NUMBER || '';
+  const bankOwner = import.meta.env.VITE_PAYMENT_ACCOUNT_NAME || '';
+  const paymentConfigured = Boolean(bankName && bankAccount && bankOwner);
 
   if (!isOpen) return null;
 
@@ -40,12 +46,13 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (submitting.current || !validate()) return;
+    submitting.current = true;
 
     setIsSubmitting(true);
 
     try {
-      const result = await createOrder({
+      const payload = {
         customerName: fullName.trim(),
         phone: phone.trim(),
         email: email.trim(),
@@ -54,11 +61,16 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
         paymentMethod: paymentMethod === 'bank_transfer' ? 'vietqr' : 'cod',
         items: cartItems,
         hasGiftBox: cartItems.some(i => i.isGift),
-      });
+      };
+      const signature = JSON.stringify(payload);
+      if (checkoutRequest.current?.signature !== signature) {
+        checkoutRequest.current = { signature, id: crypto.randomUUID() };
+      }
+      const result = await createOrder({ ...payload, requestId: checkoutRequest.current.id });
 
+      if (!result.success) throw new Error(result.error || 'Không thể tạo đơn hàng.');
       setCompletedOrder(result.order);
       setIsSubmitting(false);
-
       // Trigger celebration
       confetti({
         particleCount: 80,
@@ -71,12 +83,14 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
       }
     } catch (err) {
       alert(err.message || 'Đã xảy ra lỗi khi tạo đơn hàng');
+    } finally {
+      submitting.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleCopyAccount = () => {
-    navigator.clipboard.writeText('999988886666');
+    navigator.clipboard.writeText(bankAccount);
     setCopiedAccount(true);
     setTimeout(() => setCopiedAccount(false), 2000);
   };
@@ -112,7 +126,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
 
               <div className="space-y-1">
                 <h3 className="font-serif text-2xl sm:text-3xl font-bold text-white">
-                  {completedOrder.paymentMethod === 'bank_transfer' ? 'Đã Ghi Nhận Đơn Hàng' : 'Đặt Hàng Thành Công!'}
+                  {completedOrder.paymentMethod === 'vietqr' ? 'Đã Ghi Nhận Đơn Hàng' : 'Đặt Hàng Thành Công!'}
                 </h3>
                 <p className="text-xs text-slate-300">
                   Mã đơn hàng:{' '}
@@ -121,40 +135,59 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
               </div>
 
               {/* Bank transfer info if selected */}
-              {completedOrder.paymentMethod === 'bank_transfer' && (
+              {completedOrder.paymentMethod === 'vietqr' && (
                 <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-left space-y-3">
                   <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
                     <QrCode className="w-4 h-4 text-emerald-400" />
-                    <span>Quét mã VietQR chuyển khoản:</span>
+                    <span>Thông tin chuyển khoản — chờ xác nhận thanh toán</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                    <div className="bg-white p-3 rounded-xl max-w-[160px] mx-auto">
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=247000-EMORIA-${completedOrder.id}`}
-                        alt="QR thanh toán"
-                        className="w-full h-auto"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5 text-xs text-slate-300">
-                      <div>Ngân hàng: <strong className="text-white">MB Bank (Quân Đội)</strong></div>
-                      <div className="flex items-center gap-2">
-                        <span>STK: <strong className="font-mono text-white text-sm">9999 8888 6666</strong></span>
-                        <button
-                          type="button"
-                          onClick={handleCopyAccount}
-                          className="p-1 text-slate-400 hover:text-white"
-                          title="Sao chép số tài khoản"
-                        >
-                          {copiedAccount ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
+                  {paymentConfigured ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                      <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white/5 border border-white/10 text-center">
+                        <img
+                          src={`https://img.vietqr.io/image/${encodeURIComponent(bankName)}-${encodeURIComponent(bankAccount)}-compact2.png?amount=${completedOrder.totals?.finalTotal || ''}&addInfo=${encodeURIComponent(completedOrder.id)}&accountName=${encodeURIComponent(bankOwner)}`}
+                          alt="VietQR Chuyển Khoản"
+                          className="w-36 h-36 rounded-xl bg-white p-2 shadow-lg object-contain"
+                          loading="lazy"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-2 tracking-widest uppercase font-mono">Quét mã VietQR tự động</span>
                       </div>
-                      <div>Chủ TK: <strong className="text-white">CTY TNHH TRANG SUC EMORIA</strong></div>
-                      <div>Số tiền: <strong className="text-white font-bold">{completedOrder.formattedTotal}</strong></div>
-                      <div>Nội dung: <strong className="font-mono text-emerald-400">{completedOrder.id}</strong></div>
+
+                      <div className="space-y-2 text-xs text-slate-300">
+                        <div>Ngân hàng: <strong className="text-white">{bankName}</strong></div>
+                        <div className="flex items-center gap-2">
+                          <span>STK: <strong className="font-mono text-white text-sm">{bankAccount}</strong></span>
+                          <button
+                            type="button"
+                            onClick={handleCopyAccount}
+                            className="p-1 text-slate-400 hover:text-white"
+                            title="Sao chép số tài khoản"
+                          >
+                            {copiedAccount ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                        <div>Chủ TK: <strong className="text-white">{bankOwner}</strong></div>
+                        <div>Số tiền: <strong className="text-white font-bold text-sm">{completedOrder.totals.formattedTotal}</strong></div>
+                        <div className="flex items-center gap-2">
+                          <span>Nội dung: <strong className="font-mono text-emerald-400 font-bold">{completedOrder.id}</strong></span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(completedOrder.id);
+                              alert('Đã sao chép mã đơn: ' + completedOrder.id);
+                            }}
+                            className="p-1 text-slate-400 hover:text-white"
+                            title="Sao chép mã đơn"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <p className="text-xs text-slate-300">Thông tin tài khoản nhận tiền đang được cập nhật. Vui lòng liên hệ EMORIA và cung cấp mã đơn để nhận hướng dẫn; đơn chưa được xác nhận thanh toán.</p>
+                  )}
                 </div>
               )}
 
@@ -163,11 +196,11 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                 <div className="text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
                   Thông tin nhận hàng
                 </div>
-                <div className="text-slate-200 font-semibold">{completedOrder.customer.fullName} · {completedOrder.customer.phone}</div>
-                <div className="text-slate-300">{completedOrder.customer.address}</div>
+                <div className="text-slate-200 font-semibold">{completedOrder.customerName} · {completedOrder.phone}</div>
+                <div className="text-slate-300">{completedOrder.address}</div>
                 <div className="pt-2 border-t border-white/10 flex justify-between font-bold text-white text-sm">
                   <span>Tổng cộng</span>
-                  <span className="text-metallic">{completedOrder.formattedTotal}</span>
+                  <span className="text-metallic">{completedOrder.totals.formattedTotal}</span>
                 </div>
               </div>
 
@@ -309,7 +342,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                     />
                     <div className="flex items-center gap-2">
                       <QrCode className="w-4 h-4 text-emerald-400" />
-                      <span className="text-xs">Chuyển khoản VietQR</span>
+                      <span className="text-xs">Chuyển khoản ngân hàng</span>
                     </div>
                   </label>
                 </div>
