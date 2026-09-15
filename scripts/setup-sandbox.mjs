@@ -7,7 +7,7 @@ const config=JSON.parse(raw.slice(raw.indexOf('{')));
 if(new URL(config.API_URL).hostname!=='127.0.0.1' || !config.API_URL.endsWith(':55321'))throw new Error('Only the isolated EMORIA localhost stack is allowed.');
 fs.mkdirSync('.local',{recursive:true});
 fs.writeFileSync('.local/supabase.json',JSON.stringify(config,null,2));
-fs.writeFileSync('.env.sandbox.local',`VITE_SUPABASE_URL=${config.API_URL}\nVITE_SUPABASE_ANON_KEY=${config.ANON_KEY}\nVITE_SUPABASE_PUBLISHABLE_KEY=\nVITE_APP_MODE=sandbox\n`);
+fs.writeFileSync('.env.sandbox.local',`VITE_SUPABASE_URL=${config.API_URL}\nVITE_SUPABASE_ANON_KEY=${config.ANON_KEY}\nVITE_SUPABASE_PUBLISHABLE_KEY=\nVITE_APP_MODE=sandbox\nSUPABASE_SERVICE_ROLE_KEY=${config.SERVICE_ROLE_KEY}\n`);
 const admin=createClient(config.API_URL,config.SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
 const credentials=fs.existsSync('.local/accounts.json')?JSON.parse(fs.readFileSync('.local/accounts.json','utf8')):{password:'Emoria!'+crypto.randomBytes(9).toString('base64url'),users:[]};
 for(const [email,name,role] of [['admin@emoria.test','Quản trị thử nghiệm','admin'],['owner@emoria.test','Chủ kỷ vật thử nghiệm','owner'],['viewer@emoria.test','Khách thử nghiệm','viewer']]){

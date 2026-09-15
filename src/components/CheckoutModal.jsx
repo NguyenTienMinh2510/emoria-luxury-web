@@ -4,22 +4,24 @@ import { X, ShieldCheck, Truck, Banknote, QrCode, CheckCircle2, ArrowRight, Pack
 import confetti from 'canvas-confetti';
 import { useStore } from './StoreProvider';
 import { createOrder } from '../services/orderBackendService';
+import {supabase} from '../lib/supabaseClient';
+import {readPendingCheckout,savePendingCheckout,clearPendingCheckout} from '../services/checkoutSession';
 
-export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderComplete }) {
+export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderComplete, currentUserId='guest' }) {
   const { settings } = useStore();
+  const [pending,setPending]=useState(()=>readPendingCheckout(currentUserId));
   const [submitError, setSubmitError] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [email, setEmail] = useState('');
-  const [note, setNote] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cod'); // 'cod' | 'bank_transfer'
+  const [fullName, setFullName] = useState(pending?.payload.customerName||'');
+  const [phone, setPhone] = useState(pending?.payload.phone||'');
+  const [address, setAddress] = useState(pending?.payload.address||'');
+  const [email, setEmail] = useState(pending?.payload.email||'');
+  const [note, setNote] = useState(pending?.payload.note||'');
+  const [paymentMethod, setPaymentMethod] = useState(pending?pending.payload.paymentMethod==='vietqr'?'bank_transfer':'cod':settings?.cod_enabled?'cod':'bank_transfer');
   
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
   const [copiedAccount, setCopiedAccount] = useState(false);
-  const checkoutRequest = useRef(null);
   const submitting = useRef(false);
   const bankName = settings?.bank_bin || '';
   const bankAccount = settings?.bank_account || '';
@@ -49,7 +51,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    if (submitting.current || !validate()) return;
+    if (submitting.current || (!pending&&!validate())) return;
     submitting.current = true;
 
     setIsSubmitting(true);
@@ -66,13 +68,15 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
         items: cartItems,
         hasGiftBox: cartItems.some(i => i.isGift),
       };
-      const signature = JSON.stringify(payload);
-      if (checkoutRequest.current?.signature !== signature) {
-        checkoutRequest.current = { signature, id: crypto.randomUUID() };
-      }
-      const result = await createOrder({ ...payload, requestId: checkoutRequest.current.id });
+      const {data:session}=await supabase.auth.getSession();
+      const actor=session.session?.user.id||'guest';
+      let request=pending;
+      if(request&&request.actor!==actor)throw new Error('Yêu cầu đang chờ thuộc phiên đăng nhập trước. Quay lại đúng tài khoản để kiểm tra kết quả đơn này.');
+      if(!request){request={id:crypto.randomUUID(),payload,actor};savePendingCheckout(request);setPending(request);}
+      const result = await createOrder({ ...request.payload, requestId: request.id });
 
-      if (!result.success) throw new Error(result.error || 'Không thể tạo đơn hàng.');
+      if (!result.success){if(!result.retryable){clearPendingCheckout(actor);setPending(null);}throw new Error(result.error || 'Không thể tạo đơn hàng.');}
+      clearPendingCheckout(actor);setPending(null);
       setCompletedOrder(result.order);
       setIsSubmitting(false);
       // Trigger celebration
@@ -93,17 +97,15 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
     }
   };
 
-  const handleCopyAccount = () => {
-    navigator.clipboard.writeText(bankAccount);
-    setCopiedAccount(true);
-    setTimeout(() => setCopiedAccount(false), 2000);
+  const handleCopyAccount = async () => {
+    try{await navigator.clipboard.writeText(bankAccount);setCopiedAccount(true);setTimeout(() => setCopiedAccount(false), 2000);}catch{setSubmitError('Không sao chép được. Bạn có thể chọn số tài khoản và sao chép thủ công.');}
   };
 
   return (
     <AnimatePresence>
       <div role="dialog" aria-modal="true" aria-label="Đặt hàng"
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/85 backdrop-blur-xl"
-        onClick={onClose}
+        onClick={()=>{if(!isSubmitting)onClose();}}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -115,6 +117,8 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
         >
           {/* Close button */}
           <button
+            aria-label="Đóng đặt hàng"
+            disabled={isSubmitting}
             onClick={onClose}
             className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors z-20"
           >
@@ -223,6 +227,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
             /* --- CHECKOUT FORM SCREEN --- */
             <form onSubmit={handlePlaceOrder} className="space-y-6">
               {submitError && <p role="alert" className="text-red-300 bg-red-500/10 p-3 rounded-xl text-sm">{submitError}</p>}
+              {pending&&<div className="p-4 rounded-xl border border-amber-300/30 text-sm space-y-2"><p>Có yêu cầu đặt hàng chưa xác định kết quả. Gửi lại cùng yêu cầu để nhận đúng đơn, không trừ kho thêm lần nữa.</p><p>{pending.payload.customerName} · {pending.payload.items.reduce((n,i)=>n+i.quantity,0)} món · {pending.payload.paymentMethod==='vietqr'?'Chuyển khoản':'COD'}</p><button type="submit" disabled={isSubmitting} className="store-button">{isSubmitting?'Đang kiểm tra…':'Gửi lại yêu cầu đang chờ'}</button></div>}
               {settings?.sandbox && <p className="text-amber-200 text-sm">Đơn thử nghiệm. Dùng thông tin giả lập; không chuyển tiền.</p>}
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -235,6 +240,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
               </div>
 
               {/* Customer fields */}
+              <fieldset disabled={isSubmitting||Boolean(pending)} className="space-y-6 disabled:opacity-60">
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-slate-300 font-medium block mb-1">
@@ -243,6 +249,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                   <input
                     type="text"
                     placeholder="Ví dụ: Nguyễn Văn A"
+                    aria-label="Họ và tên người nhận" autoComplete="name" maxLength={120}
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     className="w-full glass-input rounded-xl px-4 py-2.5 text-xs"
@@ -257,6 +264,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                     </label>
                     <input
                       type="tel"
+                      aria-label="Số điện thoại" autoComplete="tel" maxLength={20}
                       placeholder="0912345678"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
@@ -271,6 +279,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                     </label>
                     <input
                       type="email"
+                      aria-label="Email liên hệ" autoComplete="email" maxLength={254}
                       placeholder="email@vidu.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -286,6 +295,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                   <input
                     type="text"
                     placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành"
+                    aria-label="Địa chỉ giao hàng" autoComplete="street-address" maxLength={500}
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     className="w-full glass-input rounded-xl px-4 py-2.5 text-xs"
@@ -300,6 +310,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                   <input
                     type="text"
                     placeholder="Ví dụ: Giao ngoài giờ hành chính, gọi trước khi đến..."
+                    aria-label="Ghi chú giao hàng" maxLength={1000}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     className="w-full glass-input rounded-xl px-4 py-2.5 text-xs"
@@ -324,6 +335,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                       type="radio"
                       name="payment"
                       checked={paymentMethod === 'cod'}
+                      disabled={!settings?.cod_enabled}
                       onChange={() => setPaymentMethod('cod')}
                       className="text-white"
                     />
@@ -344,6 +356,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                       type="radio"
                       name="payment"
                       checked={paymentMethod === 'bank_transfer'}
+                      disabled={!settings?.transfer_enabled||(!settings?.sandbox&&!paymentConfigured)}
                       onChange={() => setPaymentMethod('bank_transfer')}
                       className="text-white"
                     />
@@ -391,6 +404,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                   </>
                 )}
               </button>
+              </fieldset>
             </form>
           )}
 

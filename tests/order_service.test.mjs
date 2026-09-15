@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
+import {readPendingCheckout,savePendingCheckout,clearPendingCheckout} from '../src/services/checkoutSession.js';
+const values=new Map(),storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+const request={id:crypto.randomUUID(),actor:'owner-a',payload:{customerName:'Private fixture',items:[]}};
+savePendingCheckout(request,storage);assert.deepEqual(readPendingCheckout('owner-a',storage),request);assert.equal(readPendingCheckout('owner-b',storage),null);
+clearPendingCheckout('owner-a',storage);assert.equal(readPendingCheckout('owner-a',storage),null);
+assert.throws(()=>savePendingCheckout(request,{setItem(){throw new Error('disabled');}}));
+const child=spawnSync(process.execPath,['--input-type=module','-e',`
+ import assert from 'node:assert/strict';
+ const {supabase}=await import('./src/lib/supabaseClient.js');
+ const {createOrder}=await import('./src/services/orderBackendService.js');
+ const payload={requestId:crypto.randomUUID(),customerName:'Test',phone:'0900000000',address:'Fake',paymentMethod:'vietqr',items:[{id:'emoria-pulse',size:'S',quantity:1,price:1}]};
+ let calls=0;
+ supabase.rpc=async(name,args)=>{calls++;assert.equal(name,'rpc_create_order');assert.equal(args.p_request_id,payload.requestId);assert.equal(args.p_payload.items[0].price,undefined);return {error:{code:'P0001',message:'Không đủ tồn kho'}};};
+ let result=await createOrder(payload);assert.equal(result.success,false);assert.equal(result.retryable,false);assert.equal(result.error,'Không đủ tồn kho');
+ supabase.rpc=async()=>{throw new Error('network');};result=await createOrder(payload);assert.equal(result.success,false);assert.equal(result.retryable,true);
+ supabase.rpc=async()=>({data:{success:true,order:{id:'EMO-server',status:'pending_payment',totals:{finalTotal:299000}}}});result=await createOrder(payload);assert.equal(result.success,true);assert.equal(result.order.id,'EMO-server');assert.equal(result.order.totals.finalTotal,299000);assert.equal(result.order.status,'pending_payment');
+ console.log('PASS order service: trusted server totals, definite rejection, uncertain network recovery, unchanged request ID');
+`],{cwd:new URL('..',import.meta.url),env:{...process.env,VITE_SUPABASE_URL:'https://test.supabase.co',VITE_SUPABASE_ANON_KEY:'test-key'},encoding:'utf8'});
+assert.equal(child.status,0,child.stderr);console.log(child.stdout.trim());console.log('PASS checkout session: reload recovery, account isolation, storage failure blocks submission');

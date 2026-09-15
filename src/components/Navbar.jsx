@@ -12,6 +12,7 @@ export default function Navbar({
   onSearch,
   currentView = 'shop',
   onSelectView,
+  sandbox=false,
 }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -43,6 +44,7 @@ export default function Navbar({
 
   return (
     <header
+      style={{top:sandbox?24:0}}
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
           ? 'bg-dark-950/90 backdrop-blur-xl border-b border-white/10 shadow-2xl py-2.5'

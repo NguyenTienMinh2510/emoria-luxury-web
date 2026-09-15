@@ -5,9 +5,10 @@ import {
   MessageSquare, Send, CornerDownRight, Check, Sparkles, AlertCircle, ShoppingBag
 } from 'lucide-react';
 import { 
-  getArticleDetail, toggleArticleLike, toggleArticleBookmark, addArticleComment 
+  getArticleDetail, toggleArticleLike, toggleArticleBookmark, addArticleComment, editArticleComment, reportArticleComment 
 } from '../services/articleService';
-import { products } from '../data/products';
+import { useStore } from '../components/StoreProvider';
+import MarkdownContent from '../components/MarkdownContent';
 
 export default function ArticleDetailView({ 
   slug, 
@@ -16,6 +17,8 @@ export default function ArticleDetailView({
   onOpenAuth,
   currentUser 
 }) {
+  const {products}=useStore();
+  const [reactionBusy,setReactionBusy]=useState(false);
   const [article, setArticle] = useState(null);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +42,7 @@ export default function ArticleDetailView({
     let active = true;
     const fetchDetail = async () => {
       setLoading(true);
+      setArticle(null);setComments([]);
       try {
         const res = await getArticleDetail(slug);
         if (active && res.success && res.article) {
@@ -57,58 +61,36 @@ export default function ArticleDetailView({
 
     if (slug) fetchDetail();
     return () => { active = false; };
-  }, [slug]);
+  }, [slug,currentUser]);
 
-  // Xử lý Thích
-  const handleLike = async () => {
-    if (!article) return;
-    const previousState = isLiked;
-    const previousCount = likeCount;
-
-    // Cập nhật lạc quan
-    setIsLiked(!previousState);
-    setLikeCount(previousState ? Math.max(0, previousCount - 1) : previousCount + 1);
-
-    const res = await toggleArticleLike(article.id);
-    if (!res.success) {
-      // Revert nếu lỗi
-      setIsLiked(previousState);
-      setLikeCount(previousCount);
-      showToast(res.message || 'Vui lòng đăng nhập để thích bài viết.');
-      if (onOpenAuth && res.message?.includes('đăng nhập')) {
-        onOpenAuth();
-      }
-    }
+  const refreshComments=async()=>{const res=await getArticleDetail(slug);if(res.success)setComments(res.comments||[]);};
+  const handleLike=async()=>{
+    if(!currentUser){onOpenAuth?.();return;}if(!article||reactionBusy)return;setReactionBusy(true);
+    const res=await toggleArticleLike(article.id,!isLiked);setReactionBusy(false);
+    if(res.success){setIsLiked(res.is_liked);setLikeCount(res.likes_count);}else showToast(res.message);
   };
-
-  // Xử lý Bookmark
-  const handleBookmark = async () => {
-    if (!article) return;
-    const res = await toggleArticleBookmark(article.id);
-    if (res.success) {
-      setIsBookmarked(res.is_bookmarked);
-      showToast(res.message || (res.is_bookmarked ? 'Đã lưu vào danh sách riêng tư.' : 'Đã bỏ lưu bài viết.'));
-    } else {
-      showToast(res.message || 'Vui lòng đăng nhập để lưu bài viết.');
-      if (onOpenAuth) onOpenAuth();
-    }
+  const handleBookmark=async()=>{
+    if(!currentUser){onOpenAuth?.();return;}if(!article||reactionBusy)return;setReactionBusy(true);
+    const res=await toggleArticleBookmark(article.id,!isBookmarked);setReactionBusy(false);
+    if(res.success){setIsBookmarked(res.is_bookmarked);showToast(res.is_bookmarked?'Đã lưu vào tài khoản.':'Đã bỏ lưu.');}else showToast(res.message);
   };
-
-  // Xử lý Chia sẻ
-  const handleShare = () => {
-    const url = window.location.href;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url);
-      showToast('Đã sao chép liên kết bài viết vào bộ nhớ tạm!');
-    } else {
-      showToast('Liên kết: ' + url);
-    }
+  const handleShare=async()=>{
+    const url=new URL('/',window.location.origin);url.searchParams.set('article',slug);
+    try{if(navigator.share){await navigator.share({title:article.title,url:url.href});showToast('Đã hoàn tất thao tác chia sẻ.');}else{await navigator.clipboard.writeText(url.href);showToast('Đã sao chép liên kết.');}}
+    catch(error){if(error.name!=='AbortError')showToast('Không thể chia sẻ. Hãy sao chép đường dẫn trên thanh địa chỉ.');}
   };
+  const editComment=async(comment,remove=false)=>{
+    const content=remove?'':window.prompt('Sửa bình luận (sẽ chờ duyệt lại)',comment.content);if(content===null)return;
+    if(remove&&!window.confirm('Xóa bình luận này?'))return;
+    const res=await editArticleComment(comment.id,content,remove);if(res.success){await refreshComments();showToast(remove?'Đã xóa.':'Đã lưu và chuyển về chờ duyệt.');}else showToast(res.message);
+  };
+  const report=async id=>{if(!currentUser){onOpenAuth?.();return;}const reason=window.prompt('Lý do báo cáo');if(!reason)return;const res=await reportArticleComment(id,reason);showToast(res.success?'Đã gửi báo cáo đến quản trị.':res.message);};
 
   // Gửi bình luận gốc
   const handleSubmitComment = async (e) => {
     e.preventDefault();
-    if (!commentText.trim()) return;
+    if (!currentUser){onOpenAuth?.();return;}
+    if (!commentText.trim() || !article.allow_comments) return;
 
     setSubmittingComment(true);
     const res = await addArticleComment({
@@ -121,20 +103,7 @@ export default function ArticleDetailView({
     if (res.success) {
       setCommentText('');
       showToast(res.message);
-      // Nếu bài viết trả về comment ngay (admin) thì thêm vào list
-      if (res.status === 'approved') {
-        setComments(prev => [
-          ...prev,
-          {
-            id: res.comment_id || 'new-' + Date.now(),
-            parent_id: null,
-            author_name: currentUser?.name || 'Bạn',
-            content: commentText.trim(),
-            created_at: 'Vừa xong',
-            is_mine: true,
-          }
-        ]);
-      }
+      await refreshComments();
     } else {
       showToast(res.message || 'Không thể gửi bình luận.');
       if (onOpenAuth && res.message?.includes('đăng nhập')) {
@@ -159,19 +128,7 @@ export default function ArticleDetailView({
       setReplyText('');
       setReplyingToId(null);
       showToast(res.message);
-      if (res.status === 'approved') {
-        setComments(prev => [
-          ...prev,
-          {
-            id: res.comment_id || 'reply-' + Date.now(),
-            parent_id: parentId,
-            author_name: currentUser?.name || 'Bạn',
-            content: replyText.trim(),
-            created_at: 'Vừa xong',
-            is_mine: true,
-          }
-        ]);
-      }
+      await refreshComments();
     } else {
       showToast(res.message || 'Không thể gửi phản hồi.');
     }
@@ -180,7 +137,7 @@ export default function ArticleDetailView({
   // Lọc sản phẩm liên quan
   const relatedProducts = article?.related_product_ids?.length > 0
     ? products.filter(p => article.related_product_ids.includes(p.id))
-    : products.slice(0, 2);
+    : [];
 
   // Phân tách bình luận gốc và phản hồi
   const rootComments = comments.filter(c => !c.parent_id);
@@ -249,6 +206,7 @@ export default function ArticleDetailView({
           {/* Social Action Quick Bar */}
           <div className="flex items-center gap-2">
             <button
+              disabled={reactionBusy}
               onClick={handleLike}
               title="Thích bài viết"
               className={`p-2.5 rounded-full border transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
@@ -262,6 +220,7 @@ export default function ArticleDetailView({
             </button>
 
             <button
+              disabled={reactionBusy}
               onClick={handleBookmark}
               title="Lưu bài viết"
               className={`p-2.5 rounded-full border transition-all cursor-pointer ${
@@ -340,23 +299,7 @@ export default function ArticleDetailView({
 
         {/* Main Content Body */}
         <div className="prose prose-invert max-w-none mb-16 space-y-6 text-sm sm:text-base text-slate-300 font-light leading-relaxed">
-          {article.content.split('\n\n').map((paragraph, idx) => {
-            if (paragraph.startsWith('### ')) {
-              return (
-                <h3 key={idx} className="font-serif text-xl sm:text-2xl font-normal text-metallic pt-6 pb-2 border-b border-white/10">
-                  {paragraph.replace('### ', '')}
-                </h3>
-              );
-            }
-            if (paragraph.startsWith('1. ') || paragraph.startsWith('2. ') || paragraph.startsWith('3. ') || paragraph.startsWith('4. ')) {
-              return (
-                <div key={idx} className="p-4 rounded-xl bg-white/5 border border-white/10 my-3 font-normal text-slate-200">
-                  {paragraph}
-                </div>
-              );
-            }
-            return <p key={idx} className="leading-loose">{paragraph}</p>;
-          })}
+          <MarkdownContent content={article.content}/>
         </div>
 
         {/* Tags */}
@@ -437,7 +380,7 @@ export default function ArticleDetailView({
                 placeholder={currentUser ? "Chia sẻ cảm nghĩ của quý khách về bài viết này..." : "Đăng nhập để tham gia bình luận và thảo luận cùng cộng đồng EMORIA..."}
                 rows={3}
                 maxLength={2000}
-                disabled={!currentUser}
+                disabled={!article.allow_comments}
                 className="w-full p-4 rounded-2xl bg-white/5 border border-white/15 text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:border-white/40 transition-all resize-none shadow-inner disabled:opacity-50"
               />
               <div className="flex items-center justify-between mt-3">
@@ -448,7 +391,7 @@ export default function ArticleDetailView({
                 {currentUser ? (
                   <button
                     type="submit"
-                    disabled={submittingComment || !commentText.trim()}
+                    disabled={submittingComment || !commentText.trim() || !article.allow_comments}
                     className="px-5 py-2 rounded-full bg-white text-dark-950 hover:bg-slate-200 disabled:opacity-40 text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
                   >
                     <Send className="w-3.5 h-3.5" />
@@ -481,6 +424,7 @@ export default function ArticleDetailView({
                 return (
                   <div key={comm.id} className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-4">
                     
+                    <div className="flex gap-4 text-xs text-slate-400">{comm.status==='pending'&&<span className="text-amber-200">Chờ duyệt</span>}{comm.is_mine?<><button onClick={()=>editComment(comm)}>Sửa</button><button onClick={()=>editComment(comm,true)}>Xóa</button></>:<button onClick={()=>report(comm.id)}>Báo cáo</button>}</div>
                     {/* Root Comment Header */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
@@ -494,7 +438,7 @@ export default function ArticleDetailView({
                       </div>
 
                       {/* Reply Button (Only 1 level nested) */}
-                      {currentUser && (
+                      {currentUser && article.allow_comments && comm.status==='approved' && (
                         <button
                           onClick={() => setReplyingToId(isReplying ? null : comm.id)}
                           className="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
@@ -515,6 +459,7 @@ export default function ArticleDetailView({
                       <div className="pl-11 pt-2 space-y-3 border-l-2 border-white/10 ml-4">
                         {replies.map((rep) => (
                           <div key={rep.id} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                            <div className="flex gap-3 text-xs text-slate-400 mb-2">{rep.status==='pending'&&<span className="text-amber-200">Chờ duyệt</span>}{rep.is_mine?<><button onClick={()=>editComment(rep)}>Sửa</button><button onClick={()=>editComment(rep,true)}>Xóa</button></>:<button onClick={()=>report(rep.id)}>Báo cáo</button>}</div>
                             <div className="flex items-center gap-2 mb-1.5">
                               <span className="font-semibold text-xs text-slate-200">{rep.author_name}</span>
                               {rep.author_name?.includes('Atelier') && (

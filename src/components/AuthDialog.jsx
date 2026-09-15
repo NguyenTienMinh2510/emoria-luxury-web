@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import ModalFrame from './ModalFrame';
+import CustomerOrders from './CustomerOrders';
 export default function AuthDialog({ isOpen, onClose, onLoginSuccess, currentUser, recovery = false }) {
  const [mode,setMode]=useState('login'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[name,setName]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
@@ -15,8 +16,8 @@ export default function AuthDialog({ isOpen, onClose, onLoginSuccess, currentUse
     const {error}=await supabase.auth.resetPasswordForEmail(email.trim(),{redirectTo});if(error)throw error;
     setMessage('Nếu email đã đăng ký, liên kết đặt lại mật khẩu sẽ được gửi.');
    }else if(mode==='reset'){
-    const {error}=await supabase.auth.updateUser({password});if(error)throw error;
-    setMessage('Đã đổi mật khẩu.');setPassword('');setMode('login');
+    const {data,error}=await supabase.auth.updateUser({password});if(error)throw error;
+    setMessage('Đã đổi mật khẩu.');setPassword('');setMode('login');onLoginSuccess?.(data.user.user_metadata?.full_name||data.user.email);
    }else if(mode==='register'){
     const {data,error}=await supabase.auth.signUp({email:email.trim(),password,options:{data:{full_name:name.trim()},emailRedirectTo:window.location.origin}});if(error)throw error;
     if(data.session){onLoginSuccess?.(data.user.user_metadata?.full_name||data.user.email);onClose();}
@@ -30,7 +31,7 @@ export default function AuthDialog({ isOpen, onClose, onLoginSuccess, currentUse
  return <ModalFrame title="Tài khoản EMORIA" onClose={onClose}>
  {error&&<p role="alert" className="p-3 mb-4 bg-red-500/10 text-red-300 rounded-xl text-sm">{error}</p>}
  {message&&<p role="status" className="p-3 mb-4 bg-emerald-500/10 text-emerald-200 rounded-xl text-sm">{message}</p>}
- {currentUser && mode!=='reset'?<div className="space-y-4"><p>Xin chào, {currentUser}</p><button className="store-button" onClick={async()=>{const {error}=await supabase.auth.signOut();if(error){setError(error.message);return;}onLoginSuccess?.(null);onClose();}}>Đăng xuất</button></div>:<>
+ {currentUser && mode!=='reset'?<div className="space-y-4"><p>Xin chào, {currentUser}</p><button className="store-button" onClick={async()=>{const {error}=await supabase.auth.signOut();if(error){setError(error.message);return;}onLoginSuccess?.(null);onClose();}}>Đăng xuất</button><CustomerOrders/></div>:<>
  <p className="text-slate-400 text-sm mb-5">{({login:'Đăng nhập để quản lý đơn hàng và ký ức.',register:'Tạo tài khoản bằng email của bạn.',forgot:'Nhận liên kết đặt lại mật khẩu.',reset:'Nhập mật khẩu mới.'})[mode]}</p>
  <form onSubmit={submit} className="space-y-4">
  {mode==='register'&&<label className="store-label">Họ và tên<input required maxLength={120} autoComplete="name" value={name} onChange={e=>setName(e.target.value)} className="store-input" /></label>}

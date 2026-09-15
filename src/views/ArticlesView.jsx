@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Sparkles, BookOpen, Clock, Eye, Heart, ArrowRight, Tag, Share2, Bookmark } from 'lucide-react';
-import { getPublishedArticles } from '../services/articleService';
+import { getPublishedArticles, getSavedArticles } from '../services/articleService';
 
 const CATEGORIES = [
   'Tất cả',
@@ -12,6 +12,9 @@ const CATEGORIES = [
 ];
 
 export default function ArticlesView({ onSelectArticle, onNavigateToShop }) {
+  const [page,setPage]=useState(0);
+  const [savedOnly,setSavedOnly]=useState(false);
+  const [error,setError]=useState('');
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
@@ -23,11 +26,12 @@ export default function ArticlesView({ onSelectArticle, onNavigateToShop }) {
     const fetchArticles = async () => {
       setLoading(true);
       try {
-        const res = await getPublishedArticles({
+        const res = savedOnly ? await getSavedArticles() : await getPublishedArticles({
           category: selectedCategory === 'Tất cả' ? null : selectedCategory,
           search: searchQuery,
-          limit: 12,
+          limit: 12, offset:page*12,
         });
+        if(active){setError(res.success?'':res.message);if(!res.success)setArticles([]);}
         if (active && res.success) {
           setArticles(res.articles || []);
           setTotalCount(res.total || 0);
@@ -41,7 +45,7 @@ export default function ArticlesView({ onSelectArticle, onNavigateToShop }) {
 
     fetchArticles();
     return () => { active = false; };
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery,page,savedOnly]);
 
   return (
     <div className="min-h-screen bg-dark-950 text-slate-100 pt-24 pb-20 px-4 sm:px-6 lg:px-8">
@@ -52,6 +56,8 @@ export default function ArticlesView({ onSelectArticle, onNavigateToShop }) {
 
       <div className="max-w-7xl mx-auto relative z-10">
         
+        <div className="flex flex-wrap items-center justify-end gap-4 mb-5 text-sm"><button onClick={()=>{setSavedOnly(!savedOnly);setPage(0);}} className="store-button">{savedOnly?'Tất cả bài viết':'Bài viết đã lưu'}</button>{!savedOnly&&<><button disabled={!page} onClick={()=>setPage(p=>p-1)}>Trước</button><span>Trang {page+1}</span><button disabled={(page+1)*12>=totalCount} onClick={()=>setPage(p=>p+1)}>Sau</button></>}</div>
+        {error&&<p role="alert" className="text-red-300">{error}</p>}
         {/* Header Section */}
         <div className="text-center max-w-3xl mx-auto mb-14">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold tracking-widest text-slate-300 uppercase mb-4 shadow-silver-glow">
@@ -76,7 +82,7 @@ export default function ArticlesView({ onSelectArticle, onNavigateToShop }) {
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => {setSelectedCategory(cat);setPage(0);}}
                 className={`px-4 py-2 rounded-full text-xs font-medium tracking-wider uppercase transition-all duration-300 whitespace-nowrap cursor-pointer ${
                   selectedCategory === cat
                     ? 'bg-white text-dark-950 font-semibold shadow-silver-glow'
@@ -94,7 +100,7 @@ export default function ArticlesView({ onSelectArticle, onNavigateToShop }) {
               type="text"
               placeholder="Tìm kiếm bài viết, thẻ..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {setSearchQuery(e.target.value);setPage(0);}}
               className="w-full h-10 pl-10 pr-4 rounded-full text-xs bg-white/5 border border-white/15 text-white placeholder-slate-400 focus:outline-none focus:border-white/40 transition-all shadow-inner"
             />
             <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />

@@ -1,3 +1,9 @@
+import MemoryMediaEditor from '../components/MemoryMediaEditor';
+import MemoryMovieEditor from '../components/MemoryMovieEditor';
+import MemoryCinema from '../components/MemoryCinema';
+import {callStore} from '../services/catalogService';
+import {supabase} from '../lib/supabaseClient';
+import {useStore} from '../components/StoreProvider';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -15,7 +21,12 @@ import {
   getShowcaseMemoriesList 
 } from '../services/memoryService';
 
-export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToShop, currentUser }) {
+export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToShop, currentUser, onOpenAuth, onSelectTag }) {
+  const {settings}=useStore();
+  const [editMedia,setEditMedia]=useState([]);
+  const [tagInput,setTagInput]=useState('');
+  const [introPath,setIntroPath]=useState(''),[extraLetters,setExtraLetters]=useState([]),[movieBusy,setMovieBusy]=useState(false),[movieDone,setMovieDone]=useState(false),[studioError,setStudioError]=useState(''),[guestEntries,setGuestEntries]=useState([]);
+  const loadSequence=useRef(0);
   const [currentTag, setCurrentTag] = useState(initialTag);
   const [memoryData, setMemoryData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -47,13 +58,8 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   const [isSavingEditor, setIsSavingEditor] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Audio Player State
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioProgress, setAudioProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState('0:00');
-  const [durationTime, setDurationTime] = useState('2:15');
-  const audioRef = useRef(null);
-  const progressIntervalRef = useRef(null);
+  const [isPlaying,setIsPlaying]=useState(false),[audioError,setAudioError]=useState('');
+  const audioRef=useRef(null);
 
   // Letter Reveal State
   const [isLetterOpen, setIsLetterOpen] = useState(false);
@@ -70,15 +76,18 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
 
   // Load showcase memories list for dropdown
   useEffect(() => {
-    setAllMemories(getShowcaseMemoriesList());
-  }, []);
+    supabase.rpc('rpc_my_memories').then(({data})=>setAllMemories([...(data||[]),...(settings?.sandbox?getShowcaseMemoriesList():[])].filter((m,i,all)=>all.findIndex(x=>x.tag_uid===m.tag_uid)===i))); 
+  }, [currentUser,settings?.sandbox]);
 
   // Fetch memory data on tag change
   const loadMemory = async (tag) => {
+    const sequence=++loadSequence.current;
     setLoading(true);
+    setMemoryData(null);
     setErrorMessage('');
     try {
       const res = await fetchMemoryView(tag);
+      if(sequence!==loadSequence.current)return;
       if (res.success && res.data) {
         setMemoryData(res.data);
         // Pre-fill editor states
@@ -87,7 +96,10 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         setEditLetter(res.data.letter || '');
         setEditRecipient(res.data.recipient || '');
         setEditAudioTitle(res.data.audio_title || '');
-        setEditAudioUrl(res.data.audio_url || '');
+        setEditAudioUrl(res.data.audio_path || '');
+        setIntroPath(res.data.intro_video_path||'');setExtraLetters(res.data.letters||[]);
+        if(res.data.is_owner)setMovieDone(true);
+        setEditMedia((res.data.media_gallery||[]).filter(m=>m.path).map(m=>({path:m.path,type:m.type,caption:m.caption}))); 
         setPinAction('KEEP');
         setNewPinCode('');
       } else {
@@ -96,62 +108,21 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
     } catch (err) {
       setErrorMessage(err.message || 'Lỗi khi tải dữ liệu.');
     } finally {
+      if(sequence!==loadSequence.current)return;
       setLoading(false);
       setIsPlaying(false);
-      setAudioProgress(0);
+      setAudioError('');
       setIsLetterOpen(false);
     }
   };
 
   useEffect(() => {
-    loadMemory(currentTag);
-  }, [currentTag]);
-
-  // Audio Play / Pause handler
-  const togglePlayAudio = () => {
-    if (!audioRef.current && memoryData?.audio_url) {
-      audioRef.current = new Audio(memoryData.audio_url);
-      audioRef.current.onended = () => {
-        setIsPlaying(false);
-        setAudioProgress(0);
-        clearInterval(progressIntervalRef.current);
-      };
-    }
-
-    if (isPlaying) {
-      audioRef.current?.pause();
-      setIsPlaying(false);
-      clearInterval(progressIntervalRef.current);
-    } else {
-      audioRef.current?.play().then(() => {
-        setIsPlaying(true);
-        progressIntervalRef.current = setInterval(() => {
-          if (audioRef.current) {
-            const current = audioRef.current.currentTime;
-            const dur = audioRef.current.duration || 135;
-            setAudioProgress((current / dur) * 100);
-            const mins = Math.floor(current / 60);
-            const secs = Math.floor(current % 60);
-            setCurrentTime(`${mins}:${secs < 10 ? '0' : ''}${secs}`);
-          }
-        }, 300);
-      }).catch(err => {
-        console.warn('Audio playback prevented by browser auto-play policy:', err);
-      });
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    };
-  }, [currentTag]);
+    setMovieDone(false);
+    if(currentTag)loadMemory(currentTag);else setLoading(false);
+  }, [currentTag,currentUser]);
+  useEffect(()=>{setCurrentTag(initialTag);},[initialTag]);
+  useEffect(()=>{if(isEditorOpen&&memoryData?.is_owner)callStore('rpc_memory_guestbook',{p_tag:currentTag}).then(setGuestEntries).catch(e=>setStudioError(e.message));},[isEditorOpen,currentTag]);
+  useEffect(()=>{const warn=e=>{if(isEditorOpen){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[isEditorOpen]);
 
   // Handle PIN Unlock
   const handleVerifyPin = async (e) => {
@@ -201,10 +172,16 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   // Handle Save Editor
   const handleSaveEditor = async (e) => {
     e.preventDefault();
+    if(movieBusy||isSavingEditor)return;
+    setStudioError('');
     setIsSavingEditor(true);
 
     try {
       await updateMemorySpace(currentTag, {
+        version:memoryData.version,
+        intro_video_path:introPath,
+        letters:extraLetters,
+        media_gallery:editMedia,
         title: editTitle,
         quote: editQuote,
         letter: editLetter,
@@ -222,7 +199,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         setIsEditorOpen(false);
       }, 1000);
     } catch (err) {
-      alert(err.message || 'Lỗi khi lưu thay đổi.');
+      setStudioError(err.message || 'Lỗi khi lưu thay đổi.');
     } finally {
       setIsSavingEditor(false);
     }
@@ -253,11 +230,12 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
     }
   };
 
+  if(!currentTag)return <div className="min-h-screen max-w-4xl mx-auto px-5 py-20 space-y-8"><button className="text-slate-400 underline" onClick={onNavigateToShop}>← Cửa hàng</button><h1 className="font-serif text-4xl">Kỷ vật của bạn</h1><p className="text-slate-400">Chuẩn bị món quà theo ba bước: nhận quyền bằng mã trong đơn hàng, thêm video và thư tay, rồi xem thử trước khi tặng.</p>{!currentUser&&<button className="store-button" onClick={onOpenAuth}>Đăng nhập để chuẩn bị quà</button>}<div className="grid sm:grid-cols-2 gap-4">{allMemories.map(m=><button key={m.tag_uid} className="text-left p-5 border border-white/15 rounded-2xl hover:bg-white/5" onClick={()=>{setCurrentTag(m.tag_uid);onSelectTag?.(m.tag_uid);}}><span className="font-serif text-xl">{m.title}</span><span className="block text-xs text-slate-400 mt-2">{m.jewelry_name||m.tag_uid}</span></button>)}</div><form className="space-y-3" onSubmit={e=>{e.preventDefault();const tag=tagInput.trim().toLowerCase();if(/^[a-z0-9-]{1,64}$/.test(tag)){setCurrentTag(tag);onSelectTag?.(tag);}}}><label className="store-label">Bạn đã nhận chip? Nhập mã kỷ vật trên thẻ<input required pattern="[a-zA-Z0-9-]{1,64}" className="store-input" value={tagInput} onChange={e=>setTagInput(e.target.value)} placeholder="emo-…"/></label><button className="store-button">Mở kỷ vật</button></form></div>;
   if (loading) {
     return (
       <div className="w-full min-h-screen bg-dark-950 flex flex-col items-center justify-center text-slate-300 gap-3">
         <Sparkles className="w-8 h-8 animate-spin text-white" />
-        <p className="font-serif text-sm uppercase tracking-widest">Đang kết nối vi chip kỷ niệm NFC...</p>
+        <p className="font-serif text-sm uppercase tracking-widest">Đang mở kỷ niệm của bạn…</p>
       </div>
     );
   }
@@ -269,10 +247,10 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         <h3 className="font-serif text-xl font-bold text-white mb-2">Thông Báo Truy Xuất Kỷ Vật</h3>
         <p className="text-xs text-slate-400 max-w-md mb-6">{errorMessage || 'Không tìm thấy dữ liệu.'}</p>
         <button
-          onClick={() => loadMemory('emoria-lumen')}
+          onClick={() => loadMemory(currentTag)}
           className="px-6 py-2.5 rounded-full bg-white text-dark-950 font-bold text-xs uppercase"
         >
-          Trở về Kỷ Niệm Demo Mẫu
+          Thử tải lại kỷ vật
         </button>
       </div>
     );
@@ -316,9 +294,11 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
           <div className="flex items-center gap-2">
             <select
               value={currentTag}
-              onChange={(e) => setCurrentTag(e.target.value)}
+              aria-label="Chọn kỷ vật của bạn"
+              onChange={(e) => {setCurrentTag(e.target.value);onSelectTag?.(e.target.value);}}
               className="px-3 py-1.5 text-xs rounded-xl bg-black/60 border border-white/20 text-slate-200 focus:outline-none focus:border-white/50 cursor-pointer"
             >
+              {!allMemories.some(m=>m.tag_uid===currentTag)&&<option value={currentTag}>Kỷ vật đang mở</option>}
               {allMemories.map((m) => (
                 <option key={m.tag_uid} value={m.tag_uid}>
                   {m.title} ({m.tag_uid})
@@ -327,9 +307,9 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </select>
 
             {/* If Owner: Show Studio Button. If Not: Show Claim Chip Button */}
-            {memoryData.is_owner || memoryData.is_admin ? (
+            {memoryData.is_owner ? (
               <button
-                onClick={() => setIsEditorOpen(true)}
+                onClick={() => {setEditTitle(memoryData.title||'');setEditQuote(memoryData.quote||'');setEditRecipient(memoryData.recipient||'');setEditLetter(memoryData.letter||'');setEditAudioTitle(memoryData.audio_title||'');setEditAudioUrl(memoryData.audio_path||'');setEditMedia((memoryData.media_gallery||[]).filter(m=>m.path).map(m=>({path:m.path,type:m.type,caption:m.caption})));setIntroPath(memoryData.intro_video_path||'');setExtraLetters(memoryData.letters||[]);setPinAction('KEEP');setStudioError('');setIsEditorOpen(true);}}
                 className="px-3.5 py-1.5 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
               >
                 <Edit3 className="w-3.5 h-3.5" />
@@ -337,12 +317,12 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               </button>
             ) : (
               <button
-                onClick={() => setIsClaimModalOpen(true)}
+                onClick={() => currentUser?setIsClaimModalOpen(true):onOpenAuth?.()}
                 className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
                 title="Đăng ký quyền sở hữu chiếc trang sức này"
               >
                 <Key className="w-3.5 h-3.5" />
-                <span>Nhận Quyền Sở Hữu</span>
+                <span>{currentUser?'Tôi là người chuẩn bị quà':'Đăng nhập để chuẩn bị quà'}</span>
               </button>
             )}
           </div>
@@ -401,7 +381,9 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               <input
                 type="password"
                 maxLength={6}
-                placeholder="Nhập mã PIN (Gợi ý demo: 1000)"
+                placeholder="Nhập mã PIN"
+                aria-label="Mã PIN kỷ vật"
+                inputMode="numeric"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
                 className="w-full text-center text-xl tracking-[0.4em] px-4 py-3 rounded-xl bg-black/60 border border-white/25 text-white placeholder-slate-500 focus:outline-none focus:border-white/60 font-mono"
@@ -426,9 +408,12 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </form>
           </motion.div>
         </div>
+      ) : memoryData.intro_video_url && !movieDone ? (
+        <MemoryCinema url={memoryData.intro_video_url} title={memoryData.title} recipient={memoryData.recipient} onComplete={()=>{setMovieDone(true);setIsLetterOpen(true);window.scrollTo({top:0,behavior:'smooth'});}} onRefresh={()=>loadMemory(currentTag)}/>
       ) : (
         /* 4. MAIN MEMORY SPACE (Đã mở khóa hoặc công khai) */
         <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-10">
+          {memoryData.intro_video_url&&<button className="store-button" onClick={()=>{audioRef.current?.pause();setIsPlaying(false);setMovieDone(false);}}>▶ {memoryData.is_owner?'Xem trải nghiệm người nhận':'Xem lại bộ phim kỷ niệm'}</button>}
           
           {/* A. Hero Card */}
           <motion.div
@@ -443,7 +428,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20">
                 <Eye className="w-3.5 h-3.5" />
-                <span>Đã chạm {memoryData.tap_count || 1} lần</span>
+                <span>Lượt mở {memoryData.tap_count || 1} lần</span>
               </span>
             </div>
 
@@ -466,68 +451,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             )}
           </motion.div>
 
-          {/* B. Audio Voice & Melody Player */}
-          {memoryData.audio_url && (
-            <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                <div>
-                  <p className="text-[11px] text-slate-400 uppercase tracking-widest font-semibold flex items-center gap-1.5">
-                    <Volume2 className="w-3.5 h-3.5 text-white" />
-                    <span>Bản Ghi Âm Thanh Kỷ Niệm</span>
-                  </p>
-                  <h3 className="text-base font-bold text-white mt-1">
-                    {memoryData.audio_title || 'Giai Điệu & Lời Thì Thầm'}
-                  </h3>
-                </div>
-
-                <div className="text-xs text-slate-400 font-mono">
-                  {currentTime} / {durationTime}
-                </div>
-              </div>
-
-              {/* Waveform Visualizer Simulation */}
-              <div className="flex items-center gap-1 h-12 my-4 px-2 bg-black/30 rounded-xl overflow-hidden">
-                {Array.from({ length: 48 }).map((_, idx) => {
-                  const isActive = (idx / 48) * 100 <= audioProgress;
-                  const baseHeight = Math.sin(idx * 0.4) * 50 + 50;
-                  return (
-                    <div
-                      key={idx}
-                      className={`flex-1 rounded-full transition-all duration-200 ${
-                        isActive ? 'bg-white shadow-silver-glow' : 'bg-white/20'
-                      }`}
-                      style={{
-                        height: isPlaying ? `${Math.max(15, (baseHeight * (isPlaying ? 0.9 : 0.5)))}%` : '20%',
-                      }}
-                    />
-                  );
-                })}
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <button
-                  onClick={togglePlayAudio}
-                  className="px-5 py-2.5 rounded-full bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center gap-2 cursor-pointer shadow-silver-glow"
-                >
-                  {isPlaying ? (
-                    <>
-                      <Pause className="w-4 h-4 fill-current" />
-                      <span>Tạm Dừng</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4 fill-current" />
-                      <span>Lắng Nghe</span>
-                    </>
-                  )}
-                </button>
-
-                <p className="text-xs text-slate-400 italic">
-                  Chạm vi chip NFC trên trang sức để phát trực tiếp
-                </p>
-              </div>
-            </div>
-          )}
+          {memoryData.audio_url&&<section className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 space-y-4"><h3 className="font-serif text-xl">{memoryData.audio_title||'Giai điệu dành cho bạn'}</h3><p className="text-sm text-slate-400">Bật nhạc khi đọc những lá thư của chúng mình.</p><audio key={memoryData.audio_url} ref={audioRef} controls preload="metadata" src={memoryData.audio_url} className="w-full" onError={()=>setAudioError('Chưa phát được audio. Bạn có thể tải lại kỷ vật rồi thử lại.')} onPlay={()=>setIsPlaying(true)} onPause={()=>setIsPlaying(false)}/>{audioError&&<p role="alert" className="text-amber-200 text-sm">{audioError} <button className="underline" onClick={()=>{setAudioError('');loadMemory(currentTag);}}>Tải lại</button></p>}</section>}
 
           {/* C. Hand-written Secret Letter (Chỉ hiển thị khi đã mở khóa PIN thành công) */}
           {memoryData.letter && (
@@ -578,6 +502,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
           )}
 
           {/* D. Photo Gallery */}
+          {memoryData.letters?.map((letter,index)=><details key={index} className="p-6 sm:p-8 rounded-3xl border border-white/15 bg-white/[0.03]"><summary className="font-serif text-xl cursor-pointer">✉ {letter.title}</summary><p className="font-serif whitespace-pre-wrap leading-loose text-slate-200 mt-6">{letter.body}</p></details>)}
           {memoryData.media_gallery && memoryData.media_gallery.length > 0 && (
             <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
               <div className="flex items-center justify-between mb-6">
@@ -587,7 +512,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                     Khoảnh Khắc Kỷ Niệm ({memoryData.media_gallery.length})
                   </h3>
                 </div>
-                <p className="text-xs text-slate-400">Độ phân giải siêu nét HD</p>
+
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -636,7 +561,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               <span>Sổ Lưu Niệm & Lời Chúc Gửi Tới Kỷ Vật</span>
             </h3>
             <p className="text-xs text-slate-400 mb-6">
-              Mỗi lời nhắn gửi tại đây sẽ được lưu trữ vĩnh viễn trong cơ sở dữ liệu Supabase gắn với chip NFC này.
+              Viết một lời nhắn cho người nhận. Lời nhắn sẽ xuất hiện sau khi người chuẩn bị quà duyệt.
             </p>
 
             <div className="space-y-3 mb-6">
@@ -689,7 +614,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 {guestSuccess ? (
                   <span className="text-xs text-emerald-400 flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Đã lưu lời chúc thành công!</span>
+                    <span>Đã lưu lời chúc, đang chờ duyệt.</span>
                   </span>
                 ) : <span />}
 
@@ -705,7 +630,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </form>
           </div>
 
-          {onNavigateToShop && (
+          {onNavigateToShop && memoryData.is_owner && (
             <div className="text-center pt-6">
               <button
                 onClick={onNavigateToShop}
@@ -746,11 +671,11 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             <form onSubmit={handleClaim} className="space-y-4">
               <div>
                 <label className="text-[11px] text-slate-400 block mb-1">
-                  Mã Claim Bảo Mật (Gợi ý demo: {currentTag === 'emoria-lumen' ? 'OWNER-LUMEN-2025' : 'OWNER-PULSE-2024'}):
+                  Mã nhận quyền được cung cấp cùng đơn hàng:
                 </label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: OWNER-LUMEN-2025"
+                  placeholder="Nhập mã nhận quyền"
                   value={claimCodeInput}
                   onChange={(e) => setClaimCodeInput(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-mono uppercase focus:outline-none focus:border-white/50"
@@ -777,7 +702,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
       {isEditorOpen && (
         <div 
           className="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4 overflow-y-auto"
-          onClick={() => setIsEditorOpen(false)}
+          onClick={() => {if(window.confirm('Đóng và bỏ thay đổi chưa lưu?'))setIsEditorOpen(false);}}
         >
           <div 
             className="w-full max-w-2xl my-8 p-6 sm:p-8 rounded-3xl bg-dark-900 border border-white/25 shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto"
@@ -791,12 +716,13 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                   <p className="text-xs text-slate-400">Chủ sở hữu Chip #{memoryData.tag_uid}</p>
                 </div>
               </div>
-              <button onClick={() => setIsEditorOpen(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => {if(window.confirm('Đóng và bỏ thay đổi chưa lưu?'))setIsEditorOpen(false);}} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveEditor} className="space-y-4 text-xs">
+              <MemoryMovieEditor tag={currentTag} path={introPath} onChange={setIntroPath} onBusy={setMovieBusy}/>
               <div>
                 <label className="text-slate-300 font-semibold block mb-1">Tiêu đề kỷ niệm:</label>
                 <input
@@ -850,16 +776,20 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 </div>
 
                 <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Link âm thanh (MP3 URL):</label>
+                  <label className="text-slate-300 font-semibold block mb-1">Đường dẫn audio đã tải:</label>
                   <input
                     type="text"
                     value={editAudioUrl}
-                    onChange={(e) => setEditAudioUrl(e.target.value)}
+                    readOnly
                     className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
                   />
                 </div>
               </div>
 
+              <section className="space-y-3"><h4 className="font-serif text-lg">02 · Những lá thư bổ sung</h4>{extraLetters.map((letter,index)=><div key={index} className="space-y-2 p-3 border border-white/10 rounded-xl"><label className="store-label">Tiêu đề thư<input className="store-input" required maxLength={200} value={letter.title} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,title:e.target.value}:x))}/></label><label className="store-label">Nội dung<textarea className="store-input" required maxLength={10000} rows={5} value={letter.body} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,body:e.target.value}:x))}/></label><button type="button" onClick={()=>setExtraLetters(prev=>prev.filter((_,i)=>i!==index))}>Gỡ thư</button></div>)}<button type="button" disabled={extraLetters.length>=10} className="store-button" onClick={()=>setExtraLetters(prev=>[...prev,{title:'Một lời nhắn dành cho bạn',body:''}])}>Thêm thư tay</button></section>
+              <MemoryMediaEditor tag={currentTag} items={editMedia} onChange={setEditMedia} audio={editAudioUrl} onAudio={setEditAudioUrl} onBusy={setMovieBusy}/>
+              <details className="p-4 border border-white/10 rounded-xl"><summary className="cursor-pointer">Duyệt lời nhắn ({guestEntries.filter(x=>x.is_hidden).length} chờ duyệt)</summary>{guestEntries.map(entry=><div key={entry.id} className="py-3 space-y-2 border-b border-white/10"><p>{entry.author_name} · {entry.is_hidden?'Chờ duyệt':'Đã hiển thị'}</p><p className="whitespace-pre-wrap">{entry.message}</p>{(entry.is_hidden?['approve','delete']:['delete']).map(action=><button type="button" className="underline mr-4" key={action} onClick={async()=>{try{setGuestEntries(await callStore('rpc_memory_guestbook',{p_tag:currentTag,p_id:entry.id,p_action:action}));}catch(e){setStudioError(e.message);}}}>{action==='approve'?'Duyệt hiển thị':'Xóa lời nhắn'}</button>)}</div>)}</details>
+              {studioError&&<p role="alert" className="text-red-300">{studioError}</p>}
               {/* 3 HÀNH ĐỘNG PIN RÕ RÀNG: KEEP / SET / REMOVE (CHỐNG MẤT PIN KHI UPDATE TITLE) */}
               <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3 mt-4">
                 <p className="font-semibold text-white">Chính Sách Khóa Mã PIN Bảo Mật:</p>
@@ -928,14 +858,14 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
                 <button
                   type="button"
-                  onClick={() => setIsEditorOpen(false)}
+                  onClick={() => {if(window.confirm('Đóng và bỏ thay đổi chưa lưu?'))setIsEditorOpen(false);}}
                   className="px-4 py-2 rounded-xl bg-white/10 text-slate-300 hover:text-white"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingEditor}
+                  disabled={isSavingEditor||movieBusy}
                   className="px-6 py-2 rounded-xl bg-white text-dark-950 font-bold uppercase tracking-wider hover:bg-slate-200 cursor-pointer shadow-silver-glow flex items-center gap-2 disabled:opacity-50"
                 >
                   {isSavingEditor && <Loader2 className="w-4 h-4 animate-spin" />}

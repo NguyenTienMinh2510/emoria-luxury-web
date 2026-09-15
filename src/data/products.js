@@ -75,7 +75,7 @@ export const products = [
     hasNFC: true,
     isNfcFeatured: true,
     tag: 'Flagship NFC',
-    description: 'Mặt dây chuyền la bàn sao tỏa sáng Lumen đại diện cho ánh sáng dẫn lối, tích hợp chip NFC chống nước tuyệt đối bảo mật 128-bit.',
+    description: 'Mặt dây chuyền la bàn sao tỏa sáng Lumen đại diện cho ánh sáng dẫn lối, tích hợp chip NFC kết nối với không gian ký ức.',
     nfcStory: {
       title: 'Ngôi Sao Dẫn Lối',
       audioName: 'Letter_To_My_Future_Self.mp3',

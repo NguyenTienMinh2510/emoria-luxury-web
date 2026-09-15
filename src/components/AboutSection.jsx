@@ -83,7 +83,7 @@ export default function AboutSection({ onOpenNfcDemo }) {
             </div>
             <h4 className="text-sm font-semibold text-white mb-1">Micro-Chip NFC Kháng Từ</h4>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Màng chắn từ tính độc quyền bảo vệ chip NFC hoạt động ổn định 100% bên trong lõi bạc S925.
+              Màng chắn từ tính độc quyền bảo vệ chip NFC được tích hợp bên trong lõi bạc S925.
             </p>
           </div>
 
@@ -101,7 +101,7 @@ export default function AboutSection({ onOpenNfcDemo }) {
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center mb-3">
               <ShieldCheck className="w-5 h-5 text-slate-200" />
             </div>
-            <h4 className="text-sm font-semibold text-white mb-1">Bảo Mật &amp; Lưu Trữ Vĩnh Cửu</h4>
+            <h4 className="text-sm font-semibold text-white mb-1">Bảo Mật &amp; Lưu Trữ Trên Máy Chủ</h4>
             <p className="text-xs text-slate-400 leading-relaxed">
               Mã hóa dữ liệu đám mây độc bản, cho phép chủ sở hữu toàn quyền cập nhật hoặc khóa riêng tư bất kỳ lúc nào.
             </p>

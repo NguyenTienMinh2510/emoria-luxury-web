@@ -189,6 +189,16 @@ export async function fetchMemoryView(tagUid, grantToken = null) {
       if (error) {
         return { success: false, message: error.message, source: 'supabase_rpc' };
       } else if (data) {
+        data.media_gallery=(data.media_gallery||[]).map(m=>({...m,path:m.url?.startsWith('storage://')?m.url.slice(10):null}));
+        data.audio_path=data.audio_url;
+        if(data.is_unlocked && (data.intro_video_path || data.audio_url?.startsWith('storage://') || data.media_gallery.some(m=>m.path))){
+          const session=await supabase.auth.getSession();
+          const response=await fetch('/api/memory-media',{method:'POST',headers:{'Content-Type':'application/json',...(session.data.session?{Authorization:`Bearer ${session.data.session.access_token}`}:{})},body:JSON.stringify({tag:cleanTag,grant:token||null})});
+          const signed=await response.json();if(!response.ok)return {success:false,message:signed.error};
+          data.media_gallery=data.media_gallery.map(m=>({...m,url:m.path?signed.urls[m.path]:m.url}));
+          if(data.audio_url?.startsWith('storage://'))data.audio_url=signed.urls[data.audio_url.slice(10)];
+          if(data.intro_video_path)data.intro_video_url=signed.urls[data.intro_video_path];
+        }
         return {
           success: data.success === true,
           message: data.message,
@@ -352,6 +362,7 @@ export async function updateMemorySpace(tagUid, payload) {
     });
 
     if (error) throw new Error(error.message);
+    if(!data?.success)throw new Error(data?.message || 'Không lưu được kỷ vật.');
     return data;
   }
 
@@ -399,28 +410,8 @@ export async function submitGuestbookEntry(tagUid, messageData) {
   const cleanTag = String(tagUid).toLowerCase().trim();
 
   if (isSupabaseConfigured()) {
-    // 1. Tìm memory_id
-    const { data: memData } = await supabase
-      .from('memory_spaces')
-      .select('id')
-      .eq('tag_uid', cleanTag)
-      .single();
-
-    if (memData) {
-      const { data, error } = await supabase
-        .from('guestbook_entries')
-        .insert({
-          memory_id: memData.id,
-          author_name: messageData.author.trim(),
-          relationship: messageData.relationship || 'Người thương',
-          message: messageData.message.trim(),
-        })
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return { success: true, data };
-    }
+    const {data,error}=await supabase.rpc('rpc_guestbook',{p_tag:cleanTag,p_token:getStoredGrantToken(cleanTag)||null,p_name:messageData.author.trim(),p_message:messageData.message.trim(),p_relationship:messageData.relationship||''});
+    if(error||!data?.success)throw new Error(error?.message||data?.message||'Không gửi được lời nhắn.');return data;
   }
 
   // Offline fallback

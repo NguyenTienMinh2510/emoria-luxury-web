@@ -80,6 +80,8 @@ export default function ShopView({
         return { label: 'Đang Vận Chuyển', bg: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' };
       case 'completed':
         return { label: 'Đã Giao Thành Công', bg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' };
+      case 'cancelled':
+        return {label:'Đã hủy',bg:'bg-red-500/20 text-red-300 border-red-500/40'};
       default:
         return { label: 'Đang Xử Lý', bg: 'bg-slate-500/20 text-slate-300 border-slate-500/40' };
     }
@@ -103,7 +105,7 @@ export default function ShopView({
           </h1>
           
           <p className="text-sm sm:text-base text-slate-300 font-light leading-relaxed mb-6">
-            Mỗi chế tác trang sức Bạc Ý S925 cao cấp là một kiệt tác thủ công độc bản, ẩn chứa vi chip NFC lưu trữ hình ảnh, âm thanh và lời nhắn vĩnh cửu.
+            Mỗi chế tác trang sức Bạc Ý S925 cao cấp là một kiệt tác thủ công độc bản, ẩn chứa vi chip NFC lưu trữ hình ảnh, âm thanh và lời nhắn trên máy chủ.
           </p>
 
           {/* Sub Navigation Tabs: Cửa Hàng vs Tra Cứu Đơn Hàng */}
@@ -146,7 +148,7 @@ export default function ShopView({
               <SmartphoneNfc className="w-5 h-5 text-slate-300 flex-shrink-0" />
               <div className="text-xs">
                 <p className="font-semibold text-white">NFC Memory Chip</p>
-                <p className="text-slate-400 font-light">Chạm mở ảnh, video & giọng nói vĩnh viễn</p>
+                <p className="text-slate-400 font-light">Chạm mở ảnh, video & giọng nói trên máy chủ</p>
               </div>
             </div>
             <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center gap-3">

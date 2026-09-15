@@ -17,7 +17,7 @@ process.env.VITE_SUPABASE_URL = '';
 process.env.VITE_SUPABASE_ANON_KEY = '';
 process.env.VITE_SUPABASE_PUBLISHABLE_KEY = '';
 const { fetchMemoryView, verifyMemoryPin, updateMemorySpace, getStoredGrantToken, setStoredGrantToken } = await import('../src/services/memoryService.js');
-const { calculateOrderFinancials, createOrder } = await import('../src/services/orderBackendService.js');
+const { createOrder } = await import('../src/services/orderBackendService.js');
 const { getSystemAvailability, updateSystemAvailability } = await import('../src/services/authRoleService.js');
 
 let passedTests = 0;
@@ -114,35 +114,8 @@ async function runSecurityAudit() {
   // -------------------------------------------------------------
   console.log('\n--- PHẦN 2: KIỂM THỬ ĐƠN HÀNG & TÍNH TOÁN TÀI CHÍNH ĐỘC LẬP ---');
 
-  // Test 5: Tính toán tài chính độc lập chống can thiệp giá từ client
-  const spoofedItems = [
-    { id: 'emoria-pulse', name: 'Nhẫn Emoria Pulse', price: 1000, quantity: 1 } // Giả mạo giá 1000đ từ client
-  ];
-  const financials = calculateOrderFinancials(spoofedItems, false);
-  // Giá chuẩn của emoria-pulse trong catalog là 269.000 VNĐ
-  assert(
-    financials.subtotal === 269000,
-    `Chống gian lận giá: Hệ thống tự tra cứu giá chuẩn (269.000 VNĐ) thay vì tin giá 1.000đ từ client.`
-  );
-  assert(
-    financials.shippingFee === 30000, // Đơn dưới 1tr có phí vận chuyển 30.000 VNĐ
-    `Chính sách vận chuyển: Đơn hàng dưới 1.000.000 VNĐ tính phí vận chuyển 30.000 VNĐ.`
-  );
-
-  // Test 6: Đơn hàng thanh toán VietQR không được tự động xác nhận client-side
-  const newOrderResult = await createOrder({
-    customerName: 'Nguyễn Văn Kiểm Thử',
-    phone: '0901234567',
-    address: '123 Đồng Khởi, Q.1',
-    city: 'Hồ Chí Minh',
-    paymentMethod: 'vietqr',
-    items: spoofedItems,
-  });
-
-  assert(
-    newOrderResult.success === true && newOrderResult.isDemo === true && newOrderResult.order.status === 'pending_payment',
-    `Bảo mật thanh toán: Đơn hàng VietQR bắt buộc phải ở trạng thái 'pending_payment', tuyệt đối không tự 'confirmed'.`
-  );
+  const result=await createOrder({customerName:'Fixture',phone:'0900000000',address:'Fake',items:[{id:'emoria-pulse',quantity:1}]});
+  assert(result.success===false && result.retryable===false && !result.order,'Thiếu cấu hình backend không tạo đơn demo hoặc báo thành công giả.');
 
   // -------------------------------------------------------------
   // PHẦN 3: BẢO MẬT TOÀN HỆ THỐNG & TÍNH KHẢ DỤNG (AVAILABILITY GATE)
@@ -169,82 +142,8 @@ async function runSecurityAudit() {
 
 }
 
-const configuredAudit = spawnSync(process.execPath, ['--input-type=module', '-e', `
-  import assert from 'node:assert/strict';
-  const { supabase, isSupabaseConfigured } = await import('./src/lib/supabaseClient.js');
-  const { createOrder } = await import('./src/services/orderBackendService.js');
-  const auth = await import('./src/services/authRoleService.js');
-  const legacy = await import('./src/services/memoryViewerService.js');
-  assert.equal(isSupabaseConfigured(), true);
-  const store = new Map();
-  globalThis.localStorage = { getItem: k => store.get(k) ?? null, setItem: (k,v) => store.set(k,v) };
-  globalThis.window = { localStorage };
-  const payload = { customerName: 'Test', phone: '0901234567', address: 'Test address', paymentMethod: 'vietqr', items: [{ id: 'emoria-pulse', quantity: 1 }] };
-  supabase.auth.getSession = async () => ({ data: { session: null }, error: null });
-  for (const scenario of ['error', 'exception', 'malformed', 'denied']) {
-    store.clear();
-    const called = [];
-    supabase.from = () => { throw new Error('Direct table inserts are forbidden'); };
-    supabase.rpc = async (name, args) => {
-      called.push(name);
-      assert.equal(args.p_payload.items[0].price, undefined);
-      assert.ok(args.p_request_id);
-      if (scenario === 'exception') throw new Error('network down');
-      if (scenario === 'error') return { error: { message: 'denied' } };
-      return { data: scenario === 'denied' ? { success: false } : {} };
-    };
-    const result = await createOrder(payload);
-    assert.equal(result.success, false);
-    assert.equal(result.isDraft, true);
-    assert.equal(result.isDemo, undefined);
-    assert.equal(result.order, undefined);
-    assert.equal(result.error, 'Không thể đồng bộ đơn hàng lên hệ thống máy chủ. Đơn hàng đã được lưu nháp tại thiết bị của bạn.');
-    assert.equal(store.has('emoria_orders_v1'), false);
-    const drafts = JSON.parse(store.get('emoria_draft_orders'));
-    assert.equal(drafts.length, 1);
-    assert.equal(drafts[0].status, 'draft');
-    assert.equal(drafts[0].items.length, 1);
-    assert.deepEqual(called, ['rpc_create_order']);
-  }
-  supabase.rpc = async () => ({ data: { success: true, order: { id: 'EMO-server', status: 'pending_payment', totals: { finalTotal: 321000 } } } });
-  const saved = await createOrder(payload);
-  assert.equal(saved.success, true);
-  assert.equal(saved.isDemo, undefined);
-  assert.equal(saved.order.status, 'pending_payment');
-  assert.equal(saved.order.totals.finalTotal, 321000);
-  assert.equal(saved.order.id, 'EMO-server');
-  localStorage.setItem = () => { throw new Error('quota exceeded'); };
-  supabase.rpc = async () => ({ error: { message: 'denied' } });
-  const unsaved = await createOrder(payload);
-  assert.equal(unsaved.success, false);
-  assert.equal(unsaved.isDraft, false);
-
-  store.set('emoria_system_availability_v1', JSON.stringify({ isMaintenanceMode: false, vipPasscode: 'FORGED' }));
-  for (const mode of ['error', 'exception', 'malformed', 'denied']) {
-    supabase.rpc = async () => {
-      if (mode === 'exception') throw new Error('offline');
-      return mode === 'error' ? { error: { message: 'offline' } } : { data: mode === 'denied' ? { success: false } : {} };
-    };
-    assert.equal((await auth.fetchSystemStatus()).success, false);
-    assert.equal(auth.getSystemAvailability().isMaintenanceMode, true);
-    assert.equal(auth.getSystemAvailability().vipPasscode, '');
-    await assert.rejects(() => legacy.getMemoryByTag('emoria-pulse'));
-  }
-  supabase.rpc = async name => {
-    assert.equal(name, 'rpc_get_system_status');
-    return { data: { success: true, is_maintenance_mode: false, maintenance_message: 'server' } };
-  };
-  assert.equal((await auth.fetchSystemStatus()).success, true);
-  assert.equal(auth.getSystemAvailability().maintenanceMessage, 'server');
-  await assert.rejects(() => auth.updateSystemAvailability({ vipPasscode: 'FORGED' }));
-  console.log('[PASS] Configured order failures/drafts, server success, storage failure, maintenance and legacy fail-closed');
-`], {
-  cwd: new URL('..', import.meta.url),
-  env: { ...process.env, VITE_SUPABASE_URL: 'https://security-test.supabase.co', VITE_SUPABASE_ANON_KEY: 'test-anon-key' },
-  encoding: 'utf8', timeout: 15000,
-});
-strictAssert.equal(configuredAudit.status, 0, configuredAudit.error?.message || configuredAudit.stderr);
-console.log(configuredAudit.stdout);
+const configuredAudit=spawnSync(process.execPath,['tests/order_service.test.mjs'],{cwd:new URL('..',import.meta.url),env:process.env,encoding:'utf8',timeout:15000});
+strictAssert.equal(configuredAudit.status,0,configuredAudit.stderr);console.log(configuredAudit.stdout);
 
 runSecurityAudit().catch((err) => {
   console.error('Lỗi khi chạy bộ kiểm thử:', err);

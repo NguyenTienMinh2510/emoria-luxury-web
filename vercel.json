@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/api/memory-media", "destination": "/api/memory-media" },
+    { "source": "/api/analytics", "destination": "/api/analytics" },
     {
       "source": "/(.*)",
       "destination": "/index.html"

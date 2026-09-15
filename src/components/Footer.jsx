@@ -23,15 +23,15 @@ export default function Footer() {
         <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-[11px] text-slate-300">
           <div className="flex items-center gap-1.5">
             <Shield className="w-3.5 h-3.5 text-slate-400" />
-            <span>Cam kết Bạc Chuẩn S925</span>
+            <span>Trang sức EMORIA</span>
           </div>
           <div className="flex items-center gap-1.5">
             <SmartphoneNfc className="w-3.5 h-3.5 text-slate-400" />
-            <span>Bảo hành Chip NFC Trọn Đời</span>
+            <span>Kỷ niệm kết nối NFC</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-slate-400" />
-            <span>Làm Mới Bạc Miễn Phí</span>
+            <span>Hỗ trợ theo chính sách cửa hàng</span>
           </div>
         </div>
 

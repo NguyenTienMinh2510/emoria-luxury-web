@@ -6,6 +6,11 @@ import {
   Settings, UserCheck, Eye, Edit3, Lock, Unlock, Database,
   BookOpen, MessageSquare, Plus, Trash2, Check, EyeOff, FileText, Send
 } from 'lucide-react';
+import MarketingPanel from './MarketingPanel';
+import NfcOperations,{OrderGiftSetup} from './NfcOperations';
+import StoreAdminPanel from './StoreAdminPanel';
+import MarkdownContent from './MarkdownContent';
+import { callStore } from '../services/catalogService';
 import { listOrdersForAdmin, updateOrderStatus } from '../services/orderBackendService';
 import { 
   getSystemAvailability, 
@@ -16,7 +21,7 @@ import {
   updateMemoryAvailability 
 } from '../services/memoryService';
 import { 
-  getPublishedArticles, 
+  getArticleAdminData, 
   saveArticleAdmin, 
   moderateArticleComment, 
   DEMO_ARTICLES, 
@@ -28,6 +33,10 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
   
   // Orders State
   const [orders, setOrders] = useState([]);
+  const [orderPage,setOrderPage]=useState(0);
+  const [orderSearch,setOrderSearch]=useState('');
+  const [preview,setPreview]=useState(false);
+  const [savingArticle,setSavingArticle]=useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
 
@@ -53,38 +62,23 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
     status: 'draft',
     allow_comments: true
   });
-  const [pendingCommentsList, setPendingCommentsList] = useState([
-    {
-      id: 'comm-pending-1',
-      article_title: 'Nghệ Thuật Chế Tác Kim Hoàn & Đá Quý',
-      author_name: 'Khách hàng VIP 88',
-      content: 'Chiếc nhẫn này có thể khắc tên riêng laser vào mặt trong lòng nhẫn được không?',
-      created_at: 'Hôm nay 14:20',
-      status: 'pending'
-    },
-    {
-      id: 'comm-pending-2',
-      article_title: 'Bí Mật Công Nghệ NFC',
-      author_name: 'Đặng Thanh Thảo',
-      content: 'Chính sách bảo hành chip vi mạch là trọn đời hay 2 năm vậy shop?',
-      created_at: 'Hôm qua 18:45',
-      status: 'pending'
-    }
-  ]);
+  const [pendingCommentsList,setPendingCommentsList]=useState([]);
 
   // Load orders & memories on open
   const loadData = async () => {
     setIsLoadingOrders(true);
     try {
-      const ords = await listOrdersForAdmin();
+      const ords = await listOrdersForAdmin(orderPage,orderSearch);
       setOrders(ords);
     } catch (e) {
-      console.warn('Lỗi tải orders:', e);
+      setSaveMessage(e.message);
       setOrders([]);
     } finally {
       setIsLoadingOrders(false);
     }
-    setMemories(getAllShowcaseMemories());
+    const editorial = await getArticleAdminData();
+    if(editorial.success){setAdminArticles(editorial.articles);setPendingCommentsList(editorial.comments);}else setSaveMessage(editorial.message);
+    setMemories([]);
     setSystemConfig(getSystemAvailability());
   };
 
@@ -93,7 +87,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
       loadData();
       setSaveMessage('');
     }
-  }, [isOpen]);
+  }, [isOpen,orderPage,orderSearch]);
 
   // Helpers cho Bài viết
   const handleOpenCreateArticle = () => {
@@ -109,6 +103,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
       status: 'draft',
       allow_comments: true
     });
+    setPreview(false);
     setIsEditorOpen(true);
   };
 
@@ -125,23 +120,28 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
       status: art.status || 'draft',
       allow_comments: art.allow_comments ?? true
     });
+    setPreview(false);
     setIsEditorOpen(true);
   };
 
   const handleSaveArticle = async (statusOverride) => {
+    if(savingArticle)return;
+    setSavingArticle(true);
     const payload = {
       ...articleForm,
       status: statusOverride || articleForm.status,
-      slug: articleForm.slug || articleForm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+      slug: articleForm.slug || articleForm.title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
     };
 
     const res = await saveArticleAdmin({ articleId: editingArticleId, payload });
+    setSavingArticle(false);
     if (res.success) {
       if (editingArticleId) {
         setAdminArticles(prev => prev.map(a => a.id === editingArticleId ? { ...a, ...payload } : a));
       } else {
         setAdminArticles(prev => [{ id: res.article_id || 'art-' + Date.now(), ...payload, view_count: 0, likes_count: 0, published_at: new Date().toISOString() }, ...prev]);
       }
+      await loadData();
       setIsEditorOpen(false);
       setSaveMessage(`Đã ${payload.status === 'published' ? 'xuất bản' : 'lưu nháp'} bài viết thành công!`);
       setTimeout(() => setSaveMessage(''), 3000);
@@ -152,7 +152,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
   };
 
   const handleToggleArticleStatus = async (art) => {
-    const nextStatus = art.status === 'published' ? 'draft' : 'published';
+    const nextStatus = art.status === 'published' ? 'archived' : 'published';
     const res = await saveArticleAdmin({
       articleId: art.id,
       payload: { ...art, status: nextStatus }
@@ -180,6 +180,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
 
   // Handle Order Status Update
   const handleStatusChange = async (orderId, newStatus) => {
+    if(newStatus==='shipping'){setSaveMessage('Mở “Chi tiết món hàng & chuẩn bị NFC”, nhập mã vận đơn rồi bấm Bàn giao vận chuyển.');return;}
     setUpdatingOrderId(orderId);
     try {
       await updateOrderStatus(orderId, newStatus);
@@ -222,7 +223,9 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
       unlockDate: nextStatus === 'timed_lock' ? '2026-10-20T18:00:00.000Z' : null,
       message: nextStatus === 'timed_lock' ? 'Đang niêm phong đến ngày kỷ niệm' : 'Khả dụng bình thường',
     });
-    setMemories(getAllShowcaseMemories());
+    const editorial = await getArticleAdminData();
+    if(editorial.success){setAdminArticles(editorial.articles);setPendingCommentsList(editorial.comments);}else setSaveMessage(editorial.message);
+    setMemories([]);
     if (onRefresh) onRefresh();
   };
 
@@ -282,6 +285,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
           </div>
 
           {/* Navigation Tabs */}
+          <div className="flex flex-wrap gap-2 mb-4">{[['marketing','Phân tích marketing'],['catalog','Sản phẩm & kho'],['store-settings','Cấu hình bán hàng'],['contacts','Liên hệ']].map(([key,label])=><button key={key} onClick={()=>setActiveTab(key)} className={activeTab===key?'store-button':'px-4 py-2 text-sm bg-white/5 rounded-xl'}>{label}</button>)}</div>
           <div className="flex flex-wrap items-center gap-2 mb-6 border-b border-white/10 pb-3">
             <button
               onClick={() => setActiveTab('orders')}
@@ -328,7 +332,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
               }`}
             >
               <SmartphoneNfc className="w-4 h-4" />
-              <span>Chip NFC ({memories.length})</span>
+              <span>Chip NFC</span>
             </button>
 
             <button
@@ -364,6 +368,11 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
           )}
 
           {/* ================= TAB 1: ORDERS ================= */}
+          {activeTab==='marketing' && <MarketingPanel />}
+          {activeTab==='catalog' && <StoreAdminPanel />}
+          {activeTab==='store-settings' && <StoreAdminPanel section="settings" />}
+          {activeTab==='contacts' && <StoreAdminPanel section="contacts" />}
+          {activeTab==='orders' && <div className="flex flex-wrap gap-3 mb-4"><input aria-label="Tìm mã đơn" placeholder="Tìm mã đơn" className="store-input !w-64" value={orderSearch} onChange={e=>{setOrderSearch(e.target.value);setOrderPage(0);}}/><button disabled={!orderPage} onClick={()=>setOrderPage(p=>p-1)}>Trước</button><span>Trang {orderPage+1}</span><button disabled={orders.length<25} onClick={()=>setOrderPage(p=>p+1)}>Sau</button><button onClick={async()=>{try{const n=await callStore('rpc_expire_orders');await loadData();setSaveMessage(`Đã xử lý ${n} đơn hết hạn.`);}catch(e){setSaveMessage(e.message);}}}>Xử lý đơn hết hạn</button></div>}
           {activeTab === 'orders' && (
             <div className="space-y-4">
               {isLoadingOrders ? (
@@ -378,6 +387,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
               ) : (
                 orders.map((order) => (
                   <div key={order.id} className="p-4 rounded-2xl bg-black/40 border border-white/10 text-xs space-y-3">
+                    <OrderGiftSetup order={order} onRefresh={loadData}/>
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold text-white text-sm">{order.id}</span>
@@ -409,12 +419,12 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                         onChange={(e) => handleStatusChange(order.id, e.target.value)}
                         className="px-3 py-1.5 rounded-lg bg-black/80 border border-white/20 text-white font-medium focus:outline-none focus:border-white/50 cursor-pointer disabled:opacity-50"
                       >
-                        <option value="pending_payment">Chờ Thanh Toán VietQR</option>
-                        <option value="confirmed">Đã Tiếp Nhận & Xác Nhận</option>
-                        <option value="crafting_nfc">Đang Đúc Bạc & Nạp Chip NFC</option>
-                        <option value="shipping">Đang Vận Chuyển</option>
-                        <option value="completed">Đã Giao Hoàn Tất</option>
-                        <option value="cancelled">Đã Hủy Đơn</option>
+                        <option disabled={order.status!=='pending_payment'} value="pending_payment">Chờ Thanh Toán VietQR</option>
+                        <option disabled={!['pending_payment','confirmed'].includes(order.status)} value="confirmed">Đã Tiếp Nhận & Xác Nhận</option>
+                        <option disabled={!['confirmed','crafting_nfc'].includes(order.status)} value="crafting_nfc">Đang Đúc Bạc & Nạp Chip NFC</option>
+                        <option disabled={!['crafting_nfc','shipping'].includes(order.status)} value="shipping">Đang Vận Chuyển</option>
+                        <option disabled={!['shipping','completed'].includes(order.status)} value="completed">Đã Giao Hoàn Tất</option>
+                        <option disabled={!['pending_payment','confirmed','crafting_nfc','cancelled'].includes(order.status)} value="cancelled">Đã Hủy Đơn</option>
                       </select>
                     </div>
                   </div>
@@ -473,79 +483,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
           )}
 
           {/* ================= TAB 3: NFC MEMORY TAGS ================= */}
-          {activeTab === 'nfc' && (
-            <div className="space-y-4">
-              {memories.map((mem) => (
-                <div key={mem.tagUid} className="p-4 rounded-2xl bg-black/40 border border-white/10 text-xs space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm">{mem.jewelryName}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-slate-300 font-mono">
-                          #{mem.tagUid}
-                        </span>
-                      </div>
-                      <p className="text-slate-400 text-[11px] mt-0.5">Tiêu đề: {mem.title}</p>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="text-slate-500 text-[10px]">Cơ chế sở hữu:</p>
-                      <p className="font-mono text-amber-300 font-bold">Khóa Claim Code</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-400">Trạng thái khả dụng:</span>
-                      <span className={`px-2 py-0.5 rounded-md font-bold uppercase text-[10px] ${
-                        mem.availability?.status === 'available'
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                          : mem.availability?.status === 'timed_lock'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                      }`}>
-                        {mem.availability?.status || 'available'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleToggleTagAvailability(mem.tagUid, 'available')}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold cursor-pointer ${
-                          mem.availability?.status === 'available'
-                            ? 'bg-white text-dark-950 font-bold'
-                            : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                        }`}
-                      >
-                        Khả Dụng
-                      </button>
-                      <button
-                        onClick={() => handleToggleTagAvailability(mem.tagUid, 'timed_lock')}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold cursor-pointer ${
-                          mem.availability?.status === 'timed_lock'
-                            ? 'bg-white text-dark-950 font-bold'
-                            : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                        }`}
-                      >
-                        Hẹn Giờ Mở
-                      </button>
-                      <button
-                        onClick={() => handleToggleTagAvailability(mem.tagUid, 'suspended')}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold cursor-pointer ${
-                          mem.availability?.status === 'suspended'
-                            ? 'bg-white text-dark-950 font-bold'
-                            : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                        }`}
-                      >
-                        Tạm Khóa
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-              ))}
-            </div>
-          )}
+          {activeTab==='nfc'&&<NfcOperations/>}
 
           {/* ================= TAB: ARTICLES MANAGEMENT ================= */}
           {activeTab === 'articles' && (
@@ -573,7 +511,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                       <span>{editingArticleId ? 'Chỉnh Sửa Bài Viết' : 'Soạn Bài Viết Mới'}</span>
                     </h4>
                     <button
-                      onClick={() => setIsEditorOpen(false)}
+                      onClick={() => {if(window.confirm('Đóng trình soạn thảo? Thay đổi chưa lưu sẽ mất.'))setIsEditorOpen(false);}}
                       className="p-1 rounded-lg text-slate-400 hover:text-white"
                     >
                       <X className="w-4 h-4" />
@@ -672,6 +610,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
+                        disabled={savingArticle}
                         onClick={() => handleSaveArticle('draft')}
                         className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold transition-all cursor-pointer"
                       >
@@ -679,6 +618,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                       </button>
                       <button
                         type="button"
+                        disabled={savingArticle}
                         onClick={() => handleSaveArticle('published')}
                         className="px-5 py-2 rounded-xl bg-white text-dark-950 font-bold hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
                       >
@@ -690,6 +630,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                 </div>
               )}
 
+              {isEditorOpen && <><button className="store-button mb-4" onClick={()=>setPreview(!preview)}>Xem trước nội dung</button>{preview && <div className="p-6 border border-white/20 rounded-xl mb-5"><h2 className="font-serif text-2xl mb-4">{articleForm.title}</h2><MarkdownContent content={articleForm.content}/></div>}</>}
               {/* Articles Table */}
               <div className="space-y-3">
                 {adminArticles.map((art) => (

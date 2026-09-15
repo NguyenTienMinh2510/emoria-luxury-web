@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {createClient} from '@supabase/supabase-js';
+const config=JSON.parse(fs.readFileSync('.local/supabase.json','utf8'));
+assert.equal(config.API_URL,'http://127.0.0.1:55321','Only EMORIA sandbox');
+const credentials=JSON.parse(fs.readFileSync('.local/accounts.json','utf8'));
+const client=createClient(config.API_URL,config.ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+const {error}=await client.auth.signInWithPassword({email:'admin@emoria.test',password:credentials.password});
+assert.ifError(error);const role=await client.rpc('is_admin');assert.ifError(role.error);assert.equal(role.data,true);
+await client.auth.signOut();
+fs.writeFileSync('.local/ADMIN-CO-DINH.md',`# Tài khoản admin EMORIA local\n\nTrang đăng nhập: http://127.0.0.1:3000\n\nEmail: admin@emoria.test\n\nMật khẩu: ${credentials.password}\n\nTài khoản đã được xác minh đăng nhập và có quyền admin thực tại Supabase local. Mật khẩu không tự đổi khi build hoặc chạy lại npm run sandbox. Giữ .local/accounts.json và Docker volumes. Không dùng tài khoản thử nghiệm này cho production, không đưa file này vào gói bàn giao hoặc Git.\n\nSau đăng nhập, mở nút Quản trị để quản lý đơn, catalog, marketing và chip NFC.\n`);
+console.log('PASS: fixed admin login and server role. Credentials: .local/ADMIN-CO-DINH.md (not printed).');

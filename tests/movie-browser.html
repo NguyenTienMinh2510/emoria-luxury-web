@@ -1,0 +1,15 @@
+<!doctype html><html lang="vi"><meta charset="utf-8"><title>EMORIA — kiểm thử xuất video</title><style>body{background:#030712;color:#fff;font:16px system-ui;padding:32px}button{padding:16px}video{display:block;max-width:720px;width:100%;margin-top:24px}</style><h1>Kiểm thử video thật</h1><p>Ghép hai ảnh công khai thành 8 giây, rồi cắt/ghép lại video xuất để xác nhận đọc clip, âm thanh và thời lượng. Không tải dữ liệu lên server.</p><button id="run">Chạy kiểm thử video</button><p id="status" role="status">Chưa chạy</p><video id="preview" controls playsinline></video><script type="module">
+import {inspectMovieFile,renderMemoryMovie} from '/src/services/memoryMovie.js';
+const button=document.querySelector('#run'),status=document.querySelector('#status'),preview=document.querySelector('#preview');
+button.onclick=async()=>{button.disabled=true;const urls=[];try{
+ const clips=[];for(const name of ['product_lumen.png','product_pulse.png']){const blob=await (await fetch('/assets/'+name)).blob();const clip=await inspectMovieFile(new File([blob],name,{type:'image/png'}));clip.seconds=4;clip.caption=name;clips.push(clip);urls.push(clip.url);}
+ const output=await renderMemoryMovie(clips,{onProgress:p=>status.textContent='Ghép ảnh: '+Math.round(p*100)+'%'});
+ const original=await inspectMovieFile(output);urls.push(original.url);preview.src=original.url;
+ if(Math.abs(original.duration-8)>.7)throw new Error('Thời lượng ảnh sai: '+original.duration+' giây (cần 8).');
+ original.start=1;original.end=3;
+ const second=await renderMemoryMovie([original,{...clips[0],seconds:2}],{keepClipAudio:true,onProgress:p=>status.textContent='Ghép clip và ảnh: '+Math.round(p*100)+'%'});
+ const final=await inspectMovieFile(second);urls.push(final.url);preview.src=final.url;
+ if(Math.abs(final.duration-4)>.7)throw new Error('Thời lượng trim sai: '+final.duration+' giây (cần 4).');
+ status.textContent=`PASS: ảnh ${original.duration.toFixed(2)}s; clip cắt + ảnh ${final.duration.toFixed(2)}s; ${second.type}; ${second.size} bytes. Video 720p xem bên dưới.`;
+}catch(error){status.textContent='FAIL: '+error.message;console.error(error);}finally{button.disabled=false;}};
+</script></html>

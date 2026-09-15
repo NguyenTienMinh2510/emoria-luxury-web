@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ChevronDown, CheckCircle2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
-export default function HeroSection({ onExploreClick, onLoginSuccess }) {
+export default function HeroSection({ onExploreClick, onLoginSuccess, onOpenAuth }) {
   // authState: 'banner' | 'login' | 'register'
   const [authState, setAuthState] = useState('banner');
   const [username, setUsername] = useState('');
@@ -279,7 +279,7 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
               {/* Nút Đăng nhập */}
               <button
                 onClick={() => {
-                  setAuthState('login');
+                  onOpenAuth?.();
                   setAuthError('');
                 }}
                 className="group relative px-4 py-2 text-base sm:text-lg font-sans font-medium tracking-wide text-slate-200 hover:text-white transition-all duration-300"
@@ -295,7 +295,7 @@ export default function HeroSection({ onExploreClick, onLoginSuccess }) {
               {/* Nút Đăng ký */}
               <button
                 onClick={() => {
-                  setAuthState('register');
+                  onOpenAuth?.();
                   setAuthError('');
                 }}
                 className="group relative px-4 py-2 text-base sm:text-lg font-sans font-medium tracking-wide text-slate-200 hover:text-white transition-all duration-300"

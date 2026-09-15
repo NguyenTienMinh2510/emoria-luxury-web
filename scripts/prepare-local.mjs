@@ -3,10 +3,15 @@ const target = 'local-stack/supabase';
 fs.mkdirSync(`${target}/migrations`, { recursive: true });
 const files = ['20260913_init_emoria_schema.sql','20260914_atomic_checkout.sql','20260914_articles_system.sql','202609140001_store_operations.sql','202609140002_editor_security.sql'];
 files.forEach((file, i) => fs.copyFileSync(`supabase/migrations/${file}`, `${target}/migrations/20260914000${i+1}_${file.split('_').slice(1).join('_')}`));
+for(const file of fs.readdirSync('supabase/migrations').filter(f=>/^\d{14}_.+\.sql$/.test(f)))fs.copyFileSync(`supabase/migrations/${file}`,`${target}/migrations/${file}`);
 let config = fs.readFileSync(`${target}/config.toml`, 'utf8');
 config = config.replace('project_id = "local-stack"','project_id = "emoria-sandbox"').replaceAll('5432','5532');
 config = config.replace(/site_url = .*/, 'site_url = "http://127.0.0.1:3000"').replace(/additional_redirect_urls = .*/, 'additional_redirect_urls = ["http://127.0.0.1:3000/**", "http://localhost:3000/**"]');
-for (const section of ['analytics','realtime','studio','edge_runtime','storage.vector']) config=config.replace(new RegExp('(\\['+section.replace('.','\\.')+'\\][\\s\\S]*?enabled = )true'), '$1false');
+// Only edit the named section. Crossing section boundaries disabled Auth/Storage on repeated runs.
+for (const [section,enabled] of Object.entries({analytics:false,realtime:false,studio:false,edge_runtime:false,'storage.vector':false,auth:true,storage:true,local_smtp:true})) {
+ config=config.replace(new RegExp('(^\\['+section.replaceAll('.','\\.')+'\\][^]*?)(?=^\\[|$(?![^]))','m'),body=>body.replace(/^enabled = (true|false)$/m,`enabled = ${enabled}`));
+}
+config=config.replace(/^minimum_password_length = \d+$/m,'minimum_password_length = 8');
 fs.writeFileSync(`${target}/config.toml`, config);
 fs.writeFileSync(`${target}/seed.sql`, fs.readFileSync('supabase/seeds/demo_memory_spaces.sql','utf8')+'\n'+fs.readFileSync('supabase/seeds/checkout_variants_inventory.sql','utf8')+`\nUPDATE public.store_settings SET sandbox=true,sales_enabled=true,cod_enabled=true,transfer_enabled=true,contact_email='support@emoria.example',address='Cửa hàng trực tuyến thử nghiệm',shipping_policy='Chính sách thử nghiệm: phí giao 30.000 đ, miễn phí từ 1.000.000 đ. Không giao hàng thật.',return_policy='Chính sách thử nghiệm. Cần thay bằng điều kiện đổi trả đã duyệt trước khi mở bán.',privacy_policy='Môi trường thử nghiệm. Chỉ nhập thông tin giả lập.' WHERE id=true;
 INSERT INTO public.articles(slug,title,excerpt,content,category,cover_image,status,published_at) VALUES

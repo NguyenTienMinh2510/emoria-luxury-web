@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
+import AnalyticsConsent from './components/AnalyticsConsent';
+import {trackShopEvent} from './services/analyticsService';
 import { useStore } from './components/StoreProvider';
 import ShopView from './views/ShopView';
 import MemorySpaceView from './views/MemorySpaceView';
@@ -41,6 +43,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [recovery, setRecovery] = useState(false);
   const [routeReady, setRouteReady] = useState(false);
+  const [systemReady,setSystemReady]=useState(false);
   const [currentTag, setCurrentTag] = useState('emoria-lumen');
   const [selectedArticleSlug, setSelectedArticleSlug] = useState('nghe-thuat-che-tac-da-quy-emoria');
   const [activeSection, setActiveSection] = useState('collection');
@@ -102,7 +105,7 @@ export default function App() {
   // Listen to Supabase Auth State on mount
   useEffect(() => {
     let active = true;
-    fetchSystemStatus().then(() => { if (active) setSystemConfig(getSystemAvailability()); });
+    fetchSystemStatus().then(() => { if (active) setSystemConfig(getSystemAvailability()); }).finally(()=>{if(active)setSystemReady(true);});
     return () => { active = false; };
   }, []);
 
@@ -127,7 +130,7 @@ export default function App() {
       const q=new URLSearchParams(window.location.search);
       if(q.get('article')) { setSelectedArticleSlug(q.get('article'));setCurrentView('article-detail'); }
       else if(q.get('tag') || q.get('memory')) {setCurrentTag(q.get('tag') || q.get('memory'));setCurrentView('memory');}
-      else setCurrentView(['home','shop','memory','articles'].includes(q.get('view')) ? q.get('view') : 'home');
+      else {setCurrentView(['home','shop','memory','articles'].includes(q.get('view')) ? q.get('view') : 'home');if(q.get('view')==='memory')setCurrentTag('');}
       setRouteReady(true);
     };
     readRoute();window.addEventListener('popstate',readRoute);
@@ -138,7 +141,7 @@ export default function App() {
     const url=new URL(window.location.href);
     ['view','tag','memory','article'].forEach(key=>url.searchParams.delete(key));
     if(currentView==='article-detail')url.searchParams.set('article',selectedArticleSlug);
-    else if(currentView==='memory')url.searchParams.set('tag',currentTag);
+    else if(currentView==='memory') {if(currentTag)url.searchParams.set('tag',currentTag);else url.searchParams.set('view','memory');}
     else if(currentView!=='home')url.searchParams.set('view',currentView);
     if(url.href!==window.location.href)window.history.pushState({},'',url);
   },[currentView,currentTag,selectedArticleSlug,routeReady]);
@@ -169,6 +172,8 @@ export default function App() {
         }
       ];
     });
+    setSelectedProductId(null);
+    trackShopEvent('add_to_cart',[{...product,quantity}]);
     setIsCartOpen(true);
   };
 
@@ -230,6 +235,7 @@ export default function App() {
   };
 
   // SYSTEM MAINTENANCE GATE CHECK
+  if(!systemReady||!routeReady)return <div role="status" className="min-h-screen flex items-center justify-center bg-dark-950 text-slate-300">Đang mở EMORIA…</div>;
   const isSystemBlocked = systemConfig.isMaintenanceMode && 
     authSession.role === ROLES.GUEST && 
     !vipBypassed;
@@ -288,7 +294,8 @@ export default function App() {
     <div className="min-h-screen bg-dark-950 text-slate-100 relative selection:bg-slate-200 selection:text-dark-950 overflow-x-hidden w-full max-w-[100vw]">
       
       {/* Top Fixed Navigation with Mode Switcher */}
-      <Navbar
+      {currentView!=='memory' && <Navbar
+        sandbox={store.settings?.sandbox}
         activeSection={activeSection}
         currentUser={currentUser}
         onOpenAuth={() => setIsAuthOpen(true)}
@@ -298,6 +305,7 @@ export default function App() {
         currentView={currentView}
         onSelectView={(view) => {
           setCurrentView(view);
+          if(view==='memory')setCurrentTag('');
 
         }}
         onSearch={(query) => {
@@ -306,9 +314,11 @@ export default function App() {
             setCurrentView('shop');
           }
         }}
-      />
+      />}
 
       {store.settings?.sandbox && <div className="fixed top-0 inset-x-0 z-[60] bg-amber-200 text-black text-center text-xs py-1">CỬA HÀNG THỬ NGHIỆM · Dữ liệu được lưu thật · Không thu tiền / giao hàng</div>}
+      <AnalyticsConsent settings={store.settings} view={currentView} isAdmin={authSession.isAdmin}/>
+      {store.error&&<div role="alert" className="fixed bottom-4 left-4 right-4 z-[70] p-4 bg-dark-900 border border-red-300/30 rounded-xl text-sm">{store.error} <button className="underline ml-3" onClick={store.refresh}>Thử lại</button></div>}
       {/* Main Dynamic View Area */}
       <main>
         {/* VIEW 1: TRANG CHỦ & CÂU CHUYỆN THƯƠNG HIỆU (MẶC ĐỊNH) */}
@@ -316,6 +326,7 @@ export default function App() {
           <div>
             <HeroSection
               onExploreClick={handleExploreClick}
+              onOpenAuth={() => setIsAuthOpen(true)}
               onLoginSuccess={(name) => setCurrentUser(name)}
             />
             <CollectionShowcase
@@ -341,7 +352,7 @@ export default function App() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
-            <FeedbackSection onOpenNfcDemo={handleOpenNfcDemo} />
+
             <AboutSection onOpenNfcDemo={handleOpenNfcDemo} />
             <ContactSection />
           </div>
@@ -361,6 +372,10 @@ export default function App() {
         {/* VIEW 3: DEDICATED MEMORY SPACE VAULT SHOWCASE */}
         {currentView === 'memory' && (
           <MemorySpaceView
+            key={authSession.user?.id || 'guest'}
+            currentUser={authSession.user?.id || null}
+            onOpenAuth={()=>setIsAuthOpen(true)}
+            onSelectTag={setCurrentTag}
             initialTag={currentTag}
             onNavigateToShop={() => {
               setCurrentView('shop');
@@ -394,7 +409,7 @@ export default function App() {
             }}
             onSelectProduct={(id) => setSelectedProductId(id)}
             onOpenAuth={() => setIsAuthOpen(true)}
-            currentUser={currentUser ? { name: currentUser } : null}
+            currentUser={currentUser ? { name: currentUser, id:authSession.user?.id } : null}
           />
         )}
       </main>
@@ -403,7 +418,7 @@ export default function App() {
       {currentView !== 'memory' && <Footer />}
 
       {/* SECURITY & SESSION STATUS BADGE (Góc dưới bên trái) */}
-      <div className="fixed bottom-6 left-6 z-40">
+      <div className="fixed bottom-6 left-6 z-40" hidden={currentView==='memory'&&!currentUser}>
         <div className="relative">
           <button
             onClick={() => setIsSessionInfoOpen(!isSessionInfoOpen)}
@@ -482,24 +497,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Floating Action Button for NFC Experience (Góc dưới bên phải) */}
-      <button
-        onClick={() => {
-          if (currentView === 'memory') {
-            handleOpenNfcDemo('emoria-pulse');
-          } else {
-            setCurrentView('memory');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }
-        }}
-        className="fixed bottom-6 right-6 z-40 px-4 py-2.5 h-11 rounded-full bg-white text-dark-950 font-bold text-xs shadow-2xl hover:scale-105 hover:bg-slate-200 active:scale-95 transition-all flex items-center gap-2 border border-white/40 cursor-pointer min-h-[44px]"
-        title="Trải nghiệm chạm NFC"
-      >
-        <SmartphoneNfc className="w-4 h-4 animate-bounce" />
-        <span className="hidden sm:inline">
-          {currentView === 'memory' ? 'Thử Chạm NFC' : 'Vào Memory Space'}
-        </span>
-      </button>
+      {currentView!=='memory'&&<button onClick={()=>{setCurrentTag('');setCurrentView('memory');window.scrollTo({top:0,behavior:'smooth'});}} className="fixed bottom-6 right-6 z-40 px-4 py-3 rounded-full bg-white text-dark-950 font-semibold text-xs">Kỷ vật của bạn</button>}
 
       {/* NFC Touch Simulation Modal */}
       <NFCDemoModal
@@ -535,20 +533,23 @@ export default function App() {
         cartItems={cartItems}
         onUpdateQuantity={handleUpdateCartQuantity}
         onRemoveItem={handleRemoveCartItem}
-        onOpenCheckout={() => setIsCheckoutOpen(true)}
+        onOpenCheckout={() => {trackShopEvent('begin_checkout',cartItems);setIsCheckoutOpen(true);}}
       />
 
       {/* Dark Luxury Checkout Modal */}
-      <CheckoutModal
+      {isCheckoutOpen && <CheckoutModal
+        key={authSession.user?.id||'guest'}
+        currentUserId={authSession.user?.id||'guest'}
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         cartItems={cartItems}
         onOrderComplete={handleClearCart}
-      />
+      />}
 
       {/* Auth Modal */}
       <AuthModal
         recovery={recovery}
+        currentUser={currentUser}
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onLoginSuccess={(name) => setCurrentUser(name)}
@@ -560,6 +561,7 @@ export default function App() {
         onClose={() => setIsAdminPanelOpen(false)}
         onRefresh={() => {
           setSystemConfig(getSystemAvailability());
+          store.refresh();
         }}
       />
 
