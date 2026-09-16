@@ -376,6 +376,7 @@ export async function updateMemorySpace(tagUid, payload) {
     mem.letter = payload.letter;
     mem._private_letter = payload.letter;
   }
+  if (payload.author) mem.author = payload.author;
   if (payload.recipient) mem.recipient = payload.recipient;
   if (payload.audio_title) mem.audio_title = payload.audio_title;
   if (payload.audio_url) mem.audio_url = payload.audio_url;

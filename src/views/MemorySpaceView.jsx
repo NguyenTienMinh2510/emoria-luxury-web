@@ -47,6 +47,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   // Studio Editor Modal State
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
+  const [editAuthor, setEditAuthor] = useState('');
   const [editQuote, setEditQuote] = useState('');
   const [editLetter, setEditLetter] = useState('');
   const [editRecipient, setEditRecipient] = useState('');
@@ -92,6 +93,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         setMemoryData(res.data);
         // Pre-fill editor states
         setEditTitle(res.data.title || '');
+        setEditAuthor(res.data.author || '');
         setEditQuote(res.data.quote || '');
         setEditLetter(res.data.letter || '');
         setEditRecipient(res.data.recipient || '');
@@ -183,6 +185,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         letters:extraLetters,
         media_gallery:editMedia,
         title: editTitle,
+        author: editAuthor,
         quote: editQuote,
         letter: editLetter,
         recipient: editRecipient,
@@ -364,10 +367,25 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               ))}
             </select>
 
-            {/* If Owner: Show Studio Button. If Not: Show Claim Chip Button */}
-            {memoryData.is_owner ? (
+            {/* If Owner or Admin: Show Studio Button. If Not: Show Claim Chip Button */}
+            {(memoryData.is_owner || memoryData.is_admin) ? (
               <button
-                onClick={() => {setEditTitle(memoryData.title||'');setEditQuote(memoryData.quote||'');setEditRecipient(memoryData.recipient||'');setEditLetter(memoryData.letter||'');setEditAudioTitle(memoryData.audio_title||'');setEditAudioUrl(memoryData.audio_path||'');setEditMedia((memoryData.media_gallery||[]).filter(m=>m.path).map(m=>({path:m.path,type:m.type,caption:m.caption})));setIntroPath(memoryData.intro_video_path||'');setExtraLetters(memoryData.letters||[]);setPinAction('KEEP');setStudioError('');setIsEditorOpen(true);}}
+                onClick={() => {
+                  setEditTitle(memoryData.title || '');
+                  setEditAuthor(memoryData.author || '');
+                  setEditQuote(memoryData.quote || '');
+                  setEditRecipient(memoryData.recipient || '');
+                  setEditLetter(memoryData.letter || '');
+                  setEditAudioTitle(memoryData.audio_title || '');
+                  setEditAudioUrl(memoryData.audio_path || '');
+                  setEditMedia((memoryData.media_gallery || []).filter(m => m.path).map(m => ({ path: m.path, type: m.type, caption: m.caption })));
+                  setIntroPath(memoryData.intro_video_path || '');
+                  setExtraLetters(memoryData.letters || []);
+                  setPinAction('KEEP');
+                  setStudioError('');
+                  callStore('rpc_memory_guestbook', { p_tag: currentTag, p_action: 'list' }).then(res => setGuestEntries(res || [])).catch(() => {});
+                  setIsEditorOpen(true);
+                }}
                 className="px-3.5 py-1.5 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
               >
                 <Edit3 className="w-3.5 h-3.5" />
@@ -632,6 +650,26 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                     <span className="text-[10px] text-slate-500">{entry.created_at}</span>
                   </div>
                   <p className="text-slate-300 leading-relaxed">{entry.message}</p>
+                  {(memoryData.is_owner || memoryData.is_admin) && (
+                    <div className="flex items-center justify-end gap-3 pt-2 mt-2 border-t border-white/10">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (window.confirm(`Xóa lời nhắn của "${entry.author}"?`)) {
+                            try {
+                              await callStore('rpc_memory_guestbook', { p_tag: currentTag, p_id: entry.id, p_action: 'delete' });
+                              await loadMemory(currentTag);
+                            } catch (err) {
+                              alert(err.message || 'Lỗi khi xóa lời nhắn.');
+                            }
+                          }
+                        }}
+                        className="text-[11px] text-red-400 hover:text-red-300 underline cursor-pointer"
+                      >
+                        Xóa lời nhắn này
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -792,14 +830,27 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 />
               </div>
 
-              <div>
-                <label className="text-slate-300 font-semibold block mb-1">Người nhận kỷ vật:</label>
-                <input
-                  type="text"
-                  value={editRecipient}
-                  onChange={(e) => setEditRecipient(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Tên người tặng / gửi (Từ: ...):</label>
+                  <input
+                    type="text"
+                    value={editAuthor}
+                    onChange={(e) => setEditAuthor(e.target.value)}
+                    placeholder="Ví dụ: Minh Hoàng"
+                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Tên người nhận (Gửi đến: ...):</label>
+                  <input
+                    type="text"
+                    value={editRecipient}
+                    onChange={(e) => setEditRecipient(e.target.value)}
+                    placeholder="Ví dụ: Thiên Thanh"
+                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div>
@@ -846,7 +897,56 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
 
               <section className="space-y-3"><h4 className="font-serif text-lg">02 · Những lá thư bổ sung</h4>{extraLetters.map((letter,index)=><div key={index} className="space-y-2 p-3 border border-white/10 rounded-xl"><label className="store-label">Tiêu đề thư<input className="store-input" required maxLength={200} value={letter.title} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,title:e.target.value}:x))}/></label><label className="store-label">Nội dung<textarea className="store-input" required maxLength={10000} rows={5} value={letter.body} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,body:e.target.value}:x))}/></label><button type="button" onClick={()=>setExtraLetters(prev=>prev.filter((_,i)=>i!==index))}>Gỡ thư</button></div>)}<button type="button" disabled={extraLetters.length>=10} className="store-button" onClick={()=>setExtraLetters(prev=>[...prev,{title:'Một lời nhắn dành cho bạn',body:''}])}>Thêm thư tay</button></section>
               <MemoryMediaEditor tag={currentTag} items={editMedia} onChange={setEditMedia} audio={editAudioUrl} onAudio={setEditAudioUrl} onBusy={setMovieBusy}/>
-              <details className="p-4 border border-white/10 rounded-xl"><summary className="cursor-pointer">Duyệt lời nhắn ({guestEntries.filter(x=>x.is_hidden).length} chờ duyệt)</summary>{guestEntries.map(entry=><div key={entry.id} className="py-3 space-y-2 border-b border-white/10"><p>{entry.author_name} · {entry.is_hidden?'Chờ duyệt':'Đã hiển thị'}</p><p className="whitespace-pre-wrap">{entry.message}</p>{(entry.is_hidden?['approve','delete']:['delete']).map(action=><button type="button" className="underline mr-4" key={action} onClick={async()=>{try{setGuestEntries(await callStore('rpc_memory_guestbook',{p_tag:currentTag,p_id:entry.id,p_action:action}));}catch(e){setStudioError(e.message);}}}>{action==='approve'?'Duyệt hiển thị':'Xóa lời nhắn'}</button>)}</div>)}</details>
+              <details className="p-4 border border-white/10 rounded-xl" open><summary className="cursor-pointer font-semibold text-slate-200">Quản lý sổ lưu niệm ({guestEntries.length} lời nhắn)</summary>
+                <div className="space-y-3 mt-3">
+                  {guestEntries.map(entry => (
+                    <div key={entry.id} className="p-3 rounded-xl bg-black/50 border border-white/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-white">{entry.author_name} ({entry.relationship || 'Khách'})</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] ${entry.is_hidden ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                          {entry.is_hidden ? 'Đang ẩn' : 'Đang hiển thị'}
+                        </span>
+                      </div>
+                      <p className="whitespace-pre-wrap text-slate-300">{entry.message}</p>
+                      <div className="flex gap-4 text-xs pt-1">
+                        <button
+                          type="button"
+                          className="text-amber-300 hover:underline cursor-pointer"
+                          onClick={async () => {
+                            try {
+                              const res = await callStore('rpc_memory_guestbook', { p_tag: currentTag, p_id: entry.id, p_action: entry.is_hidden ? 'approve' : 'hide' });
+                              setGuestEntries(res || []);
+                              await loadMemory(currentTag);
+                            } catch (e) {
+                              setStudioError(e.message);
+                            }
+                          }}
+                        >
+                          {entry.is_hidden ? '✓ Cho phép hiển thị' : '👁 Ẩn lời nhắn'}
+                        </button>
+                        <button
+                          type="button"
+                          className="text-red-400 hover:underline cursor-pointer"
+                          onClick={async () => {
+                            if (window.confirm(`Xóa vĩnh viễn lời nhắn của "${entry.author_name}"?`)) {
+                              try {
+                                const res = await callStore('rpc_memory_guestbook', { p_tag: currentTag, p_id: entry.id, p_action: 'delete' });
+                                setGuestEntries(res || []);
+                                await loadMemory(currentTag);
+                              } catch (e) {
+                                setStudioError(e.message);
+                              }
+                            }
+                          }}
+                        >
+                          🗑 Xóa lời nhắn
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!guestEntries.length && <p className="text-slate-400 text-xs">Chưa có lời nhắn nào trong sổ lưu niệm.</p>}
+                </div>
+              </details>
               {studioError&&<p role="alert" className="text-red-300">{studioError}</p>}
               {/* 3 HÀNH ĐỘNG PIN RÕ RÀNG: KEEP / SET / REMOVE (CHỐNG MẤT PIN KHI UPDATE TITLE) */}
               <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3 mt-4">

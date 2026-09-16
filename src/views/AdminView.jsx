@@ -50,6 +50,7 @@ export default function AdminView({
   // System Availability State
   const [systemConfig, setSystemConfig] = useState(getSystemAvailability());
   const [saveMessage, setSaveMessage] = useState('');
+  const [settingsSubSection, setSettingsSubSection] = useState('settings');
 
   // Articles & Moderation State
   const [adminArticles, setAdminArticles] = useState([]);
@@ -485,11 +486,38 @@ export default function AdminView({
           {/* 4. SETTINGS TAB */}
           {activeTab === 'settings' && (
             <div className="space-y-6">
-              <div>
-                <h2 className="font-serif text-2xl font-bold text-white">Cấu Hình Cửa Hàng & Toàn Hệ Thống</h2>
-                <p className="text-xs text-slate-400 mt-1">Thiết lập tài khoản ngân hàng nhận chuyển khoản, cấu hình cổng bảo trì và thông tin liên hệ.</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-serif text-2xl font-bold text-white">Cấu Hình Cửa Hàng & Toàn Hệ Thống</h2>
+                  <p className="text-xs text-slate-400 mt-1">Bật/tắt chế độ thử nghiệm (Sandbox banner), nhận đơn, COD, ngân hàng VietQR và danh mục sản phẩm.</p>
+                </div>
+                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-black/60 border border-white/10 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setSettingsSubSection('settings')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${settingsSubSection === 'settings' ? 'bg-white text-dark-950 shadow-md' : 'text-slate-300 hover:text-white'}`}
+                  >
+                    Cấu Hình & Sandbox
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsSubSection('catalog')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${settingsSubSection === 'catalog' ? 'bg-white text-dark-950 shadow-md' : 'text-slate-300 hover:text-white'}`}
+                  >
+                    Sản Phẩm & Tồn Kho
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsSubSection('contacts')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${settingsSubSection === 'contacts' ? 'bg-white text-dark-950 shadow-md' : 'text-slate-300 hover:text-white'}`}
+                  >
+                    Yêu Cầu Liên Hệ
+                  </button>
+                </div>
               </div>
-              <StoreAdminPanel />
+              <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10">
+                <StoreAdminPanel section={settingsSubSection} />
+              </div>
             </div>
           )}
 
