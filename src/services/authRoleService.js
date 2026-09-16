@@ -144,12 +144,25 @@ export async function resolveCurrentSessionRole() {
 
     const isAdmin = Boolean(roleData && !error);
 
+    // Lấy thêm thông tin chi tiết hồ sơ từ bảng profiles
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, phone, birthday, gender, address, bio, avatar_url')
+      .eq('id', user.id)
+      .maybeSingle();
+
     return {
       role: isAdmin ? ROLES.ADMIN : ROLES.GUEST, // Owner được xác định theo từng memory_space
       user: {
         id: user.id,
         email: user.email,
-        fullName: user.user_metadata?.full_name || user.email,
+        fullName: profile?.full_name || user.user_metadata?.full_name || user.email,
+        phone: profile?.phone || user.user_metadata?.phone || '',
+        birthday: profile?.birthday || '',
+        gender: profile?.gender || '',
+        address: profile?.address || '',
+        bio: profile?.bio || '',
+        avatarUrl: profile?.avatar_url || '',
       },
       isAdmin,
     };

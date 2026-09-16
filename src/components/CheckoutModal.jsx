@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShieldCheck, Truck, Banknote, QrCode, CheckCircle2, ArrowRight, Package, Clock, MapPin, Phone, Copy, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -6,6 +6,7 @@ import { useStore } from './StoreProvider';
 import { createOrder } from '../services/orderBackendService';
 import {supabase} from '../lib/supabaseClient';
 import {readPendingCheckout,savePendingCheckout,clearPendingCheckout} from '../services/checkoutSession';
+import { getMyProfile } from '../services/profileService';
 
 export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderComplete, currentUserId='guest' }) {
   const { settings } = useStore();
@@ -17,6 +18,24 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
   const [email, setEmail] = useState(pending?.payload.email||'');
   const [note, setNote] = useState(pending?.payload.note||'');
   const [paymentMethod, setPaymentMethod] = useState(pending?pending.payload.paymentMethod==='vietqr'?'bank_transfer':'cod':settings?.cod_enabled?'cod':'bank_transfer');
+
+  // Auto-fill form fields from user profile if not already filled
+  useEffect(() => {
+    if (!isOpen || currentUserId === 'guest') return;
+    if (pending) return;
+
+    let active = true;
+    getMyProfile().then((res) => {
+      if (!active || !res?.success || !res.profile) return;
+      const p = res.profile;
+      setFullName((prev) => prev || p.full_name || '');
+      setPhone((prev) => prev || p.phone || '');
+      setAddress((prev) => prev || p.address || '');
+      setEmail((prev) => prev || p.email || '');
+    });
+
+    return () => { active = false; };
+  }, [isOpen, currentUserId, pending]);
   
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);

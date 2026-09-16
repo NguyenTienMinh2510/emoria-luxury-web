@@ -190,8 +190,12 @@ export default function Navbar({
               aria-label={currentUser?`Tài khoản ${currentUser}`:"Tài khoản"}
               className="p-1.5 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer min-h-[38px]"
             >
-              <div className="w-7 h-7 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-slate-200">
-                <User className="w-4 h-4" />
+              <div className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold transition-all ${
+                currentUser
+                  ? 'bg-amber-400 text-dark-950 border-amber-300 shadow-sm shadow-amber-500/20'
+                  : 'bg-white/10 border-white/20 text-slate-200'
+              }`}>
+                {currentUser ? currentUser.trim()[0]?.toUpperCase() : <User className="w-4 h-4" />}
               </div>
             </button>
 
