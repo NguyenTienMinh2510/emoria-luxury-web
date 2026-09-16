@@ -22,7 +22,7 @@ import ProductDetailModal from './components/ProductDetailModal';
 import CartDrawer from './components/CartDrawer';
 import AuthModal from './components/AuthModal';
 import CheckoutModal from './components/CheckoutModal';
-import AdminPanelModal from './components/AdminPanelModal';
+import AdminView from './views/AdminView';
 import { 
   SmartphoneNfc, Shield, User, Key, Lock, Unlock, 
   Sparkles, CheckCircle2, ChevronUp, ChevronDown, Power
@@ -57,7 +57,6 @@ export default function App() {
     user: null,
     isAdmin: false,
   });
-  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isSessionInfoOpen, setIsSessionInfoOpen] = useState(false);
 
   // System Availability (Maintenance Gate) State
@@ -132,7 +131,7 @@ export default function App() {
       const q=new URLSearchParams(window.location.search);
       if(q.get('article')) { setSelectedArticleSlug(q.get('article'));setCurrentView('article-detail'); }
       else if(q.get('tag') || q.get('memory')) {setCurrentTag(q.get('tag') || q.get('memory'));setCurrentView('memory');}
-      else {setCurrentView(['home','shop','memory','articles'].includes(q.get('view')) ? q.get('view') : 'home');if(q.get('view')==='memory')setCurrentTag('');}
+      else {setCurrentView(['home','shop','memory','articles','admin'].includes(q.get('view')) ? q.get('view') : 'home');if(q.get('view')==='memory')setCurrentTag('');}
       setRouteReady(true);
     };
     readRoute();window.addEventListener('popstate',readRoute);
@@ -296,10 +295,11 @@ export default function App() {
     <div className="min-h-screen bg-dark-950 text-slate-100 relative selection:bg-slate-200 selection:text-dark-950 overflow-x-hidden w-full max-w-[100vw]">
       
       {/* Top Fixed Navigation with Mode Switcher */}
-      {currentView!=='memory' && <Navbar
+      <Navbar
         sandbox={store.settings?.sandbox}
         activeSection={activeSection}
         currentUser={currentUser}
+        isAdmin={authSession.isAdmin}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenNfcDemo={() => handleOpenNfcDemo('emoria-lumen')}
         cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
@@ -308,7 +308,7 @@ export default function App() {
         onSelectView={(view) => {
           setCurrentView(view);
           if(view==='memory')setCurrentTag('');
-
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onSearch={(query) => {
           setSearchQuery(query);
@@ -316,7 +316,7 @@ export default function App() {
             setCurrentView('shop');
           }
         }}
-      />}
+      />
 
       {store.settings?.sandbox && <div className="fixed top-0 inset-x-0 z-[60] bg-amber-200 text-black text-center text-xs py-1">CỬA HÀNG THỬ NGHIỆM · Dữ liệu được lưu thật · Không thu tiền / giao hàng</div>}
       <AnalyticsConsent settings={store.settings} view={currentView} isAdmin={authSession.isAdmin}/>
@@ -381,6 +381,10 @@ export default function App() {
             onOpenAuth={()=>setIsAuthOpen(true)}
             onSelectTag={setCurrentTag}
             initialTag={currentTag}
+            onNavigateToHome={() => {
+              setCurrentView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onNavigateToShop={() => {
               setCurrentView('shop');
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -416,10 +420,27 @@ export default function App() {
             currentUser={currentUser ? { name: currentUser, id:authSession.user?.id } : null}
           />
         )}
+
+        {/* VIEW 6: DEDICATED FULL-PAGE ADMIN VIEW */}
+        {currentView === 'admin' && (
+          <AdminView
+            currentUser={currentUser}
+            isAdmin={authSession.isAdmin}
+            onOpenAuth={() => setIsAuthOpen(true)}
+            onNavigateToHome={() => {
+              setCurrentView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onRefresh={() => {
+              setSystemConfig(getSystemAvailability());
+              store.refresh();
+            }}
+          />
+        )}
       </main>
 
       {/* Footer */}
-      {currentView !== 'memory' && <Footer />}
+      {['home', 'shop', 'articles'].includes(currentView) && <Footer />}
 
       {/* SECURITY & SESSION STATUS BADGE (Góc dưới bên trái) */}
       <div className="fixed bottom-6 left-6 z-40" hidden={currentView==='memory'&&!currentUser}>
@@ -458,8 +479,9 @@ export default function App() {
                 {authSession.isAdmin ? (
                   <button
                     onClick={() => {
-                      setIsAdminPanelOpen(true);
+                      setCurrentView('admin');
                       setIsSessionInfoOpen(false);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     className="w-full text-left px-3 py-2 rounded-xl bg-white text-dark-950 font-bold flex items-center gap-2 transition-all cursor-pointer hover:bg-slate-200"
                   >
@@ -556,17 +578,6 @@ export default function App() {
         currentUser={currentUser}
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
-        onLoginSuccess={(name) => setCurrentUser(name)}
-      />
-
-      {/* Admin Panel Modal */}
-      <AdminPanelModal
-        isOpen={isAdminPanelOpen}
-        onClose={() => setIsAdminPanelOpen(false)}
-        onRefresh={() => {
-          setSystemConfig(getSystemAvailability());
-          store.refresh();
-        }}
       />
 
     </div>

@@ -1,10 +1,15 @@
 const consentKey='emoria_analytics_consent';
 let measurementId='', enabled=false;
+const analyticsEnv=import.meta.env||{};
+export function analyticsEligible(settings,privateView=false){
+ const host=analyticsEnv.VITE_GA4_HOSTNAME;
+ return Boolean(settings&&!privateView&&(!settings.sandbox||analyticsEnv.VITE_GA4_TRACK_SANDBOX==='true')&&(!host||location.hostname===host));
+}
 export function setAnalyticsConsent(value){try{localStorage.setItem(consentKey,value?'granted':'denied');}catch{}window.dispatchEvent(new Event('analytics-consent'));}
 export function getAnalyticsConsent(){try{return localStorage.getItem(consentKey);}catch{return null;}}
 export function configureAnalytics(settings,privateView=false){
  measurementId=settings?.ga4_measurement_id||(typeof import.meta !== 'undefined' && import.meta.env?.VITE_GA4_MEASUREMENT_ID)||'';
- enabled=Boolean(/^G-[A-Z0-9]{4,20}$/.test(measurementId)&&!settings?.sandbox&&!privateView&&getAnalyticsConsent()==='granted');
+ enabled=Boolean(/^G-[A-Z0-9]{4,20}$/.test(measurementId)&&analyticsEligible(settings,privateView)&&getAnalyticsConsent()==='granted');
  if(measurementId)window[`ga-disable-${measurementId}`]=!enabled;
  if(!enabled)return;
  window.dataLayer=window.dataLayer||[];

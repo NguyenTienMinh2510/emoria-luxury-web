@@ -6,24 +6,27 @@ const number=n=>new Intl.NumberFormat('vi-VN').format(Number(n)||0);
 const money=n=>number(n)+' đ';
 const names={activeUsers:'Người dùng hoạt động',sessions:'Phiên truy cập',screenPageViews:'Lượt xem trang',engagementRate:'Tỷ lệ tương tác'};
 export function dailyTrend(report,metric,days,updatedAt){
- if(!report?.rows?.length)return [];
+ if(!report?.rows?.length || !report?.metricHeaders)return [];
  const index=report.metricHeaders.findIndex(m=>m.name===metric);
+ if(index===-1)return [];
  const values=new Map(report.rows.map(row=>[row.dimensionValues[0].value,Number(row.metricValues[index]?.value)||0]));
  const parts=Object.fromEntries(new Intl.DateTimeFormat('en',{timeZone:report.metadata?.timeZone||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(updatedAt)).map(p=>[p.type,p.value]));
  const today=Date.UTC(Number(parts.year),Number(parts.month)-1,Number(parts.day));
  return Array.from({length:days},(_,i)=>{const date=new Date(today-(days-i)*86400000).toISOString().slice(0,10);return {label:date.slice(8)+'/'+date.slice(5,7)+'/'+date.slice(0,4),value:values.get(date.replaceAll('-',''))||0};});
 }
-export function Bars({rows,label}){
- const max=Math.max(1,...rows.map(r=>Number(r.value)));
- return rows.length?<ul className="space-y-4">{rows.map((r,i)=><li key={i}><div className="flex justify-between gap-3 text-sm mb-2"><span className="break-words min-w-0">{r.label}</span><strong>{number(r.value)}</strong></div><div className="h-2 rounded-full bg-white/5" aria-label={`${r.label}: ${number(r.value)} ${label}`}><div className="h-full rounded-full bg-sky-200" style={{width:`${100*Number(r.value)/max}%`}}/></div></li>)}</ul>:<p className="text-slate-400 text-sm py-6">Chưa có dữ liệu trong khoảng ngày này.</p>;
+export function Bars({rows=[],label}){
+ const validRows=rows||[];
+ const max=Math.max(1,...validRows.map(r=>Number(r.value)));
+ return validRows.length?<ul className="space-y-4">{validRows.map((r,i)=><li key={i}><div className="flex justify-between gap-3 text-sm mb-2"><span className="break-words min-w-0">{r.label}</span><strong>{number(r.value)}</strong></div><div className="h-2 rounded-full bg-white/5" aria-label={`${r.label}: ${number(r.value)} ${label}`}><div className="h-full rounded-full bg-sky-200" style={{width:`${100*Number(r.value)/max}%`}}/></div></li>)}</ul>:<p className="text-slate-400 text-sm py-6">Chưa có dữ liệu trong khoảng ngày này.</p>;
 }
-export function Trend({rows,label}){
- const max=Math.max(1,...rows.map(r=>Number(r.value))),x=i=>rows.length===1?320:24+i*592/(rows.length-1),y=value=>192-Number(value)*168/max;
- return rows.length?<><div className="flex justify-between text-xs text-slate-400"><span>{label}</span><span>Cao nhất: {number(Math.max(...rows.map(r=>Number(r.value))))}</span></div><svg viewBox="0 0 640 216" className="w-full h-40 sm:h-56" role="img" aria-label={`${label} theo ngày; bảng số liệu ở bên dưới`}>
+export function Trend({rows=[],label}){
+ const validRows=rows||[];
+ const max=Math.max(1,...validRows.map(r=>Number(r.value))),x=i=>validRows.length===1?320:24+i*592/(validRows.length-1),y=value=>192-Number(value)*168/max;
+ return validRows.length?<><div className="flex justify-between text-xs text-slate-400"><span>{label}</span><span>Cao nhất: {number(Math.max(...validRows.map(r=>Number(r.value))))}</span></div><svg viewBox="0 0 640 216" className="w-full h-40 sm:h-56" role="img" aria-label={`${label} theo ngày; bảng số liệu ở bên dưới`}>
  {[24,108,192].map(v=><line key={v} x1="24" x2="616" y1={v} y2={v} stroke="rgba(255,255,255,.1)"/>)}
- <polyline points={rows.map((r,i)=>`${x(i)},${y(r.value)}`).join(' ')} stroke="#bae6fd" strokeWidth="3" fill="none"/>
- {rows.map((r,i)=><circle key={r.label} cx={x(i)} cy={y(r.value)} r="3.5" fill="#e0f2fe"><title>{`${r.label}: ${number(r.value)}`}</title></circle>)}
- </svg><div className="flex justify-between text-xs text-slate-400"><span>{rows[0].label}</span><span>{rows.at(-1).label}</span></div><details className="mt-4"><summary className="cursor-pointer min-h-11 py-3 text-sm">Xem bảng số liệu</summary><div className="max-h-64 overflow-auto"><table className="w-full text-sm"><thead><tr><th className="text-left py-2">Ngày</th><th className="text-right">{label}</th></tr></thead><tbody>{rows.map(r=><tr key={r.label} className="border-t border-white/10"><td className="py-2">{r.label}</td><td className="text-right">{number(r.value)}</td></tr>)}</tbody></table></div></details></>:<div className="min-h-40 flex items-center justify-center text-center border border-dashed border-white/15 rounded-xl p-6 text-sm text-slate-400">Chưa có dữ liệu để vẽ biểu đồ. Biểu đồ sẽ xuất hiện khi nguồn báo cáo có dữ liệu.</div>;
+ <polyline points={validRows.map((r,i)=>`${x(i)},${y(r.value)}`).join(' ')} stroke="#bae6fd" strokeWidth="3" fill="none"/>
+ {validRows.map((r,i)=><circle key={r.label} cx={x(i)} cy={y(r.value)} r="3.5" fill="#e0f2fe"><title>{`${r.label}: ${number(r.value)}`}</title></circle>)}
+ </svg><div className="flex justify-between text-xs text-slate-400"><span>{validRows[0].label}</span><span>{validRows.at(-1).label}</span></div><details className="mt-4"><summary className="cursor-pointer min-h-11 py-3 text-sm">Xem bảng số liệu</summary><div className="max-h-64 overflow-auto"><table className="w-full text-sm"><thead><tr><th className="text-left py-2">Ngày</th><th className="text-right">{label}</th></tr></thead><tbody>{validRows.map(r=><tr key={r.label} className="border-t border-white/10"><td className="py-2">{r.label}</td><td className="text-right">{number(r.value)}</td></tr>)}</tbody></table></div></details></>:<div className="min-h-40 flex items-center justify-center text-center border border-dashed border-white/15 rounded-xl p-6 text-sm text-slate-400">Chưa có dữ liệu để vẽ biểu đồ. Biểu đồ sẽ xuất hiện khi nguồn báo cáo có dữ liệu.</div>;
 }
 function Stats({items}){return <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">{items.map(([label,value])=><div key={label} className="p-4 rounded-2xl bg-white/5 border border-white/10 min-w-0"><p className="text-xs text-slate-400">{label}</p><p className="mt-3 font-serif text-xl sm:text-2xl break-words">{value}</p></div>)}</div>;}
 export default function MarketingPanel(){
@@ -40,8 +43,9 @@ export default function MarketingPanel(){
  </section>
  <section aria-labelledby="ga-report" className="space-y-5 border-t border-white/10 pt-7"><div><h2 id="ga-report" className="font-serif text-2xl">Google Analytics 4</h2><p className="text-sm text-slate-400 mt-2">Lấy trực tiếp từ Google khi mở trang hoặc làm mới. Báo cáo đến hết ngày hôm qua, có độ trễ cập nhật; không phải số liệu tức thời. Bộ lọc đơn thử nghiệm phía trên chỉ áp dụng cho dữ liệu cửa hàng.</p></div>
  {gaBusy&&<p role="status" className="text-sky-200">Đang kết nối Google Analytics…</p>}{gaError&&<p role="alert" className="text-red-300">{gaError}</p>}{ga?.message&&<p role="status" className="text-amber-200">{ga.message}</p>}{ga?.missing?.length>0&&<p className="text-sm text-slate-400">Cấu hình còn thiếu: {ga.missing.join(', ')}.</p>}
- {ga?.configured&&<><p role="status" className="text-xs text-emerald-300">Đã kết nối · Cập nhật {new Date(ga.updatedAt).toLocaleString('vi-VN')}{!ga.summary.rows?.length?' · Chưa có dữ liệu trong khoảng ngày này.':''}</p><Stats items={ga.summary.metricHeaders.map((m,i)=>{const value=Number(ga.summary.rows?.[0]?.metricValues?.[i]?.value||0);return [names[m.name]||m.name,m.name==='engagementRate'?new Intl.NumberFormat('vi-VN',{style:'percent',maximumFractionDigits:1}).format(value):number(value)];})}/>
+ {ga?.configured&&<><p role="status" className="text-xs text-emerald-300">Đã kết nối{ga.hostname ? ' · '+ga.hostname : ''} · Cập nhật {new Date(ga.updatedAt).toLocaleString('vi-VN')}{!ga.summary?.rows?.length?' · Đang chờ phát sinh dữ liệu truy cập trong khoảng ngày này.':''}</p>
+ {ga.summary?.metricHeaders?.length>0 ? <Stats items={ga.summary.metricHeaders.map((m,i)=>{const value=Number(ga.summary.rows?.[0]?.metricValues?.[i]?.value||0);return [names[m.name]||m.name,m.name==='engagementRate'?new Intl.NumberFormat('vi-VN',{style:'percent',maximumFractionDigits:1}).format(value):number(value)];})}/> : <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-slate-300">Đã kết nối luồng đo lường GA4. Khi có khách truy cập và tương tác, các chỉ số sẽ xuất hiện tự động tại đây.</div>}
  <section className="analytics-card"><div className="flex flex-wrap items-center justify-between gap-3 mb-5"><h3 className="!mb-0">Xu hướng truy cập</h3><label className="text-sm">Chỉ số<select className="store-input" value={metric} onChange={e=>setMetric(e.target.value)}>{['sessions','activeUsers','screenPageViews'].map(key=><option key={key} value={key}>{names[key]}</option>)}</select></label></div><Trend rows={daily} label={names[metric]}/></section>
- <div className="grid lg:grid-cols-2 gap-4">{[['Nguồn truy cập',ga.channels,'Phiên'],['Thiết bị',ga.devices,'Người dùng']].map(([title,report,label])=><section className="analytics-card" key={title}><h3>{title}</h3><Bars rows={(report.rows||[]).map(r=>({label:({mobile:'Điện thoại',desktop:'Máy tính',tablet:'Máy tính bảng'})[r.dimensionValues[0].value]||r.dimensionValues[0].value,value:r.metricValues[0].value}))} label={label}/><p className="text-xs text-slate-500 mt-4">Đơn vị: {label.toLowerCase()}</p></section>)}</div></>}
+ <div className="grid lg:grid-cols-2 gap-4">{[['Nguồn truy cập',ga.channels,'Phiên'],['Thiết bị',ga.devices,'Người dùng']].map(([title,report,label])=><section className="analytics-card" key={title}><h3>{title}</h3><Bars rows={(report?.rows||[]).map(r=>({label:({mobile:'Điện thoại',desktop:'Máy tính',tablet:'Máy tính bảng'})[r.dimensionValues?.[0]?.value]||r.dimensionValues?.[0]?.value||'Khác',value:r.metricValues?.[0]?.value||0}))} label={label}/><p className="text-xs text-slate-500 mt-4">Đơn vị: {label.toLowerCase()}</p></section>)}</div></>}
  </section></div>;
 }

@@ -21,4 +21,7 @@ isAdmin=true;assert.equal((await invoke('/api/analytics?days=999')).status,400);
 const response=await invoke('/api/analytics?days=90');assert.equal(response.status,200);assert.equal(response.body.configured,true);assert.ok(response.body.daily);assert.ok(response.body.updatedAt);assert.equal(response.headers['Cache-Control'],'no-store');
 assert.equal(reports.length,4);assert.ok(reports.some(q=>q.dimensions.some(d=>d.name==='date')));assert.ok(reports.every(q=>q.dateRanges[0].startDate==='90daysAgo'&&q.dateRanges[0].endDate==='yesterday'));
 assert.ok(!JSON.stringify(response).includes(privateKey));
+process.env.GA4_REPORT_HOSTNAME='emoria-luxury-web.vercel.app';
+assert.equal((await invoke('/api/analytics')).body.hostname,'emoria-luxury-web.vercel.app');
+assert.ok(reports.slice(-4).every(q=>q.dimensionFilter.filter.fieldName==='hostName'&&q.dimensionFilter.filter.stringFilter.value==='emoria-luxury-web.vercel.app'));
 console.log('PASS GA4 API: unauthorized/viewer denied before Google, 7/30/90 allowlist, four inline reports including daily chart, no secret in response. Mocked Google test; not live connectivity.');

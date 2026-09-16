@@ -1,0 +1,6 @@
+import fs from 'node:fs';
+const files=['202609140001_store_operations.sql','202609140002_editor_security.sql','20260915043147_marketing_and_runtime.sql','20260915044000_memory_media_runtime.sql','20260915104510_memory_cinema_and_operations.sql','20260915114549_checkout_recovery_and_expiry.sql','20260916095740_claim_code_compatibility.sql','20260916102935_document_product_catalog.sql'];
+const body=files.map(file=>`-- Source: ${file}\n`+fs.readFileSync('supabase/migrations/'+file,'utf8').replace(/^BEGIN;\s*/,'').replace(/COMMIT;\s*$/,'')).join('\n');
+const sql=`-- Upgrade the inspected 14 September Cloud schema. No database reset. Run once.\nBEGIN;\nSET LOCAL lock_timeout='10s';\nDO $$ BEGIN\n IF to_regclass('public.store_settings') IS NOT NULL THEN RAISE EXCEPTION 'Upgrade already applied or schema differs; inspect before continuing.'; END IF;\n IF to_regprocedure('public.rpc_create_order(uuid,jsonb)') IS NULL OR to_regclass('public.article_bookmarks') IS NULL THEN RAISE EXCEPTION 'Expected existing EMORIA Cloud baseline.'; END IF;\nEND $$;\n${body}\nNOTIFY pgrst,'reload schema';\nCOMMIT;\n`;
+fs.mkdirSync('supabase/releases',{recursive:true});fs.writeFileSync('supabase/releases/20260916-cloud-upgrade.sql',sql);
+console.log('Prepared atomic Cloud upgrade from eight reviewed migrations.');

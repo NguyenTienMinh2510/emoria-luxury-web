@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, User, ShoppingBag, Menu, X, Sparkles, SmartphoneNfc, Store, Compass, BookOpen } from 'lucide-react';
+import { Search, User, ShoppingBag, Menu, X, Sparkles, SmartphoneNfc, Store, Compass, BookOpen, Shield } from 'lucide-react';
 import { navItems } from '../data/navigation';
 
 export default function Navbar({ 
@@ -71,7 +71,7 @@ export default function Navbar({
             </div>
           </div>
 
-          {/* Desktop Center: Space Switcher Pill (Shop vs Memory vs Articles vs Home) */}
+          {/* Desktop Center: Space Switcher Pill (Shop vs Memory vs Articles vs Home vs Admin) */}
           <div className="hidden xl:flex items-center p-1 rounded-full bg-black/60 border border-white/15 backdrop-blur-xl shadow-inner">
             <button
               onClick={() => handleSwitchView('home')}
@@ -120,6 +120,20 @@ export default function Navbar({
               <BookOpen className="w-3.5 h-3.5" />
               <span>Bài Viết</span>
             </button>
+
+            {isAdmin && (
+              <button
+                onClick={() => handleSwitchView('admin')}
+                className={`relative px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+                  currentView === 'admin'
+                    ? 'bg-white text-dark-950 shadow-silver-glow'
+                    : 'text-amber-300 hover:text-amber-200 hover:bg-white/5'
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5 text-amber-400" />
+                <span>Quản Trị</span>
+              </button>
+            )}
           </div>
 
           {/* Right Action Bar: Search, Cart, User Profile */}

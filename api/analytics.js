@@ -19,6 +19,8 @@ export default async function handler(req,res){
   const property=process.env.GA4_PROPERTY_ID;
   if(!property || !process.env.GA4_SERVICE_ACCOUNT_JSON)return send(200,{configured:false,missing:['GA4_PROPERTY_ID','GA4_SERVICE_ACCOUNT_JSON'].filter(name=>!process.env[name]),message:'Đã có phần theo dõi truy cập khi cấu hình Measurement ID. Để đọc báo cáo Google tại đây, cần thêm Property ID và service account ở server.'});
   if(!/^\d+$/.test(property))throw new Error('GA4_PROPERTY_ID không hợp lệ.');
+  const hostname=process.env.GA4_REPORT_HOSTNAME?.trim();
+  const dimensionFilter=hostname?{filter:{fieldName:'hostName',stringFilter:{matchType:'EXACT',value:hostname,caseSensitive:false}}}:undefined;
   if(!googleToken||googleToken.expires<Date.now()){
    const credentials=JSON.parse(process.env.GA4_SERVICE_ACCOUNT_JSON),now=Math.floor(Date.now()/1000);
    const encode=obj=>Buffer.from(JSON.stringify(obj)).toString('base64url');
@@ -29,12 +31,12 @@ export default async function handler(req,res){
    const data=await result.json();googleToken={value:data.access_token,expires:Date.now()+Math.max(0,data.expires_in-60)*1000};
   }
   const report=async(dimensions,metrics)=>{
-   const response=await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${property}:runReport`,{method:'POST',headers:{Authorization:`Bearer ${googleToken.value}`,'Content-Type':'application/json'},body:JSON.stringify({dateRanges:[{startDate:`${days}daysAgo`,endDate:'yesterday'}],dimensions:dimensions.map(name=>({name})),metrics:metrics.map(name=>({name})),limit:100}),signal:AbortSignal.timeout(15000)});
+   const response=await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${property}:runReport`,{method:'POST',headers:{Authorization:`Bearer ${googleToken.value}`,'Content-Type':'application/json'},body:JSON.stringify({dateRanges:[{startDate:`${days}daysAgo`,endDate:'yesterday'}],dimensions:dimensions.map(name=>({name})),metrics:metrics.map(name=>({name})),dimensionFilter,limit:100}),signal:AbortSignal.timeout(15000)});
    if(!response.ok)throw new Error('Google chưa trả báo cáo. Kiểm tra Data API và quyền Viewer của service account trên GA4 property.');
    return response.json();
   };
   const [summary,channels,devices,daily]=await Promise.all([report([],['activeUsers','sessions','screenPageViews','engagementRate']),report(['sessionDefaultChannelGroup'],['sessions','engagedSessions']),report(['deviceCategory'],['activeUsers']),report(['date'],['activeUsers','sessions','screenPageViews'])]);
-  send(200,{configured:true,days,summary,channels,devices,daily,updatedAt:new Date().toISOString()});
+  send(200,{configured:true,days,hostname:hostname||null,summary,channels,devices,daily,updatedAt:new Date().toISOString()});
  }catch(error){
   const network=error.name==='TimeoutError'||error.name==='AbortError'||['ETIMEDOUT','ENOTFOUND','EAI_AGAIN','EACCES','ECONNRESET','UND_ERR_CONNECT_TIMEOUT'].includes(error.cause?.code);
   send(502,{error:network?'Máy chủ chưa kết nối được Google hoặc kết nối quá chậm. Kiểm tra mạng/DNS rồi thử lại.':error.message?.startsWith('Google')||error.message?.startsWith('Không thể xác thực')?error.message:'Không thể tải báo cáo. Kiểm tra cấu hình server rồi thử lại.'});

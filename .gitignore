@@ -5,6 +5,9 @@ dist
 .env.local
 .env*.backup
 .local/
+.vercel/
+test-accounts.json
+TEST-ACCOUNTS-FOR-TESTERS.txt
 local-stack/
 *.docx
 
@@ -17,3 +20,7 @@ scratch_*.txt
 *.prompt.txt
 scripts/package-handoff.py
 scripts/finish-*.py
+
+.vercel
+.env*
+supabase/.temp/

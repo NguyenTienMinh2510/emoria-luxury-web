@@ -10,7 +10,7 @@ import {
   SmartphoneNfc, Volume2, VolumeX, Play, Pause, Heart, Mail, 
   Share2, Lock, Unlock, Sparkles, Calendar, User, Eye, Send, 
   ChevronLeft, ChevronRight, CheckCircle2, ShieldCheck, Image as ImageIcon,
-  Edit3, Key, Clock, AlertTriangle, Save, X, Loader2
+  Edit3, Key, Clock, AlertTriangle, Save, X, Loader2, ArrowLeft
 } from 'lucide-react';
 import { 
   fetchMemoryView, 
@@ -21,7 +21,7 @@ import {
   getShowcaseMemoriesList 
 } from '../services/memoryService';
 
-export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToShop, currentUser, onOpenAuth, onSelectTag }) {
+export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToHome, onNavigateToShop, currentUser, onOpenAuth, onSelectTag }) {
   const {settings}=useStore();
   const [editMedia,setEditMedia]=useState([]);
   const [tagInput,setTagInput]=useState('');
@@ -230,7 +230,33 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
     }
   };
 
-  if(!currentTag)return <div className="min-h-screen max-w-4xl mx-auto px-5 py-20 space-y-8"><button className="text-slate-400 underline" onClick={onNavigateToShop}>← Cửa hàng</button><h1 className="font-serif text-4xl">Kỷ vật của bạn</h1><p className="text-slate-400">Chuẩn bị món quà theo ba bước: nhận quyền bằng mã trong đơn hàng, thêm video và thư tay, rồi xem thử trước khi tặng.</p>{!currentUser&&<button className="store-button" onClick={onOpenAuth}>Đăng nhập để chuẩn bị quà</button>}<div className="grid sm:grid-cols-2 gap-4">{allMemories.map(m=><button key={m.tag_uid} className="text-left p-5 border border-white/15 rounded-2xl hover:bg-white/5" onClick={()=>{setCurrentTag(m.tag_uid);onSelectTag?.(m.tag_uid);}}><span className="font-serif text-xl">{m.title}</span><span className="block text-xs text-slate-400 mt-2">{m.jewelry_name||m.tag_uid}</span></button>)}</div><form className="space-y-3" onSubmit={e=>{e.preventDefault();const tag=tagInput.trim().toLowerCase();if(/^[a-z0-9-]{1,64}$/.test(tag)){setCurrentTag(tag);onSelectTag?.(tag);}}}><label className="store-label">Bạn đã nhận chip? Nhập mã kỷ vật trên thẻ<input required pattern="[a-zA-Z0-9-]{1,64}" className="store-input" value={tagInput} onChange={e=>setTagInput(e.target.value)} placeholder="emo-…"/></label><button className="store-button">Mở kỷ vật</button></form></div>;
+  if(!currentTag)return (
+    <div className="min-h-screen max-w-4xl mx-auto px-5 py-20 space-y-8">
+      <div className="flex items-center gap-4">
+        {onNavigateToHome && (
+          <button className="text-slate-300 hover:text-white underline text-xs font-semibold flex items-center gap-1 cursor-pointer" onClick={onNavigateToHome}>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Trang chủ</span>
+          </button>
+        )}
+        {onNavigateToShop && (
+          <button className="text-slate-400 hover:text-slate-200 underline text-xs cursor-pointer" onClick={onNavigateToShop}>
+            ← Cửa hàng
+          </button>
+        )}
+      </div>
+      <h1 className="font-serif text-4xl">Kỷ vật của bạn</h1>
+      <p className="text-slate-400">Chuẩn bị món quà theo ba bước: nhận quyền bằng mã trong đơn hàng, thêm video và thư tay, rồi xem thử trước khi tặng.</p>
+      {!currentUser&&<button className="store-button" onClick={onOpenAuth}>Đăng nhập để chuẩn bị quà</button>}
+      <div className="grid sm:grid-cols-2 gap-4">
+        {allMemories.map(m=><button key={m.tag_uid} className="text-left p-5 border border-white/15 rounded-2xl hover:bg-white/5" onClick={()=>{setCurrentTag(m.tag_uid);onSelectTag?.(m.tag_uid);}}><span className="font-serif text-xl">{m.title}</span><span className="block text-xs text-slate-400 mt-2">{m.jewelry_name||m.tag_uid}</span></button>)}
+      </div>
+      <form className="space-y-3" onSubmit={e=>{e.preventDefault();const tag=tagInput.trim().toLowerCase();if(/^[a-z0-9-]{1,64}$/.test(tag)){setCurrentTag(tag);onSelectTag?.(tag);}}}>
+        <label className="store-label">Bạn đã nhận chip? Nhập mã kỷ vật trên thẻ<input required pattern="[a-zA-Z0-9-]{1,64}" className="store-input" value={tagInput} onChange={e=>setTagInput(e.target.value)} placeholder="emo-…"/></label>
+        <button className="store-button">Mở kỷ vật</button>
+      </form>
+    </div>
+  );
   if (loading) {
     return (
       <div className="w-full min-h-screen bg-dark-950 flex flex-col items-center justify-center text-slate-300 gap-3">
@@ -246,12 +272,23 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         <AlertTriangle className="w-12 h-12 text-amber-400 mb-3" />
         <h3 className="font-serif text-xl font-bold text-white mb-2">Thông Báo Truy Xuất Kỷ Vật</h3>
         <p className="text-xs text-slate-400 max-w-md mb-6">{errorMessage || 'Không tìm thấy dữ liệu.'}</p>
-        <button
-          onClick={() => loadMemory(currentTag)}
-          className="px-6 py-2.5 rounded-full bg-white text-dark-950 font-bold text-xs uppercase"
-        >
-          Thử tải lại kỷ vật
-        </button>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => loadMemory(currentTag)}
+            className="px-6 py-2.5 rounded-full bg-white text-dark-950 font-bold text-xs uppercase cursor-pointer hover:bg-slate-200 transition-all"
+          >
+            Thử tải lại kỷ vật
+          </button>
+          {onNavigateToHome && (
+            <button
+              onClick={onNavigateToHome}
+              className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase border border-white/20 cursor-pointer transition-all flex items-center gap-1.5"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Về Trang Chủ</span>
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -263,6 +300,27 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   return (
     <div className="w-full min-h-screen bg-dark-950 text-slate-100 pt-24 pb-24 selection:bg-white/20">
       
+      {/* 0. Top Back Bar */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-4 flex items-center justify-between">
+        {onNavigateToHome ? (
+          <button
+            onClick={onNavigateToHome}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/15 border border-white/15 text-xs text-slate-200 hover:text-white transition-all cursor-pointer shadow-sm"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Quay lại Trang Chủ</span>
+          </button>
+        ) : <div />}
+        {onNavigateToShop && (
+          <button
+            onClick={onNavigateToShop}
+            className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            Khám phá Cửa Hàng →
+          </button>
+        )}
+      </div>
+
       {/* 1. Header Toolbar */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
