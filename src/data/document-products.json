@@ -1,0 +1,586 @@
+[
+  {
+    "id": "emoria-lumen",
+    "name": "Emoria Lumen (Dải Ký Ức)",
+    "category": "Dây chuyền",
+    "material": "Bạc S925",
+    "price": 299000,
+    "image": "/assets/catalog/emoria-lumen.png",
+    "hasNFC": true,
+    "isNfcFeatured": true,
+    "subtitle": "Emoria Lumen — Ánh sáng không tắt, Ký ức không phai",
+    "description": "Emoria Lumen (Dải Ký Ức) thuộc dòng dây chuyền bạc S925 tích hợp NFC. Chạm bằng điện thoại hỗ trợ NFC để mở Memory Space với video, ảnh, giọng nói và thư riêng.",
+    "benefits": [
+      "01 Dây chuyền mặt Emoria Lumen, chất liệu Bạc S925",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 12mm x Độ dày 3.5mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 1,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Tiêu chuẩn"
+    ]
+  },
+  {
+    "id": "emoria-lumen-duo",
+    "name": "Emoria Lumen (Dải Ký Ức) — Combo 2 chiếc",
+    "category": "Dây chuyền",
+    "material": "Bạc S925",
+    "price": 549000,
+    "image": "/assets/catalog/emoria-lumen.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Lumen — Ánh sáng không tắt, Ký ức không phai",
+    "description": "Combo 2 chiếc Emoria Lumen (Dải Ký Ức) cho cặp đôi. Mỗi chiếc có một chip NFC riêng để lưu giữ kỷ niệm.",
+    "benefits": [
+      "02 chiếc cùng mẫu, mỗi chiếc có một không gian kỷ niệm NFC riêng.",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 12mm x Độ dày 3.5mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 2,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Bộ 2 chiếc"
+    ],
+    "tag": "Combo cặp đôi",
+    "parentId": "emoria-lumen"
+  },
+  {
+    "id": "emoria-halo",
+    "name": "Emoria Halo (Vầng Sáng)",
+    "category": "Nhẫn",
+    "material": "Bạc S925",
+    "price": 229000,
+    "image": "/assets/catalog/emoria-halo.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Halo – Vầng sáng bên bạn, ký ức luôn quanh đây",
+    "description": "Emoria Halo (Vầng Sáng) thuộc dòng nhẫn bạc S925 tích hợp NFC. Chạm bằng điện thoại hỗ trợ NFC để mở Memory Space với video, ảnh, giọng nói và thư riêng.",
+    "benefits": [
+      "01 chiếc nhẫn Emoria Halo, chất liệu Bạc S925",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 12mm x Độ dày 3.5mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 1,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Tiêu chuẩn"
+    ]
+  },
+  {
+    "id": "emoria-halo-duo",
+    "name": "Emoria Halo (Vầng Sáng) — Combo 2 chiếc",
+    "category": "Nhẫn",
+    "material": "Bạc S925",
+    "price": 400000,
+    "image": "/assets/catalog/emoria-halo.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Halo – Vầng sáng bên bạn, ký ức luôn quanh đây",
+    "description": "Combo 2 chiếc Emoria Halo (Vầng Sáng) cho cặp đôi. Mỗi chiếc có một chip NFC riêng để lưu giữ kỷ niệm.",
+    "benefits": [
+      "02 chiếc cùng mẫu, mỗi chiếc có một không gian kỷ niệm NFC riêng.",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 12mm x Độ dày 3.5mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 2,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Bộ 2 chiếc"
+    ],
+    "tag": "Combo cặp đôi",
+    "parentId": "emoria-halo"
+  },
+  {
+    "id": "emoria-horizon",
+    "name": "Emoria Horizon (Chân trời)",
+    "category": "Vòng tay",
+    "material": "Bạc S925",
+    "price": 279000,
+    "image": "/assets/catalog/emoria-horizon.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Horizon – Chạm chân trời, mở hành trình ký ức",
+    "description": "Emoria Horizon (Chân trời) thuộc dòng vòng tay bạc S925 tích hợp NFC. Chạm bằng điện thoại hỗ trợ NFC để mở Memory Space với video, ảnh, giọng nói và thư riêng.",
+    "benefits": [
+      "01 chiếc lắc tay Emoria Horizon, chất liệu Bạc S925",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 12mm x Độ dày 3.5mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 1,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Tiêu chuẩn"
+    ]
+  },
+  {
+    "id": "emoria-pulse",
+    "name": "Emoria Pulse (nhịp đập)",
+    "category": "Vòng tay",
+    "material": "Bạc S925",
+    "price": 269000,
+    "image": "/assets/catalog/emoria-pulse.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Pulse – Một chạm thay lời: Mình vẫn ở đây",
+    "description": "Emoria Pulse (nhịp đập) thuộc dòng vòng tay bạc S925 tích hợp NFC. Chạm bằng điện thoại hỗ trợ NFC để mở Memory Space với video, ảnh, giọng nói và thư riêng.",
+    "benefits": [
+      "01 chiếc lắc tay Emoria Pulse, chất liệu Bạc S925",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 12mm x Độ dày 3.5mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 1,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Tiêu chuẩn"
+    ]
+  },
+  {
+    "id": "emoria-pulse-duo",
+    "name": "Emoria Pulse (nhịp đập) — Combo 2 chiếc",
+    "category": "Vòng tay",
+    "material": "Bạc S925",
+    "price": 499000,
+    "image": "/assets/catalog/emoria-pulse.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Pulse – Một chạm thay lời: Mình vẫn ở đây",
+    "description": "Combo 2 chiếc Emoria Pulse (nhịp đập) cho cặp đôi. Mỗi chiếc có một chip NFC riêng để lưu giữ kỷ niệm.",
+    "benefits": [
+      "02 chiếc cùng mẫu, mỗi chiếc có một không gian kỷ niệm NFC riêng.",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 12mm x Độ dày 3.5mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 2,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Bộ 2 chiếc"
+    ],
+    "tag": "Combo cặp đôi",
+    "parentId": "emoria-pulse"
+  },
+  {
+    "id": "emoria-faith",
+    "name": "Emoria Faith (Niềm tin)",
+    "category": "Dây chuyền",
+    "material": "Bạc S925",
+    "price": 299000,
+    "image": "/assets/catalog/emoria-faith.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Faith – Mang theo niềm tin, bước tiếp mỗi ngày.",
+    "description": "Emoria Faith (Niềm tin) thuộc dòng dây chuyền bạc S925 tích hợp NFC. Chạm bằng điện thoại hỗ trợ NFC để mở Memory Space với video, ảnh, giọng nói và thư riêng.",
+    "benefits": [
+      "01 chiếc mặt dây chuyền Emoria Faith, chất liệu Bạc S925",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 11mm x Độ dày 3mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 1,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Tiêu chuẩn"
+    ]
+  },
+  {
+    "id": "emoria-echo",
+    "name": "Emoria Echo (Tiếng vọng)",
+    "category": "Nhẫn",
+    "material": "Bạc S925",
+    "price": 239000,
+    "image": "/assets/catalog/emoria-echo.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Echo – Có những giọng nói, nghe lại là thấy cả một người",
+    "description": "Emoria Echo (Tiếng vọng) thuộc dòng nhẫn bạc S925 tích hợp NFC. Chạm bằng điện thoại hỗ trợ NFC để mở Memory Space với video, ảnh, giọng nói và thư riêng.",
+    "benefits": [
+      "01 chiếc nhẫn Emoria Echo, chất liệu Bạc S925",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 13mm x Độ dày 3.5mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 1,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Tiêu chuẩn"
+    ]
+  },
+  {
+    "id": "emoria-orbit",
+    "name": "Emoria Orbit (Quỹ đạo)",
+    "category": "Vòng tay",
+    "material": "Bạc S925",
+    "price": 279000,
+    "image": "/assets/catalog/emoria-orbit.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Orbit  –  Mỗi người một quỹ đạo, nhưng luôn thuộc về cùng một bầu trời.",
+    "description": "Emoria Orbit (Quỹ đạo) thuộc dòng vòng tay bạc S925 tích hợp NFC. Chạm bằng điện thoại hỗ trợ NFC để mở Memory Space với video, ảnh, giọng nói và thư riêng.",
+    "benefits": [
+      "01 lắc tay Emoria Orbit, chất liệu Bạc S925",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 13mm x Độ dày 3mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 1,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Tiêu chuẩn"
+    ]
+  },
+  {
+    "id": "emoria-orbit-duo",
+    "name": "Emoria Orbit (Quỹ đạo) — Combo 2 chiếc",
+    "category": "Vòng tay",
+    "material": "Bạc S925",
+    "price": 499000,
+    "image": "/assets/catalog/emoria-orbit.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Orbit  –  Mỗi người một quỹ đạo, nhưng luôn thuộc về cùng một bầu trời.",
+    "description": "Combo 2 chiếc Emoria Orbit (Quỹ đạo) cho cặp đôi. Mỗi chiếc có một chip NFC riêng để lưu giữ kỷ niệm.",
+    "benefits": [
+      "02 chiếc cùng mẫu, mỗi chiếc có một không gian kỷ niệm NFC riêng.",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 13mm x Độ dày 3mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 2,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Bộ 2 chiếc"
+    ],
+    "tag": "Combo cặp đôi",
+    "parentId": "emoria-orbit"
+  },
+  {
+    "id": "emoria-sen",
+    "name": "Emoria Sen (Hoa sen)",
+    "category": "Dây chuyền",
+    "material": "Bạc S925",
+    "price": 249000,
+    "image": "/assets/catalog/emoria-sen.png",
+    "hasNFC": true,
+    "isNfcFeatured": false,
+    "subtitle": "Emoria Sen  –  Vươn lên từ bùn, Toả hương vĩnh cửu",
+    "description": "Emoria Sen (Hoa sen) thuộc dòng dây chuyền bạc S925 tích hợp NFC. Chạm bằng điện thoại hỗ trợ NFC để mở Memory Space với video, ảnh, giọng nói và thư riêng.",
+    "benefits": [
+      "01 mặt dây chuyền Emoria Sen, chất liệu Bạc S925",
+      "Hộp quà cao cấp nhung tối màu, bộ lau chăm sóc bạc và thẻ hướng dẫn sử dụng"
+    ],
+    "specifications": [
+      [
+        "Chất liệu khung & dây",
+        "Bạc S925 cao cấp (Chống hoen gỉ, an toàn cho da)"
+      ],
+      [
+        "Chip kết nối",
+        "NFC Passive NTAG215 (Không dùng pin, tuổi thọ trên 10 năm)"
+      ],
+      [
+        "Kháng nước & Bụi",
+        "Chuẩn IP68 (An toàn khi rửa tay, đi mưa nhỏ)"
+      ],
+      [
+        "Lớp phủ công nghệ",
+        "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
+      ],
+      [
+        "Kích thước mặt Charm",
+        "Đường kính 13mm x Độ dày 3mm"
+      ],
+      [
+        "Độ tương thích",
+        "Tất cả dòng iPhone (từ iPhone 7 trở lên) và Smartphone Android có NFC"
+      ]
+    ],
+    "unitsPerItem": 1,
+    "sourceRevision": "dig-mar-group2-20260916",
+    "priceNote": "Giá dự kiến theo bộ sưu tập",
+    "sizes": [
+      "Tiêu chuẩn"
+    ]
+  }
+]

@@ -29,7 +29,7 @@ import {
 } from '../services/articleService';
 
 export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'articles' | 'moderation' | 'system' | 'nfc' | 'infrastructure'
+  const [activeTab, setActiveTab] = useState('marketing'); // 'orders' | 'articles' | 'moderation' | 'system' | 'nfc' | 'infrastructure'
   
   // Orders State
   const [orders, setOrders] = useState([]);
@@ -48,7 +48,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
   const [memories, setMemories] = useState([]);
 
   // Articles & Moderation State
-  const [adminArticles, setAdminArticles] = useState(DEMO_ARTICLES);
+  const [adminArticles, setAdminArticles] = useState([]);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingArticleId, setEditingArticleId] = useState(null);
   const [articleForm, setArticleForm] = useState({
@@ -232,14 +232,13 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
   return (
     <AnimatePresence>
       <div 
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/85 backdrop-blur-2xl"
-        onClick={onClose}
+        className="admin-page min-h-screen px-3 sm:px-6 pt-32 pb-16 max-w-7xl mx-auto"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className="relative w-full max-w-4xl rounded-3xl bg-dark-900/95 border border-white/20 p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto text-slate-100"
+          className="relative w-full min-w-0 rounded-3xl bg-dark-900/95 border border-white/15 p-4 sm:p-8 text-slate-100"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -268,6 +267,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
               </button>
               <button
                 onClick={onClose}
+                aria-label="Về cửa hàng"
                 className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -275,18 +275,10 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
             </div>
           </div>
 
-          {/* Infrastructure Health Alert */}
-          <div className="mb-6 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-3">
-            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
-            <div className="leading-relaxed">
-              <span className="font-bold">Hạ tầng Supabase Cloud: </span>
-              Endpoint Auth phản hồi <span className="font-bold underline">HTTP 200 OK</span>. Đã chuẩn bị sẵn file 1-Click <code className="font-mono bg-black/40 px-1 py-0.5 rounded text-emerald-200">supabase/production_schema_deploy.sql</code> tích hợp đầy đủ 18 bảng, RLS và 14 RPC bảo mật để triển khai trực tiếp lên Cloud.
-            </div>
-          </div>
-
+          <label className="sm:hidden store-label mb-6">Khu vực quản trị<select className="store-input" value={activeTab} onChange={e=>setActiveTab(e.target.value)}>{[['marketing','Phân tích marketing'],['orders','Đơn hàng'],['catalog','Sản phẩm & kho'],['articles','Bài viết'],['moderation','Duyệt bình luận'],['nfc','Kỷ vật NFC'],['contacts','Liên hệ'],['store-settings','Cấu hình bán hàng'],['system','Bảo trì']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
           {/* Navigation Tabs */}
-          <div className="flex flex-wrap gap-2 mb-4">{[['marketing','Phân tích marketing'],['catalog','Sản phẩm & kho'],['store-settings','Cấu hình bán hàng'],['contacts','Liên hệ']].map(([key,label])=><button key={key} onClick={()=>setActiveTab(key)} className={activeTab===key?'store-button':'px-4 py-2 text-sm bg-white/5 rounded-xl'}>{label}</button>)}</div>
-          <div className="flex flex-wrap items-center gap-2 mb-6 border-b border-white/10 pb-3">
+          <div className="hidden sm:flex flex-wrap gap-2 mb-4">{[['marketing','Phân tích marketing'],['catalog','Sản phẩm & kho'],['store-settings','Cấu hình bán hàng'],['contacts','Liên hệ']].map(([key,label])=><button key={key} onClick={()=>setActiveTab(key)} className={activeTab===key?'store-button':'px-4 py-2 text-sm bg-white/5 rounded-xl'}>{label}</button>)}</div>
+          <div className="hidden sm:flex flex-wrap items-center gap-2 mb-6 border-b border-white/10 pb-3">
             <button
               onClick={() => setActiveTab('orders')}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all ${

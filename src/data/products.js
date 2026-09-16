@@ -1,4 +1,5 @@
-export const products = [
+import documentProducts from './document-products.json' with { type: 'json' };
+const originalProducts = [
   {
     id: 'emoria-pulse',
     name: 'EMORIA PULSE',
@@ -128,4 +129,5 @@ export const products = [
   }
 ];
 
+export const products = [...documentProducts.map(p => ({...p, formattedPrice: new Intl.NumberFormat('vi-VN').format(p.price)+' VNĐ'})), ...originalProducts.filter(p => !documentProducts.some(d => d.id === p.id))];
 export const categories = ['Tất cả', 'Nhẫn', 'Vòng tay', 'Dây chuyền', 'Móc khóa'];

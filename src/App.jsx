@@ -9,6 +9,7 @@ import ArticlesView from './views/ArticlesView';
 import ArticleDetailView from './views/ArticleDetailView';
 import ArticlesSection from './components/ArticlesSection';
 import HeroSection from './components/HeroSection';
+import ProductExplodedShowcase from './components/ProductExplodedShowcase';
 import CollectionShowcase from './components/CollectionShowcase';
 import ProductCatalog from './components/ProductCatalog';
 import FeedbackSection from './components/FeedbackSection';
@@ -48,6 +49,7 @@ export default function App() {
   const [selectedArticleSlug, setSelectedArticleSlug] = useState('nghe-thuat-che-tac-da-quy-emoria');
   const [activeSection, setActiveSection] = useState('collection');
   const [searchQuery, setSearchQuery] = useState('');
+  const [heroLayoutMode, setHeroLayoutMode] = useState('before-hero'); // 'before-hero' | 'hero'
   
   // Real RBAC Session State
   const [authSession, setAuthSession] = useState({
@@ -324,10 +326,12 @@ export default function App() {
         {/* VIEW 1: TRANG CHỦ & CÂU CHUYỆN THƯƠNG HIỆU (MẶC ĐỊNH) */}
         {currentView === 'home' && (
           <div>
-            <HeroSection
-              onExploreClick={handleExploreClick}
+            <ProductExplodedShowcase
+              mode="hero"
+              currentUser={currentUser}
               onOpenAuth={() => setIsAuthOpen(true)}
-              onLoginSuccess={(name) => setCurrentUser(name)}
+              onExploreClick={handleExploreClick}
+              onOpenNfcDemo={handleOpenNfcDemo}
             />
             <CollectionShowcase
               onSelectProduct={(id) => {

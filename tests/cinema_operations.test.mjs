@@ -21,7 +21,18 @@ try {
  await denied(admin.rpc('rpc_save_catalog',{p_id:id,p_expected:expected,p_product:{...product,price:200000},p_variants:variants}));
  const row=await good(root.from('checkout_products').select('*').eq('id',id).single());assert.equal(row.price,100000);
  const lines=await good(root.from('order_items').select('*').eq('order_id',orderId));
- for(const item of lines){const chip=await good(admin.rpc('rpc_issue_chip',{p_order_id:orderId,p_item_id:item.id}));assert.ok(chip.claim_code);await denied(admin.rpc('rpc_issue_chip',{p_order_id:orderId,p_item_id:item.id}));}
+ for(const item of lines){
+  const chip=await good(admin.rpc('rpc_issue_chip',{p_order_id:orderId,p_item_id:item.id}));assert.ok(chip.claim_code);
+  await denied(admin.rpc('rpc_issue_chip',{p_order_id:orderId,p_item_id:item.id}));
+  await denied(guest.rpc('rpc_claim_nfc_chip',{p_tag_uid:chip.tag,p_claim_code:chip.claim_code}));
+  await denied(owner.rpc('rpc_claim_nfc_chip',{p_tag_uid:chip.tag,p_claim_code:'wrong-code'}));
+  await good(owner.rpc('rpc_claim_nfc_chip',{p_tag_uid:chip.tag,p_claim_code:chip.claim_code}));
+  await good(owner.rpc('rpc_claim_nfc_chip',{p_tag_uid:chip.tag,p_claim_code:chip.claim_code}));
+  await denied(admin.rpc('rpc_claim_nfc_chip',{p_tag_uid:chip.tag,p_claim_code:chip.claim_code}));
+  const owned=await good(owner.rpc('rpc_get_memory_view',{p_tag_uid:chip.tag}));assert.equal(owned.is_owner,true);assert.equal(owned.is_unlocked,true);
+  assert.equal((await good(root.from('memory_spaces').select('claim_code_hash').eq('tag_uid',chip.tag).single())).claim_code_hash,null);
+ }
+ console.log('PASS claim: issued bcrypt code accepted by owner, wrong code/anonymous/second owner denied, owner retry safe, claim secret consumed');
  console.log('PASS catalog: admin only, stale stock cannot overwrite purchase, failed save leaves price unchanged; NFC: per-line quota across same-name variants');
  await good(root.from('memory_spaces').insert({tag_uid:tag,jewelry_name:'Fixture',title:'Fixture',owner_id:ownerId,is_protected:true,letter:'Private letter'}));
  const image=`${tag}/image`,video=`${tag}/intro`,wrong=`${tag}-other/intro`;

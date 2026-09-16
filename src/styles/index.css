@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+.analytics-card { min-width: 0; padding: 1.25rem; border: 1px solid rgb(255 255 255 / .1); border-radius: 1rem; background: rgb(255 255 255 / .025); }
+.analytics-card h3 { font-weight: 600; margin-bottom: 1.25rem; }
+:where(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid #bae6fd; outline-offset: 3px; }
+@media (max-width: 639px) {
+  .admin-page button, .admin-page select, .admin-page summary { min-height: 44px; }
+  .admin-page input:not([type=checkbox]), .admin-page textarea, .admin-page select,
+  .store-input { font-size: 16px; max-width: 100%; }
+  .admin-page form { min-width: 0; }
+  .analytics-card { padding: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
 :root {
   color-scheme: dark;
 }

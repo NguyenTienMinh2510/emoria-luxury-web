@@ -41,6 +41,7 @@ export default function ShopView({
   const filteredProducts = useMemo(() => {
     return products
       .filter((item) => {
+        if (!item.active) return false;
         const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
         const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           item.material.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -56,7 +57,7 @@ export default function ShopView({
       .sort((a, b) => {
         if (sortBy === 'priceAsc') return a.price - b.price;
         if (sortBy === 'priceDesc') return b.price - a.price;
-        if (sortBy === 'rating') return (b.rating || 5) - (a.rating || 5);
+        if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
         return 0; // Default popular
       });
   }, [products, selectedCategory, searchQuery, priceFilter, sortBy]);

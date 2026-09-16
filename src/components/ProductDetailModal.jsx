@@ -9,7 +9,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
 
   const defaultSizes = (product?.variants || []).map(v => v.size);
   const [quantity, setQuantity] = useState(1);
-  const [selectedSize, setSelectedSize] = useState(defaultSizes[0]);
+  const [selectedSize, setSelectedSize] = useState(product?.variants?.find(v => v.stock > 0)?.size || defaultSizes[0]);
   const [isGift, setIsGift] = useState(false);
   const [added, setAdded] = useState(false);
 
@@ -81,27 +81,31 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
               </div>
 
               {/* Price & Rating */}
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex flex-wrap gap-2 items-center justify-between pb-3 border-b border-white/10">
                 <span className="text-2xl font-bold text-metallic">
                   {product.formattedPrice}
                 </span>
-                <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-200">
+                {product.rating > 0 && <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-200">
                   <span>{product.rating}</span>
                   <Star className="w-4 h-4 fill-slate-200 text-slate-200" />
                   <span className="text-xs text-slate-400 font-normal">({product.reviewsCount} đánh giá)</span>
-                </div>
+                </div>}
               </div>
 
               {/* Description */}
+              {product.subtitle && <p className="font-serif text-lg text-white">{product.subtitle}</p>}
               <p className="text-sm text-slate-300 leading-relaxed font-light">
                 {product.description}
               </p>
+              {product.priceNote && <p className="text-xs text-slate-400">{product.priceNote}{product.unitsPerItem === 2 ? ' · Giá cho một bộ 2 chiếc; tồn kho tính theo bộ.' : ''}</p>}
+              {product.benefits?.length > 0 && <div className="text-sm text-slate-300"><h4 className="font-semibold text-white mb-2">Đi kèm sản phẩm</h4><ul className="list-disc pl-5 space-y-1">{product.benefits.map(text => <li key={text}>{text}</li>)}</ul></div>}
+              {product.specifications?.length > 0 && <details className="text-sm border border-white/10 rounded-xl p-3"><summary className="cursor-pointer min-h-[44px] flex items-center">Thông số sản phẩm</summary><dl className="space-y-3 pt-2">{product.specifications.map(([label,value]) => <div key={label} className="grid sm:grid-cols-2 gap-1"><dt className="text-slate-400">{label}</dt><dd className="break-words">{value}</dd></div>)}</dl></details>}
 
               {/* Size selection */}
               {defaultSizes.length > 1 && (
                 <div className="space-y-1.5 pt-1">
                   <label className="text-xs font-semibold text-slate-300 block">
-                    Chọn kích cỡ:
+                    Chọn phiên bản:
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {defaultSizes.map((sz) => (
@@ -110,7 +114,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                         type="button"
                         disabled={!product.variants.find(v => v.size === sz)?.stock}
                         onClick={() => { setSelectedSize(sz); setQuantity(1); }}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                        className={`min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-medium border transition-all disabled:opacity-40 ${
                           selectedSize === sz
                             ? 'bg-white text-dark-950 border-white font-bold shadow-sm'
                             : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
@@ -133,7 +137,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                 />
                 <div className="flex items-center gap-2 text-xs">
                   <Gift className="w-4 h-4 text-slate-200" />
-                  <span>Hộp quà & thiệp (+{new Intl.NumberFormat('vi-VN').format(settings?.gift_fee || 0)} đ / đơn)</span>
+                  <span>{product.benefits?.length ? 'Nâng cấp gói quà & thiệp' : 'Hộp quà & thiệp'} (+{new Intl.NumberFormat('vi-VN').format(settings?.gift_fee || 0)} đ / đơn)</span>
                 </div>
               </label>
 
@@ -158,7 +162,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
               </div>
 
               {/* Quantity & Add to Cart */}
-              <div className="flex items-center gap-4 pt-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-2">
                 <div className="flex items-center rounded-xl bg-white/5 border border-white/10 p-1">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}

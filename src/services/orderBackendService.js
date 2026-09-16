@@ -55,6 +55,7 @@ export async function listOrdersForAdmin(page = 0, search = '') {
             size: it.size,
             price: it.unit_price,
             quantity: it.quantity,
+            unitsPerItem: it.units_per_item || 1,
             isGift: it.is_gift,
             image: it.image_url,
           })),

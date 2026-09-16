@@ -18,6 +18,7 @@ export default function ProductCatalog({
   // Filter & Search Logic
   const filteredProducts = useMemo(() => {
     return products.filter((item) => {
+      if (!item.active) return false;
       const matchCategory = activeCategory === 'Tất cả' || item.category === activeCategory;
       const matchSearch = !searchQuery || 
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -201,10 +202,10 @@ export default function ProductCatalog({
                     </p>
 
                     {/* Rating Stars matching Mockup 4 (e.g. 4.8 ★, 5 ★) */}
-                    <div className="flex items-center justify-center gap-1 pt-1 text-slate-300 text-xs font-medium">
+                    {product.rating > 0 && <div className="flex items-center justify-center gap-1 pt-1 text-slate-300 text-xs font-medium">
                       <span>{product.rating}</span>
                       <Star className="w-3.5 h-3.5 fill-slate-200 text-slate-200" />
-                    </div>
+                    </div>}
                   </div>
                 </motion.div>
               );

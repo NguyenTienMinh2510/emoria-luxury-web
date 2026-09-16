@@ -33,8 +33,8 @@ export default async function handler(req,res){
    if(!response.ok)throw new Error('Google chưa trả báo cáo. Kiểm tra Data API và quyền Viewer của service account trên GA4 property.');
    return response.json();
   };
-  const [summary,channels,devices]=await Promise.all([report([],['activeUsers','sessions','screenPageViews','engagementRate']),report(['sessionDefaultChannelGroup'],['sessions','engagedSessions']),report(['deviceCategory'],['activeUsers'])]);
-  send(200,{configured:true,days,summary,channels,devices});
+  const [summary,channels,devices,daily]=await Promise.all([report([],['activeUsers','sessions','screenPageViews','engagementRate']),report(['sessionDefaultChannelGroup'],['sessions','engagedSessions']),report(['deviceCategory'],['activeUsers']),report(['date'],['activeUsers','sessions','screenPageViews'])]);
+  send(200,{configured:true,days,summary,channels,devices,daily,updatedAt:new Date().toISOString()});
  }catch(error){
   const network=error.name==='TimeoutError'||error.name==='AbortError'||['ETIMEDOUT','ENOTFOUND','EAI_AGAIN','EACCES','ECONNRESET','UND_ERR_CONNECT_TIMEOUT'].includes(error.cause?.code);
   send(502,{error:network?'Máy chủ chưa kết nối được Google hoặc kết nối quá chậm. Kiểm tra mạng/DNS rồi thử lại.':error.message?.startsWith('Google')||error.message?.startsWith('Không thể xác thực')?error.message:'Không thể tải báo cáo. Kiểm tra cấu hình server rồi thử lại.'});

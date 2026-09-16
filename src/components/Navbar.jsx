@@ -4,7 +4,9 @@ import { Search, User, ShoppingBag, Menu, X, Sparkles, SmartphoneNfc, Store, Com
 import { navItems } from '../data/navigation';
 
 export default function Navbar({ 
-  activeSection, 
+  activeSection,
+  currentUser,
+  isAdmin=false, 
   onOpenAuth, 
   onOpenNfcDemo, 
   cartCount = 0, 
@@ -52,7 +54,7 @@ export default function Navbar({
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-2">
 
           {/* Logo */}
           <div 
@@ -60,7 +62,7 @@ export default function Navbar({
             className="flex items-center gap-2.5 group relative cursor-pointer"
           >
             <div className="flex items-center gap-1.5">
-              <span className="font-serif text-2xl sm:text-3xl font-bold tracking-[0.2em] text-metallic group-hover:brightness-125 transition-all">
+              <span className="font-serif text-xl sm:text-3xl font-bold tracking-[0.12em] sm:tracking-[0.2em] text-metallic group-hover:brightness-125 transition-all">
                 EMORIA
               </span>
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/10 border border-white/30 text-[10px] text-white/90 shadow-silver-glow animate-pulse">
@@ -70,7 +72,7 @@ export default function Navbar({
           </div>
 
           {/* Desktop Center: Space Switcher Pill (Shop vs Memory vs Articles vs Home) */}
-          <div className="hidden md:flex items-center p-1 rounded-full bg-black/60 border border-white/15 backdrop-blur-xl shadow-inner">
+          <div className="hidden xl:flex items-center p-1 rounded-full bg-black/60 border border-white/15 backdrop-blur-xl shadow-inner">
             <button
               onClick={() => handleSwitchView('home')}
               className={`relative px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
@@ -126,7 +128,7 @@ export default function Navbar({
             {/* Search Input Bar (Visible from lg) */}
             <form
               onSubmit={handleSearchSubmit}
-              className={`relative hidden lg:flex items-center transition-all duration-300 ${
+              className={`relative hidden xl:flex items-center transition-all duration-300 ${
                 searchFocused ? 'w-56' : 'w-40'
               }`}
             >
@@ -153,6 +155,7 @@ export default function Navbar({
               </button>
             </form>
 
+            {isAdmin&&<button onClick={()=>handleSwitchView('admin')} className="hidden sm:block min-h-11 px-2 sm:px-3 text-xs rounded-xl border border-white/20" aria-current={currentView==='admin'?'page':undefined}>Quản trị</button>}
             {/* Shopping Cart Button */}
             <button
               onClick={onOpenCart}
@@ -170,7 +173,7 @@ export default function Navbar({
             {/* Auth / Account Profile Button */}
             <button
               onClick={onOpenAuth}
-              aria-label="Tài khoản"
+              aria-label={currentUser?`Tài khoản ${currentUser}`:"Tài khoản"}
               className="p-1.5 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer min-h-[38px]"
             >
               <div className="w-7 h-7 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-slate-200">
@@ -181,8 +184,8 @@ export default function Navbar({
             {/* Mobile Hamburger Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center min-w-[40px] min-h-[40px]"
-              aria-label="Toggle menu"
+              className="xl:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center min-w-[40px] min-h-[40px]"
+              aria-label="Mở menu" aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -197,7 +200,7 @@ export default function Navbar({
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.25 }}
-              className="md:hidden overflow-hidden mt-3 pt-3 pb-4 border-t border-white/10 bg-dark-950/95 backdrop-blur-2xl rounded-2xl px-4 space-y-3 shadow-2xl"
+              className="xl:hidden overflow-hidden mt-3 pt-3 pb-4 border-t border-white/10 bg-dark-950/95 backdrop-blur-2xl rounded-2xl px-4 space-y-3 shadow-2xl"
             >
               {/* Mobile View Switcher Buttons */}
               <div className="grid grid-cols-4 gap-2 pb-3 border-b border-white/10">
@@ -250,6 +253,7 @@ export default function Navbar({
                 </button>
               </div>
 
+              {isAdmin&&<button onClick={()=>handleSwitchView('admin')} className="w-full min-h-11 rounded-xl bg-white text-dark-950 font-semibold">Trang quản trị</button>}
               {/* Mobile Search */}
               <form onSubmit={handleSearchSubmit} className="relative mb-2">
                 <input

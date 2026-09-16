@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import ModalFrame from './ModalFrame';
 import CustomerOrders from './CustomerOrders';
-export default function AuthDialog({ isOpen, onClose, onLoginSuccess, currentUser, recovery = false }) {
+export default function AuthDialog({ isOpen, onClose, onLoginSuccess, currentUser, recovery = false, initialMode='login' }) {
  const [mode,setMode]=useState('login'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[name,setName]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
- useEffect(()=>{if(recovery)setMode('reset');},[recovery]);
+ useEffect(()=>{if(isOpen){setMode(recovery?'reset':initialMode);setError('');setMessage('');setPassword('');}},[isOpen,recovery,initialMode]);
  if(!isOpen)return null;
  const submit=async e=>{
   e.preventDefault();if(busy)return;setBusy(true);setError('');setMessage('');

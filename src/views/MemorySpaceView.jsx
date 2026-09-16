@@ -291,12 +291,12 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
           </div>
 
           {/* Right Selector & Owner Studio Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col min-[480px]:flex-row w-full sm:w-auto min-w-0 gap-2">
             <select
               value={currentTag}
               aria-label="Chọn kỷ vật của bạn"
               onChange={(e) => {setCurrentTag(e.target.value);onSelectTag?.(e.target.value);}}
-              className="px-3 py-1.5 text-xs rounded-xl bg-black/60 border border-white/20 text-slate-200 focus:outline-none focus:border-white/50 cursor-pointer"
+              className="w-full sm:max-w-64 min-h-11 min-w-0 px-3 py-1.5 text-sm rounded-xl bg-black/60 border border-white/20 text-slate-200 focus:outline-none focus:border-white/50 cursor-pointer"
             >
               {!allMemories.some(m=>m.tag_uid===currentTag)&&<option value={currentTag}>Kỷ vật đang mở</option>}
               {allMemories.map((m) => (
@@ -701,11 +701,11 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
       {/* MODAL 2: OWNER STUDIO (CHỈNH SỬA TOÀN DIỆN & QUẢN LÝ PIN AN TOÀN) */}
       {isEditorOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
           onClick={() => {if(window.confirm('Đóng và bỏ thay đổi chưa lưu?'))setIsEditorOpen(false);}}
         >
           <div 
-            className="w-full max-w-2xl my-8 p-6 sm:p-8 rounded-3xl bg-dark-900 border border-white/25 shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-2xl my-2 sm:my-8 p-4 sm:p-8 rounded-3xl bg-dark-900 border border-white/25 shadow-2xl text-slate-100 max-h-[90dvh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-6">

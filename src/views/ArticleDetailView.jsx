@@ -194,7 +194,7 @@ export default function ArticleDetailView({
       <article className="max-w-4xl mx-auto">
         
         {/* Navigation Bar Back */}
-        <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
           <button
             onClick={onBack}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-semibold tracking-wider text-slate-300 hover:text-white transition-all cursor-pointer shadow-inner"
@@ -208,8 +208,8 @@ export default function ArticleDetailView({
             <button
               disabled={reactionBusy}
               onClick={handleLike}
-              title="Thích bài viết"
-              className={`p-2.5 rounded-full border transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+              title="Thích bài viết" aria-label="Thích bài viết" aria-pressed={isLiked}
+              className={`min-h-11 min-w-11 p-2.5 rounded-full border transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
                 isLiked 
                   ? 'bg-rose-500/20 border-rose-500/40 text-rose-400 shadow-silver-glow' 
                   : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
@@ -222,8 +222,8 @@ export default function ArticleDetailView({
             <button
               disabled={reactionBusy}
               onClick={handleBookmark}
-              title="Lưu bài viết"
-              className={`p-2.5 rounded-full border transition-all cursor-pointer ${
+              title="Lưu bài viết" aria-label="Lưu bài viết" aria-pressed={isBookmarked}
+              className={`min-h-11 min-w-11 p-2.5 rounded-full border transition-all cursor-pointer ${
                 isBookmarked
                   ? 'bg-white/20 border-white/40 text-white shadow-silver-glow'
                   : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
@@ -234,8 +234,8 @@ export default function ArticleDetailView({
 
             <button
               onClick={handleShare}
-              title="Chia sẻ liên kết"
-              className="p-2.5 rounded-full bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              title="Chia sẻ liên kết" aria-label="Chia sẻ liên kết"
+              className="min-h-11 min-w-11 p-2.5 rounded-full bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
             >
               <Share2 className="w-4 h-4" />
             </button>
