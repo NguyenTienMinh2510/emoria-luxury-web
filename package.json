@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node tests/security_and_rbac.test.js && node tests/memory_access_regression.test.js",
+    "test": "node tests/security_and_rbac.test.js && node tests/memory_access_regression.test.js && node tests/sepay_webhook.test.mjs",
     "test:db": "node tests/backend_database.test.js",
     "dev": "vite",
     "build": "vite build",

@@ -10,6 +10,6 @@ try{
  sql(fs.readFileSync('supabase/production_schema_deploy.sql','utf8'));
  const upgrade=fs.readFileSync('supabase/releases/20260916-cloud-upgrade.sql','utf8').replace(/^CREATE EXTENSION IF NOT EXISTS pg_cron.*$/m,'').replace(/^SELECT cron.schedule.*$/m,'');
  sql(upgrade);
- sql("DO $$ BEGIN IF to_regclass('public.store_settings') IS NULL OR to_regprocedure('public.rpc_save_catalog(text,jsonb,jsonb,jsonb)') IS NULL THEN RAISE EXCEPTION 'Missing new schema'; END IF; END $$;");
+ sql("DO $$ BEGIN IF to_regclass('public.store_settings') IS NULL OR to_regprocedure('public.rpc_save_catalog(text,jsonb,jsonb,jsonb)') IS NULL OR to_regclass('public.bank_payment_events') IS NULL OR to_regprocedure('public.rpc_receive_bank_payment(bigint,boolean,text,text,text,bigint,text)') IS NULL OR to_regclass('public.gateway_payment_events') IS NULL OR to_regprocedure('public.rpc_receive_gateway_payment(text,boolean,text,text,bigint,jsonb)') IS NULL THEN RAISE EXCEPTION 'Missing new schema'; END IF; END $$;");
  console.log('PASS: existing production schema upgrades atomically in isolated Postgres; storage schema shim only for local test; pg_cron scheduling verified separately.');
 }finally{docker(['exec',container,'dropdb','-U','postgres',database]);}

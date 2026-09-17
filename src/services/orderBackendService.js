@@ -1,11 +1,18 @@
 import {supabase,isSupabaseConfigured} from '../lib/supabaseClient.js';
 export function normalizeCheckout(payload) {
-  return {customerName:String(payload.customerName||'').trim(),phone:String(payload.phone||'').replace(/\D/g,''),email:String(payload.email||'').trim().toLowerCase(),address:String(payload.address||'').trim(),city:String(payload.city||''),note:String(payload.note||'').trim(),paymentMethod:payload.paymentMethod==='vietqr'?'vietqr':'cod',hasGiftBox:Boolean(payload.hasGiftBox||payload.items?.some(i=>i.isGift)),items:(payload.items||[]).map(i=>({id:i.id,size:i.size||'Tiêu chuẩn',quantity:i.quantity??1,isGift:Boolean(i.isGift)}))};
+  const method = ['vietqr', 'sepay', 'cod'].includes(payload.paymentMethod) ? payload.paymentMethod : 'cod';
+  return {customerName:String(payload.customerName||'').trim(),phone:String(payload.phone||'').replace(/\D/g,''),email:String(payload.email||'').trim().toLowerCase(),address:String(payload.address||'').trim(),city:String(payload.city||''),note:String(payload.note||'').trim(),paymentMethod:method,hasGiftBox:Boolean(payload.hasGiftBox||payload.items?.some(i=>i.isGift)),items:(payload.items||[]).map(i=>({id:i.id,size:i.size||'Tiêu chuẩn',quantity:i.quantity??1,isGift:Boolean(i.isGift)}))};
 }
 export async function createOrder(payload) {
  if(!isSupabaseConfigured())return {success:false,retryable:false,error:'Chưa kết nối máy chủ. Chưa tạo đơn hàng.'};
  const normalized=normalizeCheckout(payload);
  if(!normalized.customerName||!normalized.address||!/^\d{9,11}$/.test(normalized.phone)||!normalized.items.length)return {success:false,retryable:false,error:'Kiểm tra họ tên, số điện thoại, địa chỉ và giỏ hàng.'};
+ if (typeof window !== 'undefined') {
+   const { data: sessionData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+   if (!sessionData?.session?.user) {
+     return { success: false, retryable: false, error: 'Vui lòng đăng nhập hoặc đăng ký tài khoản để tiến hành đặt hàng.' };
+   }
+ }
  try {
   const {data,error}=await supabase.rpc('rpc_create_order',{p_request_id:payload.requestId||crypto.randomUUID(),p_payload:normalized});
   if(error){const definite=/^(P0001|22|23|42501)/.test(error.code||'');return {success:false,retryable:!definite,error:definite?error.message:'Chưa xác định được kết quả đặt đơn. Dùng nút gửi lại cùng yêu cầu để tránh đơn trùng.'};}
@@ -50,6 +57,8 @@ export async function listOrdersForAdmin(page = 0, search = '', status = '') {
           city: o.city,
           note: o.note,
           paymentMethod: o.payment_method,
+          paymentProvider: o.payment_provider || (o.payment_method === 'sepay' ? 'sepay' : null),
+          paymentId: o.payment_id,
           status: o.status,
           totals: { finalTotal: o.final_total },
           createdAt: o.created_at,

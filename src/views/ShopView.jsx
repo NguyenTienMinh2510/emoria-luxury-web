@@ -448,6 +448,35 @@ export default function ShopView({
               )}
             </div>
 
+            {/* Payment callback banner */}
+            {initialTracking?.paymentResult === 'success' && (
+              <div className="p-4 mb-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-400" />
+                <div>
+                  <p className="font-semibold">Thanh toán qua cổng SePay thành công!</p>
+                  <p className="text-xs text-slate-300">Hệ thống đang tự động kiểm tra và đồng bộ trạng thái đơn hàng thời gian thực.</p>
+                </div>
+              </div>
+            )}
+            {initialTracking?.paymentResult === 'cancel' && (
+              <div className="p-4 mb-6 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm flex items-center gap-3">
+                <Clock className="w-5 h-5 flex-shrink-0 text-amber-400" />
+                <div>
+                  <p className="font-semibold">Đã hủy giao dịch trên cổng SePay.</p>
+                  <p className="text-xs text-slate-300">Đơn hàng vẫn được lưu ở trạng thái chờ thanh toán trong thời gian giữ chỗ. Quý khách có thể bấm nút bên dưới để thanh toán lại.</p>
+                </div>
+              </div>
+            )}
+            {initialTracking?.paymentResult === 'error' && (
+              <div className="p-4 mb-6 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm flex items-center gap-3">
+                <X className="w-5 h-5 flex-shrink-0 text-red-400" />
+                <div>
+                  <p className="font-semibold">Thanh toán qua cổng SePay không thành công hoặc bị gián đoạn.</p>
+                  <p className="text-xs text-slate-300">Quý khách vui lòng thử lại bằng nút bên dưới.</p>
+                </div>
+              </div>
+            )}
+
             {/* Tracking Results List */}
             {trackingResults && trackingResults.length > 0 && (
               <div className="space-y-6">

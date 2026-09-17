@@ -16,6 +16,12 @@ const child=spawnSync(process.execPath,['--input-type=module','-e',`
  let result=await createOrder(payload);assert.equal(result.success,false);assert.equal(result.retryable,false);assert.equal(result.error,'Không đủ tồn kho');
  supabase.rpc=async()=>{throw new Error('network');};result=await createOrder(payload);assert.equal(result.success,false);assert.equal(result.retryable,true);
  supabase.rpc=async()=>({data:{success:true,order:{id:'EMO-server',status:'pending_payment',totals:{finalTotal:299000}}}});result=await createOrder(payload);assert.equal(result.success,true);assert.equal(result.order.id,'EMO-server');assert.equal(result.order.totals.finalTotal,299000);assert.equal(result.order.status,'pending_payment');
- console.log('PASS order service: trusted server totals, definite rejection, uncertain network recovery, unchanged request ID');
+ globalThis.window = {};
+ result = await createOrder(payload);
+ assert.equal(result.success, false);
+ assert.equal(result.retryable, false);
+ assert.equal(result.error, 'Vui lòng đăng nhập hoặc đăng ký tài khoản để tiến hành đặt hàng.');
+ delete globalThis.window;
+ console.log('PASS order service: trusted server totals, definite rejection, unauthenticated guest blocking, unchanged request ID');
 `],{cwd:new URL('..',import.meta.url),env:{...process.env,VITE_SUPABASE_URL:'https://test.supabase.co',VITE_SUPABASE_ANON_KEY:'test-key'},encoding:'utf8'});
 assert.equal(child.status,0,child.stderr);console.log(child.stdout.trim());console.log('PASS checkout session: reload recovery, account isolation, storage failure blocks submission');

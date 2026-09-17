@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, ShoppingBag, ArrowRight, Plus, Minus, Gift } from 'lucide-react';
+import { X, Trash2, ShoppingBag, ArrowRight, Plus, Minus, Gift, ShieldCheck, LogIn } from 'lucide-react';
 
 export default function CartDrawer({
   isOpen,
@@ -8,12 +8,22 @@ export default function CartDrawer({
   cartItems,
   onUpdateQuantity,
   onRemoveItem,
-  onOpenCheckout
+  onOpenCheckout,
+  currentUser,
+  onOpenAuth
 }) {
   const totalPrice = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const formattedTotal = new Intl.NumberFormat('vi-VN').format(totalPrice) + ' VNĐ';
 
   const handleProceedToCheckout = () => {
+    if (!currentUser) {
+      if (onOpenAuth) {
+        onOpenAuth();
+      } else if (onOpenCheckout) {
+        onOpenCheckout();
+      }
+      return;
+    }
     onClose();
     if (onOpenCheckout) {
       onOpenCheckout();
@@ -124,6 +134,18 @@ export default function CartDrawer({
           {/* Footer & Checkout */}
           {cartItems.length > 0 && (
             <div className="pt-4 border-t border-white/10 space-y-4">
+              {!currentUser && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-200 flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <span className="font-semibold text-amber-300">Yêu cầu tài khoản EMORIA</span>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Quý khách vui lòng đăng nhập hoặc tạo tài khoản để đặt hàng và kích hoạt bảo hành NFC cho kỷ vật.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-400">Tổng thanh toán:</span>
                 <span className="text-xl font-bold text-white font-serif">{formattedTotal}</span>
@@ -131,10 +153,23 @@ export default function CartDrawer({
 
               <button
                 onClick={handleProceedToCheckout}
-                className="w-full h-12 min-h-[44px] rounded-2xl bg-gradient-to-r from-slate-200 via-white to-slate-300 text-dark-950 font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-silver-glow cursor-pointer"
+                className={`w-full h-12 min-h-[44px] rounded-2xl font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  currentUser
+                    ? 'bg-gradient-to-r from-slate-200 via-white to-slate-300 text-dark-950 shadow-silver-glow'
+                    : 'bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-dark-950 shadow-amber-glow'
+                }`}
               >
-                <span>Tiến Hành Đặt Hàng</span>
-                <ArrowRight className="w-4 h-4" />
+                {currentUser ? (
+                  <>
+                    <span>Tiến Hành Đặt Hàng</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4" />
+                    <span>Đăng Nhập Để Đặt Hàng</span>
+                  </>
+                )}
               </button>
             </div>
           )}

@@ -664,5 +664,834 @@ END $$;
 REVOKE ALL ON FUNCTION public.rpc_issue_chip(text,uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.rpc_issue_chip(text,uuid) TO authenticated;
 
+-- Source: 20260917000200_fix_memory_tap_count_and_order_tracking.sql
+-- ==============================================================================
+-- EMORIA LUXURY - FIX MEMORY TAP COUNT & ORDER TRACKING LOOKUP
+-- Migration: 20260917000200_fix_memory_tap_count_and_order_tracking
+-- Description: 
+-- 1. Ghi nhận sự kiện mở kỷ vật vào nfc_tap_events để lượt mở thư tăng thật.
+-- 2. Cho phép tra cứu đơn hàng trực tiếp bằng Mã Đơn Hàng (EMO-...) mà không
+--    bắt buộc phải có UUID token bí mật.
+-- ==============================================================================
+
+-- 1. CẬP NHẬT get_memory_view_internal: TỰ ĐỘNG GHI NHẬN LƯỢT MỞ KỶ VẬT
+CREATE OR REPLACE FUNCTION public.get_memory_view_internal(p_tag_uid text, p_grant_token uuid DEFAULT NULL::uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_mem RECORD;
+  v_is_owner BOOLEAN := FALSE;
+  v_is_admin BOOLEAN := FALSE;
+  v_has_valid_grant BOOLEAN := FALSE;
+  v_can_see_private BOOLEAN := FALSE;
+  v_media JSONB;
+  v_guestbook JSONB;
+  v_tap_count BIGINT;
+BEGIN
+  -- 1. Tìm memory space
+  SELECT * INTO v_mem FROM public.memory_spaces WHERE tag_uid = lower(trim(p_tag_uid));
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Không tìm thấy kỷ vật mang mã chip ' || p_tag_uid);
+  END IF;
+
+  -- 2. Kiểm tra vai trò
+  IF auth.uid() IS NOT NULL THEN
+    v_is_owner := COALESCE(v_mem.owner_id = auth.uid(), FALSE);
+    v_is_admin := public.is_admin();
+  END IF;
+
+  -- 3. Kiểm tra Access Grant Token
+  IF p_grant_token IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM public.access_grants
+      WHERE memory_id = v_mem.id AND grant_token = p_grant_token AND expires_at > NOW()
+    ) INTO v_has_valid_grant;
+    v_is_owner := v_is_owner OR EXISTS (
+      SELECT 1 FROM public.access_grants
+      WHERE memory_id = v_mem.id AND grant_token = p_grant_token
+        AND expires_at > NOW() AND grant_type = 'owner'
+        AND (user_id IS NULL OR user_id = auth.uid())
+    );
+  END IF;
+
+  -- 4. Kiểm tra trạng thái khả dụng
+  IF NOT v_is_owner AND (
+    v_mem.availability_status = 'suspended'
+    OR (v_mem.availability_status = 'timed_lock' AND (v_mem.unlock_at IS NULL OR NOW() < v_mem.unlock_at))
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Kỷ niệm hiện chưa khả dụng.',
+      'availability', jsonb_build_object('status', v_mem.availability_status, 'unlock_date', v_mem.unlock_at));
+  END IF;
+
+  IF NOT v_mem.is_protected OR v_is_owner OR v_has_valid_grant THEN
+    v_can_see_private := TRUE;
+  END IF;
+
+  -- 5. Lấy danh sách Media
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'id', id, 'url', url, 'type', type, 'caption', caption, 'order_index', order_index
+  ) ORDER BY order_index ASC), '[]'::jsonb)
+  INTO v_media
+  FROM public.memory_media
+  WHERE memory_id = v_mem.id AND (NOT is_private OR v_can_see_private);
+
+  -- 6. Lấy danh sách Guestbook
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'id', id, 'author', author_name, 'relationship', relationship, 'message', message,
+    'created_at', to_char(created_at, 'DD/MM/YYYY HH24:MI')
+  ) ORDER BY created_at DESC), '[]'::jsonb)
+  INTO v_guestbook
+  FROM public.guestbook_entries
+  WHERE memory_id = v_mem.id AND NOT is_hidden;
+
+  -- 7. GHI NHẬN SỰ KIỆN MỞ KỶ VẬT VÀ LẤY SỐ LƯỢT MỞ
+  INSERT INTO public.nfc_tap_events (memory_id, device_type, tapped_at)
+  VALUES (v_mem.id, 'web', NOW());
+
+  SELECT COUNT(*) INTO v_tap_count FROM public.nfc_tap_events WHERE memory_id = v_mem.id;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'tag_uid', v_mem.tag_uid,
+    'jewelry_name', v_mem.jewelry_name,
+    'title', v_mem.title,
+    'date', v_mem.date,
+    'quote', v_mem.quote,
+    'author', v_mem.author_name,
+    'recipient', v_mem.recipient_name,
+    'audio_title', v_mem.audio_title,
+    'audio_url', v_mem.audio_url,
+    'is_protected', v_mem.is_protected,
+    'is_unlocked', v_can_see_private,
+    'letter', CASE WHEN v_can_see_private THEN v_mem.letter ELSE NULL END,
+    'availability', jsonb_build_object('status', v_mem.availability_status, 'unlock_date', v_mem.unlock_at),
+    'is_owner', v_is_owner,
+    'is_admin', v_is_admin,
+    'tap_count', v_tap_count,
+    'media_gallery', v_media,
+    'guestbook', v_guestbook
+  );
+END;
+$function$;
+
+-- 2. CẬP NHẬT rpc_track_order: HỖ TRỢ TRA CỨU BẰNG MÃ ĐƠN HÀNG (EMO-...)
+-- Drop định nghĩa cũ (tham số UUID) để tránh xung đột function overload
+DROP FUNCTION IF EXISTS public.rpc_track_order(text, uuid);
+DROP FUNCTION IF EXISTS public.rpc_track_order(text, text);
+
+CREATE OR REPLACE FUNCTION public.rpc_track_order(
+  p_order_id text,
+  p_token text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  ord public.orders;
+  items jsonb;
+  timeline jsonb;
+  v_token_uuid uuid := NULL;
+  v_is_authorized boolean := false;
+BEGIN
+  IF p_order_id IS NULL OR trim(p_order_id) = '' THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Vui lòng nhập mã đơn hàng cần tra cứu.');
+  END IF;
+
+  -- Chuyển đổi an toàn p_token sang UUID nếu có dạng hợp lệ
+  IF p_token IS NOT NULL AND trim(p_token) <> '' THEN
+    BEGIN
+      v_token_uuid := trim(p_token)::uuid;
+    EXCEPTION WHEN OTHERS THEN
+      v_token_uuid := NULL;
+    END;
+  END IF;
+
+  -- Tìm đơn hàng theo mã đơn (không phân biệt hoa thường)
+  SELECT * INTO ord
+  FROM public.orders
+  WHERE upper(id) = upper(trim(p_order_id));
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Không tìm thấy đơn hàng mang mã: ' || p_order_id);
+  END IF;
+
+  -- Kiểm tra quyền:
+  -- Mã đơn hàng EMO- là chuỗi ngẫu nhiên 32 ký tự bảo mật cao (112 bits entropy, không thể đoán mò).
+  -- Người sở hữu mã đơn hàng, hoặc người có mã token, hoặc số điện thoại, hoặc tài khoản sở hữu, hoặc admin đều được xem.
+  v_is_authorized := (
+    public.is_admin()
+    OR (auth.uid() IS NOT NULL AND ord.user_id = auth.uid())
+    OR (v_token_uuid IS NOT NULL AND ord.lookup_token = v_token_uuid)
+    OR (p_token IS NOT NULL AND (
+         regexp_replace(coalesce(ord.phone, ''), '\D', '', 'g') = regexp_replace(p_token, '\D', '', 'g')
+         OR lower(trim(coalesce(ord.email, ''))) = lower(trim(p_token))
+       ))
+    -- Cho phép tra cứu bằng mã đơn hàng EMO-... (tối thiểu 8 ký tự)
+    OR (length(trim(p_order_id)) >= 8)
+  );
+
+  IF NOT v_is_authorized THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Không tìm thấy đơn hoặc mã tra cứu không đúng.');
+  END IF;
+
+  -- Lấy danh sách sản phẩm trong đơn
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'id', product_id,
+    'name', product_name,
+    'price', unit_price,
+    'size', size,
+    'quantity', quantity,
+    'image', image_url,
+    'isGift', is_gift
+  )), '[]'::jsonb)
+  INTO items
+  FROM public.order_items
+  WHERE order_id = ord.id;
+
+  -- Lấy dòng thời gian tiến độ đơn hàng
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'status', CASE WHEN action = 'order.expired' THEN 'cancelled' ELSE detail->>'to' END,
+    'time', created_at,
+    'description', CASE WHEN action = 'order.expired' THEN 'Hết thời gian giữ hàng' ELSE 'Cập nhật trạng thái đơn hàng' END
+  ) ORDER BY created_at), '[]'::jsonb)
+  INTO timeline
+  FROM public.operation_audit
+  WHERE resource_id = ord.id AND action IN ('order.status', 'order.expired');
+
+  timeline := jsonb_build_array(jsonb_build_object(
+    'status', CASE WHEN ord.payment_method = 'vietqr' THEN 'pending_payment' ELSE 'confirmed' END,
+    'time', ord.created_at,
+    'description', 'Đã tiếp nhận đơn hàng'
+  )) || timeline;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'order', jsonb_build_object(
+      'id', ord.id,
+      'customerName', ord.customer_name,
+      'phone', ord.phone,
+      'address', ord.address,
+      'status', ord.status,
+      'paymentMethod', ord.payment_method,
+      'createdAt', ord.created_at,
+      'isTest', ord.is_test,
+      'trackingNumber', ord.tracking_number,
+      'expiresAt', ord.expires_at,
+      'statusTimeline', timeline,
+      'totals', jsonb_build_object('finalTotal', ord.final_total),
+      'items', items
+    )
+  );
+END;
+$$;
+
+-- Cấp quyền gọi cho anon và authenticated
+GRANT EXECUTE ON FUNCTION public.get_memory_view_internal(text, uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_track_order(text, text) TO anon, authenticated;
+
+-- Source: 20260917010000_order_tracking_and_shipping.sql
+ALTER TABLE public.orders
+ ADD COLUMN IF NOT EXISTS shipping_carrier text,
+ ADD COLUMN IF NOT EXISTS delivery_estimate date,
+ ADD COLUMN IF NOT EXISTS shipping_note text,
+ ADD COLUMN IF NOT EXISTS shipped_at timestamptz,
+ ADD COLUMN IF NOT EXISTS delivered_at timestamptz;
+CREATE INDEX IF NOT EXISTS orders_lookup_token_idx ON public.orders(lookup_token);
+
+-- One signature for both older UUID-token clients and the current text input.
+DROP FUNCTION IF EXISTS public.rpc_track_order(text,uuid);
+CREATE OR REPLACE FUNCTION public.rpc_track_order(p_order_id text,p_token text DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE ord public.orders; code text:=trim(coalesce(p_order_id,'')); secret text:=trim(coalesce(p_token,''));
+ tok uuid; full_access boolean; timeline jsonb; result jsonb; items jsonb;
+BEGIN
+ IF code='' OR length(code)>150 OR length(secret)>150 THEN
+  RETURN jsonb_build_object('success',false,'message','Nhập mã đơn EMO-… hoặc mã tra cứu riêng nhận được khi đặt hàng.');
+ END IF;
+ BEGIN tok:=code::uuid; EXCEPTION WHEN invalid_text_representation THEN tok:=NULL; END;
+ IF tok IS NOT NULL THEN
+  SELECT * INTO ord FROM public.orders WHERE lookup_token=tok;
+ ELSE
+  SELECT * INTO ord FROM public.orders WHERE upper(id)=upper(code);
+ END IF;
+ IF ord.id IS NULL THEN RETURN jsonb_build_object('success',false,'message','Không tìm thấy đơn. Hãy sao chép đầy đủ mã từ xác nhận đặt hàng.'); END IF;
+ full_access:=coalesce(public.is_admin() OR (auth.uid() IS NOT NULL AND ord.user_id=auth.uid()) OR ord.lookup_token=tok,false);
+ IF NOT full_access AND secret<>'' THEN
+  full_access:=lower(secret)=ord.lookup_token::text
+    OR (length(regexp_replace(secret,'\D','','g')) BETWEEN 9 AND 11
+        AND regexp_replace(secret,'\D','','g')=regexp_replace(ord.phone,'\D','','g'));
+  IF NOT coalesce(full_access,false) THEN RETURN jsonb_build_object('success',false,'message','Mã tra cứu riêng hoặc số điện thoại không đúng.'); END IF;
+ END IF;
+ SELECT coalesce(jsonb_agg(jsonb_build_object(
+  'status',CASE WHEN action='order.expired' THEN 'cancelled' ELSE detail->>'to' END,
+  'time',created_at,'description',CASE WHEN action='order.expired' THEN 'Hết thời gian giữ hàng'
+    WHEN action='order.shipment' THEN 'Đã cập nhật thông tin vận chuyển'
+    WHEN detail->>'to'='confirmed' THEN 'Đã xác nhận đơn hàng'
+    WHEN detail->>'to'='crafting_nfc' THEN 'Đang chuẩn bị trang sức và NFC'
+    WHEN detail->>'to'='shipping' THEN 'Đã bàn giao cho đơn vị vận chuyển'
+    WHEN detail->>'to'='completed' THEN 'Đã giao hàng thành công'
+    WHEN detail->>'to'='cancelled' THEN 'Đã hủy đơn hàng' ELSE 'Đã cập nhật đơn hàng' END
+ ) ORDER BY created_at,id),'[]'::jsonb) INTO timeline FROM public.operation_audit
+ WHERE resource_id=ord.id AND action IN ('order.status','order.expired','order.shipment');
+ timeline:=jsonb_build_array(jsonb_build_object('status',CASE WHEN ord.payment_method='vietqr' THEN 'pending_payment' ELSE 'confirmed' END,'time',ord.created_at,'description','Đã tiếp nhận đơn hàng'))||timeline;
+ result:=jsonb_build_object('id',ord.id,'status',ord.status,'createdAt',ord.created_at,'isTest',ord.is_test,
+  'shippingCarrier',ord.shipping_carrier,'deliveryEstimate',ord.delivery_estimate,
+  'shippedAt',ord.shipped_at,'deliveredAt',ord.delivered_at,'statusTimeline',timeline,
+  'accessLevel',CASE WHEN full_access THEN 'full' ELSE 'summary' END,'items','[]'::jsonb);
+ -- An order ID alone exposes progress only, never the recipient/address or private lookup code.
+ IF full_access THEN
+  SELECT coalesce(jsonb_agg(jsonb_build_object('id',product_id,'name',product_name,'price',unit_price,'size',size,'quantity',quantity,'image',image_url,'isGift',is_gift)),'[]'::jsonb)
+   INTO items FROM public.order_items WHERE order_id=ord.id;
+  result:=result||jsonb_build_object('customerName',ord.customer_name,'phone',ord.phone,'address',ord.address,'city',ord.city,
+   'paymentMethod',ord.payment_method,'trackingNumber',ord.tracking_number,'shippingNote',ord.shipping_note,
+   'expiresAt',ord.expires_at,'totals',jsonb_build_object('finalTotal',ord.final_total),'items',items);
+ END IF;
+ RETURN jsonb_build_object('success',true,'order',result);
+END $$;
+
+CREATE OR REPLACE FUNCTION public.rpc_save_shipment(p_order_id text,p_carrier text,p_tracking text,
+ p_estimate date DEFAULT NULL,p_note text DEFAULT '',p_status text DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE ord public.orders; target text; carrier text:=trim(coalesce(p_carrier,'')); tracking text:=trim(coalesce(p_tracking,'')); v_note text:=trim(coalesce(p_note,''));
+BEGIN
+ IF NOT public.is_admin() THEN RAISE EXCEPTION 'Yêu cầu quyền quản trị.'; END IF;
+ SELECT * INTO ord FROM public.orders WHERE id=p_order_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Không tìm thấy đơn.'; END IF;
+ IF ord.status NOT IN ('confirmed','crafting_nfc','shipping') THEN RAISE EXCEPTION 'Chỉ cập nhật vận chuyển cho đơn đã xác nhận và chưa kết thúc.'; END IF;
+ target:=coalesce(p_status,ord.status);
+ IF target NOT IN (ord.status,'shipping','completed') THEN RAISE EXCEPTION 'Trạng thái vận chuyển không hợp lệ.'; END IF;
+ IF length(carrier)>100 OR length(tracking)>120 OR length(v_note)>1000 THEN RAISE EXCEPTION 'Thông tin vận chuyển quá dài.'; END IF;
+ IF target IN ('shipping','completed') AND (carrier='' OR tracking='') THEN RAISE EXCEPTION 'Nhập đơn vị vận chuyển và mã vận đơn.'; END IF;
+ -- Existing order transition RPC keeps expiry, inventory and NFC cancellation rules intact.
+ PERFORM public.rpc_order_status(p_order_id,target,tracking);
+ UPDATE public.orders SET shipping_carrier=nullif(carrier,''),tracking_number=nullif(tracking,''),
+  delivery_estimate=p_estimate,shipping_note=nullif(v_note,''),updated_at=now(),
+  shipped_at=CASE WHEN target='shipping' THEN coalesce(shipped_at,now()) ELSE shipped_at END,
+  delivered_at=CASE WHEN target='completed' THEN coalesce(delivered_at,now()) ELSE delivered_at END
+ WHERE id=ord.id;
+ IF ROW(ord.shipping_carrier,ord.tracking_number,ord.delivery_estimate,ord.shipping_note) IS DISTINCT FROM ROW(nullif(carrier,''),nullif(tracking,''),p_estimate,nullif(v_note,'')) THEN
+  INSERT INTO public.operation_audit(actor_id,resource_id,action,detail) VALUES(auth.uid(),ord.id,'order.shipment',jsonb_build_object('to',target));
+ END IF;
+ RETURN jsonb_build_object('success',true);
+END $$;
+REVOKE ALL ON FUNCTION public.rpc_track_order(text,text),public.rpc_save_shipment(text,text,text,date,text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_track_order(text,text) TO anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_save_shipment(text,text,text,date,text,text) TO authenticated;
+NOTIFY pgrst,'reload schema';
+
+-- Source: 20260917011000_verified_bank_payments.sql
+ALTER TABLE public.orders
+ ADD COLUMN payment_status text NOT NULL DEFAULT 'unpaid' CHECK(payment_status IN ('unpaid','partial','paid','overpaid','review')),
+ ADD COLUMN paid_amount bigint NOT NULL DEFAULT 0 CHECK(paid_amount>=0),
+ ADD COLUMN paid_at timestamptz;
+-- Preserve historical admin-confirmed transfers without claiming a new bank verification.
+UPDATE public.orders SET payment_status='paid',paid_amount=final_total,paid_at=payment_confirmed_at
+ WHERE payment_method='vietqr' AND payment_confirmed_at IS NOT NULL;
+CREATE TABLE public.bank_payment_events (
+ id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ provider_id bigint NOT NULL,
+ is_test boolean NOT NULL,
+ reference text NOT NULL DEFAULT '',
+ account_number text NOT NULL,
+ order_id text REFERENCES public.orders(id),
+ amount bigint NOT NULL CHECK(amount>0),
+ content text NOT NULL,
+ received_at timestamptz NOT NULL DEFAULT now(),
+ outcome text NOT NULL DEFAULT 'unmatched',
+ UNIQUE(is_test,provider_id)
+);
+CREATE UNIQUE INDEX bank_payment_reference_unique ON public.bank_payment_events(is_test,account_number,reference) WHERE reference<>'';
+ALTER TABLE public.bank_payment_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.bank_payment_events FROM PUBLIC,anon,authenticated;
+GRANT SELECT ON public.bank_payment_events TO authenticated;
+CREATE POLICY bank_payments_admin_read ON public.bank_payment_events FOR SELECT TO authenticated USING(public.is_admin());
+
+CREATE FUNCTION public.rpc_receive_bank_payment(p_provider_id bigint,p_test boolean,p_reference text,p_account text,p_order_id text,p_amount bigint,p_content text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE event_id bigint; ord public.orders; total bigint; v_outcome text; cfg public.store_settings;
+BEGIN
+ IF p_provider_id<=0 OR p_amount<=0 OR p_amount>1000000000000 OR length(p_content)>2000 OR length(p_reference)>200 OR length(p_account)>100 THEN RAISE EXCEPTION 'Invalid bank event'; END IF;
+ -- Serialize repeated deliveries first, then concurrent payments on the same order.
+ PERFORM pg_advisory_xact_lock(hashtextextended(p_test::text||':'||p_provider_id::text,19));
+ IF EXISTS(SELECT 1 FROM public.bank_payment_events WHERE is_test=p_test AND (provider_id=p_provider_id OR (p_reference<>'' AND account_number=p_account AND reference=p_reference))) THEN RETURN jsonb_build_object('success',true,'duplicate',true); END IF;
+ SELECT * INTO ord FROM public.orders WHERE upper(id)=upper(p_order_id) FOR UPDATE;
+ INSERT INTO public.bank_payment_events(provider_id,is_test,reference,account_number,order_id,amount,content)
+ VALUES(p_provider_id,p_test,p_reference,p_account,ord.id,p_amount,p_content) ON CONFLICT DO NOTHING RETURNING id INTO event_id;
+ IF event_id IS NULL THEN RETURN jsonb_build_object('success',true,'duplicate',true); END IF;
+ SELECT * INTO cfg FROM public.store_settings WHERE id=true;
+ v_outcome:=CASE WHEN ord.id IS NULL THEN 'unmatched'
+  WHEN ord.is_test<>p_test THEN 'mode_mismatch'
+  WHEN ord.payment_method<>'vietqr' THEN 'not_transfer'
+  WHEN regexp_replace(cfg.bank_account,'\s','','g')<>p_account OR cfg.bank_account='' THEN 'account_mismatch'
+  ELSE 'received' END;
+ IF v_outcome='received' THEN
+  SELECT coalesce(sum(amount),0)+p_amount INTO total FROM public.bank_payment_events
+   WHERE order_id=ord.id AND id<>event_id AND outcome IN ('received','cancelled_review');
+  IF ord.status='cancelled' THEN v_outcome:='cancelled_review'; END IF;
+  UPDATE public.orders SET paid_amount=total,
+   payment_status=CASE WHEN ord.status='cancelled' THEN 'review' WHEN total<final_total THEN 'partial' WHEN total=final_total THEN 'paid' ELSE 'overpaid' END,
+   paid_at=CASE WHEN total>=final_total THEN coalesce(paid_at,now()) ELSE paid_at END,
+   updated_at=now() WHERE id=ord.id;
+  INSERT INTO public.operation_audit(actor_id,resource_id,action,detail) VALUES(NULL,ord.id,'order.payment',jsonb_build_object('amount',p_amount,'total',total,'review',ord.status='cancelled'));
+ END IF;
+ UPDATE public.bank_payment_events SET outcome=v_outcome WHERE id=event_id;
+ RETURN jsonb_build_object('success',true,'outcome',v_outcome);
+END $$;
+REVOKE ALL ON FUNCTION public.rpc_receive_bank_payment(bigint,boolean,text,text,text,bigint,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_receive_bank_payment(bigint,boolean,text,text,text,bigint,text) TO service_role;
+CREATE OR REPLACE FUNCTION public.rpc_order_status(p_order_id text,p_status text,p_tracking text DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE ord public.orders; item record;
+BEGIN
+ IF NOT public.is_admin() THEN RAISE EXCEPTION 'Yêu cầu quyền quản trị.'; END IF;
+ SELECT * INTO ord FROM public.orders WHERE id=p_order_id FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Không tìm thấy đơn.'; END IF;
+ IF ord.status='pending_payment' AND p_status='confirmed' AND ord.expires_at<=now() AND ord.paid_amount=0 THEN RAISE EXCEPTION 'Đơn đã hết thời gian giữ hàng. Kiểm tra giao dịch rồi liên hệ khách để đặt lại; không xác nhận đơn hết hạn.'; END IF;
+ IF ord.status='pending_payment' AND p_status='confirmed' AND (ord.payment_status NOT IN ('paid','overpaid') OR ord.paid_amount<ord.final_total) THEN RAISE EXCEPTION 'Chưa nhận đủ tiền. Chỉ duyệt sau khi giao dịch đã được xác minh.'; END IF;
+ IF p_status='shipping' AND length(trim(coalesce(p_tracking,ord.tracking_number,''))) NOT BETWEEN 1 AND 120 THEN RAISE EXCEPTION 'Nhập mã vận đơn trước khi bàn giao vận chuyển.'; END IF;
+ IF p_status=ord.status THEN RETURN jsonb_build_object('success',true); END IF;
+ IF p_status IS NULL OR NOT (
+  (ord.status='pending_payment' AND p_status IN ('confirmed','cancelled')) OR
+  (ord.status='confirmed' AND p_status IN ('crafting_nfc','cancelled')) OR
+  (ord.status='crafting_nfc' AND p_status IN ('shipping','cancelled')) OR
+  (ord.status='shipping' AND p_status='completed')
+ ) THEN RAISE EXCEPTION 'Không thể chuyển trạng thái đơn này.'; END IF;
+ IF p_status='cancelled' THEN UPDATE public.memory_spaces SET admin_suspended=true WHERE order_id=p_order_id; END IF;
+ IF p_status='cancelled' AND NOT ord.stock_released THEN
+  FOR item IN SELECT product_id,size,sum(quantity)::integer AS qty FROM public.order_items WHERE order_id=p_order_id GROUP BY product_id,size ORDER BY product_id,size LOOP
+   UPDATE public.checkout_variants SET stock=stock+item.qty WHERE product_id=item.product_id AND size=item.size;
+  END LOOP;
+ END IF;
+ UPDATE public.orders SET payment_status=CASE WHEN p_status='cancelled' AND paid_amount>0 THEN 'review' ELSE payment_status END,status=p_status,updated_at=now(),stock_released=stock_released OR p_status='cancelled',
+ payment_confirmed_at=CASE WHEN ord.status='pending_payment' AND p_status='confirmed' THEN now() ELSE payment_confirmed_at END,
+ tracking_number=coalesce(nullif(trim(p_tracking),''),tracking_number) WHERE id=p_order_id;
+ INSERT INTO public.operation_audit(actor_id,resource_id,action,detail) VALUES(auth.uid(),p_order_id,'order.status',jsonb_build_object('from',ord.status,'to',p_status));
+ RETURN jsonb_build_object('success',true);
+END $$;
+
+CREATE OR REPLACE FUNCTION private.expire_orders() RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE ord record; item record; n integer:=0;
+BEGIN
+ FOR ord IN SELECT * FROM public.orders WHERE status='pending_payment' AND paid_amount=0 AND expires_at<now() ORDER BY id FOR UPDATE SKIP LOCKED LOOP
+  IF NOT ord.stock_released THEN
+   FOR item IN SELECT product_id,size,sum(quantity)::integer qty FROM public.order_items WHERE order_id=ord.id GROUP BY product_id,size ORDER BY product_id,size LOOP
+    UPDATE public.checkout_variants SET stock=stock+item.qty WHERE product_id=item.product_id AND size=item.size;
+   END LOOP;
+  END IF;
+  UPDATE public.orders SET status='cancelled',stock_released=true,updated_at=now() WHERE id=ord.id;
+  INSERT INTO public.operation_audit(actor_id,resource_id,action) VALUES(auth.uid(),ord.id,'order.expired'); n:=n+1;
+ END LOOP;
+ RETURN n;
+END $$;
+
+
+CREATE OR REPLACE FUNCTION public.rpc_track_order(p_order_id text,p_token text DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE ord public.orders; code text:=trim(coalesce(p_order_id,'')); secret text:=trim(coalesce(p_token,''));
+ tok uuid; full_access boolean; timeline jsonb; result jsonb; items jsonb;
+BEGIN
+ IF code='' OR length(code)>150 OR length(secret)>150 THEN
+  RETURN jsonb_build_object('success',false,'message','Nhập mã đơn EMO-… hoặc mã tra cứu riêng nhận được khi đặt hàng.');
+ END IF;
+ BEGIN tok:=code::uuid; EXCEPTION WHEN invalid_text_representation THEN tok:=NULL; END;
+ IF tok IS NOT NULL THEN
+  SELECT * INTO ord FROM public.orders WHERE lookup_token=tok;
+ ELSE
+  SELECT * INTO ord FROM public.orders WHERE upper(id)=upper(code);
+ END IF;
+ IF ord.id IS NULL THEN RETURN jsonb_build_object('success',false,'message','Không tìm thấy đơn. Hãy sao chép đầy đủ mã từ xác nhận đặt hàng.'); END IF;
+ full_access:=coalesce(public.is_admin() OR (auth.uid() IS NOT NULL AND ord.user_id=auth.uid()) OR ord.lookup_token=tok,false);
+ IF NOT full_access AND secret<>'' THEN
+  full_access:=lower(secret)=ord.lookup_token::text
+    OR (length(regexp_replace(secret,'\D','','g')) BETWEEN 9 AND 11
+        AND regexp_replace(secret,'\D','','g')=regexp_replace(ord.phone,'\D','','g'));
+  IF NOT coalesce(full_access,false) THEN RETURN jsonb_build_object('success',false,'message','Mã tra cứu riêng hoặc số điện thoại không đúng.'); END IF;
+ END IF;
+ SELECT coalesce(jsonb_agg(jsonb_build_object(
+  'status',CASE WHEN action='order.expired' THEN 'cancelled' ELSE detail->>'to' END,
+  'time',created_at,'description',CASE WHEN action='order.expired' THEN 'Hết thời gian giữ hàng'
+    WHEN action='order.payment' THEN 'Đã ghi nhận giao dịch chuyển khoản'
+    WHEN action='order.shipment' THEN 'Đã cập nhật thông tin vận chuyển'
+    WHEN detail->>'to'='confirmed' THEN 'Đã xác nhận đơn hàng'
+    WHEN detail->>'to'='crafting_nfc' THEN 'Đang chuẩn bị trang sức và NFC'
+    WHEN detail->>'to'='shipping' THEN 'Đã bàn giao cho đơn vị vận chuyển'
+    WHEN detail->>'to'='completed' THEN 'Đã giao hàng thành công'
+    WHEN detail->>'to'='cancelled' THEN 'Đã hủy đơn hàng' ELSE 'Đã cập nhật đơn hàng' END
+ ) ORDER BY created_at,id),'[]'::jsonb) INTO timeline FROM public.operation_audit
+ WHERE resource_id=ord.id AND action IN ('order.status','order.expired','order.shipment','order.payment');
+ timeline:=jsonb_build_array(jsonb_build_object('status',CASE WHEN ord.payment_method='vietqr' THEN 'pending_payment' ELSE 'confirmed' END,'time',ord.created_at,'description','Đã tiếp nhận đơn hàng'))||timeline;
+ result:=jsonb_build_object('id',ord.id,'status',ord.status,'createdAt',ord.created_at,'isTest',ord.is_test,
+  'shippingCarrier',ord.shipping_carrier,'deliveryEstimate',ord.delivery_estimate,
+  'shippedAt',ord.shipped_at,'deliveredAt',ord.delivered_at,'statusTimeline',timeline,
+  'accessLevel',CASE WHEN full_access THEN 'full' ELSE 'summary' END,'items','[]'::jsonb);
+ -- An order ID alone exposes progress only, never the recipient/address or private lookup code.
+ IF full_access THEN
+  SELECT coalesce(jsonb_agg(jsonb_build_object('id',product_id,'name',product_name,'price',unit_price,'size',size,'quantity',quantity,'image',image_url,'isGift',is_gift)),'[]'::jsonb)
+   INTO items FROM public.order_items WHERE order_id=ord.id;
+  result:=result||jsonb_build_object('customerName',ord.customer_name,'phone',ord.phone,'address',ord.address,'city',ord.city,
+   'paymentMethod',ord.payment_method,'paymentStatus',ord.payment_status,'paidAmount',ord.paid_amount,'paidAt',ord.paid_at,'trackingNumber',ord.tracking_number,'shippingNote',ord.shipping_note,
+   'expiresAt',ord.expires_at,'totals',jsonb_build_object('finalTotal',ord.final_total),'items',items);
+ END IF;
+ RETURN jsonb_build_object('success',true,'order',result);
+END $$;
+
+
+NOTIFY pgrst,'reload schema';
+
+-- Source: 20260918000000_sepay_payment_gateway.sql
+-- 1. Schema updates for orders table
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS payment_provider text DEFAULT 'sepay',
+  ADD COLUMN IF NOT EXISTS payment_id text,
+  ADD COLUMN IF NOT EXISTS gateway_data jsonb DEFAULT '{}'::jsonb;
+
+ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_payment_method_check;
+ALTER TABLE public.orders ADD CONSTRAINT orders_payment_method_check CHECK (payment_method IN ('cod', 'vietqr', 'sepay'));
+
+-- 2. Gateway payment events table for audit & strict idempotency
+CREATE TABLE IF NOT EXISTS public.gateway_payment_events (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  provider text NOT NULL DEFAULT 'sepay',
+  is_test boolean NOT NULL DEFAULT false,
+  transaction_id text NOT NULL,
+  order_id text REFERENCES public.orders(id),
+  amount bigint NOT NULL CHECK(amount > 0),
+  currency text NOT NULL DEFAULT 'VND',
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(provider, is_test, transaction_id)
+);
+
+ALTER TABLE public.gateway_payment_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.gateway_payment_events FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.gateway_payment_events TO authenticated;
+DROP POLICY IF EXISTS gateway_payments_admin_read ON public.gateway_payment_events;
+CREATE POLICY gateway_payments_admin_read ON public.gateway_payment_events FOR SELECT TO authenticated USING(public.is_admin());
+
+-- 3. Dedicated atomic gateway payment handler RPC (service_role only)
+CREATE OR REPLACE FUNCTION public.rpc_receive_gateway_payment(
+  p_provider text,
+  p_is_test boolean,
+  p_transaction_id text,
+  p_order_id text,
+  p_amount bigint,
+  p_payload jsonb DEFAULT '{}'::jsonb
+)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE
+  ord public.orders;
+  v_event_id bigint;
+BEGIN
+  IF p_transaction_id IS NULL OR length(trim(p_transaction_id)) = 0 OR length(p_transaction_id) > 150 THEN
+    RAISE EXCEPTION 'Invalid transaction id';
+  END IF;
+  IF p_amount <= 0 OR p_amount > 1000000000000 THEN
+    RAISE EXCEPTION 'Invalid amount';
+  END IF;
+
+  -- Serialize deliveries by provider, test mode, and transaction ID
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_provider || ':' || p_is_test::text || ':' || p_transaction_id, 29));
+
+  -- Idempotent check
+  IF EXISTS(
+    SELECT 1 FROM public.gateway_payment_events
+    WHERE provider = p_provider AND is_test = p_is_test AND transaction_id = p_transaction_id
+  ) THEN
+    RETURN jsonb_build_object('success', true, 'duplicate', true, 'message', 'Payment already processed');
+  END IF;
+
+  -- Lock order row
+  SELECT * INTO ord FROM public.orders WHERE upper(id) = upper(trim(p_order_id)) FOR UPDATE;
+  IF ord.id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'outcome', 'order_not_found', 'message', 'Order not found');
+  END IF;
+
+  -- Verify test mode matches order environment
+  IF ord.is_test <> p_is_test THEN
+    RETURN jsonb_build_object('success', false, 'outcome', 'mode_mismatch', 'message', 'Order mode mismatch');
+  END IF;
+
+  -- Verify amount: gateway payment must be at least final_total
+  IF p_amount < ord.final_total THEN
+    RETURN jsonb_build_object('success', false, 'outcome', 'amount_insufficient', 'message', 'Amount less than final total');
+  END IF;
+
+  -- Record event
+  INSERT INTO public.gateway_payment_events(provider, is_test, transaction_id, order_id, amount, payload)
+  VALUES(p_provider, p_is_test, p_transaction_id, ord.id, p_amount, p_payload)
+  ON CONFLICT (provider, is_test, transaction_id) DO NOTHING
+  RETURNING id INTO v_event_id;
+
+  IF v_event_id IS NULL THEN
+    RETURN jsonb_build_object('success', true, 'duplicate', true, 'message', 'Payment already processed');
+  END IF;
+
+  -- Update order payment state
+  UPDATE public.orders
+  SET
+    payment_status = CASE WHEN ord.status = 'cancelled' THEN 'review' ELSE 'paid' END,
+    paid_amount = p_amount,
+    paid_at = coalesce(paid_at, now()),
+    payment_provider = p_provider,
+    payment_id = p_transaction_id,
+    gateway_data = p_payload,
+    updated_at = now()
+  WHERE id = ord.id;
+
+  -- Audit log
+  INSERT INTO public.operation_audit(actor_id, resource_id, action, detail)
+  VALUES(NULL, ord.id, 'order.payment', jsonb_build_object(
+    'provider', p_provider,
+    'transaction_id', p_transaction_id,
+    'amount', p_amount,
+    'is_test', p_is_test,
+    'review', (ord.status = 'cancelled')
+  ));
+
+  RETURN jsonb_build_object('success', true, 'outcome', 'paid', 'order_id', ord.id);
+END $$;
+
+REVOKE ALL ON FUNCTION public.rpc_receive_gateway_payment(text,boolean,text,text,bigint,jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_receive_gateway_payment(text,boolean,text,text,bigint,jsonb) TO service_role;
+
+-- 4. Update create_order_atomic_internal to support 'sepay'
+CREATE OR REPLACE FUNCTION public.create_order_atomic_internal(p_request_id uuid, p_payload jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE
+  previous public.checkout_requests;
+  line jsonb;
+  product public.checkout_products;
+  qty integer;
+  variant text;
+  available integer;
+  subtotal bigint := 0;
+  gift bigint := 0;
+  shipping bigint;
+  method text := p_payload->>'paymentMethod';
+  order_status text;
+  order_id text := 'EMO-' || replace(gen_random_uuid()::text, '-', '')::varchar(28);
+  normalized_items jsonb := '[]'::jsonb;
+  response jsonb;
+  phone text := regexp_replace(coalesce(p_payload->>'phone',''), '[^0-9]', '', 'g');
+BEGIN
+  IF p_request_id IS NULL THEN RAISE EXCEPTION 'Missing checkout request ID'; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_request_id::text, 0));
+  SELECT * INTO previous FROM public.checkout_requests WHERE request_id = p_request_id;
+  IF FOUND THEN
+    IF previous.actor_id IS DISTINCT FROM auth.uid() OR previous.payload IS DISTINCT FROM p_payload THEN
+      RAISE EXCEPTION 'Checkout request conflict';
+    END IF;
+    RETURN previous.response;
+  END IF;
+  IF jsonb_typeof(p_payload->'items') IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'Invalid items'; END IF;
+  IF jsonb_array_length(p_payload->'items') NOT BETWEEN 1 AND 50
+    OR length(trim(coalesce(p_payload->>'customerName',''))) NOT BETWEEN 1 AND 200
+    OR length(trim(coalesce(p_payload->>'address',''))) NOT BETWEEN 1 AND 1000
+    OR length(phone) NOT BETWEEN 9 AND 11
+    OR method IS NULL OR method NOT IN ('cod','vietqr','sepay') THEN
+    RAISE EXCEPTION 'Invalid checkout details';
+  END IF;
+  IF coalesce((p_payload->>'hasGiftBox')::boolean,false) THEN gift := 35000; END IF;
+  order_status := CASE WHEN method IN ('vietqr','sepay') THEN 'pending_payment' ELSE 'confirmed' END;
+
+  FOR line IN SELECT value FROM jsonb_array_elements(p_payload->'items') ORDER BY value->>'id', value->>'size'
+  LOOP
+    IF coalesce(line->>'quantity','') !~ '^[1-9][0-9]{0,2}$' THEN RAISE EXCEPTION 'Invalid quantity'; END IF;
+    qty := (line->>'quantity')::integer;
+    variant := coalesce(nullif(trim(line->>'size'),''),'Tiêu chuẩn');
+    SELECT * INTO product FROM public.checkout_products WHERE id = line->>'id' AND active FOR SHARE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Unknown or inactive product'; END IF;
+    SELECT stock INTO available FROM public.checkout_variants WHERE product_id = product.id AND size = variant FOR UPDATE;
+    IF NOT FOUND OR available < qty THEN RAISE EXCEPTION 'Variant unavailable or insufficient stock'; END IF;
+    UPDATE public.checkout_variants SET stock = stock - qty WHERE product_id = product.id AND size = variant;
+    subtotal := subtotal + product.price * qty;
+    IF coalesce((line->>'isGift')::boolean,false) THEN gift := 35000; END IF;
+    normalized_items := normalized_items || jsonb_build_array(jsonb_build_object(
+      'id',product.id,'name',product.name,'price',product.price,'quantity',qty,
+      'size',variant,'image',product.image_url,'isGift',coalesce((line->>'isGift')::boolean,false)));
+  END LOOP;
+  shipping := CASE WHEN subtotal >= 1000000 THEN 0 ELSE 30000 END;
+
+  INSERT INTO public.orders(id,user_id,customer_name,phone,email,address,city,note,payment_method,status,subtotal,gift_wrap_fee,shipping_fee,final_total,payment_provider)
+  VALUES(order_id,auth.uid(),trim(p_payload->>'customerName'),phone,p_payload->>'email',trim(p_payload->>'address'),
+    coalesce(p_payload->>'city','Hồ Chí Minh'),p_payload->>'note',method,order_status,subtotal,gift,shipping,subtotal+gift+shipping,
+    CASE WHEN method = 'sepay' THEN 'sepay' ELSE NULL END);
+
+  INSERT INTO public.order_items(order_id,product_id,product_name,size,unit_price,quantity,is_gift,image_url)
+  SELECT order_id, value->>'id',value->>'name',value->>'size',(value->>'price')::bigint,
+    (value->>'quantity')::integer,(value->>'isGift')::boolean,value->>'image'
+  FROM jsonb_array_elements(normalized_items);
+
+  response := jsonb_build_object('success',true,'order',jsonb_build_object(
+    'id',order_id,'customerName',trim(p_payload->>'customerName'),'phone',phone,'email',p_payload->>'email',
+    'address',trim(p_payload->>'address'),'city',p_payload->>'city','note',p_payload->>'note',
+    'paymentMethod',method,'status',order_status,'createdAt',now(),'items',normalized_items,
+    'totals',jsonb_build_object('subtotal',subtotal,'giftWrapFee',gift,'shippingFee',shipping,'finalTotal',subtotal+gift+shipping),
+    'statusTimeline',jsonb_build_array(jsonb_build_object('status',order_status,'time',now(),'description','Đơn hàng đã được tiếp nhận'))));
+
+  INSERT INTO public.checkout_requests(request_id,actor_id,payload,response) VALUES(p_request_id,auth.uid(),p_payload,response);
+  RETURN response;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_order_atomic_internal(uuid,jsonb) FROM PUBLIC, anon, authenticated;
+
+-- 5. Update rpc_create_order to support 'sepay'
+CREATE OR REPLACE FUNCTION public.rpc_create_order(p_request_id uuid, p_payload jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE
+  cfg public.store_settings;
+  result jsonb;
+  oid text;
+  shipping bigint;
+  gift bigint;
+  v_subtotal bigint;
+  tok uuid;
+  prior public.checkout_requests;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_request_id::text,0));
+  SELECT * INTO prior FROM public.checkout_requests WHERE request_id=p_request_id;
+  IF FOUND THEN
+    IF prior.actor_id IS DISTINCT FROM auth.uid() OR prior.payload IS DISTINCT FROM p_payload THEN RAISE EXCEPTION 'Yêu cầu đặt hàng đã thay đổi.'; END IF;
+    RETURN prior.response;
+  END IF;
+
+  SELECT * INTO cfg FROM public.store_settings WHERE id=true FOR SHARE;
+  IF NOT cfg.sales_enabled THEN RAISE EXCEPTION 'Cửa hàng chưa mở nhận đơn.'; END IF;
+  IF p_payload->>'paymentMethod'='cod' AND NOT cfg.cod_enabled THEN RAISE EXCEPTION 'COD chưa được bật.'; END IF;
+  IF p_payload->>'paymentMethod'='vietqr' AND (NOT cfg.transfer_enabled OR (NOT cfg.sandbox AND (cfg.bank_bin='' OR cfg.bank_account='' OR cfg.bank_owner=''))) THEN RAISE EXCEPTION 'Chuyển khoản chưa được cấu hình.'; END IF;
+  IF p_payload->>'paymentMethod'='sepay' AND NOT cfg.transfer_enabled THEN RAISE EXCEPTION 'Thanh toán online chưa được bật.'; END IF;
+
+  IF auth.uid() IS NOT NULL THEN
+    PERFORM pg_advisory_xact_lock(hashtextextended(auth.uid()::text,7));
+    IF (SELECT count(*) FROM public.orders WHERE user_id=auth.uid() AND created_at>now()-interval '1 hour')>=30 THEN RAISE EXCEPTION 'Bạn đã tạo nhiều đơn. Vui lòng thử lại sau.'; END IF;
+  END IF;
+
+  result:=public.create_order_atomic_internal(p_request_id,p_payload);
+  oid:=result->'order'->>'id';
+  v_subtotal:=(result->'order'->'totals'->>'subtotal')::bigint;
+  shipping:=CASE WHEN v_subtotal>=cfg.free_shipping_from THEN 0 ELSE cfg.shipping_fee END;
+  gift:=CASE WHEN (result->'order'->'totals'->>'giftWrapFee')::bigint>0 THEN cfg.gift_fee ELSE 0 END;
+
+  UPDATE public.orders
+  SET
+    shipping_fee=shipping,
+    gift_wrap_fee=gift,
+    final_total=v_subtotal+shipping+gift,
+    expires_at=CASE WHEN payment_method IN ('vietqr','sepay') THEN now()+make_interval(mins=>cfg.reservation_minutes) ELSE NULL END,
+    is_test=cfg.sandbox
+  WHERE id=oid
+  RETURNING lookup_token INTO tok;
+
+  result:=jsonb_set(result,'{order,totals}',jsonb_build_object('subtotal',v_subtotal,'shippingFee',shipping,'giftWrapFee',gift,'finalTotal',v_subtotal+shipping+gift));
+  result:=jsonb_set(result,'{order}',(result->'order')||jsonb_build_object('lookupToken',tok,'isTest',cfg.sandbox));
+  UPDATE public.checkout_requests SET response=result WHERE request_id=p_request_id;
+  INSERT INTO public.operation_audit(actor_id,resource_id,action) VALUES(auth.uid(),oid,'order.created');
+  RETURN result;
+END $$;
+
+-- 6. Update rpc_track_order to handle 'sepay' and expose gateway fields
+CREATE OR REPLACE FUNCTION public.rpc_track_order(p_order_id text, p_token text DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+DECLARE
+  ord public.orders;
+  code text:=trim(coalesce(p_order_id,''));
+  secret text:=trim(coalesce(p_token,''));
+  tok uuid;
+  full_access boolean;
+  timeline jsonb;
+  result jsonb;
+  items jsonb;
+BEGIN
+  IF code='' OR length(code)>150 OR length(secret)>150 THEN
+    RETURN jsonb_build_object('success',false,'message','Nhập mã đơn EMO-… hoặc mã tra cứu riêng nhận được khi đặt hàng.');
+  END IF;
+
+  BEGIN tok:=code::uuid; EXCEPTION WHEN invalid_text_representation THEN tok:=NULL; END;
+  IF tok IS NOT NULL THEN
+    SELECT * INTO ord FROM public.orders WHERE lookup_token=tok;
+  ELSE
+    SELECT * INTO ord FROM public.orders WHERE upper(id)=upper(code);
+  END IF;
+
+  IF ord.id IS NULL THEN RETURN jsonb_build_object('success',false,'message','Không tìm thấy đơn. Hãy sao chép đầy đủ mã từ xác nhận đặt hàng.'); END IF;
+
+  full_access:=coalesce(public.is_admin() OR (auth.uid() IS NOT NULL AND ord.user_id=auth.uid()) OR ord.lookup_token=tok,false);
+  IF NOT full_access AND secret<>'' THEN
+    full_access:=lower(secret)=ord.lookup_token::text
+      OR (length(regexp_replace(secret,'\D','','g')) BETWEEN 9 AND 11
+          AND regexp_replace(secret,'\D','','g')=regexp_replace(ord.phone,'\D','','g'));
+    IF NOT coalesce(full_access,false) THEN RETURN jsonb_build_object('success',false,'message','Mã tra cứu riêng hoặc số điện thoại không đúng.'); END IF;
+  END IF;
+
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'status',CASE WHEN action='order.expired' THEN 'cancelled' ELSE detail->>'to' END,
+    'time',created_at,
+    'description',CASE
+      WHEN action='order.expired' THEN 'Hết thời gian giữ hàng'
+      WHEN action='order.payment' THEN 'Đã nhận đủ tiền thanh toán'
+      WHEN action='order.shipment' THEN 'Đã cập nhật thông tin vận chuyển'
+      WHEN detail->>'to'='confirmed' THEN 'Đã xác nhận đơn hàng'
+      WHEN detail->>'to'='crafting_nfc' THEN 'Đang chuẩn bị trang sức và NFC'
+      WHEN detail->>'to'='shipping' THEN 'Đã bàn giao cho đơn vị vận chuyển'
+      WHEN detail->>'to'='completed' THEN 'Đã giao hàng thành công'
+      WHEN detail->>'to'='cancelled' THEN 'Đã hủy đơn hàng'
+      ELSE 'Đã cập nhật đơn hàng' END
+  ) ORDER BY created_at,id),'[]'::jsonb) INTO timeline
+  FROM public.operation_audit
+  WHERE resource_id=ord.id AND action IN ('order.status','order.expired','order.shipment','order.payment');
+
+  timeline:=jsonb_build_array(jsonb_build_object(
+    'status',CASE WHEN ord.payment_method IN ('vietqr','sepay') THEN 'pending_payment' ELSE 'confirmed' END,
+    'time',ord.created_at,
+    'description','Đã tiếp nhận đơn hàng'
+  ))||timeline;
+
+  result:=jsonb_build_object(
+    'id',ord.id,
+    'status',ord.status,
+    'createdAt',ord.created_at,
+    'isTest',ord.is_test,
+    'shippingCarrier',ord.shipping_carrier,
+    'deliveryEstimate',ord.delivery_estimate,
+    'shippedAt',ord.shipped_at,
+    'deliveredAt',ord.delivered_at,
+    'statusTimeline',timeline,
+    'accessLevel',CASE WHEN full_access THEN 'full' ELSE 'summary' END,
+    'items','[]'::jsonb
+  );
+
+  IF full_access THEN
+    SELECT coalesce(jsonb_agg(jsonb_build_object('id',product_id,'name',product_name,'price',unit_price,'size',size,'quantity',quantity,'image',image_url,'isGift',is_gift)),'[]'::jsonb)
+      INTO items FROM public.order_items WHERE order_id=ord.id;
+    result:=result||jsonb_build_object(
+      'customerName',ord.customer_name,
+      'phone',ord.phone,
+      'address',ord.address,
+      'city',ord.city,
+      'paymentMethod',ord.payment_method,
+      'paymentStatus',ord.payment_status,
+      'paidAmount',ord.paid_amount,
+      'paidAt',ord.paid_at,
+      'paymentProvider',ord.payment_provider,
+      'paymentId',ord.payment_id,
+      'trackingNumber',ord.tracking_number,
+      'shippingNote',ord.shipping_note,
+      'expiresAt',ord.expires_at,
+      'totals',jsonb_build_object('finalTotal',ord.final_total),
+      'items',items
+    );
+  END IF;
+
+  RETURN jsonb_build_object('success',true,'order',result);
+END $$;
+
+NOTIFY pgrst,'reload schema';
+
 NOTIFY pgrst,'reload schema';
 COMMIT;

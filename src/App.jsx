@@ -130,7 +130,17 @@ export default function App() {
   useEffect(() => {
     const readRoute = () => {
       const q=new URLSearchParams(window.location.search);
-      if(q.get('article')) { setSelectedArticleSlug(q.get('article'));setCurrentView('article-detail'); }
+      const payment=q.get('payment');
+      const orderId=q.get('orderId');
+      const token=q.get('token');
+      if (payment && orderId) {
+        if (payment === 'success') {
+          setCartItems([]);
+          try { localStorage.removeItem('emoria_cart_v1'); } catch {}
+        }
+        setTrackingRequest({ id: orderId, token, paymentResult: payment });
+        setCurrentView('shop');
+      } else if(q.get('article')) { setSelectedArticleSlug(q.get('article'));setCurrentView('article-detail'); }
       else if(q.get('tag') || q.get('memory')) {setCurrentTag(q.get('tag') || q.get('memory'));setCurrentView('memory');}
       else {setCurrentView(['home','shop','memory','articles','admin'].includes(q.get('view')) ? q.get('view') : 'home');if(q.get('view')==='memory')setCurrentTag('');}
       setRouteReady(true);
@@ -141,7 +151,7 @@ export default function App() {
   useEffect(()=>{
     if(!routeReady)return;
     const url=new URL(window.location.href);
-    ['view','tag','memory','article'].forEach(key=>url.searchParams.delete(key));
+    ['view','tag','memory','article','payment','orderId','token'].forEach(key=>url.searchParams.delete(key));
     if(currentView==='article-detail')url.searchParams.set('article',selectedArticleSlug);
     else if(currentView==='memory') {if(currentTag)url.searchParams.set('tag',currentTag);else url.searchParams.set('view','memory');}
     else if(currentView!=='home')url.searchParams.set('view',currentView);
@@ -563,7 +573,16 @@ export default function App() {
         cartItems={cartItems}
         onUpdateQuantity={handleUpdateCartQuantity}
         onRemoveItem={handleRemoveCartItem}
-        onOpenCheckout={() => {trackShopEvent('begin_checkout',cartItems);setIsCheckoutOpen(true);}}
+        currentUser={authSession.user}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenCheckout={() => {
+          if (!authSession.user) {
+            setIsAuthOpen(true);
+            return;
+          }
+          trackShopEvent('begin_checkout', cartItems);
+          setIsCheckoutOpen(true);
+        }}
       />
 
       {/* Dark Luxury Checkout Modal */}
@@ -575,6 +594,7 @@ export default function App() {
         cartItems={cartItems}
         onOrderComplete={handleClearCart}
         onTrack={order=>{setTrackingRequest({id:order.id,token:order.lookupToken});setIsCheckoutOpen(false);setIsCartOpen(false);setCurrentView("shop");window.scrollTo({top:0});}}
+        onOpenAuth={() => setIsAuthOpen(true)}
       />}
 
       {/* Auth Modal */}
