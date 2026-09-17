@@ -1,0 +1,33 @@
+EMORIA — Kết nối xác nhận chuyển khoản tự động (SePay)
+
+Trạng thái: Code có webhook và đối soát, CHƯA thể nhận tiền tự động cho đến khi chủ dự án liên kết ngân hàng và đặt các biến server dưới đây. QR VietQR tự nó không gửi thông báo tiền về.
+
+1. Đăng ký / đăng nhập SePay và liên kết đúng tài khoản nhận tiền. Làm theo xác minh của ngân hàng trên trang chính thức; không gửi thông tin đăng nhập hoặc OTP trong chat.
+2. Tại Vercel → emoria-luxury-web → Settings → Environment Variables → Production, đặt:
+   SEPAY_WEBHOOK_KEY: chuỗi bí mật ngẫu nhiên ít nhất 32 ký tự, dùng chung với cấu hình webhook SePay.
+   SEPAY_ACCOUNT_NUMBER: số tài khoản nhận tiền, giữ cả số 0 đầu nếu có.
+   SEPAY_MODE: live cho giao dịch thật hoặc test cho SePay Test Mode.
+   SUPABASE_SERVICE_ROLE_KEY: khóa server hiện có. Tuyệt đối không thêm tiền tố VITE_ cho các biến trên.
+3. Trong admin EMORIA → Cấu hình cửa hàng, điền bank_bin (BIN VietQR), bank_account (đúng SEPAY_ACCOUNT_NUMBER), bank_owner. Bật chuyển khoản. Với Live, tắt sandbox; với Test Mode, giữ sandbox bật. Bản sandbox không hiển thị QR chuyển tiền thật.
+4. Trong SePay → Webhooks → thêm webhook:
+   URL: https://emoria-luxury-web.vercel.app/api/sepay-webhook
+   Chọn tài khoản cụ thể ở bước 1; giao dịch tiền vào; JSON; bật gửi lại khi lỗi.
+   Xác thực: API Key, đặt đúng SEPAY_WEBHOOK_KEY. Header được gửi là Authorization: Apikey <key>.
+   Không lọc bỏ giao dịch thiếu mã: hệ thống cần giữ chúng trong phần đối soát.
+5. Redeploy production sau khi thay biến môi trường. Không cần đổi mã nguồn hoặc gửi key vào chat.
+6. Tạo đơn QR mới. Giữ nguyên nội dung EMO-... và số tiền. Thử SePay Test Mode trước với key riêng; sau đó chủ tài khoản tự thực hiện một giao dịch Live để nghiệm thu. Đây là thao tác của chủ tài khoản, agent không tự chuyển tiền.
+7. Webhook thành công trả {"success":true}. Màn hình sau đặt đơn và trang tra cứu tự kiểm tra thanh toán mỗi 8 giây khi tab đang hiển thị.
+8. Khi đủ tiền, khách thấy “Đã nhận đủ tiền / Đang chờ admin duyệt”. Admin → Đơn Hàng & Vận Chuyển → Duyệt đơn đã thanh toán → Bắt đầu chuẩn bị → nhập hãng/mã vận đơn → Bàn giao → Xác nhận đã giao.
+
+Đối soát và giới hạn:
+- Giao dịch trùng ID/tham chiếu không cộng tiền lần nữa. Chuyển nhiều lần được cộng dồn, chuyển thiếu chưa được duyệt. Tiền đã nhận giữ đơn khỏi tự hết hạn.
+- Chuyển thừa được đánh dấu riêng; admin xử lý phần thừa với khách/ngân hàng. Tiền về sau khi hủy chỉ ghi nhận cần đối soát, không tự mở lại đơn hoặc giữ kho lần nữa.
+- Sai/thiếu mã, sai môi trường, khác tài khoản nhận hoặc đơn COD: xem mục Đối soát giao dịch chuyển khoản, kiểm tra trên SePay/ngân hàng. Chưa có nút tự gán lại giao dịch hoặc tự hoàn tiền.
+- Webhook xử lý tiền vào; đối soát sao kê/hoàn tiền vẫn do admin thực hiện. Thay số tài khoản nhận khi còn đơn QR chờ trả cần đối soát thủ công các đơn cũ.
+- Vận chuyển đang được admin cập nhật trên web. Chưa tạo vận đơn hoặc đồng bộ trạng thái tự động với GHN/GHTK/Viettel Post.
+- Test Mode và Live phải dùng khóa riêng. Không dùng cùng webhook key cho hai chế độ.
+
+Tài liệu chính thức:
+https://developer.sepay.vn/vi/sepay-webhooks/tao-webhook
+https://developer.sepay.vn/vi/sepay-webhooks/xac-thuc
+https://developer.sepay.vn/vi/sepay-webhooks/tich-hop-webhook

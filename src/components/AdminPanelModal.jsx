@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import MarketingPanel from './MarketingPanel';
 import NfcOperations,{OrderGiftSetup} from './NfcOperations';
+import ShipmentEditor from './ShipmentEditor';
 import StoreAdminPanel from './StoreAdminPanel';
 import MarkdownContent from './MarkdownContent';
 import { callStore } from '../services/catalogService';
@@ -379,7 +380,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
               ) : (
                 orders.map((order) => (
                   <div key={order.id} className="p-4 rounded-2xl bg-black/40 border border-white/10 text-xs space-y-3">
-                    <OrderGiftSetup order={order} onRefresh={loadData}/>
+                    <OrderGiftSetup order={order} onRefresh={loadData}/><ShipmentEditor order={order} onRefresh={loadData}/>
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold text-white text-sm">{order.id}</span>
@@ -412,10 +413,10 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                         className="px-3 py-1.5 rounded-lg bg-black/80 border border-white/20 text-white font-medium focus:outline-none focus:border-white/50 cursor-pointer disabled:opacity-50"
                       >
                         <option disabled={order.status!=='pending_payment'} value="pending_payment">Chờ Thanh Toán VietQR</option>
-                        <option disabled={!['pending_payment','confirmed'].includes(order.status)} value="confirmed">Đã Tiếp Nhận & Xác Nhận</option>
+                        <option disabled={order.status!=='confirmed' && !(order.status==='pending_payment' && ['paid','overpaid'].includes(order.paymentStatus))} value="confirmed">Đã Tiếp Nhận & Xác Nhận</option>
                         <option disabled={!['confirmed','crafting_nfc'].includes(order.status)} value="crafting_nfc">Đang Đúc Bạc & Nạp Chip NFC</option>
                         <option disabled={!['crafting_nfc','shipping'].includes(order.status)} value="shipping">Đang Vận Chuyển</option>
-                        <option disabled={!['shipping','completed'].includes(order.status)} value="completed">Đã Giao Hoàn Tất</option>
+                        <option disabled={order.status!=='completed'} value="completed">Đã Giao Hoàn Tất</option>
                         <option disabled={!['pending_payment','confirmed','crafting_nfc','cancelled'].includes(order.status)} value="cancelled">Đã Hủy Đơn</option>
                       </select>
                     </div>

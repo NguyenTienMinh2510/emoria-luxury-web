@@ -42,6 +42,7 @@ export default function App() {
   const store = useStore();
   // Navigation View: Mặc định là 'home' (Trang chủ & Câu chuyện thương hiệu)
   const [currentView, setCurrentView] = useState('home');
+  const [trackingRequest,setTrackingRequest]=useState(null);
   const [recovery, setRecovery] = useState(false);
   const [routeReady, setRouteReady] = useState(false);
   const [systemReady,setSystemReady]=useState(false);
@@ -364,7 +365,7 @@ export default function App() {
 
         {/* VIEW 2: DEDICATED STOREFRONT / SHOPPING INTERFACE */}
         {currentView === 'shop' && (
-          <ShopView
+          <ShopView initialTracking={trackingRequest}
             initialSearch={searchQuery}
             onSelectProduct={(id) => setSelectedProductId(id)}
             onAddToCart={handleAddToCart}
@@ -570,6 +571,7 @@ export default function App() {
         onClose={() => setIsCheckoutOpen(false)}
         cartItems={cartItems}
         onOrderComplete={handleClearCart}
+        onTrack={order=>{setTrackingRequest({id:order.id,token:order.lookupToken});setIsCheckoutOpen(false);setIsCartOpen(false);setCurrentView("shop");window.scrollTo({top:0});}}
       />}
 
       {/* Auth Modal */}

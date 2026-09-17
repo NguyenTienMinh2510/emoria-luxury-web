@@ -1,13 +1,12 @@
 import React,{useState,useEffect} from 'react';
 import {callStore} from '../services/catalogService';
 export function OrderGiftSetup({order,onRefresh}) {
-  const [issued,setIssued]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[tracking,setTracking]=useState(order.trackingNumber||'');
+  const [issued,setIssued]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const run=async action=>{if(busy)return;setBusy(true);setError('');try{await action();}catch(e){setError(e.message);}finally{setBusy(false);}};
   return <details className="p-3 border border-white/10 rounded-xl"><summary className="cursor-pointer font-semibold">Chi tiết món hàng & chuẩn bị NFC</summary><div className="space-y-4 pt-4">
     {order.note&&<p className="whitespace-pre-wrap">Ghi chú: {order.note}</p>}
     {order.items.map(item=><div key={item.orderItemId||item.id+item.size} className="flex flex-wrap items-center gap-3"><p className="flex-1">{item.name} · {item.size} · SL {item.quantity} · {new Intl.NumberFormat('vi-VN').format(item.price)} đ</p><button className="store-button" disabled={busy||!['confirmed','crafting_nfc','shipping','completed'].includes(order.status)||!item.orderItemId} onClick={()=>run(async()=>{const data=await callStore('rpc_issue_chip',{p_order_id:order.id,p_item_id:item.orderItemId});setIssued(prev=>[...prev,data]);})}>Cấp 1 chip NFC</button></div>)}
     {issued.map(chip=><div key={chip.tag} className="p-4 bg-amber-200/10 rounded-xl space-y-2"><p>Lưu mã nhận quyền trước khi đóng. Mã chỉ được trả về một lần.</p><p>Link ghi vào NFC:</p><code className="break-all select-all">{location.origin}/?tag={chip.tag}</code><p>Mã nhận quyền của người mua:</p><code className="break-all select-all">{chip.claim_code}</code><button className="underline block" onClick={()=>run(async()=>{await navigator.clipboard.writeText(`Link NFC: ${location.origin}/?tag=${chip.tag}\nMã nhận quyền: ${chip.claim_code}`);})}>Sao chép thông tin bàn giao</button></div>)}
-    {order.status==='crafting_nfc'&&<div className="flex flex-col sm:flex-row gap-3"><label className="store-label flex-1 min-w-0">Mã vận đơn<input maxLength={120} className="store-input" value={tracking} onChange={e=>setTracking(e.target.value)}/></label><button className="store-button" disabled={busy||!tracking.trim()} onClick={()=>run(async()=>{await callStore('rpc_order_status',{p_order_id:order.id,p_status:'shipping',p_tracking:tracking.trim()});await onRefresh();})}>Bàn giao vận chuyển</button></div>}
     {order.trackingNumber&&<p>Mã vận đơn: {order.trackingNumber}</p>}{error&&<p role="alert" className="text-red-300">{error}</p>}
   </div></details>;
 }

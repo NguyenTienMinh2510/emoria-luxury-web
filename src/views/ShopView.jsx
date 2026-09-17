@@ -5,10 +5,12 @@ import {
   CheckCircle2, Package, Truck, Clock, ShieldCheck, Heart, RefreshCw, X
 } from 'lucide-react';
 import { useStore } from '../components/StoreProvider';
+import PaymentStatus from '../components/PaymentStatus';
 import { trackOrderSecure } from '../services/orderBackendService';
 
 export default function ShopView({
   initialSearch = '',
+  initialTracking = null,
   onSelectProduct,
   onAddToCart,
   onOpenNfcDemo,
@@ -29,6 +31,7 @@ export default function ShopView({
   const [trackingError, setTrackingError] = useState('');
   const [isSearchingOrder, setIsSearchingOrder] = useState(false);
 
+  useEffect(()=>{if(!initialTracking)return;let active=true;setActiveTab('tracking');setTrackingInput(initialTracking.id);setTrackingToken(initialTracking.token||'');setTrackingError('');setTrackingResults(null);setIsSearchingOrder(true);trackOrderSecure(initialTracking.id,initialTracking.token).then(order=>{if(active)setTrackingResults([order]);}).catch(e=>{if(active)setTrackingError(e.message);}).finally(()=>{if(active)setIsSearchingOrder(false);});return()=>{active=false;};},[initialTracking]);
   // Danh mục sản phẩm
   const categories = [
     { id: 'all', label: 'Tất Cả Sản Phẩm' },
@@ -397,7 +400,7 @@ export default function ShopView({
                 Tra Cứu Tiến Độ Đơn Hàng
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto mb-6">
-                Nhập mã đơn hàng (EMO-…) đã nhận được sau khi đặt mua để kiểm tra tiến độ chế tác và giao hàng.
+                Nhập mã đơn EMO-… để xem tiến độ, hoặc dán mã tra cứu riêng để xem đầy đủ đơn hàng. Người đặt đơn đã đăng nhập có thể dùng mã đơn.
               </p>
 
               <form onSubmit={handleTrackOrder} className="max-w-lg mx-auto space-y-3">
@@ -406,7 +409,7 @@ export default function ShopView({
                     <input
                       type="text"
                       required
-                      placeholder="Nhập mã đơn hàng (EMO-…)"
+                      aria-label="Mã đơn hoặc mã tra cứu riêng" placeholder="Mã đơn EMO-… hoặc mã tra cứu riêng"
                       value={trackingInput}
                       onChange={(e) => setTrackingInput(e.target.value)}
                       className="w-full px-4 py-3 text-sm rounded-xl bg-black/50 border border-white/20 text-white placeholder-slate-500 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/30 uppercase font-mono"
@@ -453,7 +456,7 @@ export default function ShopView({
                 </h3>
 
                 {trackingResults.map((order) => {
-                  const badge = getStatusBadge(order.status);
+                  const badge = order.status==='pending_payment'&&['paid','overpaid'].includes(order.paymentStatus) ? {label:'Đã thanh toán · Chờ duyệt',bg:'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'} : getStatusBadge(order.status);
                   return (
                     <div
                       key={order.id}
@@ -462,8 +465,8 @@ export default function ShopView({
                       {/* Order Header */}
                       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/10 mb-4">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-lg font-bold text-white">{order.id}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-sm sm:text-lg font-bold text-white break-all">{order.id}</span>
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase ${badge.bg}`}>
                               {badge.label}
                             </span>
@@ -473,13 +476,14 @@ export default function ShopView({
                           </p>
                         </div>
 
-                        <div className="text-right">
+                        {order.totals&&<div className="text-right">
                           <p className="text-xs text-slate-400 font-light">Tổng thanh toán</p>
                           <p className="font-serif text-lg font-bold text-white">
                             {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totals?.finalTotal || 0)}
                           </p>
-                        </div>
+                        </div>}
                       </div>
+                      {order.accessLevel==='summary'&&<p className="text-sm text-slate-400 mb-4">Đã tìm thấy đơn. Để xem người nhận, sản phẩm và mã vận đơn, nhập thêm mã tra cứu riêng hoặc số điện thoại đặt hàng; bạn cũng có thể đăng nhập tài khoản đã đặt đơn.</p>}
 
                       {/* Items in order */}
                       <div className="space-y-3 mb-4">
@@ -504,7 +508,7 @@ export default function ShopView({
                       </div>
 
                       {/* Shipping Info */}
-                      <div className="p-3 rounded-xl bg-black/40 border border-white/5 text-xs text-slate-300 mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {order.accessLevel!=='summary'&&<div className="p-3 rounded-xl bg-black/40 border border-white/5 text-xs text-slate-300 mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
                           <span className="text-slate-500">Người nhận: </span>
                           <span className="font-medium text-white">{order.customerName} ({order.phone})</span>
@@ -513,8 +517,9 @@ export default function ShopView({
                           <span className="text-slate-500">Địa chỉ giao: </span>
                           <span className="font-medium text-white">{order.address}, {order.city}</span>
                         </div>
-                      </div>
-
+                      </div>}
+                      <div className="p-4 border border-white/10 rounded-xl mb-4 space-y-2 text-sm break-words"><p>Đơn vị vận chuyển: {order.shippingCarrier||'Chưa bàn giao'}</p>{order.trackingNumber&&<p>Mã vận đơn: <span className="font-mono select-all">{order.trackingNumber}</span></p>}{order.deliveryEstimate&&<p>Dự kiến giao: {new Date(order.deliveryEstimate+'T00:00:00').toLocaleDateString('vi-VN')}</p>}{order.shippingNote&&<p className="whitespace-pre-wrap">{order.shippingNote}</p>}</div>
+                      {order.accessLevel!=='summary'&&<PaymentStatus order={order} autoRefresh lookupToken={trackingToken||(/^[0-9a-f-]{36}$/i.test(trackingInput.trim())?trackingInput.trim():undefined)}/>}
                       {/* Timeline status */}
                       <div>
                         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Lịch sử tiến độ:</p>

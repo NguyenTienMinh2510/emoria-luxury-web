@@ -9,6 +9,9 @@ import {
 } from 'lucide-react';
 import MarketingPanel from '../components/MarketingPanel';
 import NfcOperations, { OrderGiftSetup } from '../components/NfcOperations';
+import PaymentStatus from '../components/PaymentStatus';
+import PaymentReview from '../components/PaymentReview';
+import ShipmentEditor from '../components/ShipmentEditor';
 import StoreAdminPanel from '../components/StoreAdminPanel';
 import MarkdownContent from '../components/MarkdownContent';
 import { callStore } from '../services/catalogService';
@@ -42,6 +45,7 @@ export default function AdminView({
   const [orders, setOrders] = useState([]);
   const [orderPage, setOrderPage] = useState(0);
   const [orderSearch, setOrderSearch] = useState('');
+  const [orderStatus,setOrderStatus]=useState('');
   const [preview, setPreview] = useState(false);
   const [savingArticle, setSavingArticle] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
@@ -73,7 +77,7 @@ export default function AdminView({
   const loadData = async () => {
     setIsLoadingOrders(true);
     try {
-      const ords = await listOrdersForAdmin(orderPage, orderSearch);
+      const ords = await listOrdersForAdmin(orderPage, orderSearch, orderStatus);
       setOrders(ords || []);
     } catch (e) {
       setSaveMessage(e.message);
@@ -99,7 +103,7 @@ export default function AdminView({
     if (isAdmin) {
       loadData();
     }
-  }, [isAdmin, orderPage, orderSearch]);
+  }, [isAdmin, orderPage, orderSearch, orderStatus]);
 
   // Handle Order Status Update
   const handleStatusChange = async (orderId, newStatus) => {
@@ -349,14 +353,16 @@ export default function AdminView({
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder="Tìm theo mã đơn hoặc SĐT..."
+                    placeholder="Mã đơn, SĐT hoặc mã vận đơn"
                     value={orderSearch}
-                    onChange={(e) => setOrderSearch(e.target.value)}
-                    className="store-input !py-2 text-xs w-64"
+                    onChange={(e) => {setOrderSearch(e.target.value);setOrderPage(0);}}
+                    className="store-input !py-2 text-xs w-full sm:w-64"
                   />
                 </div>
               </div>
 
+              <PaymentReview/>
+              <div className="flex flex-wrap items-center gap-3"><label className="store-label">Lọc trạng thái<select className="store-input" value={orderStatus} onChange={e=>{setOrderStatus(e.target.value);setOrderPage(0);}}>{[['','Tất cả'],['pending_payment','Chờ thanh toán / duyệt'],['confirmed','Đã tiếp nhận'],['crafting_nfc','Đang chuẩn bị'],['shipping','Đang giao'],['completed','Đã giao'],['cancelled','Đã hủy']].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><button className="store-button" disabled={!orderPage||isLoadingOrders} onClick={()=>setOrderPage(p=>p-1)}>Trước</button><span>Trang {orderPage+1}</span><button className="store-button" disabled={orders.length<25||isLoadingOrders} onClick={()=>setOrderPage(p=>p+1)}>Sau</button></div>
               {isLoadingOrders ? (
                 <div className="p-12 text-center text-slate-400">
                   <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-slate-500" />
@@ -377,7 +383,7 @@ export default function AdminView({
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10 text-xs">
                         <div className="flex items-center gap-3">
-                          <span className="font-mono font-bold text-white text-sm">#{ord.id.slice(0, 8)}</span>
+                          <span className="font-mono font-bold text-white text-sm break-all">{ord.id}</span>
                           <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                             ord.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
                             ord.status === 'confirmed' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30' :
@@ -385,36 +391,37 @@ export default function AdminView({
                             ord.status === 'cancelled' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
                             'bg-white/10 text-slate-300 border border-white/15'
                           }`}>
-                            {ord.status === 'pending_payment' ? 'Chờ thanh toán' :
+                            {ord.status === 'pending_payment' ? (['paid','overpaid'].includes(ord.paymentStatus)?'Đã thanh toán · Chờ duyệt':'Chờ thanh toán') :
                              ord.status === 'confirmed' ? 'Đã xác nhận' :
+                             ord.status === 'crafting_nfc' ? 'Đang chuẩn bị NFC' :
                              ord.status === 'shipping' ? 'Đang giao hàng' :
                              ord.status === 'completed' ? 'Hoàn tất' : 'Đã hủy'}
                           </span>
-                          {ord.is_test && (
+                          {ord.isTest && (
                             <span className="px-2 py-0.5 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30">
                               Đơn Thử Nghiệm
                             </span>
                           )}
                         </div>
                         <span className="text-slate-400">
-                          {new Date(ord.created_at).toLocaleString('vi-VN')}
+                          {new Date(ord.createdAt).toLocaleString('vi-VN')}
                         </span>
                       </div>
 
                       <div className="grid sm:grid-cols-3 gap-4 text-xs">
                         <div>
                           <p className="text-slate-400">Khách hàng:</p>
-                          <p className="font-bold text-white mt-0.5">{ord.customer_name || 'Khách vãng lai'}</p>
-                          <p className="text-slate-400 font-mono mt-0.5">{ord.customer_phone}</p>
-                          <p className="text-slate-400 mt-1 line-clamp-2">{ord.shipping_address}</p>
+                          <p className="font-bold text-white mt-0.5">{ord.customerName || 'Khách vãng lai'}</p>
+                          <p className="text-slate-400 font-mono mt-0.5">{ord.phone}</p>
+                          <p className="text-slate-400 mt-1 line-clamp-2">{ord.address}</p>
                         </div>
                         <div>
                           <p className="text-slate-400">Thanh toán:</p>
-                          <p className="font-bold text-white mt-0.5 uppercase">{ord.payment_method}</p>
+                          <p className="font-bold text-white mt-0.5 uppercase">{ord.paymentMethod}</p>
                           <p className="text-slate-300 font-semibold mt-1">
-                            Tổng: {new Intl.NumberFormat('vi-VN').format(ord.total_amount || 0)} đ
+                            Tổng: {new Intl.NumberFormat('vi-VN').format(ord.totals?.finalTotal || 0)} đ
                           </p>
-                          {ord.has_gift_box && (
+                          {ord.hasGiftBox && (
                             <p className="text-amber-300 mt-1 flex items-center gap-1 text-[11px]">
                               <span>✦ Có gói hộp quà EMORIA</span>
                             </p>
@@ -427,22 +434,22 @@ export default function AdminView({
                               {ord.status === 'pending_payment' && (
                                 <button
                                   onClick={() => handleStatusChange(ord.id, 'confirmed')}
-                                  disabled={updatingOrderId === ord.id}
+                                  disabled={updatingOrderId === ord.id || !['paid','overpaid'].includes(ord.paymentStatus)}
                                   className="px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-xs font-semibold border border-sky-500/30 transition-all cursor-pointer"
                                 >
-                                  Xác Nhận Đơn
+                                  Duyệt đơn đã thanh toán
                                 </button>
                               )}
                               {ord.status === 'confirmed' && (
                                 <button
-                                  onClick={() => handleStatusChange(ord.id, 'completed')}
+                                  onClick={() => handleStatusChange(ord.id, 'crafting_nfc')}
                                   disabled={updatingOrderId === ord.id}
                                   className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-all cursor-pointer"
                                 >
-                                  Hoàn Tất Đơn
+                                  Bắt đầu chuẩn bị
                                 </button>
                               )}
-                              {ord.status !== 'cancelled' && ord.status !== 'completed' && (
+                              {['pending_payment','confirmed','crafting_nfc'].includes(ord.status) && (
                                 <button
                                   onClick={() => handleStatusChange(ord.id, 'cancelled')}
                                   disabled={updatingOrderId === ord.id}
@@ -457,7 +464,9 @@ export default function AdminView({
                       </div>
 
                       {/* Chi tiết chuẩn bị quà & NFC nếu có */}
+                      <PaymentStatus order={ord}/>
                       <OrderGiftSetup order={ord} onRefresh={loadData} />
+                      <ShipmentEditor order={ord} onRefresh={loadData} />
                     </div>
                   ))}
                 </div>

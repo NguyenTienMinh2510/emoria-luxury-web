@@ -6,9 +6,10 @@ import { useStore } from './StoreProvider';
 import { createOrder } from '../services/orderBackendService';
 import {supabase} from '../lib/supabaseClient';
 import {readPendingCheckout,savePendingCheckout,clearPendingCheckout} from '../services/checkoutSession';
+import PaymentStatus from './PaymentStatus';
 import { getMyProfile } from '../services/profileService';
 
-export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderComplete, currentUserId='guest' }) {
+export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderComplete, onTrack, currentUserId='guest' }) {
   const { settings } = useStore();
   const [pending,setPending]=useState(()=>readPendingCheckout(currentUserId));
   const [submitError, setSubmitError] = useState('');
@@ -157,17 +158,19 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                 </h3>
                 <p className="text-xs text-slate-300">
                   Mã đơn hàng:{' '}
-                  <span className="font-mono font-bold text-metallic text-sm">{completedOrder.id}</span>
+                  <span className="font-mono font-bold text-metallic text-sm break-all select-all">{completedOrder.id}</span>
                 </p>
               </div>
 
               {completedOrder.lookupToken && <div className="rounded-xl p-4 bg-white/5 text-left text-sm space-y-2"><p>Mã tra cứu riêng — hãy lưu lại:</p><code className="break-all select-all">{completedOrder.lookupToken}</code><p className="text-slate-400 text-xs">Dùng cùng mã đơn ở mục Tra cứu. Không chia sẻ mã này công khai.</p></div>}
+              <div className="flex flex-wrap justify-center gap-3">{onTrack&&<button className="store-button" onClick={()=>onTrack(completedOrder)}>Tra cứu đơn vừa đặt</button>}<button className="store-button" onClick={async()=>{try{await navigator.clipboard.writeText(`Mã đơn: ${completedOrder.id}\nMã tra cứu riêng: ${completedOrder.lookupToken||''}`);setSubmitError('Đã sao chép thông tin tra cứu.');}catch{setSubmitError('Hãy chọn và sao chép mã hiển thị phía trên.');}}}>Sao chép mã tra cứu</button></div>{submitError&&<p role="status" className="text-sm">{submitError}</p>}
+              <PaymentStatus order={completedOrder} autoRefresh/>
               {/* Bank transfer info if selected */}
               {completedOrder.paymentMethod === 'vietqr' && (
                 <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-left space-y-3">
                   <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
                     <QrCode className="w-4 h-4 text-emerald-400" />
-                    <span>Thông tin chuyển khoản — chờ xác nhận thanh toán</span>
+                    <span>Chuyển đúng số tiền và giữ nguyên nội dung mã đơn</span>
                   </div>
 
                   {paymentConfigured ? (

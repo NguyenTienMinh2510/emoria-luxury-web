@@ -17,7 +17,8 @@ export async function trackOrderSecure(id,token) {
  if(!isSupabaseConfigured())throw new Error('Chưa kết nối máy chủ.');
  if(!id || !String(id).trim())throw new Error('Vui lòng nhập mã đơn hàng.');
  const {data,error}=await supabase.rpc('rpc_track_order',{p_order_id:String(id).trim(),p_token:token?String(token).trim():null});
- if(error||!data?.success)throw new Error(data?.message||'Không tìm thấy đơn hoặc mã tra cứu không đúng.');
+ if(error)throw new Error(['PGRST202','PGRST203'].includes(error.code)?'Dịch vụ tra cứu cần được cập nhật. Vui lòng liên hệ cửa hàng.':'Chưa tải được đơn từ máy chủ. Vui lòng thử lại; đây không phải xác nhận đơn không tồn tại.');
+ if(!data?.success)throw new Error(data?.message||'Không tìm thấy đơn hoặc mã tra cứu không đúng.');
  return data.order;
 }
 export async function updateOrderStatus(id,status,tracking=null) {
@@ -26,13 +27,17 @@ export async function updateOrderStatus(id,status,tracking=null) {
  if(error||!data?.success)throw new Error(error?.message||data?.message||'Không thể cập nhật đơn.');
  return data;
 }
-export async function listOrdersForAdmin(page = 0, search = '') {
+export async function listOrdersForAdmin(page = 0, search = '', status = '') {
   if (isSupabaseConfigured()) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select('*, order_items(*)')
-        .order('created_at', { ascending: false }).ilike('id', `%${search}%`).range(page * 25, page * 25 + 24);
+        .order('created_at', { ascending: false });
+      const term=search.replace(/[^a-zA-Z0-9@+ ._-]/g,'').trim();
+      if(term)query=query.or(`id.ilike.%${term}%,phone.ilike.%${term}%,tracking_number.ilike.%${term}%`);
+      if(status)query=query.eq('status',status);
+      const { data, error } = await query.range(page * 25, page * 25 + 24);
 
       if (error) throw new Error(error.message);
       if (data) {
@@ -49,6 +54,9 @@ export async function listOrdersForAdmin(page = 0, search = '') {
           totals: { finalTotal: o.final_total },
           createdAt: o.created_at,
           isTest:o.is_test,trackingNumber:o.tracking_number,
+          shippingCarrier:o.shipping_carrier,deliveryEstimate:o.delivery_estimate,shippingNote:o.shipping_note,
+          shippedAt:o.shipped_at,deliveredAt:o.delivered_at,hasGiftBox:o.gift_wrap_fee>0,
+          paymentStatus:o.payment_status,paidAmount:o.paid_amount||0,paidAt:o.paid_at,
           items: (o.order_items || []).map(it => ({
             id: it.product_id,
             orderItemId:it.id,

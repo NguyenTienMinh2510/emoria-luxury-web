@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/sepay-webhook", "destination": "/api/sepay-webhook" },
     { "source": "/api/memory-media", "destination": "/api/memory-media" },
     { "source": "/api/analytics", "destination": "/api/analytics" },
     {
