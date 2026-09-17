@@ -97,9 +97,10 @@ export default function ProductExplodedShowcase({
     const imgAspect = img.width / img.height;
     const canvasAspect = canvas.width / canvas.height;
 
-    // Phóng to frames (1.32x desktop, 1.12x mobile) để mặt dây chuyền to hoành tráng, rõ nét, nhìn đã mắt
+    // Phóng to frames animation to và sắc nét, tạo chiều sâu hoành tráng theo yêu cầu
     const isMobile = window.innerWidth < 768;
-    const scaleMultiplier = isMobile ? 1.12 : 1.32;
+    const isTablet = window.innerWidth < 1024;
+    const scaleMultiplier = isMobile ? 1.15 : (isTablet ? 1.35 : 1.50);
     let drawW, drawH, drawX, drawY;
 
     if (canvasAspect > imgAspect) {
@@ -465,9 +466,9 @@ export default function ProductExplodedShowcase({
       <div className="absolute inset-0 bg-diamond-pattern opacity-20 pointer-events-none z-0" />
 
       {/* 1. TOP HERO BRAND HEADER */}
-      <div className="shrink-0 w-full max-w-4xl mx-auto flex flex-col items-center text-center relative z-30 pt-14 sm:pt-16 px-4">
+      <div className="shrink-0 w-full max-w-4xl mx-auto flex flex-col items-center text-center relative z-30 pt-12 sm:pt-13 pb-0.5 px-4">
         {/* Subtle Top Utility Bar: Quick Skip & Lock Status */}
-        <div className="w-full flex items-center justify-between gap-2 mb-1 text-[11px] text-slate-400">
+        <div className="w-full flex items-center justify-between gap-2 mb-0.5 text-[11px] text-slate-400">
           <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] sm:text-[11px]">
             {isUnlocked ? (
               <span className="flex items-center gap-1 text-emerald-400 font-medium">
@@ -496,18 +497,18 @@ export default function ProductExplodedShowcase({
         <motion.div
           animate={{ y: [-3, 3, -3] }}
           transition={{ duration: 6, ease: "easeInOut", repeat: Infinity }}
-          className="relative inline-flex flex-col items-center select-none mt-1"
+          className="relative inline-flex flex-col items-center select-none mt-0.5"
         >
           <img
             src="/assets/logo.png"
             alt="EMORIA Logo"
             style={{ imageRendering: '-webkit-optimize-contrast' }}
-            className="w-[72vw] max-w-[290px] sm:max-w-[360px] md:max-w-[400px] h-auto object-contain drop-shadow-[0_6px_28px_rgba(255,255,255,0.25)] select-none"
+            className="w-[60vw] max-w-[240px] sm:max-w-[280px] md:max-w-[310px] h-auto object-contain drop-shadow-[0_6px_28px_rgba(255,255,255,0.25)] select-none"
           />
         </motion.div>
 
         {/* Official Slogan with Silver Gradients & Diamond Accents */}
-        <div className="flex items-center justify-center gap-2 sm:gap-3 mt-1 sm:mt-1.5 px-4">
+        <div className="flex items-center justify-center gap-2 sm:gap-3 mt-0.5 sm:mt-1 px-4">
           <span className="w-6 sm:w-10 h-px bg-gradient-to-r from-transparent via-slate-400/40 to-transparent" />
           <p className="text-[10px] sm:text-xs md:text-sm font-sans font-medium tracking-[0.28em] sm:tracking-[0.38em] text-transparent bg-clip-text bg-gradient-to-r from-slate-300 via-white to-slate-300 uppercase text-center drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
             MỘT CHẠM MỞ KÍ ỨC · TRỌN ĐỜI GIỮ YÊU THƯƠNG
@@ -516,7 +517,7 @@ export default function ProductExplodedShowcase({
         </div>
 
         {/* PURE TEXT AUTH LINKS: KHÔNG Ô BUTTON, KHÔNG ICON, KHÔNG LỖI FONT */}
-        <div className="mt-2 sm:mt-2.5 flex items-center justify-center">
+        <div className="mt-1 sm:mt-1.5 flex items-center justify-center">
           {currentUser ? (
             <div className="flex items-center gap-3">
               <span className="text-xs text-slate-300 font-sans tracking-wide">
@@ -554,7 +555,7 @@ export default function ProductExplodedShowcase({
       <div className="relative w-full flex-1 min-h-0 flex items-center justify-center">
 
         {/* CỘT THÔNG SỐ BÊN TRÁI (Desktop / Tablet) */}
-        <div className="absolute left-3 sm:left-6 lg:left-10 xl:left-14 top-1/2 -translate-y-1/2 z-30 space-y-2 max-w-[210px] lg:max-w-[240px] hidden md:block pointer-events-auto">
+        <div className="absolute left-3 sm:left-6 lg:left-10 xl:left-14 top-[40%] -translate-y-1/2 z-30 space-y-1.5 max-w-[195px] lg:max-w-[225px] xl:max-w-[245px] max-h-[calc(100vh-230px)] overflow-y-auto no-scrollbar hidden md:block pointer-events-auto">
           {componentsData.filter(c => c.side === 'left').map((comp) => {
             const Icon = comp.icon;
             const isVisible = currentFrame >= comp.activeFrames[0];
@@ -571,12 +572,12 @@ export default function ProductExplodedShowcase({
                 transition={{ duration: 0.25 }}
                 onMouseEnter={() => setActiveCardIndex(comp.id)}
                 onMouseLeave={() => setActiveCardIndex(null)}
-                className={`p-2.5 rounded-xl transition-all duration-300 border ${isHovered
+                className={`p-2 lg:p-2.5 rounded-xl transition-all duration-300 border ${isHovered
                     ? 'glass-panel border-white/50 shadow-silver-glow scale-105 bg-white/20'
                     : 'glass-panel border-white/10 hover:border-white/30 hover:bg-white/10'
                   }`}
               >
-                <div className="flex items-center gap-1.5 mb-1">
+                <div className="flex items-center gap-1.5 mb-0.5">
                   <div className="w-4 h-4 rounded bg-white/10 flex items-center justify-center text-slate-200 shrink-0">
                     <Icon className="w-2.5 h-2.5" />
                   </div>
@@ -584,13 +585,13 @@ export default function ProductExplodedShowcase({
                     Tầng 0{comp.id}
                   </span>
                 </div>
-                <h4 className="text-xs font-sans font-bold text-white tracking-wide leading-snug">
+                <h4 className="text-[11px] sm:text-xs font-sans font-bold text-white tracking-wide leading-snug">
                   {comp.name}
                 </h4>
-                <p className="text-[10px] text-slate-300 font-light mt-0.5 leading-relaxed">
+                <p className="text-[10px] text-slate-300 font-light mt-0.5 leading-relaxed line-clamp-2">
                   {comp.desc}
                 </p>
-                <div className="mt-1 pt-1 border-t border-white/10 text-[9px] text-slate-400 font-mono">
+                <div className="mt-1 pt-0.5 border-t border-white/10 text-[9px] text-slate-400 font-mono truncate">
                   <span>{comp.spec}</span>
                 </div>
               </motion.div>
@@ -602,8 +603,8 @@ export default function ProductExplodedShowcase({
         <div
           className="relative w-full h-full flex items-center justify-center min-h-0 overflow-hidden"
           style={{
-            maskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%)'
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 2%, black 98%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 2%, black 98%, transparent 100%)'
           }}
         >
           <canvas
@@ -624,7 +625,7 @@ export default function ProductExplodedShowcase({
         </div>
 
         {/* CỘT THÔNG SỐ BÊN PHẢI (Desktop / Tablet) */}
-        <div className="absolute right-3 sm:right-6 lg:right-10 xl:right-14 top-1/2 -translate-y-1/2 z-30 space-y-2 max-w-[210px] lg:max-w-[240px] hidden md:block pointer-events-auto">
+        <div className="absolute right-3 sm:right-6 lg:right-10 xl:right-14 top-[40%] -translate-y-1/2 z-30 space-y-1.5 max-w-[195px] lg:max-w-[225px] xl:max-w-[245px] max-h-[calc(100vh-230px)] overflow-y-auto no-scrollbar hidden md:block pointer-events-auto">
           {componentsData.filter(c => c.side === 'right').map((comp) => {
             const Icon = comp.icon;
             const isVisible = currentFrame >= comp.activeFrames[0];
@@ -641,12 +642,12 @@ export default function ProductExplodedShowcase({
                 transition={{ duration: 0.25 }}
                 onMouseEnter={() => setActiveCardIndex(comp.id)}
                 onMouseLeave={() => setActiveCardIndex(null)}
-                className={`p-2.5 rounded-xl transition-all duration-300 border ${isHovered
+                className={`p-2 lg:p-2.5 rounded-xl transition-all duration-300 border ${isHovered
                     ? 'glass-panel border-amber-300/50 shadow-silver-glow scale-105 bg-white/20'
                     : 'glass-panel border-white/10 hover:border-white/30 hover:bg-white/10'
                   }`}
               >
-                <div className="flex items-center gap-1.5 mb-1">
+                <div className="flex items-center gap-1.5 mb-0.5">
                   <div className="w-4 h-4 rounded bg-amber-400/20 flex items-center justify-center text-amber-200 shrink-0">
                     <Icon className="w-2.5 h-2.5" />
                   </div>
@@ -654,13 +655,13 @@ export default function ProductExplodedShowcase({
                     Tầng 0{comp.id} · CORE TECH
                   </span>
                 </div>
-                <h4 className="text-xs font-sans font-bold text-white tracking-wide leading-snug">
+                <h4 className="text-[11px] sm:text-xs font-sans font-bold text-white tracking-wide leading-snug">
                   {comp.name}
                 </h4>
-                <p className="text-[10px] text-slate-300 font-light mt-0.5 leading-relaxed">
+                <p className="text-[10px] text-slate-300 font-light mt-0.5 leading-relaxed line-clamp-2">
                   {comp.desc}
                 </p>
-                <div className="mt-1 pt-1 border-t border-white/10 text-[9px] text-amber-200/90 font-mono">
+                <div className="mt-1 pt-0.5 border-t border-white/10 text-[9px] text-amber-200/90 font-mono truncate">
                   <span>{comp.spec}</span>
                 </div>
               </motion.div>
@@ -673,9 +674,9 @@ export default function ProductExplodedShowcase({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               onClick={() => onOpenNfcDemo('emoria-lumen')}
-              className="w-full p-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-[11px] font-sans font-medium flex items-center justify-center gap-1.5 text-white shadow-silver-glow transition-all group cursor-pointer"
+              className="w-full p-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-[10px] font-sans font-medium flex items-center justify-center gap-1.5 text-white shadow-silver-glow transition-all group cursor-pointer mt-1"
             >
-              <Smartphone className="w-3.5 h-3.5 text-slate-300 group-hover:scale-110 transition-transform" />
+              <Smartphone className="w-3 h-3 text-slate-300 group-hover:scale-110 transition-transform" />
               <span>Mô phỏng "Một chạm"</span>
             </motion.button>
           )}
