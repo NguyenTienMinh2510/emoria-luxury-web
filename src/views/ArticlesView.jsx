@@ -11,7 +11,7 @@ const CATEGORIES = [
   'Hướng dẫn'
 ];
 
-export default function ArticlesView({ onSelectArticle, onNavigateToShop }) {
+export default function ArticlesView({ onSelectArticle, onNavigateToShop, isAdmin = false }) {
   const [page,setPage]=useState(0);
   const [savedOnly,setSavedOnly]=useState(false);
   const [error,setError]=useState('');
@@ -183,10 +183,12 @@ export default function ArticlesView({ onSelectArticle, onNavigateToShop }) {
                 {/* Footer Metadata & CTA */}
                 <div className="px-6 pb-6 pt-2 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
                   <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <Eye className="w-3.5 h-3.5" />
-                      {article.view_count || 0}
-                    </span>
+                    {isAdmin && (
+                      <span className="flex items-center gap-1" title="Lượt xem bài viết (chỉ admin hiển thị)">
+                        <Eye className="w-3.5 h-3.5" />
+                        {article.view_count || 0}
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
                       <Heart className="w-3.5 h-3.5 text-rose-400" />
                       {article.likes_count || 0}

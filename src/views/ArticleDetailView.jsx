@@ -15,7 +15,8 @@ export default function ArticleDetailView({
   onBack, 
   onSelectProduct, 
   onOpenAuth,
-  currentUser 
+  currentUser,
+  isAdmin = false
 }) {
   const {products}=useStore();
   const [reactionBusy,setReactionBusy]=useState(false);
@@ -266,10 +267,12 @@ export default function ArticleDetailView({
             </div>
 
             <div className="flex items-center gap-4 font-mono">
-              <span className="flex items-center gap-1">
-                <Eye className="w-3.5 h-3.5" />
-                {article.view_count || 0} lượt đọc
-              </span>
+              {(isAdmin || currentUser?.isAdmin) && (
+                <span className="flex items-center gap-1" title="Lượt đọc bài viết (chỉ admin hiển thị)">
+                  <Eye className="w-3.5 h-3.5" />
+                  {article.view_count || 0} lượt đọc
+                </span>
+              )}
               <span className="flex items-center gap-1">
                 <Heart className="w-3.5 h-3.5 text-rose-400" />
                 {likeCount} lượt thích

@@ -449,8 +449,6 @@ export default function ProductExplodedShowcase({
     }
   };
 
-  const progressPercent = Math.min(100, Math.round((currentFrame / (TOTAL_FRAMES - 1)) * 100));
-
   // Xác định tầng linh kiện đang được bóc tách
   const activeComponentMobile = componentsData
     .filter(c => currentFrame >= c.activeFrames[0])
@@ -806,11 +804,11 @@ export default function ProductExplodedShowcase({
         </AnimatePresence>
       </div>
 
-      {/* 4. BOTTOM CONTROLS & DYNAMIC PROGRESS BAR */}
+      {/* 4. BOTTOM CONTROLS (Thanh tiến độ đã ẩn theo yêu cầu, giữ nguyên trải nghiệm cuộn) */}
       <div className="shrink-0 relative z-30 w-full max-w-2xl mx-auto flex flex-col items-center pb-2.5 sm:pb-3 px-3 sm:px-6">
 
         {/* Action Prompt / Next Section Unlock Status */}
-        <div className="flex items-center gap-2 sm:gap-3 text-xs mb-1.5 sm:mb-2">
+        <div className="flex items-center gap-2 sm:gap-3 text-xs">
           {isUnlocked ? (
             /* Khi đã chạy hết 120 frames: Nút mở khóa để tiếp tục cuộn */
             <motion.button
@@ -830,9 +828,6 @@ export default function ProductExplodedShowcase({
                 {currentFrame === 0
                   ? 'Lăn chuột để bắt đầu bóc tách'
                   : 'Tiếp tục lăn chuột để xem hết linh kiện'}
-              </span>
-              <span className="text-slate-500 font-mono text-[10px]">
-                ({currentFrame + 1}/{TOTAL_FRAMES})
               </span>
             </div>
           )}
@@ -854,36 +849,6 @@ export default function ProductExplodedShowcase({
           >
             <RotateCcw className="w-3 h-3" />
           </button>
-        </div>
-
-        {/* Interactive Scrubbing Slider */}
-        <div className="w-full flex items-center gap-3">
-          <input
-            type="range"
-            min="0"
-            max={TOTAL_FRAMES - 1}
-            value={currentFrame}
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              currentFrameRef.current = val;
-              setCurrentFrame(val);
-              drawFrame(val);
-              if (val >= TOTAL_FRAMES - 1) {
-                isUnlockedRef.current = true;
-                setIsUnlocked(true);
-              }
-            }}
-            className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-slate-200"
-          />
-        </div>
-
-        {/* Status Label */}
-        <div className="flex justify-between w-full mt-1 text-[9px] sm:text-[10px] text-slate-500 font-mono">
-          <span>Nguyên vẹn</span>
-          <span className={isUnlocked ? 'text-emerald-400 font-semibold' : 'text-slate-400'}>
-            {isUnlocked ? '✓ 100% Phân tách · Đã mở khóa' : `Tiến trình: ${progressPercent}%`}
-          </span>
-          <span>Phân tách tối đa</span>
         </div>
 
       </div>

@@ -347,6 +347,7 @@ export default function App() {
               onOpenNfcDemo={handleOpenNfcDemo}
             />
             <ArticlesSection
+              isAdmin={authSession.isAdmin}
               onSelectArticle={(slug) => {
                 setSelectedArticleSlug(slug);
                 setCurrentView('article-detail');
@@ -396,6 +397,7 @@ export default function App() {
         {/* VIEW 4: DEDICATED ARTICLES & BLOG MAGAZINE */}
         {currentView === 'articles' && (
           <ArticlesView
+            isAdmin={authSession.isAdmin}
             onSelectArticle={(slug) => {
               setSelectedArticleSlug(slug);
               setCurrentView('article-detail');
@@ -412,13 +414,14 @@ export default function App() {
         {currentView === 'article-detail' && (
           <ArticleDetailView
             slug={selectedArticleSlug}
+            isAdmin={authSession.isAdmin}
             onBack={() => {
               setCurrentView('articles');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onSelectProduct={(id) => setSelectedProductId(id)}
             onOpenAuth={() => setIsAuthOpen(true)}
-            currentUser={currentUser ? { name: currentUser, id:authSession.user?.id } : null}
+            currentUser={currentUser ? { name: currentUser, id: authSession.user?.id, isAdmin: authSession.isAdmin } : null}
           />
         )}
 

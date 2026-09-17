@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, Eye, Heart, Clock } from 'lucide-react';
 import { getPublishedArticles } from '../services/articleService';
 
-export default function ArticlesSection({ onSelectArticle, onNavigateToArticles }) {
+export default function ArticlesSection({ onSelectArticle, onNavigateToArticles, isAdmin = false }) {
   const [featuredArticles, setFeaturedArticles] = useState([]);
 
   useEffect(() => {
@@ -59,18 +59,24 @@ export default function ArticlesSection({ onSelectArticle, onNavigateToArticles 
               className="group relative rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/30 overflow-hidden cursor-pointer backdrop-blur-xl transition-all duration-300 hover:shadow-silver-glow flex flex-col justify-between"
             >
               <div>
+                {/* Image Cover */}
                 <div className="relative aspect-[16/10] overflow-hidden">
                   <img
                     src={article.cover_image}
                     alt={article.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/20 to-transparent" />
-                  <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-black/60 border border-white/20 text-slate-200 backdrop-blur-md uppercase">
-                    {article.category}
-                  </span>
+                  
+                  {/* Category Pill */}
+                  <div className="absolute top-4 left-4">
+                    <span className="px-3 py-1 rounded-full bg-dark-950/80 backdrop-blur-md border border-white/15 text-[10px] font-semibold tracking-wider text-slate-200 uppercase">
+                      {article.category}
+                    </span>
+                  </div>
                 </div>
 
+                {/* Content */}
                 <div className="p-6">
                   <div className="text-[11px] text-slate-400 mb-2 font-mono">
                     {article.published_at ? new Date(article.published_at).toLocaleDateString('vi-VN') : 'Mới cập nhật'}
@@ -86,10 +92,12 @@ export default function ArticlesSection({ onSelectArticle, onNavigateToArticles 
 
               <div className="px-6 pb-6 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
                 <div className="flex items-center gap-3">
-                  <span className="flex items-center gap-1">
-                    <Eye className="w-3.5 h-3.5" />
-                    {article.view_count || 0}
-                  </span>
+                  {isAdmin && (
+                    <span className="flex items-center gap-1" title="Lượt xem bài viết (chỉ admin hiển thị)">
+                      <Eye className="w-3.5 h-3.5" />
+                      {article.view_count || 0}
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
                     <Heart className="w-3.5 h-3.5 text-rose-400" />
                     {article.likes_count || 0}
