@@ -397,32 +397,45 @@ export default function ShopView({
                 Tra Cứu Tiến Độ Đơn Hàng
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto mb-6">
-                Nhập mã đơn và mã tra cứu riêng nhận được sau khi đặt hàng. Nếu đã đăng nhập đúng tài khoản đặt đơn, có thể bỏ trống mã tra cứu.
+                Nhập mã đơn hàng (EMO-…) đã nhận được sau khi đặt mua để kiểm tra tiến độ chế tác và giao hàng.
               </p>
 
-              <form onSubmit={handleTrackOrder} className="flex flex-col gap-3 max-w-lg mx-auto">
-                <input aria-label="Mã tra cứu riêng" type="password" placeholder="Mã tra cứu riêng (UUID)" value={trackingToken} onChange={e=>setTrackingToken(e.target.value)} className="store-input" />
-                <div className="relative flex-1">
+              <form onSubmit={handleTrackOrder} className="max-w-lg mx-auto space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Nhập mã đơn hàng (EMO-…)"
+                      value={trackingInput}
+                      onChange={(e) => setTrackingInput(e.target.value)}
+                      className="w-full px-4 py-3 text-sm rounded-xl bg-black/50 border border-white/20 text-white placeholder-slate-500 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/30 uppercase font-mono"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSearchingOrder || !trackingInput.trim()}
+                    className="px-6 py-3 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {isSearchingOrder ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    <span>Tra Cứu Đơn</span>
+                  </button>
+                </div>
+
+                <div className="relative">
                   <input
+                    aria-label="Số điện thoại hoặc mã tra cứu bổ sung (tùy chọn)"
                     type="text"
-                    placeholder="Mã đơn EMO-…"
-                    value={trackingInput}
-                    onChange={(e) => setTrackingInput(e.target.value)}
-                    className="w-full px-4 py-3 text-sm rounded-xl bg-black/50 border border-white/20 text-white placeholder-slate-500 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/30 uppercase"
+                    placeholder="Số điện thoại hoặc mã tra cứu riêng (tùy chọn)"
+                    value={trackingToken}
+                    onChange={(e) => setTrackingToken(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-black/30 border border-white/10 text-slate-300 placeholder-slate-500 focus:outline-none focus:border-white/30"
                   />
                 </div>
-                <button
-                  type="submit"
-                  disabled={isSearchingOrder}
-                  className="px-6 py-3 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {isSearchingOrder ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                  <span>Tra Cứu</span>
-                </button>
               </form>
 
               {trackingError && (

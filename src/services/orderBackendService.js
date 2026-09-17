@@ -15,7 +15,8 @@ export async function createOrder(payload) {
 }
 export async function trackOrderSecure(id,token) {
  if(!isSupabaseConfigured())throw new Error('Chưa kết nối máy chủ.');
- const {data,error}=await supabase.rpc('rpc_track_order',{p_order_id:id.trim(),p_token:token?.trim()||null});
+ if(!id || !String(id).trim())throw new Error('Vui lòng nhập mã đơn hàng.');
+ const {data,error}=await supabase.rpc('rpc_track_order',{p_order_id:String(id).trim(),p_token:token?String(token).trim():null});
  if(error||!data?.success)throw new Error(data?.message||'Không tìm thấy đơn hoặc mã tra cứu không đúng.');
  return data.order;
 }
