@@ -27,22 +27,23 @@ const scenarios = [
   ['configured server denial and errors never fall back', true, `
     const { supabase } = await import('./src/lib/supabaseClient.js');
     const m = await import('./src/services/memoryService.js');
-    supabase.rpc = async () => ({ data: { success: false, message: 'denied' }, error: null });
+    supabase.auth.getSession = async () => ({data:{session:null}});
+    globalThis.fetch = async () => Response.json({error:{message:'denied'}},{status:403});
     assert.equal((await m.fetchMemoryView('emoria-pulse')).message, 'denied');
     assert.equal((await m.verifyMemoryPin('emoria-pulse', '1000')).success, false);
-    supabase.rpc = async () => ({ data: null, error: { message: 'unavailable' } });
+    globalThis.fetch = async () => Response.json({error:{message:'unavailable'}},{status:503});
     assert.equal((await m.fetchMemoryView('emoria-pulse')).success, false);
     assert.equal((await m.verifyMemoryPin('emoria-pulse', '1000')).success, false);
-    supabase.rpc = async () => { throw new Error('offline'); };
+    globalThis.fetch = async () => { throw new Error('offline'); };
     assert.equal((await m.fetchMemoryView('emoria-pulse')).success, false);
     assert.equal((await m.verifyMemoryPin('emoria-pulse', '1000')).success, false);
     let sent;
-    supabase.rpc = async (name, args) => {
-      sent = { name, args };
-      return { data: { success: true, grant_token: 'server-token' }, error: null };
+    globalThis.fetch = async (url, options) => {
+      sent = { url, method:options.method, body:JSON.parse(options.body) };
+      return Response.json({ success: true, grant_token: 'server-token' });
     };
     await m.verifyMemoryPin(' EMORIA-PULSE ', ' 1000 ');
-    assert.deepEqual(sent, { name: 'rpc_verify_memory_pin', args: { p_tag_uid: 'emoria-pulse', p_pin: '1000' } });
+    assert.deepEqual(sent, { url: '/api/v1/memories/emoria-pulse/grants', method:'POST', body: { pin: '1000' } });
     assert.equal(m.getStoredGrantToken('emoria-pulse'), 'server-token');
   `],
 ];

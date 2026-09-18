@@ -1,8 +1,8 @@
+import {apiRequest} from '../services/apiClient.js';
 import MemoryMediaEditor from '../components/MemoryMediaEditor';
 import MemoryMovieEditor from '../components/MemoryMovieEditor';
 import MemoryCinema from '../components/MemoryCinema';
 import {callStore} from '../services/catalogService';
-import {supabase} from '../lib/supabaseClient';
 import {useStore} from '../components/StoreProvider';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -77,7 +77,11 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
 
   // Load showcase memories list for dropdown
   useEffect(() => {
-    supabase.rpc('rpc_my_memories').then(({data})=>setAllMemories([...(data||[]),...(settings?.sandbox?getShowcaseMemoriesList():[])].filter((m,i,all)=>all.findIndex(x=>x.tag_uid===m.tag_uid)===i))); 
+    let active=true;
+    const showcase=settings?.sandbox?getShowcaseMemoriesList():[];
+    const request=currentUser?apiRequest('/me/memories'):Promise.resolve([]);
+    request.then(data=>{if(active)setAllMemories([...(data||[]),...showcase].filter((m,i,all)=>all.findIndex(x=>x.tag_uid===m.tag_uid)===i));}).catch(()=>{if(active)setAllMemories(showcase);});
+    return()=>{active=false;};
   }, [currentUser,settings?.sandbox]);
 
   // Fetch memory data on tag change

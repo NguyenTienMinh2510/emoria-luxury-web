@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShieldCheck, Truck, Banknote, QrCode, CheckCircle2, ArrowRight, Package, Clock, MapPin, Phone, Copy, Check, ExternalLink, Smartphone, ChevronDown } from 'lucide-react';
+import { X, ShieldCheck, Truck, Banknote, QrCode, CheckCircle2, ArrowRight, Package, Clock, MapPin, Phone, Copy, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useStore } from './StoreProvider';
 import { createOrder } from '../services/orderBackendService';
 import {supabase} from '../lib/supabaseClient';
 import {readPendingCheckout,savePendingCheckout,clearPendingCheckout} from '../services/checkoutSession';
 import PaymentStatus from './PaymentStatus';
+import BankAppPayment from './BankAppPayment';
 import { getMyProfile, updateMyProfile } from '../services/profileService';
 
 const BANK_BIN_NAMES = {
@@ -36,21 +37,6 @@ const BANK_BIN_NAMES = {
   '970457': 'Woori Bank',
   '970424': 'Shinhan Bank'
 };
-
-const POPULAR_BANK_APPS = [
-  { id: 'bidv', name: 'BIDV', short: 'BIDV' },
-  { id: 'vcb', name: 'Vietcombank', short: 'VCB' },
-  { id: 'mb', name: 'MB Bank', short: 'MB' },
-  { id: 'tcb', name: 'Techcombank', short: 'TCB' },
-  { id: 'icb', name: 'VietinBank', short: 'VietinBank' },
-  { id: 'acb', name: 'ACB', short: 'ACB' },
-  { id: 'tpb', name: 'TPBank', short: 'TPBank' },
-  { id: 'vpb', name: 'VPBank', short: 'VPBank' },
-  { id: 'vba', name: 'Agribank', short: 'Agribank' },
-  { id: 'ocb', name: 'OCB', short: 'OCB' },
-  { id: 'cake', name: 'Cake', short: 'Cake' },
-  { id: 'timo', name: 'Timo', short: 'Timo' },
-];
 
 export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderComplete, onTrack, currentUserId='guest', onOpenAuth }) {
   const { settings } = useStore();
@@ -117,12 +103,6 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
   const [copiedAccount, setCopiedAccount] = useState(false);
-  const [selectedBankApp, setSelectedBankApp] = useState(() => {
-    try { return localStorage.getItem('emoria_preferred_bank_app') || 'bidv'; } catch { return 'bidv'; }
-  });
-  const [showBankSelector, setShowBankSelector] = useState(false);
-  const [desktopNotice, setDesktopNotice] = useState('');
-  const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
   const submitting = useRef(false);
   const bankName = settings?.bank_bin || '';
   const bankAccount = settings?.bank_account || '';
@@ -319,79 +299,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                         </div>
                       </div>
 
-                      {/* Mobile Deeplink: Open Banking App */}
-                      <div className="space-y-2.5 pt-2 border-t border-white/10">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                            <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Mở App Ngân Hàng Tự Động:</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setShowBankSelector(!showBankSelector)}
-                            className="text-[11px] text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer flex items-center gap-1 bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded-lg transition-all"
-                          >
-                            <span>{showBankSelector ? 'Thu gọn' : 'Đổi App khác'}</span>
-                            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${showBankSelector ? 'rotate-180' : ''}`} />
-                          </button>
-                        </div>
-
-                        {/* Primary Action Button */}
-                        <a
-                          href={`https://dl.vietqr.io/pay?app=${encodeURIComponent(selectedBankApp)}&ba=${encodeURIComponent(bankAccount)}@${encodeURIComponent(bankName)}&am=${completedOrder.totals?.finalTotal || ''}&tn=${encodeURIComponent(completedOrder.id)}&bn=${encodeURIComponent(bankOwner)}`}
-                          target={isMobile ? '_self' : '_blank'}
-                          rel="noopener noreferrer"
-                          onClick={() => {
-                            if (!isMobile) {
-                              setDesktopNotice('💡 Tính năng mở App trực tiếp hoạt động trên điện thoại di động (iOS / Android). Trên máy tính, quý khách vui lòng dùng điện thoại mở App ngân hàng quét mã QR ở trên.');
-                              setTimeout(() => setDesktopNotice(''), 7000);
-                            }
-                          }}
-                          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 text-dark-950 font-bold text-xs hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
-                        >
-                          <ExternalLink className="w-4 h-4 shrink-0" />
-                          <span>Mở App {POPULAR_BANK_APPS.find(b => b.id === selectedBankApp)?.name || selectedBankApp.toUpperCase()} Để Chuyển Khoản</span>
-                        </a>
-
-                        {desktopNotice && (
-                          <div className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl text-left leading-relaxed">
-                            {desktopNotice}
-                          </div>
-                        )}
-
-                        {/* Bank App Selector grid */}
-                        {showBankSelector && (
-                          <div className="pt-1.5 space-y-2 bg-black/30 p-3 rounded-2xl border border-white/10 text-left">
-                            <p className="text-[10px] text-slate-400 font-medium">Bấm vào ngân hàng bạn đang dùng để mở App ngay:</p>
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
-                              {POPULAR_BANK_APPS.map((b) => (
-                                <a
-                                  key={b.id}
-                                  href={`https://dl.vietqr.io/pay?app=${b.id}&ba=${encodeURIComponent(bankAccount)}@${encodeURIComponent(bankName)}&am=${completedOrder.totals?.finalTotal || ''}&tn=${encodeURIComponent(completedOrder.id)}&bn=${encodeURIComponent(bankOwner)}`}
-                                  target={isMobile ? '_self' : '_blank'}
-                                  rel="noopener noreferrer"
-                                  onClick={() => {
-                                    setSelectedBankApp(b.id);
-                                    try { localStorage.setItem('emoria_preferred_bank_app', b.id); } catch {}
-                                    if (!isMobile) {
-                                      setDesktopNotice('💡 Tính năng mở App trực tiếp hoạt động trên điện thoại di động (iOS / Android). Trên máy tính, quý khách chỉ cần quét mã QR ở trên.');
-                                      setTimeout(() => setDesktopNotice(''), 7000);
-                                    }
-                                  }}
-                                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
-                                    selectedBankApp === b.id
-                                      ? 'bg-emerald-500/25 border-emerald-400 text-white font-bold shadow-sm'
-                                      : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white'
-                                  }`}
-                                >
-                                  <span className="text-[11px] font-semibold leading-tight">{b.short}</span>
-                                  <span className="text-[9px] text-slate-400 truncate max-w-full">{b.name}</span>
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <BankAppPayment bank={bankName} account={bankAccount} owner={bankOwner} order={completedOrder} />
                     </div>
                   ) : (
                     <p className="text-xs text-slate-300">{settings?.sandbox ? 'Thanh toán thử nghiệm: quản trị viên xác nhận trong mục Đơn hàng. Không chuyển tiền thật.' : 'Chưa có thông tin nhận chuyển khoản. Đơn chưa được xác nhận thanh toán.'}</p>

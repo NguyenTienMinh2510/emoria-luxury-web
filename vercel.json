@@ -1,5 +1,7 @@
 {
+  "buildCommand": "npm run test:ci && npm run build",
   "rewrites": [
+    { "source": "/api/v1/:resource*", "destination": "/api/v1?resource=:resource*" },
     { "source": "/api/sepay-webhook", "destination": "/api/sepay-webhook" },
     { "source": "/api/memory-media", "destination": "/api/memory-media" },
     { "source": "/api/analytics", "destination": "/api/analytics" },

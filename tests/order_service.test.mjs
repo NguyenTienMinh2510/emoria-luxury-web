@@ -12,10 +12,11 @@ const child=spawnSync(process.execPath,['--input-type=module','-e',`
  const {createOrder}=await import('./src/services/orderBackendService.js');
  const payload={requestId:crypto.randomUUID(),customerName:'Test',phone:'0900000000',address:'Fake',paymentMethod:'vietqr',items:[{id:'emoria-pulse',size:'S',quantity:1,price:1}]};
  let calls=0;
- supabase.rpc=async(name,args)=>{calls++;assert.equal(name,'rpc_create_order');assert.equal(args.p_request_id,payload.requestId);assert.equal(args.p_payload.items[0].price,undefined);return {error:{code:'P0001',message:'Không đủ tồn kho'}};};
+ supabase.auth.getSession=async()=>({data:{session:null}});
+ globalThis.fetch=async(url,options)=>{calls++;const sent=JSON.parse(options.body);assert.equal(url,'/api/v1/orders');assert.equal(sent.requestId,payload.requestId);assert.equal(sent.items[0].price,undefined);return Response.json({error:{code:'P0001',message:'Không đủ tồn kho'}},{status:409});};
  let result=await createOrder(payload);assert.equal(result.success,false);assert.equal(result.retryable,false);assert.equal(result.error,'Không đủ tồn kho');
- supabase.rpc=async()=>{throw new Error('network');};result=await createOrder(payload);assert.equal(result.success,false);assert.equal(result.retryable,true);
- supabase.rpc=async()=>({data:{success:true,order:{id:'EMO-server',status:'pending_payment',totals:{finalTotal:299000}}}});result=await createOrder(payload);assert.equal(result.success,true);assert.equal(result.order.id,'EMO-server');assert.equal(result.order.totals.finalTotal,299000);assert.equal(result.order.status,'pending_payment');
+ globalThis.fetch=async()=>{throw new Error('network');};result=await createOrder(payload);assert.equal(result.success,false);assert.equal(result.retryable,true);
+ globalThis.fetch=async()=>Response.json({success:true,order:{id:'EMO-server',status:'pending_payment',totals:{finalTotal:299000}}});result=await createOrder(payload);assert.equal(result.success,true);assert.equal(result.order.id,'EMO-server');assert.equal(result.order.totals.finalTotal,299000);assert.equal(result.order.status,'pending_payment');
  globalThis.window = {};
  result = await createOrder(payload);
  assert.equal(result.success, false);

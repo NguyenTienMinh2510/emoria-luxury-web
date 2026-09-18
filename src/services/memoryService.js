@@ -4,6 +4,7 @@
  * Bảo vệ triệt để quyền riêng tư: Thư tay và Media nhạy cảm chỉ được tải sau khi có Grant Token hợp lệ.
  */
 
+import {apiRequest} from './apiClient.js';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 
 // Bộ nhớ đệm tạm thời cho phiên làm việc (In-memory Session Grants)
@@ -178,17 +179,11 @@ export async function fetchMemoryView(tagUid, grantToken = null) {
   const cleanTag = String(tagUid).toLowerCase().trim();
   const token = grantToken || getStoredGrantToken(cleanTag);
 
-  // 1. Thử gọi Supabase RPC server
+  // REST endpoint keeps the database access and grant checks on the server.
   if (isSupabaseConfigured()) {
     try {
-      const { data, error } = await supabase.rpc('rpc_get_memory_view', {
-        p_tag_uid: cleanTag,
-        p_grant_token: token || null,
-      });
-
-      if (error) {
-        return { success: false, message: error.message, source: 'supabase_rpc' };
-      } else if (data) {
+      const data = await apiRequest(`/memories/${encodeURIComponent(cleanTag)}/access`,{method:'POST',body:{grant:token||null}});
+      if (data) {
         data.media_gallery=(data.media_gallery||[]).map(m=>({...m,path:m.url?.startsWith('storage://')?m.url.slice(10):null}));
         data.audio_path=data.audio_url;
         if(data.is_unlocked && (data.intro_video_path || data.audio_url?.startsWith('storage://') || data.media_gallery.some(m=>m.path))){
@@ -204,12 +199,12 @@ export async function fetchMemoryView(tagUid, grantToken = null) {
           message: data.message,
           availability: data.availability,
           data,
-          source: 'supabase_rpc',
+          source: 'rest_api',
         };
       }
       return { success: false, message: 'Phản hồi máy chủ không hợp lệ.' };
     } catch (err) {
-      return { success: false, message: err.message, source: 'supabase_rpc' };
+      return { success: false, message: err.message, source: 'rest_api' };
     }
   }
 
@@ -266,21 +261,17 @@ export async function verifyMemoryPin(tagUid, enteredPin) {
 
   const cleanTag = String(tagUid).toLowerCase().trim();
 
-  // 1. Thử gọi qua Supabase RPC
+  // The server/database validates PIN and limits repeated attempts.
   if (isSupabaseConfigured()) {
     try {
-      const { data, error } = await supabase.rpc('rpc_verify_memory_pin', {
-        p_tag_uid: cleanTag,
-        p_pin: enteredPin.trim(),
-      });
-
-      if (!error && data) {
+      const data = await apiRequest(`/memories/${encodeURIComponent(cleanTag)}/grants`,{method:'POST',body:{pin:enteredPin.trim()}});
+      if (data) {
         if (data.success && data.grant_token) {
           setStoredGrantToken(cleanTag, data.grant_token);
         }
         return data;
       }
-      return { success: false, message: error?.message || 'Phản hồi máy chủ không hợp lệ.' };
+      return { success: false, message: 'Phản hồi máy chủ không hợp lệ.' };
     } catch (e) {
       return { success: false, message: e.message };
     }
@@ -324,12 +315,7 @@ export async function claimNfcOwnership(tagUid, claimCode) {
   const cleanTag = String(tagUid).toLowerCase().trim();
 
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.rpc('rpc_claim_nfc_chip', {
-      p_tag_uid: cleanTag,
-      p_claim_code: claimCode.trim(),
-    });
-
-    if (error) throw new Error(error.message);
+    const data = await apiRequest(`/memories/${encodeURIComponent(cleanTag)}/claims`,{method:'POST',body:{code:claimCode.trim()}});
     return data;
   }
 
@@ -356,12 +342,7 @@ export async function updateMemorySpace(tagUid, payload) {
   const cleanTag = String(tagUid).toLowerCase().trim();
 
   if (isSupabaseConfigured()) {
-    const { data, error } = await supabase.rpc('rpc_update_memory_space', {
-      p_tag_uid: cleanTag,
-      p_payload: payload,
-    });
-
-    if (error) throw new Error(error.message);
+    const data = await apiRequest(`/memories/${encodeURIComponent(cleanTag)}`,{method:'PATCH',body:payload});
     if(!data?.success)throw new Error(data?.message || 'Không lưu được kỷ vật.');
     return data;
   }
@@ -411,8 +392,7 @@ export async function submitGuestbookEntry(tagUid, messageData) {
   const cleanTag = String(tagUid).toLowerCase().trim();
 
   if (isSupabaseConfigured()) {
-    const {data,error}=await supabase.rpc('rpc_guestbook',{p_tag:cleanTag,p_token:getStoredGrantToken(cleanTag)||null,p_name:messageData.author.trim(),p_message:messageData.message.trim(),p_relationship:messageData.relationship||''});
-    if(error||!data?.success)throw new Error(error?.message||data?.message||'Không gửi được lời nhắn.');return data;
+    return apiRequest(`/memories/${encodeURIComponent(cleanTag)}/guestbook`,{method:'POST',body:{grant:getStoredGrantToken(cleanTag)||null,name:messageData.author.trim(),message:messageData.message.trim(),relationship:messageData.relationship||''}});
   }
 
   // Offline fallback
@@ -470,15 +450,7 @@ export async function updateMemoryAvailability(tagUid, availability) {
 
   if (isSupabaseConfigured()) {
     try {
-      const { error } = await supabase
-        .from('memory_spaces')
-        .update({
-          availability_status: availability.status,
-          unlock_at: availability.unlockDate || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('tag_uid', cleanTag);
-      if (error) return { success: false, message: error.message };
+      await apiRequest(`/admin/memories/${encodeURIComponent(cleanTag)}/availability`,{method:'PATCH',body:{status:availability.status,unlockDate:availability.unlockDate||null}});
       return { success: true };
     } catch (e) {
       return { success: false, message: e.message };

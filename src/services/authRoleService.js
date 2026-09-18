@@ -4,6 +4,7 @@
  * TUYỆT ĐỐI KHÔNG tin role tự khai từ client, localStorage, hay passkey hardcoded.
  */
 
+import {apiRequest} from './apiClient.js';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 
 export const ROLES = {
@@ -32,9 +33,9 @@ let serverSystemAvailability = { ...UNAVAILABLE_SYSTEM };
 export async function fetchSystemStatus() {
   if (!isSupabaseConfigured()) return { success: true, ...getSystemAvailability(), isDemo: true };
   try {
-    const { data, error } = await supabase.rpc('rpc_get_system_status');
-    if (error || data?.success !== true || typeof data.is_maintenance_mode !== 'boolean') {
-      throw new Error(error?.message || data?.message || 'Phản hồi máy chủ không hợp lệ.');
+    const data = await apiRequest('/system/status');
+    if (data?.success !== true || typeof data.is_maintenance_mode !== 'boolean') {
+      throw new Error(data?.message || 'Phản hồi máy chủ không hợp lệ.');
     }
     serverSystemAvailability = {
       isMaintenanceMode: data.is_maintenance_mode,
@@ -85,14 +86,7 @@ export function updateSystemAvailability(partial = {}) {
 
 async function updateServerSystemAvailability(partial) {
   if ('vipPasscode' in partial) throw new Error('Đổi mã VIP trên máy chủ chưa được hỗ trợ.');
-  const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'maintenance_config').single();
-  if (error || !data) throw new Error(error?.message || 'Không thể đọc cấu hình máy chủ.');
-  const value = { ...data.value };
-  if ('isMaintenanceMode' in partial) value.is_maintenance_mode = Boolean(partial.isMaintenanceMode);
-  if ('maintenanceMessage' in partial) value.maintenance_message = partial.maintenanceMessage;
-  const { data: saved, error: saveError } = await supabase.from('system_settings')
-    .update({ value, updated_at: new Date().toISOString() }).eq('key', 'maintenance_config').select('key').single();
-  if (saveError || !saved) throw new Error(saveError?.message || 'Không thể lưu cấu hình máy chủ.');
+  await apiRequest('/admin/system/maintenance',{method:'PATCH',body:partial});
   const result = await fetchSystemStatus();
   if (!result.success) throw new Error(result.error);
   return getSystemAvailability();
@@ -134,22 +128,7 @@ export async function resolveCurrentSessionRole() {
 
     const user = session.user;
 
-    // Kiểm tra quyền Admin trong bảng role_assignments phía server
-    const { data: roleData, error } = await supabase
-      .from('role_assignments')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-
-    const isAdmin = Boolean(roleData && !error);
-
-    // Lấy thêm thông tin chi tiết hồ sơ từ bảng profiles
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, phone, birthday, gender, address, bio, avatar_url')
-      .eq('id', user.id)
-      .maybeSingle();
+    const {isAdmin,profile}=await apiRequest('/me/session');
 
     return {
       role: isAdmin ? ROLES.ADMIN : ROLES.GUEST, // Owner được xác định theo từng memory_space
@@ -187,14 +166,8 @@ export async function checkMemoryOwnership(tagUid, currentUserId) {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('memory_spaces')
-      .select('owner_id')
-      .eq('tag_uid', String(tagUid).toLowerCase().trim())
-      .single();
-
-    if (error || !data) return false;
-    return data.owner_id === currentUserId;
+    const data=await apiRequest(`/memories/${encodeURIComponent(String(tagUid).toLowerCase().trim())}/ownership`);
+    return data.isOwner===true;
   } catch (e) {
     return false;
   }

@@ -13,5 +13,4 @@ dist
 *.txt
 test-accounts.json
 scripts
-tests
 supabase
