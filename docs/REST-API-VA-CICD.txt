@@ -93,7 +93,11 @@ POST /api/sepay-webhook — API key riêng, server đối soát chuyển khoản
 
 Link ngân hàng
 ba phải là account@bank-code (ví dụ 00123456789@bidv), khác BIN dùng trong QR.
-am lấy tổng tiền trả từ server, tn giữ nguyên mã EMO-..., bn tên chủ tài khoản.
+am lấy tổng tiền trả từ server. BIDV áp dụng giới hạn ghi chú alphanumeric nên
+deeplink dùng mã đối soát rút gọn dạng EMO + 20 ký tự hex (23 ký tự, không dấu
+gạch); webhook tự tìm về mã đơn đầy đủ EMO-... và QR hiển thị cùng mã rút gọn.
+Mã đơn đầy đủ vẫn hiển thị trên xác nhận/tra cứu; tn không phải bằng chứng thanh toán.
+bn tên chủ tài khoản.
 url quay lại web tra cứu đơn, không mang lookupToken/PIN.
 Bấm link hay quay lại từ app KHÔNG xác nhận đã thanh toán.
 Theo changelog VietQR, BIDV/MB/VietinBank/ACB/OCB có hỗ trợ autofill. Các app

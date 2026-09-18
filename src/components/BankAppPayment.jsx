@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {BANK_APPS,bankTransferLink} from '../services/bankTransfer.js';
+import {BANK_APPS,bankTransferLink,bankTransferMemo} from '../services/bankTransfer.js';
 
 export default function BankAppPayment({bank,account,owner,order}) {
   const [app,setApp]=useState(()=>{
@@ -7,7 +7,8 @@ export default function BankAppPayment({bank,account,owner,order}) {
   });
   const [notice,setNotice]=useState('');
   const selected=BANK_APPS.find(b=>b.id===app);
-  const href=bankTransferLink({app,bank,account,owner,amount:order.totals.finalTotal,memo:order.id,
+  const memo=bankTransferMemo(order.id);
+  const href=bankTransferLink({app,bank,account,owner,amount:order.totals.finalTotal,memo,
     returnUrl:typeof location!=='undefined'?`${location.origin}/?payment=return&orderId=${encodeURIComponent(order.id)}`:undefined});
   return <div className="space-y-3 pt-3 border-t border-white/10 text-left">
     <label className="store-label">Ngân hàng bạn dùng để chuyển tiền
@@ -20,7 +21,7 @@ export default function BankAppPayment({bank,account,owner,order}) {
       if(!mobile){e.preventDefault();setNotice('Trên máy tính, dùng điện thoại quét QR phía trên để điền đủ thông tin chuyển khoản.');}
     }}>Mở {selected.name}{selected.autofill?' với thông tin chuyển khoản':''}</a>:<p className="text-amber-200 text-xs">Chưa tạo được link cho ngân hàng nhận này. Hãy dùng mã QR phía trên.</p>}
     <p className="text-xs text-slate-300">{selected.autofill?'App hỗ trợ điền sẵn người nhận, số tiền và nội dung đơn. Kiểm tra lại các thông tin trước khi xác nhận.':'App này chưa được xác nhận hỗ trợ điền sẵn qua link. Lưu/chụp mã QR phía trên, rồi chọn quét QR từ ảnh trong app ngân hàng.'}</p>
-    <p className="text-xs text-slate-400">Nếu app chỉ mở trang chủ sau khi đăng nhập, quay lại đây và bấm mở lần nữa hoặc quét QR. Giữ nguyên nội dung {order.id} để hệ thống đối soát.</p>
+    <p className="text-xs text-slate-400">Nội dung chuyển khoản: <strong className="font-mono text-emerald-300">{memo||'EMO'}</strong>. Hệ thống tự đối soát về đơn {order.id}.</p>
     {notice&&<p role="status" className="text-xs text-amber-200">{notice}</p>}
   </div>;
 }

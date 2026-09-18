@@ -19,12 +19,22 @@ export default async function handler(req,res){
   if(!Number.isSafeInteger(body.id)||body.id<=0||!Number.isSafeInteger(body.transferAmount)||body.transferAmount<=0||body.transferAmount>1e12||typeof body.content!=='string'||body.content.length>2000||typeof body.accountNumber!=='string'||!['in','out'].includes(body.transferType))return send(400,{success:false});
   if(body.transferType!=='in')return send(200,{success:true});
   if(body.accountNumber.trim()!==account)return send(400,{success:false,error:'Account mismatch'});
-  // Reject ambiguous references. Banks may remove the hyphen or alter case.
-  const ids=[...new Set([...body.content.toUpperCase().matchAll(/\bEMO[- ]?([A-F0-9]{28})\b/g)].map(m=>'EMO-'+m[1].toLowerCase()))];
+  // BIDV accepts only alphanumeric notes up to 23 chars. Resolve short EMO
+  // references to the full order id before calling the payment RPC.
+  const refs=[...new Set([...body.content.toUpperCase().matchAll(/\bEMO[- ]?([A-F0-9]{20,32})\b/g)].map(m=>'EMO'+m[1]))];
   const reference=body.referenceCode||'';
   if(typeof reference!=='string'||reference.length>200)return send(400,{success:false});
   const client=createClient(base,key,{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(url,options)=>fetch(url,{...options,signal:AbortSignal.timeout(15000)})}});
-  const {error,data}=await client.rpc('rpc_receive_bank_payment',{p_provider_id:body.id,p_test:mode==='test',p_reference:reference,p_account:account,p_order_id:ids.length===1?ids[0]:null,p_amount:body.transferAmount,p_content:body.content});
+  let orderId=null;
+  if(refs.length===1){
+    const ref=refs[0].replace(/^EMO/,'');
+    if(ref.length>=28) orderId=`EMO-${ref.toLowerCase()}`;
+    else {
+      const {data:matches,error:lookupError}=await client.from('orders').select('id').ilike('id',`EMO-${ref}%`).limit(2);
+      if(!lookupError&&matches?.length===1)orderId=matches[0].id;
+    }
+  }
+  const {error,data}=await client.rpc('rpc_receive_bank_payment',{p_provider_id:body.id,p_test:mode==='test',p_reference:reference,p_account:account,p_order_id:orderId,p_amount:body.transferAmount,p_content:body.content});
   if(error||!data?.success)return send(503,{success:false,error:'Payment could not be saved; retry required'});
   return send(200,{success:true});
  }catch{return send(503,{success:false,error:'Payment service temporarily unavailable'});}

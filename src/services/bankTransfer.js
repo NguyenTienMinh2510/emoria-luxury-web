@@ -16,10 +16,17 @@ export const BANK_APPS = [
   {id:'vpb',name:'VPBank'}, {id:'vba',name:'Agribank'},
   {id:'cake',name:'Cake'}, {id:'timo',name:'Timo'},
 ];
+// BIDV's deeplink rejects punctuation and long notes. Keep a deterministic,
+// alphanumeric reference (23 chars max) and resolve it to the full EMO id on
+// the server webhook. The full order id remains visible in the confirmation.
+export function bankTransferMemo(orderId) {
+  const compact=String(orderId||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  return /^EMO[A-Z0-9]{20,32}$/.test(compact)?compact.slice(0,23):null;
+}
 export function bankTransferLink({app,bank,account,owner,amount,memo,returnUrl}) {
   const code = BANK_CODES[String(bank).trim()] || Object.values(BANK_CODES).find(c=>c===String(bank).toLowerCase());
   if (!code || !BANK_APPS.some(b=>b.id===app) || !/^[a-zA-Z0-9]+$/.test(account || '') ||
-      !Number.isSafeInteger(amount) || amount<=0 || !/^EMO-[a-zA-Z0-9-]+$/.test(memo || '') || !owner?.trim()) return null;
+      !Number.isSafeInteger(amount) || amount<=0 || !/^EMO[A-Z0-9]{20}$/.test(memo || '') || !owner?.trim()) return null;
   const params = new URLSearchParams({app,ba:`${account}@${code}`,am:String(amount),tn:memo,bn:owner.trim()});
   // Return navigation is never proof of payment. SePay alone verifies the transfer.
   if (returnUrl) {

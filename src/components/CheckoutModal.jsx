@@ -9,6 +9,7 @@ import {readPendingCheckout,savePendingCheckout,clearPendingCheckout} from '../s
 import PaymentStatus from './PaymentStatus';
 import BankAppPayment from './BankAppPayment';
 import { getMyProfile, updateMyProfile } from '../services/profileService';
+import { bankTransferMemo } from '../services/bankTransfer';
 
 const BANK_BIN_NAMES = {
   '970418': 'BIDV',
@@ -259,7 +260,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                         <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white/5 border border-white/10 text-center">
                           <img
-                            src={`https://img.vietqr.io/image/${encodeURIComponent(bankName)}-${encodeURIComponent(bankAccount)}-compact2.png?amount=${completedOrder.totals?.finalTotal || ''}&addInfo=${encodeURIComponent(completedOrder.id)}&accountName=${encodeURIComponent(bankOwner)}`}
+                            src={`https://img.vietqr.io/image/${encodeURIComponent(bankName)}-${encodeURIComponent(bankAccount)}-compact2.png?amount=${completedOrder.totals?.finalTotal || ''}&addInfo=${encodeURIComponent(bankTransferMemo(completedOrder.id)||completedOrder.id)}&accountName=${encodeURIComponent(bankOwner)}`}
                             alt="VietQR Chuyển Khoản"
                             className="w-40 h-40 rounded-xl bg-white p-2 shadow-lg object-contain"
                             loading="lazy"
@@ -283,12 +284,13 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                           <div>Chủ TK: <strong className="text-white">{bankOwner}</strong></div>
                           <div>Số tiền: <strong className="text-white font-bold text-sm">{completedOrder.totals.formattedTotal}</strong></div>
                           <div className="flex items-center gap-2">
-                            <span>Nội dung: <strong className="font-mono text-emerald-400 font-bold">{completedOrder.id}</strong></span>
+                            <span>Nội dung: <strong className="font-mono text-emerald-400 font-bold">{bankTransferMemo(completedOrder.id)||completedOrder.id}</strong></span>
                             <button
                               type="button"
                               onClick={() => {
-                                navigator.clipboard.writeText(completedOrder.id);
-                                alert('Đã sao chép mã đơn: ' + completedOrder.id);
+                                const memo=bankTransferMemo(completedOrder.id)||completedOrder.id;
+                                navigator.clipboard.writeText(memo);
+                                alert('Đã sao chép nội dung chuyển khoản: ' + memo);
                               }}
                               className="p-1 text-slate-400 hover:text-white"
                               title="Sao chép mã đơn"

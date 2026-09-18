@@ -18,6 +18,7 @@ for(const amount of [-1,0,1.5,Number.MAX_SAFE_INTEGER,'100000'])assert.equal((aw
 assert.equal((await invoke('{invalid')).statusCode,400);
 assert.equal((await invoke(payload)).statusCode,200);assert.equal(calls.at(-1).p_order_id,order);assert.equal(calls.at(-1).p_test,true);
 await invoke({...payload,content:order.replace('-','').toUpperCase()});assert.equal(calls.at(-1).p_order_id,order);
+await invoke({...payload,content:'Thanh toan EMO'+ 'a'.repeat(20)});assert.equal(calls.at(-1).p_order_id,null);
 await invoke({...payload,content:`${order} EMO-${'b'.repeat(28)}`});assert.equal(calls.at(-1).p_order_id,null);
 await invoke({...payload,content:'No order reference'});assert.equal(calls.at(-1).p_order_id,null);
 globalThis.fetch=async()=>new Response(JSON.stringify({message:'DB failed'}),{status:500});
