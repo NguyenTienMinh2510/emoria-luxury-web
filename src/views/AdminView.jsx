@@ -7,6 +7,7 @@ import {
   BookOpen, MessageSquare, Plus, Trash2, Check, EyeOff, FileText, Send,
   ArrowLeft, LogOut, ExternalLink, Sparkles, ChevronRight, Store, BarChart3
 } from 'lucide-react';
+import CommentModeration from '../components/CommentModeration';
 import MarketingPanel from '../components/MarketingPanel';
 import NfcOperations, { OrderGiftSetup } from '../components/NfcOperations';
 import PaymentStatus from '../components/PaymentStatus';
@@ -71,7 +72,7 @@ export default function AdminView({
     status: 'draft',
     allow_comments: true
   });
-  const [pendingCommentsList, setPendingCommentsList] = useState([]);
+  const [adminComments, setAdminComments] = useState([]);
 
   // Load orders & system data
   const loadData = async () => {
@@ -90,7 +91,7 @@ export default function AdminView({
       const editorial = await getArticleAdminData();
       if (editorial && editorial.success) {
         setAdminArticles(editorial.articles || []);
-        setPendingCommentsList(editorial.comments || []);
+        setAdminComments(editorial.comments || []);
       }
     } catch (e) {
       console.warn('Could not load editorial admin data:', e);
@@ -198,7 +199,7 @@ export default function AdminView({
   const handleModerateComment = async (commentId, nextStatus) => {
     const res = await moderateArticleComment(commentId, nextStatus);
     if (res.success) {
-      setPendingCommentsList(prev => prev.filter(c => c.id !== commentId));
+      setAdminComments(prev => nextStatus === 'deleted' ? prev.filter(c => c.id !== commentId) : prev.map(c => c.id === commentId ? {...c, status:nextStatus} : c));
       setSaveMessage(`Đã ${nextStatus === 'approved' ? 'phê duyệt' : nextStatus === 'hidden' ? 'ẩn' : 'xóa'} bình luận.`);
       setTimeout(() => setSaveMessage(''), 3000);
     } else {
@@ -254,7 +255,7 @@ export default function AdminView({
     { id: 'nfc', label: 'Kỷ Vật & Chip NFC', icon: SmartphoneNfc },
     { id: 'settings', label: 'Cấu Hình Cửa Hàng', icon: Settings },
     { id: 'articles', label: 'Tạp Chí & Bài Viết', icon: BookOpen },
-    { id: 'moderation', label: 'Duyệt Bình Luận', icon: MessageSquare, badge: pendingCommentsList.length },
+    { id: 'moderation', label: 'Duyệt Bình Luận', icon: MessageSquare, badge: adminComments.filter(c => c.status === 'pending').length },
   ];
 
   return (
@@ -692,59 +693,7 @@ export default function AdminView({
 
           {/* 6. MODERATION TAB */}
           {activeTab === 'moderation' && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="font-serif text-2xl font-bold text-white">Kiểm Duyệt Bình Luận Cộng Đồng</h2>
-                <p className="text-xs text-slate-400 mt-1">Phê duyệt hoặc ẩn các bình luận của độc giả trên các bài viết Tạp chí.</p>
-              </div>
-
-              {pendingCommentsList.length === 0 ? (
-                <div className="p-12 text-center border border-dashed border-white/15 rounded-2xl bg-white/[0.02]">
-                  <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
-                  <p className="text-sm text-slate-300 font-semibold">Tất cả bình luận đã được xử lý sạch sẽ!</p>
-                  <p className="text-xs text-slate-500 mt-1">Không có bình luận nào đang chờ phê duyệt.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {pendingCommentsList.map((comm) => (
-                    <div 
-                      key={comm.id}
-                      className="p-4 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white">{comm.author_name}</span>
-                          <span className="text-slate-500 font-mono text-[10px]">
-                            {new Date(comm.created_at).toLocaleString('vi-VN')}
-                          </span>
-                        </div>
-                        <p className="text-slate-300 mt-1">{comm.content}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleModerateComment(comm.id, 'approved')}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold border border-emerald-500/30 cursor-pointer"
-                        >
-                          Duyệt
-                        </button>
-                        <button
-                          onClick={() => handleModerateComment(comm.id, 'hidden')}
-                          className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 font-semibold cursor-pointer"
-                        >
-                          Ẩn
-                        </button>
-                        <button
-                          onClick={() => handleModerateComment(comm.id, 'deleted')}
-                          className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 font-semibold border border-red-500/30 cursor-pointer"
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <CommentModeration comments={adminComments} onModerate={handleModerateComment} />
           )}
         </div>
 

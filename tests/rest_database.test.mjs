@@ -73,8 +73,18 @@ try {
   assert.ok((await ok('/me/saved-articles','GET',undefined,'viewer')).articles.some(a=>a.id===articleId));
   const comment=(await ok('/articles/'+articleId+'/comments','POST',{content:'REST comment'},'viewer')).comment_id;
   assert.ok((await request('/comments/'+comment,'PATCH',{content:'Hijack'},'owner')).status>=400);
+  assert.ok(!(await ok('/articles/'+slug)).comments.some(c=>c.id===comment),'Pending comments must not be public');
+  const listed=(await ok('/admin/articles','GET',undefined,'admin')).comments.find(c=>c.id===comment);
+  assert.equal(listed.article_id,articleId);assert.equal(listed.article_slug,slug);
+  assert.equal(listed.article_title,article.title);assert.equal(listed.article_status,'published');assert.equal(listed.status,'pending');
+  await ok('/admin/comments/'+comment+'/status','PATCH',{status:'approved'},'admin');
+  assert.ok((await ok('/articles/'+slug)).comments.some(c=>c.id===comment&&c.status==='approved'),'Approved comments must be visible to guests');
+  assert.equal((await ok('/admin/articles','GET',undefined,'admin')).comments.find(c=>c.id===comment).status,'approved');
+  await ok('/admin/comments/'+comment+'/status','PATCH',{status:'hidden'},'admin');
+  assert.ok(!(await ok('/articles/'+slug)).comments.some(c=>c.id===comment),'Hidden comments must not be public');
   await ok('/admin/comments/'+comment+'/status','PATCH',{status:'approved'},'admin');
   await ok('/comments/'+comment,'DELETE',{},'viewer');
+  assert.ok(!(await ok('/articles/'+slug)).comments.some(c=>c.id===comment),'Deleted comments must not be public');
   const insert=await root.from('memory_spaces').insert({tag_uid:tag,jewelry_name:'REST fixture',title:'REST memory',owner_id:accounts.users.find(u=>u.role==='owner').id,is_protected:true,letter:'Private fixture'});assert.ifError(insert.error);
   assert.equal((await ok('/memories/'+tag+'/access','POST',{})).letter,null);
   assert.equal((await ok('/memories/'+tag+'/access','POST',{},'admin')).letter,null);

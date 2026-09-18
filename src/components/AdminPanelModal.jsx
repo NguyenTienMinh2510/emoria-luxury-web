@@ -6,6 +6,7 @@ import {
   Settings, UserCheck, Eye, Edit3, Lock, Unlock, Database,
   BookOpen, MessageSquare, Plus, Trash2, Check, EyeOff, FileText, Send
 } from 'lucide-react';
+import CommentModeration from './CommentModeration';
 import MarketingPanel from './MarketingPanel';
 import NfcOperations,{OrderGiftSetup} from './NfcOperations';
 import ShipmentEditor from './ShipmentEditor';
@@ -63,7 +64,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
     status: 'draft',
     allow_comments: true
   });
-  const [pendingCommentsList,setPendingCommentsList]=useState([]);
+  const [adminComments,setAdminComments]=useState([]);
 
   // Load orders & memories on open
   const loadData = async () => {
@@ -78,7 +79,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
       setIsLoadingOrders(false);
     }
     const editorial = await getArticleAdminData();
-    if(editorial.success){setAdminArticles(editorial.articles);setPendingCommentsList(editorial.comments);}else setSaveMessage(editorial.message);
+    if(editorial.success){setAdminArticles(editorial.articles);setAdminComments(editorial.comments);}else setSaveMessage(editorial.message);
     setMemories([]);
     setSystemConfig(getSystemAvailability());
   };
@@ -169,7 +170,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
   const handleModerateComment = async (commentId, nextStatus) => {
     const res = await moderateArticleComment(commentId, nextStatus);
     if (res.success) {
-      setPendingCommentsList(prev => prev.filter(c => c.id !== commentId));
+      setAdminComments(prev => nextStatus === 'deleted' ? prev.filter(c => c.id !== commentId) : prev.map(c => c.id === commentId ? {...c, status:nextStatus} : c));
       setSaveMessage(`Đã ${nextStatus === 'approved' ? 'phê duyệt' : nextStatus === 'hidden' ? 'ẩn' : 'xóa'} bình luận.`);
       setTimeout(() => setSaveMessage(''), 3000);
     } else {
@@ -225,7 +226,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
       message: nextStatus === 'timed_lock' ? 'Đang niêm phong đến ngày kỷ niệm' : 'Khả dụng bình thường',
     });
     const editorial = await getArticleAdminData();
-    if(editorial.success){setAdminArticles(editorial.articles);setPendingCommentsList(editorial.comments);}else setSaveMessage(editorial.message);
+    if(editorial.success){setAdminArticles(editorial.articles);setAdminComments(editorial.comments);}else setSaveMessage(editorial.message);
     setMemories([]);
     if (onRefresh) onRefresh();
   };
@@ -313,7 +314,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
               }`}
             >
               <MessageSquare className="w-4 h-4" />
-              <span>Duyệt Bình Luận ({pendingCommentsList.length})</span>
+              <span>Duyệt Bình Luận ({adminComments.filter(c => c.status === 'pending').length})</span>
             </button>
 
             <button
@@ -682,73 +683,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
 
           {/* ================= TAB: COMMENTS MODERATION ================= */}
           {activeTab === 'moderation' && (
-            <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                <div>
-                  <h3 className="font-bold text-white text-sm">Kiểm Duyệt Bình Luận Bài Viết</h3>
-                  <p className="text-slate-400 text-[11px] mt-0.5">Duyệt trước để bảo đảm văn phong cao cấp cho không gian EMORIA</p>
-                </div>
-                <span className="px-3 py-1 rounded-full bg-white/10 text-slate-200 font-mono text-[11px]">
-                  {pendingCommentsList.length} bình luận chờ duyệt
-                </span>
-              </div>
-
-              {pendingCommentsList.length === 0 ? (
-                <div className="text-center py-12 rounded-2xl bg-black/30 border border-white/10">
-                  <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
-                  <p className="text-white font-medium text-xs">Tất cả bình luận đã được xử lý</p>
-                  <p className="text-[11px] text-slate-400 mt-1">Không có phản hồi nào đang chờ kiểm duyệt lúc này.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {pendingCommentsList.map((comm) => (
-                    <div
-                      key={comm.id}
-                      className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span className="font-bold text-white text-xs">{comm.author_name}</span>
-                          <span className="text-[10px] text-slate-400 ml-2">bình luận trên bài: <strong className="text-slate-300">{comm.article_title}</strong></span>
-                          <span className="text-[10px] text-slate-500 block">{comm.created_at}</span>
-                        </div>
-                        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                          Chờ Duyệt
-                        </span>
-                      </div>
-
-                      <p className="p-3 rounded-xl bg-white/5 border border-white/5 text-slate-200 leading-relaxed font-light">
-                        "{comm.content}"
-                      </p>
-
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
-                        <button
-                          onClick={() => handleModerateComment(comm.id, 'deleted')}
-                          className="px-3 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Xóa Bỏ</span>
-                        </button>
-                        <button
-                          onClick={() => handleModerateComment(comm.id, 'hidden')}
-                          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <EyeOff className="w-3.5 h-3.5" />
-                          <span>Ẩn Bài</span>
-                        </button>
-                        <button
-                          onClick={() => handleModerateComment(comm.id, 'approved')}
-                          className="px-4 py-1.5 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-md"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Phê Duyệt</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <CommentModeration comments={adminComments} onModerate={handleModerateComment} />
           )}
 
           {/* ================= TAB 4: SCHEMA & RLS ================= */}

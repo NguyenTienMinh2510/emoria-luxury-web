@@ -64,6 +64,11 @@ export default function ArticleDetailView({
     return () => { active = false; };
   }, [slug,currentUser]);
 
+  useEffect(() => {
+    if (!article || window.location.hash !== '#comments') return;
+    document.getElementById('comments')?.scrollIntoView({block:'start'});
+  }, [article]);
+
   const refreshComments=async()=>{const res=await getArticleDetail(slug);if(res.success)setComments(res.comments||[]);};
   const handleLike=async()=>{
     if(!currentUser){onOpenAuth?.();return;}if(!article||reactionBusy)return;setReactionBusy(true);
@@ -363,7 +368,7 @@ export default function ArticleDetailView({
         )}
 
         {/* COMMENTS SECTION */}
-        <section className="p-8 rounded-3xl bg-black/50 border border-white/10 backdrop-blur-2xl shadow-2xl">
+        <section id="comments" className="scroll-mt-28 p-4 sm:p-8 rounded-3xl bg-black/50 border border-white/10 backdrop-blur-2xl shadow-2xl">
           <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-slate-300" />

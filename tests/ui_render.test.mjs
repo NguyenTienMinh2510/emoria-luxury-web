@@ -35,4 +35,19 @@ assert.ok(bankHtml.includes('ba=00123456789%40bidv'));
 assert.ok(bankHtml.includes(`tn=${memo}`));
 assert.ok(bankHtml.includes('Hỗ trợ điền sẵn'));
 assert.ok(bankHtml.includes('Quét QR trong app'));
+const {default:CommentModeration}=await compile('src/components/CommentModeration.jsx','comment-moderation');
+const moderationHtml=render(CommentModeration,{onModerate:()=>{},comments:[
+ {id:'pending',article_title:'Bài NFC',article_slug:'bai-nfc',article_status:'published',author_name:'Khách',created_at:'2026-09-18T00:00:00Z',content:'Chưa duyệt',status:'pending'},
+ {id:'approved',article_title:'Bài NFC',article_slug:'bai-nfc',article_status:'published',author_name:'Khách',created_at:'2026-09-18T00:00:00Z',content:'Đã công khai',status:'approved'},
+ {id:'hidden',article_title:'Bản nháp',article_slug:'draft',article_status:'draft',author_name:'Khách',created_at:'2026-09-18T00:00:00Z',content:'Ẩn',status:'hidden'},
+ {id:'reply',parent_id:'hidden',article_title:'Bản nháp',article_status:'draft',created_at:'2026-09-18T00:00:00Z',content:'Phản hồi',status:'approved'},
+]});
+assert.ok(moderationHtml.includes('Chờ duyệt (1)'));
+assert.ok(moderationHtml.includes('Đã duyệt (2)'));
+assert.ok(moderationHtml.includes('Đã ẩn (1)'));
+assert.ok(moderationHtml.includes('/?article=bai-nfc#comments'));
+assert.ok(!moderationHtml.includes('/?article=draft'));
+assert.ok(moderationHtml.includes('bình luận gốc cần được duyệt'));
+assert.match(moderationHtml, /<button[^>]*disabled=""[^>]*>Duyệt<\/button>/);
+assert.ok(render(CommentModeration,{comments:[],onModerate:()=>{}}).includes('Không có bình luận trong mục này.'));
 console.log('PASS render: login/register disappear for authenticated user; charts handle empty/zero/90-day data with readable table. This is a render check, not a mobile browser test.');
