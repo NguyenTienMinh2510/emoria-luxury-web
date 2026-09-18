@@ -3,6 +3,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
 import React from 'react';
+import {bankTransferMemo} from '../src/services/bankTransfer.js';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {build} from 'esbuild';
 const target=path.resolve('.local/ui-render');fs.mkdirSync(target,{recursive:true});
@@ -27,9 +28,11 @@ for(const rows of [[{label:'01/09',value:0}],Array.from({length:90},(_,i)=>({lab
 }
 assert.ok(render(Bars,{rows:[{label:'Điện thoại',value:0}],label:'Người dùng'}).includes('width:0%'));
 const {default:BankAppPayment}=await compile('src/components/BankAppPayment.jsx','bank-payment');
-const bankHtml=render(BankAppPayment,{bank:'970418',account:'00123456789',owner:'TEST ONLY',order:{id:'EMO-fixture',totals:{finalTotal:123000}}});
+const fixtureOrderId='EMO-1234567890ABCDEF1234567890ABCDEF';
+const memo=bankTransferMemo(fixtureOrderId);
+const bankHtml=render(BankAppPayment,{bank:'970418',account:'00123456789',owner:'TEST ONLY',order:{id:fixtureOrderId,totals:{finalTotal:123000}}});
 assert.ok(bankHtml.includes('ba=00123456789%40bidv'));
-assert.ok(bankHtml.includes('tn=EMO-fixture'));
+assert.ok(bankHtml.includes(`tn=${memo}`));
 assert.ok(bankHtml.includes('Hỗ trợ điền sẵn'));
 assert.ok(bankHtml.includes('Quét QR trong app'));
 console.log('PASS render: login/register disappear for authenticated user; charts handle empty/zero/90-day data with readable table. This is a render check, not a mobile browser test.');
