@@ -1,4 +1,6 @@
 import {apiRequest} from '../services/apiClient.js';
+import NfcTools from '../components/NfcTools';
+import VideoLabelEditor from '../components/VideoLabelEditor';
 import MemoryMediaEditor from '../components/MemoryMediaEditor';
 import MemoryMovieEditor from '../components/MemoryMovieEditor';
 import MemoryCinema from '../components/MemoryCinema';
@@ -24,6 +26,7 @@ import {
 export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToHome, onNavigateToShop, currentUser, onOpenAuth, onSelectTag }) {
   const {settings}=useStore();
   const [editMedia,setEditMedia]=useState([]);
+  const [videoConsent,setVideoConsent]=useState(false);
   const [tagInput,setTagInput]=useState('');
   const [introPath,setIntroPath]=useState(''),[extraLetters,setExtraLetters]=useState([]),[movieBusy,setMovieBusy]=useState(false),[movieDone,setMovieDone]=useState(false),[studioError,setStudioError]=useState(''),[guestEntries,setGuestEntries]=useState([]);
   const loadSequence=useRef(0);
@@ -252,7 +255,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
           </button>
         )}
       </div>
-      <h1 className="font-serif text-4xl">Kỷ vật của bạn</h1>
+      <h1 className="font-serif text-4xl">Kỷ vật của bạn</h1><NfcTools onRead={tag=>{setCurrentTag(tag);onSelectTag?.(tag);}} />
       <p className="text-slate-400">Chuẩn bị món quà theo ba bước: nhận quyền bằng mã trong đơn hàng, thêm video và thư tay, rồi xem thử trước khi tặng.</p>
       {!currentUser&&<button className="store-button" onClick={onOpenAuth}>Đăng nhập để chuẩn bị quà</button>}
       <div className="grid sm:grid-cols-2 gap-4">
@@ -307,6 +310,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   return (
     <div className="w-full min-h-screen bg-dark-950 text-slate-100 pt-24 pb-24 selection:bg-white/20">
       
+      {memoryData.media_warning&&<p role="status" className="max-w-4xl mx-auto px-4 py-3 mb-4 text-sm text-amber-200">{memoryData.media_warning}</p>}
       {/* 0. Top Back Bar */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-4 flex items-center justify-between">
         {onNavigateToHome ? (
@@ -328,6 +332,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         )}
       </div>
 
+      <details className="max-w-5xl mx-auto px-4 sm:px-6 mb-4"><summary className="cursor-pointer text-sm">Mở kỷ vật khác bằng NFC</summary><NfcTools onRead={tag=>{setCurrentTag(tag);onSelectTag?.(tag);}} /></details>
       {/* 1. Header Toolbar */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
@@ -374,6 +379,8 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             {/* If Owner or Admin: Show Studio Button. If Not: Show Claim Chip Button */}
             {(memoryData.is_owner || memoryData.is_admin) ? (
               <button
+                disabled={!!memoryData.media_warning}
+                title={memoryData.media_warning?'Hãy chờ media tải đầy đủ trước khi chỉnh sửa.':undefined}
                 onClick={() => {
                   setEditTitle(memoryData.title || '');
                   setEditAuthor(memoryData.author || '');
@@ -625,7 +632,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end pointer-events-none">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end pointer-events-none">
                       <p className="text-[11px] text-white line-clamp-2">{media.caption}</p>
                     </div>
                   </div>
@@ -822,7 +829,8 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </div>
 
             <form onSubmit={handleSaveEditor} className="space-y-4 text-xs">
-              <MemoryMovieEditor tag={currentTag} path={introPath} onChange={setIntroPath} onBusy={setMovieBusy}/>
+              <label className="flex gap-3 items-start p-4 rounded-xl border border-white/15 text-sm"><input type="checkbox" checked={videoConsent} disabled={movieBusy} onChange={e=>setVideoConsent(e.target.checked)}/><span>Tôi đồng ý gửi hình ảnh và âm thanh trong video tải lên cho Google Gemini để kiểm duyệt. Video vi phạm sẽ bị từ chối; quản trị viên xem được lịch sử tải, nhãn và lý do kiểm duyệt.</span></label>
+              <MemoryMovieEditor tag={currentTag} path={introPath} onChange={setIntroPath} onBusy={setMovieBusy} videoConsent={videoConsent}/>
               <div>
                 <label className="text-slate-300 font-semibold block mb-1">Tiêu đề kỷ niệm:</label>
                 <input
@@ -900,7 +908,8 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               </div>
 
               <section className="space-y-3"><h4 className="font-serif text-lg">02 · Những lá thư bổ sung</h4>{extraLetters.map((letter,index)=><div key={index} className="space-y-2 p-3 border border-white/10 rounded-xl"><label className="store-label">Tiêu đề thư<input className="store-input" required maxLength={200} value={letter.title} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,title:e.target.value}:x))}/></label><label className="store-label">Nội dung<textarea className="store-input" required maxLength={10000} rows={5} value={letter.body} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,body:e.target.value}:x))}/></label><button type="button" onClick={()=>setExtraLetters(prev=>prev.filter((_,i)=>i!==index))}>Gỡ thư</button></div>)}<button type="button" disabled={extraLetters.length>=10} className="store-button" onClick={()=>setExtraLetters(prev=>[...prev,{title:'Một lời nhắn dành cho bạn',body:''}])}>Thêm thư tay</button></section>
-              <MemoryMediaEditor tag={currentTag} items={editMedia} onChange={setEditMedia} audio={editAudioUrl} onAudio={setEditAudioUrl} onBusy={setMovieBusy}/>
+              <MemoryMediaEditor tag={currentTag} items={editMedia} onChange={setEditMedia} audio={editAudioUrl} onAudio={setEditAudioUrl} onBusy={setMovieBusy} videoConsent={videoConsent}/>
+              <VideoLabelEditor key={currentTag} tag={currentTag} items={editMedia} introPath={introPath} onBusy={setMovieBusy} consent={videoConsent} refreshKey={movieBusy} onApproved={path=>setEditMedia(prev=>prev.some(m=>m.path===path)?prev:[...prev,{path,type:'video',caption:'Video đã kiểm duyệt'}])}/>
               <details className="p-4 border border-white/10 rounded-xl" open><summary className="cursor-pointer font-semibold text-slate-200">Quản lý sổ lưu niệm ({guestEntries.length} lời nhắn)</summary>
                 <div className="space-y-3 mt-3">
                   {guestEntries.map(entry => (

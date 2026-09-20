@@ -1,5 +1,6 @@
 {
   "buildCommand": "npm run test:ci && npm run build",
+  "functions": {"api/v1.js": {"maxDuration": 180}},
   "rewrites": [
     { "source": "/api/v1/:resource*", "destination": "/api/v1?resource=:resource*" },
     { "source": "/api/sepay-webhook", "destination": "/api/sepay-webhook" },

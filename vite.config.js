@@ -8,6 +8,8 @@ import restHandler from './api/v1.js';
 // https://vitejs.dev/config/ - updated for local sandbox
 export default defineConfig(({mode}) => {
   const env=loadEnv(mode,process.cwd(),'');
+  if(env.GEMINI_API_KEY!==undefined)process.env.GEMINI_API_KEY=env.GEMINI_API_KEY;
+  if(env.GEMINI_VIDEO_MODEL!==undefined)process.env.GEMINI_VIDEO_MODEL=env.GEMINI_VIDEO_MODEL;
   for(const key of ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY','VITE_SUPABASE_PUBLISHABLE_KEY','GA4_PROPERTY_ID','GA4_SERVICE_ACCOUNT_JSON','SUPABASE_SERVICE_ROLE_KEY','SEPAY_WEBHOOK_KEY','SEPAY_ACCOUNT_NUMBER','SEPAY_MODE']) if(env[key]!==undefined)process.env[key]=env[key];
   return {
   plugins: [react(),{name:'emoria-api',configureServer(server){

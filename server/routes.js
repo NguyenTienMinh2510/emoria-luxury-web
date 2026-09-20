@@ -1,11 +1,26 @@
 // Explicit resource routes. SQL functions remain the transaction boundary.
 import {normalizeCheckout} from '../src/services/checkoutPayload.js';
+import {analyzeVideo,readVideoLabels,readVideoUploads} from './videoLabels.js';
 const route=(method,path,access,run,status)=>({method,pattern:new RegExp(`^${path}$`),access,run,status});
 const rpc=(c,name,args={})=>c.db(c.client.rpc(name,args));
 const integer=(value,fallback,max=10000)=>{const n=Number(value??fallback);if(!Number.isInteger(n)||n<0||n>max)throw Object.assign(new Error('Tham số phân trang không hợp lệ.'),{status:400});return n;};
 const pick=(body,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(body,k)).map(k=>[k,body[k]]));
 const settingKeys=['sandbox','sales_enabled','cod_enabled','transfer_enabled','shipping_fee','free_shipping_from','gift_fee','reservation_minutes','bank_bin','bank_account','bank_owner','contact_email','contact_phone','address','ga4_measurement_id','shipping_policy','return_policy','privacy_policy'];
 export const routes=[
+  route('GET','/admin/video-uploads','admin',c=>{
+    const page=integer(c.query.get('page'),0),status=c.query.get('status');
+    let query=c.client.from('video_upload_events').select('id,created_at,user_id,author_name,tag,path,status,labels,violations,reason,model,policy_version').order('created_at',{ascending:false}).order('id',{ascending:false});
+    if(status){if(!['uploaded','processing','ready','rejected','failed'].includes(status))throw Object.assign(new Error('Trạng thái không hợp lệ.'),{status:400});query=query.eq('status',status);}
+    const user=c.query.get('user'),raw=c.query.get('search')||'';
+    const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if(user){if(!uuid.test(user))throw Object.assign(new Error('User ID không hợp lệ.'),{status:400});query=query.eq('user_id',user);}
+    const term=raw.normalize('NFC').replace(/[^\p{L}\p{M}\p{N} -]/gu,' ').replace(/\s+/g,' ').trim().slice(0,120);
+    if(term)query=uuid.test(term)?query.eq('user_id',term):query.or(`author_name.ilike.%${term}%,tag.ilike.%${term}%`);
+    return c.db(query.range(page*25,page*25+24));
+  }),
+  route('POST','/memories/([^/]+)/video-labels/analyze','user',analyzeVideo),
+  route('POST','/memories/([^/]+)/video-labels/read','admin',readVideoLabels),
+  route('GET','/memories/([^/]+)/video-uploads','user',readVideoUploads),
   route('GET','/system/status','public',c=>rpc(c,'rpc_get_system_status')),
   route('GET','/me/session','user',async c=>{
     const [isAdmin,profile]=await Promise.all([rpc(c,'is_admin'),c.db(c.client.from('profiles').select('full_name, phone, birthday, gender, address, bio, avatar_url').eq('id',c.user.id).maybeSingle())]);

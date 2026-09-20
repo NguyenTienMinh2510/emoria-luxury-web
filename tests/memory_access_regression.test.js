@@ -24,6 +24,18 @@ const scenarios = [
     assert.equal((await m.verifyMemoryPin(tag, '1000')).success, false);
     assert.equal((await m.verifyMemoryPin(tag, '2468')).success, true);
   `],
+  ['degraded media preserves letters and hides unavailable files', true, `
+    const {supabase}=await import('./src/lib/supabaseClient.js');
+    const m=await import('./src/services/memoryService.js');
+    supabase.auth.getSession=async()=>({data:{session:null}});
+    globalThis.fetch=async url=>Response.json(url==='/api/memory-media'
+      ?{urls:{},blocked:['emo-test/video'],unavailable:['emo-test/photo'],warning:'Media unavailable'}
+      :{success:true,is_unlocked:true,letter:'Private letter',intro_video_path:'emo-test/video',audio_url:'storage://emo-test/song',media_gallery:[{type:'image',url:'storage://emo-test/photo'},{type:'video',url:'storage://emo-test/video'}]});
+    const result=await m.fetchMemoryView('emo-test');
+    assert.equal(result.success,true);assert.equal(result.data.letter,'Private letter');
+    assert.deepEqual(result.data.media_gallery,[]);assert.equal(result.data.intro_video_url,null);
+    assert.equal(result.data.audio_url,undefined);assert.equal(result.data.media_warning,'Media unavailable');
+  `],
   ['configured server denial and errors never fall back', true, `
     const { supabase } = await import('./src/lib/supabaseClient.js');
     const m = await import('./src/services/memoryService.js');

@@ -28,6 +28,20 @@ for(const rows of [[{label:'01/09',value:0}],Array.from({length:90},(_,i)=>({lab
 }
 assert.ok(render(Bars,{rows:[{label:'Điện thoại',value:0}],label:'Người dùng'}).includes('width:0%'));
 const {default:BankAppPayment}=await compile('src/components/BankAppPayment.jsx','bank-payment');
+const {default:NfcTools}=await compile('src/components/NfcTools.jsx','nfc-tools');
+const nfcHtml=render(NfcTools,{tag:'emo-test'});
+assert.ok(nfcHtml.includes('https://emoria-luxury-web.vercel.app/?tag=emo-test'));
+assert.ok(nfcHtml.includes('Trình duyệt này chưa hỗ trợ'));
+assert.ok(!nfcHtml.includes('Ghi link vào chip</button>'));
+const {default:VideoLabelEditor}=await compile('src/components/VideoLabelEditor.jsx','video-labels');
+const videoHtml=render(VideoLabelEditor,{tag:'emo-test',items:[{path:'emo-test/file',type:'video',caption:'Fixture video'}]});
+assert.ok(videoHtml.includes('Video mới tự động được kiểm duyệt khi tải lên.'));
+assert.ok(!videoHtml.includes('Lọc video theo nhãn'));
+assert.ok(!videoHtml.includes('Nhãn chủ đề'));
+const {default:VideoModerationAdmin}=await compile('src/components/VideoModerationAdmin.jsx','video-admin');
+const adminVideoHtml=render(VideoModerationAdmin,{});
+assert.ok(adminVideoHtml.includes('User ID, tên tác giả hoặc mã kỷ vật'));
+assert.ok(adminVideoHtml.includes('Tìm kiếm'));
 const fixtureOrderId='EMO-1234567890ABCDEF1234567890ABCDEF';
 const memo=bankTransferMemo(fixtureOrderId);
 const bankHtml=render(BankAppPayment,{bank:'970418',account:'00123456789',owner:'TEST ONLY',order:{id:fixtureOrderId,totals:{finalTotal:123000}}});

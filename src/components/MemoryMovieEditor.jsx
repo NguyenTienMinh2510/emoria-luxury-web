@@ -1,8 +1,8 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {supabase} from '../lib/supabaseClient';
+import {uploadModeratedVideo} from '../services/videoUpload.js';
 import {inspectMovieFile, renderMemoryMovie, MOVIE_LIMITS} from '../services/memoryMovie';
 
-export default function MemoryMovieEditor({tag, path, onChange, onBusy}) {
+export default function MemoryMovieEditor({tag, path, onChange, onBusy,videoConsent=false}) {
   const [clips,setClips]=useState([]),[music,setMusic]=useState(null),[keepAudio,setKeepAudio]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState(0),[result,setResult]=useState(null),[preview,setPreview]=useState('');
   const urls=useRef(new Set()), abort=useRef(null), mounted=useRef(true);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;abort.current?.abort();urls.current.forEach(url=>URL.revokeObjectURL(url));};},[]);
@@ -13,8 +13,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy}) {
   });
   const upload=async file=>{
     if(!['video/mp4','video/webm'].includes(file?.type)||file.size>MOVIE_LIMITS.outputBytes)throw new Error('Video MP4/WebM tối đa 50 MB.');
-    const next=`${tag}/${crypto.randomUUID()}`;
-    const {error}=await supabase.storage.from('emoria-memory').upload(next,file,{contentType:file.type,upsert:false});if(error)throw error;
+    const next=await uploadModeratedVideo(tag,file,videoConsent);
     onChange(next);
   };
   const edit=(id,patch)=>setClips(prev=>prev.map(c=>c.id===id?{...c,...patch}:c));
@@ -31,7 +30,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy}) {
       {music&&<button type="button" disabled={busy} onClick={()=>setMusic(null)}>Gỡ nhạc: {music.name}</button>}
       <label className="flex gap-2 items-center"><input type="checkbox" checked={keepAudio} disabled={busy} onChange={e=>setKeepAudio(e.target.checked)}/>Giữ tiếng gốc trong clip</label>
       <button type="button" disabled={busy||!clips.length} className="store-button" onClick={()=>run(async()=>{setProgress(0);abort.current=new AbortController();const file=await renderMemoryMovie(clips,{music,keepClipAudio:keepAudio,signal:abort.current.signal,onProgress:setProgress});if(!mounted.current)return;const url=URL.createObjectURL(file);urls.current.add(url);if(preview){URL.revokeObjectURL(preview);urls.current.delete(preview);}setResult(file);setPreview(url);})}>Ghép thành video</button>
-      {busy&&<div role="status"><progress className="w-full" max="1" value={progress}/><p>Đang xử lý · {Math.round(progress*100)}%</p><button type="button" onClick={()=>abort.current?.abort()}>Hủy ghép</button></div>}
+      {busy&&<div role="status"><progress className="w-full" max="1" value={progress}/><p>Đang xử lý / kiểm duyệt · {Math.round(progress*100)}%</p><button type="button" onClick={()=>abort.current?.abort()}>Hủy ghép</button></div>}
       {result&&<div className="space-y-3"><video controls playsInline src={preview} className="w-full rounded-xl"/><p className="text-xs text-slate-400">Đã xuất {(result.size/1024/1024).toFixed(1)} MB. Xem lại trước khi gắn vào món quà.</p><a className="underline mr-4" href={preview} download={result.name}>Tải bản video</a><button type="button" disabled={busy} className="store-button" onClick={()=>run(()=>upload(result))}>Dùng làm video mở đầu</button></div>}
     </div></details>
     {error&&<p role="alert" className="text-red-300">{error}</p>}

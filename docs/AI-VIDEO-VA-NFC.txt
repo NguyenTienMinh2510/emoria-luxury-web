@@ -1,0 +1,114 @@
+EMORIA — AI VIDEO & NFC
+Cập nhật: 20/09/2026
+
+1. MODEL & HẠN MỨC
+- Mặc định server: gemini-3.7-flash, hỗ trợ video/audio và có Free Tier
+  cho request Standard. Chọn sau khi 3.8 gặp quá tải và 3.7 chạy thử thành công.
+- Ghi đè bằng GEMINI_VIDEO_MODEL; key ở GEMINI_API_KEY. Không dùng VITE_ cho
+  hai biến này hoặc SUPABASE_SERVICE_ROLE_KEY. Khởi động lại/redeploy sau khi đổi.
+- Request JSON gọn, tối đa 8 nhãn chủ đề + mã vi phạm, maxOutputTokens=2048;
+  Gemini 3 dùng thinkingLevel=low, Gemini 2.5 dùng thinkingBudget=0.
+- Một lần phân tích cho cả chủ đề và vi phạm; tái sử dụng kết quả đã lưu.
+  Giữ 20 lượt/account/ngày UTC, tối thiểu 30 giây giữa các lượt, khóa đồng thời
+  tại database. Hạn mức Google áp dụng thêm ở cấp project; không bảo đảm 20
+  lượt/account nếu quota chung đã hết. Không retry tự động khi Google 429/503,
+  không tự đổi model hoặc bật tính phí. Project có billing vẫn theo gói Google.
+- MP4/WebM tối đa 50 MB. <=10 MB gửi inline, lớn hơn dùng Google Files API,
+  DELETE trong finally cả thành công lẫn thất bại. Google có thời hạn lưu tạm
+  nếu mạng làm cleanup thất bại. Function giới hạn 180 giây; thử clip ngắn hơn
+  nếu hết thời gian. Không tự cắt bỏ đoạn video để giảm quota kiểm duyệt.
+- Free Tier có điều khoản sử dụng dữ liệu để cải thiện sản phẩm của Google.
+  Chủ kỷ vật phải đồng ý gửi hình ảnh/âm thanh trước khi tải video để kiểm duyệt.
+
+2. LUỒNG NGƯỜI MUA / NGƯỜI NHẬN
+- Người mua mở Kỷ vật > Studio > đồng ý > tải video hoặc ghép phim.
+  Hệ thống tự kiểm duyệt; chỉ video đạt mới được thêm vào kỷ vật.
+  Bấm Lưu thay đổi để người nhận thấy nội dung mới.
+- Lỗi kỹ thuật, hết quota, quá tải không bị tính là vi phạm; video chờ kiểm duyệt
+  và có thể thử lại trong phần Kết quả kiểm duyệt video.
+- Người nhận mở link/NFC, nhập PIN nếu có, xem phim mở quà rồi đọc thư, nghe nhạc.
+- Người mua và người nhận KHÔNG nhận nhãn chủ đề từ API và không có bộ lọc nhãn.
+  API phân tích chỉ trả approved/reason, kể cả khi dùng cache.
+  GET /api/v1/memories/:tag/video-uploads dành riêng chủ sở hữu: trạng thái,
+  lý do, đường dẫn, thời gian; không trả nhãn/mã vi phạm/model.
+- Chủ sở hữu là người duy nhất được gửi video cho AI. Quyền admin không tự
+  cho phép gửi nội dung riêng tư của người khác sang Google.
+
+3. NHÃN & KIỂM DUYỆT
+- Nhãn chủ đề mở bằng tiếng Việt, tối đa 8 nhãn. Chuẩn hóa Unicode NFC,
+  bỏ ký tự lạ, gộp khoảng trắng, <=40 ký tự/nhãn, loại trùng không phân biệt hoa.
+- Giữ bộ vi phạm: tình dục tường minh, bóc lột trẻ em, bạo lực ghê rợn,
+  thù ghét/quấy rối, cổ súy tự hại, cổ súy hành vi nguy hiểm/phạm pháp.
+  Google safety block cũng bị từ chối. Nỗi buồn/tang lễ hoặc nội dung giáo dục
+  không tự động được coi là vi phạm chỉ vì cảm xúc tiêu cực.
+- Có vi phạm => approved=false, lưu lý do, xóa object khỏi Supabase Storage.
+  Trạng thái rejected chặn gắn/phát ngay cả khi thao tác xóa gặp lỗi mạng;
+  server ghi cảnh báo cleanup để vận hành xử lý. Nhãn/lịch sử vẫn giữ cho admin.
+- Đây là kiểm duyệt tự động có thể sai, không phải bảo đảm phát hiện 100% vi phạm.
+- Video cũ đã gắn trước migration giữ trạng thái legacy-unreviewed để không làm
+  hỏng kỷ vật cũ; không hiển thị là đã được AI kiểm duyệt. Chủ có thể gửi kiểm tra.
+
+4. ADMIN
+- Quản trị > Kiểm duyệt video: tìm User ID đầy đủ, tên tác giả hoặc mã kỷ vật.
+- Nhật ký gom theo account trên từng trang, 25 sự kiện/trang; bấm Xem toàn bộ
+  lịch sử tài khoản để lọc chính xác User ID ở server, rồi dùng Trước/Sau.
+- Mỗi sự kiện có tên, UUID, tag, thời gian, trạng thái, nhãn chủ đề, vi phạm,
+  lý do và model. Một video có nhiều sự kiện (tải lên/xử lý/kết quả).
+- GET /api/v1/admin/video-uploads?search=...&user=<UUID>&status=...&page=0
+  chỉ admin được gọi; RLS của video_upload_events cũng chỉ cho admin đọc.
+- POST /api/v1/memories/:tag/video-labels/read chỉ admin; người chưa đăng nhập
+  nhận 401, người dùng thường (kể cả owner) nhận 403. Bảng memory_video_labels
+  không cho browser đọc trực tiếp. Admin xem metadata, không có link video riêng tư.
+
+5. FALLBACK TRANG KỶ VẬT
+- api/memory-media vẫn kiểm tra quyền/PIN trước mọi fallback.
+- Thiếu service-role: trả 200 với urls rỗng và cảnh báo; giữ thư/nội dung chữ.
+- Thiếu bảng kiểm duyệt hoặc truy vấn bị lỗi: chặn video; ảnh/audio có metadata
+  Storage hợp lệ vẫn được ký link. Không tin loại media do client khai báo để
+  tránh giả video thành ảnh. Tệp thiếu/lỗi bị bỏ qua riêng lẻ.
+- Có cảnh báo thiếu media thì Studio tạm khóa chỉnh sửa để không vô tình lưu
+  một bộ sưu tập thiếu tệp. Tải lại sau khi sửa cấu hình.
+- Fallback không cấp quyền mới, không duyệt video mặc định, không dùng dữ liệu demo
+  để thay nội dung riêng tư. PIN sai/kỷ vật khóa vẫn bị từ chối.
+
+6. CÀI ĐẶT / TRIỂN KHAI
+- Hai migration mới (áp dụng đúng thứ tự cho database đích chưa có chúng):
+  supabase/migrations/20260920050838_video_labels.sql
+  supabase/migrations/20260920053451_video_upload_moderation.sql
+  Không chạy lại toàn bộ lịch sử migration trên Cloud đang có dữ liệu.
+- Server cần SUPABASE_URL, public key hiện có, SUPABASE_SERVICE_ROLE_KEY,
+  GEMINI_API_KEY; GEMINI_VIDEO_MODEL là tùy chọn. Model thực tế được ghi sau
+  khi xử lý; bản ghi pending chưa thể hiện model đã sử dụng.
+- Hai migration đã áp dụng trên Docker local. Bản cập nhật này chưa được
+  commit/push, chưa áp dụng trên Supabase Cloud hoặc deploy Vercel.
+- npm run test:ci: unit/API mock/RBAC/UI render và fallback media.
+- node tests/video_nfc.test.mjs: nhãn mở, bảo mật, Gemini mock, cleanup, NFC.
+- node tests/video_labels_database.test.mjs (hoặc npm run test:video-db):
+  HTTP/Auth/Storage/Postgres thật trên Docker local, Google mock, fixture tự dọn.
+- npm run build: build production. CI GitHub Actions hiện chạy test:ci + build.
+  Bài test database cần Docker + .local/supabase.json + .local/accounts.json,
+  chạy riêng local; không đưa khóa/tài khoản fixture lên GitHub.
+- Kiểm tra thực tế Gemini 3.8 bằng clip hoa CC0 ngày 20/09 gặp Google 503 quá tải;
+  sau đó Gemini 3.7 phân tích chính clip đó thành công với API key hiện có:
+  trả nhãn chủ đề tiếng Việt, violations=[] và approved=true.
+  Các test tự động không chứng minh quota/model live luôn sẵn sàng.
+
+7. NFC
+- Admin cấp chip từ đơn hàng, chọn Ghi link vào chip > Đọc kiểm tra chip.
+- Web NFC cần HTTPS, thiết bị có NFC và trình duyệt hỗ trợ (đặc biệt Chrome
+  Android). iPhone/Safari không ghi/đọc bằng Web NFC trong trang này.
+  Dùng app NFC ghi URL; người nhận chạm chip, mở thông báo của iPhone vào web.
+- VITE_PUBLIC_SITE_URL mặc định https://emoria-luxury-web.vercel.app.
+  Chip chỉ chứa URL kỷ vật công khai; không ghi PIN, claim code hoặc hardware UID.
+  Không khóa chip vĩnh viễn; ghi đè cần chọn xác nhận trên giao diện.
+- Quét NFC mở trang, không chứng minh quyền sở hữu hoặc chống sao chép chip.
+  PIN và mã nhận quyền sở hữu vẫn được kiểm tra riêng ở database.
+- Cần kiểm thử chip thật: ghi mới, chip chỉ đọc, ghi đè, quyền trình duyệt,
+  Android và mở URL bằng iPhone. Các test hiện tại chưa thay thế kiểm tra này.
+
+TÀI LIỆU CHÍNH THỨC
+https://ai.google.dev/gemini-api/docs/pricing
+https://ai.google.dev/gemini-api/docs/models/gemini-3.7-flash
+https://ai.google.dev/gemini-api/docs/generate-content/video-understanding
+https://ai.google.dev/api/files
+https://developer.chrome.com/docs/capabilities/nfc

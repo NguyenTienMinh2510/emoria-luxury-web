@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import CommentModeration from './CommentModeration';
 import MarketingPanel from './MarketingPanel';
+import VideoModerationAdmin from './VideoModerationAdmin';
 import NfcOperations,{OrderGiftSetup} from './NfcOperations';
 import ShipmentEditor from './ShipmentEditor';
 import StoreAdminPanel from './StoreAdminPanel';
@@ -277,9 +278,9 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
             </div>
           </div>
 
-          <label className="sm:hidden store-label mb-6">Khu vực quản trị<select className="store-input" value={activeTab} onChange={e=>setActiveTab(e.target.value)}>{[['marketing','Phân tích marketing'],['orders','Đơn hàng'],['catalog','Sản phẩm & kho'],['articles','Bài viết'],['moderation','Duyệt bình luận'],['nfc','Kỷ vật NFC'],['contacts','Liên hệ'],['store-settings','Cấu hình bán hàng'],['system','Bảo trì']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="sm:hidden store-label mb-6">Khu vực quản trị<select className="store-input" value={activeTab} onChange={e=>setActiveTab(e.target.value)}>{[['video-moderation','Kiểm duyệt video'],['marketing','Phân tích marketing'],['orders','Đơn hàng'],['catalog','Sản phẩm & kho'],['articles','Bài viết'],['moderation','Duyệt bình luận'],['nfc','Kỷ vật NFC'],['contacts','Liên hệ'],['store-settings','Cấu hình bán hàng'],['system','Bảo trì']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
           {/* Navigation Tabs */}
-          <div className="hidden sm:flex flex-wrap gap-2 mb-4">{[['marketing','Phân tích marketing'],['catalog','Sản phẩm & kho'],['store-settings','Cấu hình bán hàng'],['contacts','Liên hệ']].map(([key,label])=><button key={key} onClick={()=>setActiveTab(key)} className={activeTab===key?'store-button':'px-4 py-2 text-sm bg-white/5 rounded-xl'}>{label}</button>)}</div>
+          <div className="hidden sm:flex flex-wrap gap-2 mb-4">{[['video-moderation','Kiểm duyệt video'],['marketing','Phân tích marketing'],['catalog','Sản phẩm & kho'],['store-settings','Cấu hình bán hàng'],['contacts','Liên hệ']].map(([key,label])=><button key={key} onClick={()=>setActiveTab(key)} className={activeTab===key?'store-button':'px-4 py-2 text-sm bg-white/5 rounded-xl'}>{label}</button>)}</div>
           <div className="hidden sm:flex flex-wrap items-center gap-2 mb-6 border-b border-white/10 pb-3">
             <button
               onClick={() => setActiveTab('orders')}
@@ -367,6 +368,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
           {activeTab==='store-settings' && <StoreAdminPanel section="settings" />}
           {activeTab==='contacts' && <StoreAdminPanel section="contacts" />}
           {activeTab==='orders' && <div className="flex flex-wrap gap-3 mb-4"><input aria-label="Tìm mã đơn" placeholder="Tìm mã đơn" className="store-input !w-64" value={orderSearch} onChange={e=>{setOrderSearch(e.target.value);setOrderPage(0);}}/><button disabled={!orderPage} onClick={()=>setOrderPage(p=>p-1)}>Trước</button><span>Trang {orderPage+1}</span><button disabled={orders.length<25} onClick={()=>setOrderPage(p=>p+1)}>Sau</button><button onClick={async()=>{try{const n=await callStore('rpc_expire_orders');await loadData();setSaveMessage(`Đã xử lý ${n} đơn hết hạn.`);}catch(e){setSaveMessage(e.message);}}}>Xử lý đơn hết hạn</button></div>}
+          {activeTab === 'video-moderation' && <VideoModerationAdmin/>}
           {activeTab === 'orders' && (
             <div className="space-y-4">
               {isLoadingOrders ? (

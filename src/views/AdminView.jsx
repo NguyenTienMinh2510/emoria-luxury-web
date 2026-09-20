@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import CommentModeration from '../components/CommentModeration';
 import MarketingPanel from '../components/MarketingPanel';
+import VideoModerationAdmin from '../components/VideoModerationAdmin';
 import NfcOperations, { OrderGiftSetup } from '../components/NfcOperations';
 import PaymentStatus from '../components/PaymentStatus';
 import PaymentReview from '../components/PaymentReview';
@@ -250,6 +251,7 @@ export default function AdminView({
 
   // TABS CONFIGURATION
   const tabs = [
+    { id:'video-moderation',label:'Kiểm Duyệt Video',icon:Shield },
     { id: 'orders', label: 'Đơn Hàng & Vận Chuyển', icon: Package },
     { id: 'marketing', label: 'Báo Cáo & GA4', icon: BarChart3 },
     { id: 'nfc', label: 'Kỷ Vật & Chip NFC', icon: SmartphoneNfc },
@@ -344,6 +346,7 @@ export default function AdminView({
         {/* TAB CONTENTS */}
         <div className="min-w-0">
           {/* 1. ORDERS TAB */}
+          {activeTab === 'video-moderation' && <VideoModerationAdmin/>}
           {activeTab === 'orders' && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
