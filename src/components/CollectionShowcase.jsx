@@ -53,11 +53,11 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
             </p>
           </div>
 
-          {/* Action Buttons: Responsive h-11 full-width on mobile */}
+          {/* Action Buttons: High-Impact Luxury CTAs */}
           <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full">
             <a
               href="#products"
-              className="h-11 min-h-[44px] px-8 rounded-full bg-white text-dark-950 font-bold text-sm tracking-wider uppercase hover:bg-slate-200 transition-all duration-300 shadow-[0_0_25px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer"
+              className="cta-luxury-gold !h-12 !px-8 text-xs sm:text-sm !w-full sm:!w-auto flex items-center justify-center gap-2.5 shadow-[0_0_30px_rgba(250,204,21,0.6)]"
             >
               <span>Xem Sản Phẩm</span>
               <ArrowUpRight className="w-4 h-4" />
@@ -65,9 +65,9 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
 
             <button
               onClick={() => onOpenNfcDemo && onOpenNfcDemo('emoria-celestial-duo')}
-              className="h-11 min-h-[44px] px-6 rounded-full glass-panel glass-panel-hover text-slate-200 font-medium text-sm tracking-wider hover:text-white transition-all flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer"
+              className="cta-luxury-secondary !h-12 !px-7 text-xs sm:text-sm !w-full sm:!w-auto flex items-center justify-center gap-2.5"
             >
-              <SmartphoneNfc className="w-4 h-4 text-slate-300" />
+              <SmartphoneNfc className="w-4 h-4 text-amber-300" />
               <span>Chạm Thử NFC</span>
             </button>
           </div>

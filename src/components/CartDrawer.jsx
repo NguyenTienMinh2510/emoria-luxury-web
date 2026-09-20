@@ -153,11 +153,7 @@ export default function CartDrawer({
 
               <button
                 onClick={handleProceedToCheckout}
-                className={`w-full h-12 min-h-[44px] rounded-2xl font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                  currentUser
-                    ? 'bg-gradient-to-r from-slate-200 via-white to-slate-300 text-dark-950 shadow-silver-glow'
-                    : 'bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-dark-950 shadow-amber-glow'
-                }`}
+                className="w-full !h-13 !text-sm !tracking-wider cta-luxury-gold shadow-[0_0_35px_rgba(250,204,21,0.65)]"
               >
                 {currentUser ? (
                   <>

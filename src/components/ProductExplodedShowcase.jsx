@@ -100,19 +100,23 @@ export default function ProductExplodedShowcase({
     // Phóng to frames animation to và sắc nét, tạo chiều sâu hoành tráng theo yêu cầu
     const isMobile = window.innerWidth < 768;
     const isTablet = window.innerWidth < 1024;
-    const scaleMultiplier = isMobile ? 1.15 : (isTablet ? 1.35 : 1.50);
+    // Tỉ lệ scale tối ưu: Đảm bảo khi bung tối đa 5 tầng (frame 80-120), Tầng 5 ở đáy không bị cắt khỏi màn hình
+    const scaleMultiplier = isMobile ? 1.05 : (isTablet ? 1.18 : 1.28);
     let drawW, drawH, drawX, drawY;
+
+    // Nhẹ nhàng nhấc trục Y lên một chút khi hoạt ảnh bóc tách tầng dưới để Tầng 5 lộ diện hoàn toàn
+    const yOffset = frameIndex > 40 ? -canvas.height * 0.035 : 0;
 
     if (canvasAspect > imgAspect) {
       drawH = canvas.height * scaleMultiplier;
       drawW = drawH * imgAspect;
       drawX = (canvas.width - drawW) / 2;
-      drawY = (canvas.height - drawH) / 2;
+      drawY = (canvas.height - drawH) / 2 + yOffset;
     } else {
       drawW = canvas.width * scaleMultiplier;
       drawH = drawW / imgAspect;
       drawX = (canvas.width - drawW) / 2;
-      drawY = (canvas.height - drawH) / 2;
+      drawY = (canvas.height - drawH) / 2 + yOffset;
     }
 
     ctx.drawImage(img, drawX, drawY, drawW, drawH);
@@ -391,8 +395,8 @@ export default function ProductExplodedShowcase({
     {
       id: 1,
       name: "Nắp Vòm Bạc S925 Đúc Khối",
-      spec: "Bạc S925 cao cấp · Khắc logo EMORIA · Độ bóng gương",
-      desc: "Mặt nạ bảo vệ đúc nguyên khối tinh xảo, đính kim cương trung tâm và họa tiết mặt trời rạng rỡ.",
+      spec: "Bạc S925 cao cấp · Khắc laser logo EMORIA",
+      desc: "Mặt nạ bảo vệ đúc khối tinh xảo, đính kim cương và họa tiết mặt trời rạng rỡ.",
       icon: Sparkles,
       side: "left",
       activeFrames: [30, 120]
@@ -401,7 +405,7 @@ export default function ProductExplodedShowcase({
       id: 2,
       name: "Seal Silicon Kháng Nước IP68",
       spec: "Chuẩn kháng nước IP68 · Chống ẩm & mồ hôi",
-      desc: "Vòng đệm đàn hồi cao cấp giúp khoang chứa linh kiện kín khít tuyệt đối, an toàn khi đi mưa.",
+      desc: "Vòng đệm đàn hồi cao cấp giúp khoang linh kiện kín khít, an toàn khi đi mưa.",
       icon: ShieldCheck,
       side: "left",
       activeFrames: [48, 120]
@@ -410,7 +414,7 @@ export default function ProductExplodedShowcase({
       id: 3,
       name: "Vi Chip NFC NTAG215 & Cuộn Đồng",
       spec: "Không dùng pin · Tuổi thọ >10 năm · Chạm 0.5s",
-      desc: "Trái tim lưu giữ Memory Space. Hoạt động bằng cảm ứng từ trường từ smartphone mà không cần sạc.",
+      desc: "Trái tim Memory Space, vận hành bằng cảm ứng từ smartphone không cần sạc.",
       icon: Cpu,
       side: "right",
       activeFrames: [66, 120]
@@ -419,7 +423,7 @@ export default function ProductExplodedShowcase({
       id: 4,
       name: "Lá Chắn Từ Ferrite Chống Nhiễu",
       spec: "Độ dày 0.2mm · Triệt tiêu nhiễu sóng kim loại",
-      desc: "Lớp màng cách từ đặc chủng giúp sóng vô tuyến xuyên thấu qua lớp bạc S925 mượt mà không độ trễ.",
+      desc: "Lá chắn từ đặc chủng giúp sóng NFC xuyên thấu qua lớp bạc S925 mượt mà.",
       icon: Layers,
       side: "right",
       activeFrames: [80, 120]
@@ -427,11 +431,11 @@ export default function ProductExplodedShowcase({
     {
       id: 5,
       name: "Khung Đáy Bạc S925 & Quai Dây",
-      spec: "Chốt hàn laser · Đai ngàm khóa kép · Chắc chắn",
-      desc: "Phần đế chịu lực định vị toàn bộ linh kiện thành một khối trang sức trang nhã, hoàn hảo.",
+      spec: "Chốt hàn laser · Ngàm khóa kép chắc chắn",
+      desc: "Khung đế đúc nguyên khối, định vị toàn bộ linh kiện thành khối trang sức hoàn mỹ.",
       icon: Disc,
       side: "right",
-      activeFrames: [94, 120]
+      activeFrames: [86, 120]
     }
   ];
 
@@ -466,7 +470,7 @@ export default function ProductExplodedShowcase({
       <div className="absolute inset-0 bg-diamond-pattern opacity-20 pointer-events-none z-0" />
 
       {/* 1. TOP HERO BRAND HEADER */}
-      <div className="shrink-0 w-full max-w-4xl mx-auto flex flex-col items-center text-center relative z-30 pt-12 sm:pt-13 pb-0.5 px-4">
+      <div className="shrink-0 w-full max-w-4xl mx-auto flex flex-col items-center text-center relative z-30 pt-9 sm:pt-10 pb-0.5 px-4">
         {/* Subtle Top Utility Bar: Quick Skip & Lock Status */}
         <div className="w-full flex items-center justify-between gap-2 mb-0.5 text-[11px] text-slate-400">
           <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] sm:text-[11px]">
@@ -555,7 +559,7 @@ export default function ProductExplodedShowcase({
       <div className="relative w-full flex-1 min-h-0 flex items-center justify-center">
 
         {/* CỘT THÔNG SỐ BÊN TRÁI (Desktop / Tablet) */}
-        <div className="absolute left-3 sm:left-6 lg:left-10 xl:left-14 top-[40%] -translate-y-1/2 z-30 space-y-1.5 max-w-[195px] lg:max-w-[225px] xl:max-w-[245px] max-h-[calc(100vh-230px)] overflow-y-auto no-scrollbar hidden md:block pointer-events-auto">
+        <div className="absolute left-3 sm:left-6 lg:left-8 xl:left-12 top-[40%] -translate-y-1/2 z-30 space-y-2 max-w-[240px] lg:max-w-[280px] xl:max-w-[310px] hidden md:block pointer-events-auto">
           {componentsData.filter(c => c.side === 'left').map((comp) => {
             const Icon = comp.icon;
             const isVisible = currentFrame >= comp.activeFrames[0];
@@ -572,26 +576,26 @@ export default function ProductExplodedShowcase({
                 transition={{ duration: 0.25 }}
                 onMouseEnter={() => setActiveCardIndex(comp.id)}
                 onMouseLeave={() => setActiveCardIndex(null)}
-                className={`p-2 lg:p-2.5 rounded-xl transition-all duration-300 border ${isHovered
-                    ? 'glass-panel border-white/50 shadow-silver-glow scale-105 bg-white/20'
-                    : 'glass-panel border-white/10 hover:border-white/30 hover:bg-white/10'
+                className={`p-2.5 sm:p-3 rounded-xl transition-all duration-300 border ${isHovered
+                    ? 'glass-panel border-white/60 shadow-[0_0_25px_rgba(255,255,255,0.3)] scale-[1.02] bg-white/20'
+                    : 'glass-panel border-white/15 hover:border-white/35 hover:bg-white/10'
                   }`}
               >
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <div className="w-4 h-4 rounded bg-white/10 flex items-center justify-center text-slate-200 shrink-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="w-4 h-4 rounded bg-white/15 flex items-center justify-center text-slate-100 shrink-0">
                     <Icon className="w-2.5 h-2.5" />
                   </div>
-                  <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400 leading-normal">
+                  <span className="text-[11px] sm:text-xs font-sans font-bold uppercase tracking-wider text-slate-300 leading-normal">
                     Tầng 0{comp.id}
                   </span>
                 </div>
-                <h4 className="text-[11px] sm:text-xs font-sans font-bold text-white tracking-wide leading-snug">
+                <h4 className="text-xs sm:text-sm lg:text-[15px] font-sans font-bold text-white tracking-wide leading-snug">
                   {comp.name}
                 </h4>
-                <p className="text-[10px] text-slate-300 font-light mt-0.5 leading-relaxed line-clamp-2">
+                <p className="text-[11px] sm:text-xs text-slate-200 font-light mt-0.5 leading-relaxed">
                   {comp.desc}
                 </p>
-                <div className="mt-1 pt-0.5 border-t border-white/10 text-[9px] text-slate-400 font-mono truncate">
+                <div className="mt-1.5 pt-1 border-t border-white/10 text-[10px] sm:text-[11px] text-slate-300 font-mono truncate">
                   <span>{comp.spec}</span>
                 </div>
               </motion.div>
@@ -617,7 +621,7 @@ export default function ProductExplodedShowcase({
           {!isLoaded && loadedCount < 10 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-dark-950/70 backdrop-blur-sm z-20">
               <div className="w-7 h-7 border-2 border-slate-400/30 border-t-white rounded-full animate-spin mb-2" />
-              <p className="text-[11px] tracking-widest uppercase text-slate-300 font-sans">
+              <p className="text-xs tracking-widest uppercase text-slate-300 font-sans">
                 Đang chuẩn bị khung hình: {Math.round((loadedCount / TOTAL_FRAMES) * 100)}%
               </p>
             </div>
@@ -625,11 +629,12 @@ export default function ProductExplodedShowcase({
         </div>
 
         {/* CỘT THÔNG SỐ BÊN PHẢI (Desktop / Tablet) */}
-        <div className="absolute right-3 sm:right-6 lg:right-10 xl:right-14 top-[40%] -translate-y-1/2 z-30 space-y-1.5 max-w-[195px] lg:max-w-[225px] xl:max-w-[245px] max-h-[calc(100vh-230px)] overflow-y-auto no-scrollbar hidden md:block pointer-events-auto">
+        <div className="absolute right-3 sm:right-6 lg:right-8 xl:right-12 top-[40%] -translate-y-1/2 z-30 space-y-2 max-w-[240px] lg:max-w-[280px] xl:max-w-[310px] hidden md:block pointer-events-auto">
           {componentsData.filter(c => c.side === 'right').map((comp) => {
             const Icon = comp.icon;
             const isVisible = currentFrame >= comp.activeFrames[0];
             const isHovered = activeCardIndex === comp.id;
+            const isBaseLayer = comp.id === 5;
 
             if (!isVisible) return null;
 
@@ -642,50 +647,55 @@ export default function ProductExplodedShowcase({
                 transition={{ duration: 0.25 }}
                 onMouseEnter={() => setActiveCardIndex(comp.id)}
                 onMouseLeave={() => setActiveCardIndex(null)}
-                className={`p-2 lg:p-2.5 rounded-xl transition-all duration-300 border ${isHovered
-                    ? 'glass-panel border-amber-300/50 shadow-silver-glow scale-105 bg-white/20'
-                    : 'glass-panel border-white/10 hover:border-white/30 hover:bg-white/10'
-                  }`}
+                className={`p-2.5 sm:p-3 rounded-xl transition-all duration-300 border ${
+                  isBaseLayer
+                    ? isHovered
+                      ? 'glass-panel border-white/90 shadow-[0_0_30px_rgba(255,255,255,0.45)] scale-[1.02] bg-white/25 ring-1 ring-white/50'
+                      : 'glass-panel border-white/40 shadow-[0_0_20px_rgba(255,255,255,0.2)] bg-white/10 hover:border-white/70'
+                    : isHovered
+                    ? 'glass-panel border-amber-300/80 shadow-[0_0_25px_rgba(251,191,36,0.35)] scale-[1.02] bg-white/20'
+                    : 'glass-panel border-white/15 hover:border-white/35 hover:bg-white/10'
+                }`}
               >
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <div className="w-4 h-4 rounded bg-amber-400/20 flex items-center justify-center text-amber-200 shrink-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 ${
+                    isBaseLayer ? 'bg-white/25 text-white shadow-sm' : 'bg-amber-400/20 text-amber-200'
+                  }`}>
                     <Icon className="w-2.5 h-2.5" />
                   </div>
-                  <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-amber-300 leading-normal">
-                    Tầng 0{comp.id} · CORE TECH
+                  <span className={`text-[11px] sm:text-xs font-sans font-bold uppercase tracking-wider leading-normal ${
+                    isBaseLayer ? 'text-white' : 'text-amber-300'
+                  }`}>
+                    Tầng 0{comp.id} {isBaseLayer ? '· ĐẾ NGUYÊN KHỐI S925' : '· CORE TECH'}
                   </span>
                 </div>
-                <h4 className="text-[11px] sm:text-xs font-sans font-bold text-white tracking-wide leading-snug">
+                <h4 className="text-xs sm:text-sm lg:text-[15px] font-sans font-bold text-white tracking-wide leading-snug">
                   {comp.name}
                 </h4>
-                <p className="text-[10px] text-slate-300 font-light mt-0.5 leading-relaxed line-clamp-2">
+                <p className="text-[11px] sm:text-xs text-slate-200 font-light mt-0.5 leading-relaxed">
                   {comp.desc}
                 </p>
-                <div className="mt-1 pt-0.5 border-t border-white/10 text-[9px] text-amber-200/90 font-mono truncate">
-                  <span>{comp.spec}</span>
+                <div className="mt-1.5 pt-1 border-t border-white/10 text-[10px] sm:text-[11px] font-mono truncate flex items-center justify-between">
+                  <span className={isBaseLayer ? 'text-slate-200 font-medium' : 'text-amber-200/95'}>{comp.spec}</span>
+                  {comp.id === 3 && onOpenNfcDemo && isUnlocked && (
+                    <button
+                      onClick={() => onOpenNfcDemo('emoria-lumen')}
+                      className="text-amber-300 hover:text-white underline underline-offset-2 ml-2 flex items-center gap-1 font-semibold text-[10px] sm:text-[11px] cursor-pointer"
+                    >
+                      <Smartphone className="w-3 h-3" />
+                      <span>Thử chạm</span>
+                    </button>
+                  )}
                 </div>
               </motion.div>
             );
           })}
-
-          {/* Quick Interactive Button to Test Touch Demo */}
-          {onOpenNfcDemo && isUnlocked && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              onClick={() => onOpenNfcDemo('emoria-lumen')}
-              className="w-full p-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-[10px] font-sans font-medium flex items-center justify-center gap-1.5 text-white shadow-silver-glow transition-all group cursor-pointer mt-1"
-            >
-              <Smartphone className="w-3 h-3 text-slate-300 group-hover:scale-110 transition-transform" />
-              <span>Mô phỏng "Một chạm"</span>
-            </motion.button>
-          )}
         </div>
 
       </div>
 
       {/* 3. KHUNG THÔNG TIN BÓC TÁCH CHO GIAO DIỆN MOBILE */}
-      <div className="md:hidden w-full max-w-sm sm:max-w-md mx-auto px-3 mb-1.5 z-30">
+      <div className="md:hidden w-full max-w-sm sm:max-w-md mx-auto px-3 mb-2 z-30">
         <AnimatePresence mode="wait">
           {activeComponentMobile ? (
             <motion.div
@@ -694,14 +704,20 @@ export default function ProductExplodedShowcase({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.2 }}
-              className="w-full rounded-2xl p-2.5 glass-panel border border-white/20 bg-dark-950/90 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.85)]"
+              className="w-full rounded-2xl p-3.5 glass-panel border border-white/20 bg-dark-950/95 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.85)]"
             >
               {/* Header: Tầng Badge + Chuyển nhanh 5 tầng + Nút xem toàn bộ */}
-              <div className="flex items-center justify-between gap-1 mb-1 pb-1 border-b border-white/10">
+              <div className="flex items-center justify-between gap-1 mb-1.5 pb-1.5 border-b border-white/10">
                 <div className="flex items-center gap-1.5">
                   <span className={`w-2 h-2 rounded-full ${activeComponentMobile.id >= 3 ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'bg-slate-300'} animate-pulse`} />
-                  <span className={`text-[10px] font-sans font-bold uppercase tracking-wider ${activeComponentMobile.id >= 3 ? 'text-amber-300' : 'text-slate-300'}`}>
-                    Tầng 0{activeComponentMobile.id} {activeComponentMobile.id >= 3 ? '· CORE TECH' : ''}
+                  <span className={`text-xs font-sans font-bold uppercase tracking-wider ${
+                    activeComponentMobile.id === 5 
+                      ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' 
+                      : activeComponentMobile.id >= 3 
+                      ? 'text-amber-300' 
+                      : 'text-slate-200'
+                  }`}>
+                    Tầng 0{activeComponentMobile.id} {activeComponentMobile.id === 5 ? '· ĐẾ BẠC NGUYÊN KHỐI' : activeComponentMobile.id >= 3 ? '· CORE TECH' : ''}
                   </span>
                 </div>
 
@@ -713,12 +729,14 @@ export default function ProductExplodedShowcase({
                       <button
                         key={num}
                         onClick={() => handleJumpToLayer(num)}
-                        className={`w-5 h-5 rounded-full text-[9px] font-bold font-mono transition-all flex items-center justify-center cursor-pointer ${
+                        className={`w-6 h-6 rounded-full text-[10px] font-bold font-mono transition-all flex items-center justify-center cursor-pointer ${
                           isActive
-                            ? num >= 3
+                            ? num === 5
+                              ? 'bg-white text-black shadow-[0_0_12px_rgba(255,255,255,0.9)] scale-110 ring-2 ring-white/60'
+                              : num >= 3
                               ? 'bg-amber-400 text-black shadow-[0_0_10px_rgba(251,191,36,0.9)] scale-110'
                               : 'bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.9)] scale-110'
-                            : 'bg-white/10 text-slate-400 hover:text-white hover:bg-white/20'
+                            : 'bg-white/10 text-slate-300 hover:text-white hover:bg-white/20'
                         }`}
                         title={`Xem Tầng 0${num}`}
                       >
@@ -729,36 +747,36 @@ export default function ProductExplodedShowcase({
 
                   <button
                     onClick={() => setIsMobileDrawerOpen(true)}
-                    className="ml-1 px-1.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-[9px] font-sans flex items-center gap-0.5 cursor-pointer"
+                    className="ml-1 px-2 py-1 rounded-full bg-white/15 hover:bg-white/25 text-white text-[10px] font-sans flex items-center gap-1 cursor-pointer"
                     title="Xem chi tiết cả 5 tầng"
                   >
                     <span>5 Tầng</span>
-                    <Layers className="w-2.5 h-2.5" />
+                    <Layers className="w-3 h-3" />
                   </button>
                 </div>
               </div>
 
               {/* Tên Tầng */}
-              <h4 className="text-xs font-sans font-bold text-white tracking-wide leading-snug">
+              <h4 className="text-sm sm:text-base font-sans font-bold text-white tracking-wide leading-snug">
                 {activeComponentMobile.name}
               </h4>
 
               {/* Mô tả đầy đủ */}
-              <p className="text-[10px] text-slate-300 font-light mt-0.5 leading-snug">
+              <p className="text-xs sm:text-sm text-slate-200 font-light mt-1 leading-relaxed">
                 {activeComponentMobile.desc}
               </p>
 
               {/* Thông số kỹ thuật */}
-              <div className="mt-1 pt-1 border-t border-white/10 flex items-center justify-between text-[9px]">
-                <span className={activeComponentMobile.id >= 3 ? 'text-amber-200 font-mono font-medium' : 'text-slate-400 font-mono'}>
+              <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-xs">
+                <span className={activeComponentMobile.id >= 3 ? 'text-amber-200 font-mono font-medium' : 'text-slate-300 font-mono'}>
                   {activeComponentMobile.spec}
                 </span>
                 {activeComponentMobile.id === 3 && onOpenNfcDemo && (
                   <button
                     onClick={() => onOpenNfcDemo('emoria-lumen')}
-                    className="text-[9px] text-amber-300 underline underline-offset-2 flex items-center gap-0.5 ml-2 cursor-pointer shrink-0 font-medium"
+                    className="text-xs text-amber-300 underline underline-offset-2 flex items-center gap-1 ml-2 cursor-pointer shrink-0 font-medium"
                   >
-                    <Smartphone className="w-2.5 h-2.5" />
+                    <Smartphone className="w-3 h-3" />
                     <span>Thử chạm</span>
                   </button>
                 )}
@@ -771,32 +789,32 @@ export default function ProductExplodedShowcase({
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              className="w-full rounded-2xl p-2.5 glass-panel border border-white/15 bg-dark-950/85 backdrop-blur-xl shadow-lg"
+              className="w-full rounded-2xl p-3 glass-panel border border-white/15 bg-dark-950/90 backdrop-blur-xl shadow-lg"
             >
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <div className="flex items-center gap-1.5 text-[10px] font-sans font-medium text-slate-200">
-                  <Sparkles className="w-3 h-3 text-amber-300" />
+              <div className="flex items-center justify-between gap-1 mb-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-sans font-medium text-slate-200">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                   <span>5 Tầng Linh Kiện Bạc S925 & Chip NFC</span>
                 </div>
                 <button
                   onClick={() => setIsMobileDrawerOpen(true)}
-                  className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-[9px] font-sans flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-sans flex items-center gap-1 cursor-pointer"
                 >
                   <span>Xem 5 tầng</span>
-                  <Layers className="w-2.5 h-2.5" />
+                  <Layers className="w-3 h-3" />
                 </button>
               </div>
-              <p className="text-[10px] text-slate-400 leading-snug">
+              <p className="text-xs text-slate-300 leading-snug">
                 Vuốt màn hình hoặc chạm tầng dưới đây để khám phá:
               </p>
-              <div className="flex items-center justify-between gap-1 mt-1.5 pt-1 border-t border-white/10">
+              <div className="flex items-center justify-between gap-1.5 mt-2 pt-1.5 border-t border-white/10">
                 {[1, 2, 3, 4, 5].map((num) => (
                   <button
                     key={num}
                     onClick={() => handleJumpToLayer(num)}
-                    className="flex-1 py-1 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-[9px] text-slate-300 hover:text-white font-mono flex items-center justify-center cursor-pointer"
+                    className="flex-1 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/15 text-xs text-slate-200 hover:text-white font-mono flex items-center justify-center cursor-pointer font-bold"
                   >
-                    <span>Tầng 0{num}</span>
+                    <span>T0{num}</span>
                   </button>
                 ))}
               </div>
@@ -806,28 +824,28 @@ export default function ProductExplodedShowcase({
       </div>
 
       {/* 4. BOTTOM CONTROLS (Thanh tiến độ đã ẩn theo yêu cầu, giữ nguyên trải nghiệm cuộn) */}
-      <div className="shrink-0 relative z-30 w-full max-w-2xl mx-auto flex flex-col items-center pb-2.5 sm:pb-3 px-3 sm:px-6">
+      <div className="shrink-0 relative z-30 w-full max-w-2xl mx-auto flex flex-col items-center pb-3 px-3 sm:px-6">
 
         {/* Action Prompt / Next Section Unlock Status */}
-        <div className="flex items-center gap-2 sm:gap-3 text-xs">
+        <div className="flex items-center gap-3 text-xs sm:text-sm">
           {isUnlocked ? (
-            /* Khi đã chạy hết 120 frames: Nút mở khóa để tiếp tục cuộn */
+            /* Khi đã chạy hết 120 frames: Nút CTA siêu nổi bật để tiếp tục cuộn */
             <motion.button
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               onClick={handleScrollToNext}
-              className="flex items-center gap-2 px-5 py-1.5 rounded-full bg-gradient-to-r from-slate-100 via-white to-slate-200 text-dark-950 font-sans font-semibold text-[11px] sm:text-xs tracking-wider uppercase shadow-[0_0_20px_rgba(255,255,255,0.4)] hover:scale-105 transition-all cursor-pointer"
+              className="cta-luxury-gold !px-8 !py-3.5 text-xs sm:text-sm tracking-[0.2em] shadow-[0_0_35px_rgba(250,204,21,0.65)]"
             >
-              <span>Khám phá bộ sưu tập (Cuộn mạnh để xuống)</span>
-              <ChevronDown className="w-3.5 h-3.5 text-dark-950 animate-bounce" />
+              <span>Khám phá bộ sưu tập</span>
+              <ChevronDown className="w-4 h-4 animate-bounce text-dark-950" />
             </motion.button>
           ) : (
             /* Khi đang cuộn trong 120 frames: Khóa chặt trang và nhắc người dùng */
-            <div className="flex items-center gap-1.5 text-slate-400 text-[11px] sm:text-xs">
-              <ArrowDown className="w-3 h-3 animate-bounce text-slate-300" />
-              <span className="tracking-wide text-slate-300 font-sans">
+            <div className="flex items-center gap-2 text-slate-300 text-xs sm:text-sm font-medium">
+              <ArrowDown className="w-4 h-4 animate-bounce text-slate-200" />
+              <span className="tracking-wide text-slate-200 font-sans">
                 {currentFrame === 0
-                  ? 'Lăn chuột để bắt đầu bóc tách'
+                  ? 'Lăn chuột để bắt đầu bóc tách linh kiện'
                   : 'Tiếp tục lăn chuột để xem hết linh kiện'}
               </span>
             </div>
@@ -837,18 +855,18 @@ export default function ProductExplodedShowcase({
           <button
             onClick={() => setIsAutoPlaying(!isAutoPlaying)}
             title={isAutoPlaying ? "Tạm dừng" : "Tự động phát hoạt ảnh"}
-            className="p-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-slate-200 hover:text-white transition-colors cursor-pointer"
           >
-            {isAutoPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+            {isAutoPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
           </button>
 
           {/* Nút Reset */}
           <button
             onClick={handleRestart}
             title="Xem lại từ đầu"
-            className="p-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-slate-200 hover:text-white transition-colors cursor-pointer"
           >
-            <RotateCcw className="w-3 h-3" />
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -892,7 +910,7 @@ export default function ProductExplodedShowcase({
               </div>
 
               {/* Scrollable Layer Cards List */}
-              <div className="flex-1 overflow-y-auto py-3 space-y-2.5 pr-1">
+              <div className="flex-1 overflow-y-auto py-3 space-y-3 pr-1">
                 {componentsData.map((comp) => {
                   const Icon = comp.icon;
                   const isCurrentActive = activeComponentMobile?.id === comp.id;
@@ -901,20 +919,20 @@ export default function ProductExplodedShowcase({
                   return (
                     <div
                       key={comp.id}
-                      className={`p-3 rounded-2xl border transition-all ${
+                      className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
                         isCurrentActive
                           ? isCoreTech
-                            ? 'border-amber-400/60 bg-amber-400/10 shadow-[0_0_15px_rgba(251,191,36,0.15)]'
-                            : 'border-white/50 bg-white/10'
-                          : 'border-white/10 bg-white/5'
+                            ? 'border-amber-400/70 bg-amber-400/15 shadow-[0_0_20px_rgba(251,191,36,0.2)]'
+                            : 'border-white/60 bg-white/15 shadow-[0_0_20px_rgba(255,255,255,0.15)]'
+                          : 'border-white/15 bg-white/5'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
                         <div className="flex items-center gap-2">
-                          <div className={`w-5 h-5 rounded flex items-center justify-center ${isCoreTech ? 'bg-amber-400/20 text-amber-300' : 'bg-white/10 text-slate-200'}`}>
-                            <Icon className="w-3 h-3" />
+                          <div className={`w-6 h-6 rounded-md flex items-center justify-center ${isCoreTech ? 'bg-amber-400/20 text-amber-300' : 'bg-white/15 text-slate-100'}`}>
+                            <Icon className="w-3.5 h-3.5" />
                           </div>
-                          <span className={`text-[10px] font-sans font-bold uppercase tracking-wider ${isCoreTech ? 'text-amber-300' : 'text-slate-400'}`}>
+                          <span className={`text-xs font-sans font-bold uppercase tracking-wider ${isCoreTech ? 'text-amber-300' : 'text-slate-300'}`}>
                             Tầng 0{comp.id} {isCoreTech ? '· CORE TECH' : ''}
                           </span>
                         </div>
@@ -924,26 +942,26 @@ export default function ProductExplodedShowcase({
                             handleJumpToLayer(comp.id);
                             setIsMobileDrawerOpen(false);
                           }}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-sans font-medium transition-all cursor-pointer ${
+                          className={`px-3 py-1 rounded-full text-xs font-sans font-semibold transition-all cursor-pointer ${
                             isCurrentActive
-                              ? 'bg-white text-dark-950 font-bold shadow-sm'
-                              : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                              ? 'bg-white text-dark-950 font-bold shadow-md'
+                              : 'bg-white/10 text-slate-200 hover:bg-white/20'
                           }`}
                         >
                           {isCurrentActive ? 'Đang xem ✓' : 'Xem tầng này →'}
                         </button>
                       </div>
 
-                      <h4 className="text-xs font-sans font-bold text-white tracking-wide">
+                      <h4 className="text-sm sm:text-base font-sans font-bold text-white tracking-wide">
                         {comp.name}
                       </h4>
 
-                      <p className="text-[11px] text-slate-300 font-light mt-1 leading-relaxed">
+                      <p className="text-xs sm:text-sm text-slate-200 font-light mt-1.5 leading-relaxed">
                         {comp.desc}
                       </p>
 
-                      <div className="mt-1.5 pt-1.5 border-t border-white/10 text-[10px] flex items-center justify-between">
-                        <span className={isCoreTech ? 'text-amber-200 font-mono' : 'text-slate-400 font-mono'}>
+                      <div className="mt-2.5 pt-2 border-t border-white/10 text-xs flex items-center justify-between">
+                        <span className={isCoreTech ? 'text-amber-200 font-mono font-medium' : 'text-slate-300 font-mono'}>
                           {comp.spec}
                         </span>
                         {comp.id === 3 && onOpenNfcDemo && (
@@ -952,9 +970,9 @@ export default function ProductExplodedShowcase({
                               setIsMobileDrawerOpen(false);
                               onOpenNfcDemo('emoria-lumen');
                             }}
-                            className="text-[10px] text-amber-300 underline underline-offset-2 flex items-center gap-1 font-medium cursor-pointer"
+                            className="text-xs text-amber-300 underline underline-offset-2 flex items-center gap-1 font-medium cursor-pointer"
                           >
-                            <Smartphone className="w-3 h-3" />
+                            <Smartphone className="w-3.5 h-3.5" />
                             <span>Thử một chạm</span>
                           </button>
                         )}

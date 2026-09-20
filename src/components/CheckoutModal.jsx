@@ -536,7 +536,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                   onClick={() => {
                     if (onOpenAuth) onOpenAuth();
                   }}
-                  className="w-full h-12 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-dark-950 font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-amber-glow cursor-pointer"
+                  className="cta-luxury-gold !w-full !h-13 !text-sm !tracking-wider shadow-[0_0_30px_rgba(250,204,21,0.45)]"
                 >
                   <span>Đăng Nhập Để Đặt Hàng · {formattedTotal}</span>
                   <ArrowRight className="w-4 h-4" />
@@ -545,7 +545,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                 <button
                   type="submit"
                   disabled={isSubmitting || !settings?.sales_enabled || !cartItems.length || (paymentMethod === 'cod' ? !settings?.cod_enabled : !settings?.transfer_enabled)}
-                  className="w-full h-12 rounded-2xl bg-gradient-to-r from-slate-200 via-white to-slate-300 text-dark-950 font-bold text-sm hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-silver-glow cursor-pointer disabled:opacity-50"
+                  className="cta-luxury-gold !w-full !h-13 !text-sm !tracking-wider shadow-[0_0_35px_rgba(250,204,21,0.65)] disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <div className="w-5 h-5 border-2 border-dark-950 border-t-transparent rounded-full animate-spin" />

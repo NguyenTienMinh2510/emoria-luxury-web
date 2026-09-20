@@ -14,6 +14,7 @@ import CollectionShowcase from './components/CollectionShowcase';
 import ProductCatalog from './components/ProductCatalog';
 import FeedbackSection from './components/FeedbackSection';
 import AboutSection from './components/AboutSection';
+import AboutView from './views/AboutView';
 import ContactSection from './components/ContactSection';
 import Footer from './components/Footer';
 import NFCDemoModal from './components/NFCDemoModal';
@@ -25,7 +26,7 @@ import CheckoutModal from './components/CheckoutModal';
 import AdminView from './views/AdminView';
 import { 
   SmartphoneNfc, Shield, User, Key, Lock, Unlock, 
-  Sparkles, CheckCircle2, ChevronUp, ChevronDown, Power
+  Sparkles, CheckCircle2, ChevronUp, ChevronDown, Power, ArrowRight
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
 import { 
@@ -83,6 +84,17 @@ export default function App() {
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [nfcModalState, setNfcModalState] = useState({ isOpen: false, productId: 'emoria-pulse' });
   const [memoryViewerState, setMemoryViewerState] = useState({ isOpen: false, tagUid: 'emoria-lumen', token: null });
+
+  const [hasScrolledPastHero, setHasScrolledPastHero] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setHasScrolledPastHero(window.scrollY > 320);
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Refresh Real Session Role
   const refreshSessionRole = async () => {
@@ -142,7 +154,7 @@ export default function App() {
         setCurrentView('shop');
       } else if(q.get('article')) { setSelectedArticleSlug(q.get('article'));setCurrentView('article-detail'); }
       else if(q.get('tag') || q.get('memory')) {setCurrentTag(q.get('tag') || q.get('memory'));setCurrentView('memory');}
-      else {setCurrentView(['home','shop','memory','articles','admin'].includes(q.get('view')) ? q.get('view') : 'home');if(q.get('view')==='memory')setCurrentTag('');}
+      else {setCurrentView(['home','shop','memory','articles','about','admin'].includes(q.get('view')) ? q.get('view') : 'home');if(q.get('view')==='memory')setCurrentTag('');}
       setRouteReady(true);
     };
     readRoute();window.addEventListener('popstate',readRoute);
@@ -355,6 +367,10 @@ export default function App() {
               onSelectProduct={(id) => setSelectedProductId(id)}
               onAddToCart={handleAddToCart}
               onOpenNfcDemo={handleOpenNfcDemo}
+              onNavigateToShop={() => {
+                setCurrentView('shop');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
             <ArticlesSection
               isAdmin={authSession.isAdmin}
@@ -369,7 +385,34 @@ export default function App() {
               }}
             />
 
-            <AboutSection onOpenNfcDemo={handleOpenNfcDemo} />
+            {/* EDITORIAL BANNER: CÂU CHUYỆN THƯƠNG HIỆU (DẪN ĐẾN TRANG ABOUT RIÊNG BIỆT) */}
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 my-4">
+              <div className="rounded-3xl glass-panel p-8 sm:p-12 md:p-14 border border-white/15 bg-gradient-to-r from-white/[0.04] via-white/[0.02] to-transparent flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl relative overflow-hidden">
+                <div className="space-y-3 text-center md:text-left relative z-10">
+                  <span className="text-xs uppercase tracking-[0.25em] text-amber-300 font-bold font-sans flex items-center justify-center md:justify-start gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>EMORIA ATELIER · KHỞI NGUỒN KỶ NIỆM</span>
+                  </span>
+                  <h3 className="font-serif text-2xl sm:text-4xl font-normal text-white leading-snug">
+                    Câu Chuyện Thương Hiệu &amp; Nghệ Thuật Chế Tác
+                  </h3>
+                  <p className="text-sm text-slate-300 max-w-xl font-light leading-relaxed">
+                    Khám phá hành trình kết hợp giữa kỹ nghệ đúc Bạc Ý S925 và vi mạch cảm ứng NFC lưu giữ khoảnh khắc vĩnh cửu trong một không gian riêng biệt.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setCurrentView('about');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="cta-luxury-primary shrink-0 !px-8 !py-4 relative z-10"
+                >
+                  <span>Khám Phá Về EMORIA</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </section>
+
             <ContactSection />
           </div>
         )}
@@ -435,7 +478,22 @@ export default function App() {
           />
         )}
 
-        {/* VIEW 6: DEDICATED FULL-PAGE ADMIN VIEW */}
+        {/* VIEW 6: DEDICATED ABOUT US & BRAND ATELIER (TRANG RIÊNG BIỆT) */}
+        {currentView === 'about' && (
+          <AboutView
+            onNavigateToShop={() => {
+              setCurrentView('shop');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToMemory={() => {
+              setCurrentView('memory');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenNfcDemo={handleOpenNfcDemo}
+          />
+        )}
+
+        {/* VIEW 7: DEDICATED FULL-PAGE ADMIN VIEW */}
         {currentView === 'admin' && (
           <AdminView
             currentUser={currentUser}
@@ -454,7 +512,14 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      {['home', 'shop', 'articles'].includes(currentView) && <Footer />}
+      {['home', 'shop', 'articles', 'about'].includes(currentView) && (
+        <Footer 
+          onSelectView={(view) => {
+            setCurrentView(view);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
 
       {/* SECURITY & SESSION STATUS BADGE (Góc dưới bên trái) */}
       <div className="fixed bottom-6 left-6 z-40" hidden={currentView==='memory'&&!currentUser}>
@@ -537,7 +602,18 @@ export default function App() {
         </div>
       </div>
 
-      {currentView!=='memory'&&<button onClick={()=>{setCurrentTag('');setCurrentView('memory');window.scrollTo({top:0,behavior:'smooth'});}} className="fixed bottom-6 right-6 z-40 px-4 py-3 rounded-full bg-white text-dark-950 font-semibold text-xs">Kỷ vật của bạn</button>}
+      {currentView !== 'memory' && (currentView !== 'home' || hasScrolledPastHero) && (
+        <button
+          onClick={() => {
+            setCurrentTag('');
+            setCurrentView('memory');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className="fixed bottom-6 right-6 z-40 px-4 py-2.5 rounded-full bg-white text-dark-950 font-bold text-xs shadow-silver-glow hover:scale-105 transition-all duration-300 cursor-pointer"
+        >
+          Kỷ vật của bạn
+        </button>
+      )}
 
       {/* NFC Touch Simulation Modal */}
       <NFCDemoModal
