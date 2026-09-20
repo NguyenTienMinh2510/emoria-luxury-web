@@ -185,6 +185,8 @@ export async function fetchMemoryView(tagUid, grantToken = null) {
       const data = await apiRequest(`/memories/${encodeURIComponent(cleanTag)}/access`,{method:'POST',body:{grant:token||null}});
       if (data) {
         data.media_gallery=(data.media_gallery||[]).map(m=>({...m,path:m.url?.startsWith('storage://')?m.url.slice(10):null}));
+        // Studio edits the saved collection, not the subset whose playback URLs loaded.
+        if(data.is_owner||data.is_admin)data.studio_media=data.media_gallery.map(m=>({...m}));
         data.audio_path=data.audio_url;
         if(data.is_unlocked && (data.intro_video_path || data.audio_url?.startsWith('storage://') || data.media_gallery.some(m=>m.path))){
           const session=await supabase.auth.getSession();

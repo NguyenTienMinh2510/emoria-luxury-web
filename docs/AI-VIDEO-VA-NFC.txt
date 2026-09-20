@@ -66,8 +66,9 @@ Cập nhật: 20/09/2026
 - Thiếu bảng kiểm duyệt hoặc truy vấn bị lỗi: chặn video; ảnh/audio có metadata
   Storage hợp lệ vẫn được ký link. Không tin loại media do client khai báo để
   tránh giả video thành ảnh. Tệp thiếu/lỗi bị bỏ qua riêng lẻ.
-- Có cảnh báo thiếu media thì Studio tạm khóa chỉnh sửa để không vô tình lưu
-  một bộ sưu tập thiếu tệp. Tải lại sau khi sửa cấu hình.
+- Cảnh báo thiếu media không khóa Studio. Danh sách tệp chỉnh sửa được giữ
+  riêng từ dữ liệu đã lưu, không lấy từ danh sách đã lọc để phát. Vì vậy tệp
+  không tự bị gỡ khỏi kỷ vật khi ký URL gặp lỗi.
 - Fallback không cấp quyền mới, không duyệt video mặc định, không dùng dữ liệu demo
   để thay nội dung riêng tư. PIN sai/kỷ vật khóa vẫn bị từ chối.
 
@@ -79,8 +80,9 @@ Cập nhật: 20/09/2026
 - Server cần SUPABASE_URL, public key hiện có, SUPABASE_SERVICE_ROLE_KEY,
   GEMINI_API_KEY; GEMINI_VIDEO_MODEL là tùy chọn. Model thực tế được ghi sau
   khi xử lý; bản ghi pending chưa thể hiện model đã sử dụng.
-- Hai migration đã áp dụng trên Docker local. Bản cập nhật này chưa được
-  commit/push, chưa áp dụng trên Supabase Cloud hoặc deploy Vercel.
+- Hai migration đã áp dụng trên Docker local và Supabase Cloud ngày 20/09/2026.
+  Đợt sửa production khôi phục video emoria-lumen còn trong Storage; nguyên nhân
+  là code đã deploy trước hai bảng kiểm duyệt. Đã xác minh URL phát video trả 200.
 - npm run test:ci: unit/API mock/RBAC/UI render và fallback media.
 - node tests/video_nfc.test.mjs: nhãn mở, bảo mật, Gemini mock, cleanup, NFC.
 - node tests/video_labels_database.test.mjs (hoặc npm run test:video-db):

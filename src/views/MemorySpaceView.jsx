@@ -108,7 +108,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         setEditAudioUrl(res.data.audio_path || '');
         setIntroPath(res.data.intro_video_path||'');setExtraLetters(res.data.letters||[]);
         if(res.data.is_owner)setMovieDone(true);
-        setEditMedia((res.data.media_gallery||[]).filter(m=>m.path).map(m=>({path:m.path,type:m.type,caption:m.caption}))); 
+        setEditMedia((res.data.studio_media||res.data.media_gallery||[]).filter(m=>m.path).map(m=>({path:m.path,type:m.type,caption:m.caption})));
         setPinAction('KEEP');
         setNewPinCode('');
       } else {
@@ -379,8 +379,6 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             {/* If Owner or Admin: Show Studio Button. If Not: Show Claim Chip Button */}
             {(memoryData.is_owner || memoryData.is_admin) ? (
               <button
-                disabled={!!memoryData.media_warning}
-                title={memoryData.media_warning?'Hãy chờ media tải đầy đủ trước khi chỉnh sửa.':undefined}
                 onClick={() => {
                   setEditTitle(memoryData.title || '');
                   setEditAuthor(memoryData.author || '');
@@ -389,7 +387,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                   setEditLetter(memoryData.letter || '');
                   setEditAudioTitle(memoryData.audio_title || '');
                   setEditAudioUrl(memoryData.audio_path || '');
-                  setEditMedia((memoryData.media_gallery || []).filter(m => m.path).map(m => ({ path: m.path, type: m.type, caption: m.caption })));
+                  setEditMedia((memoryData.studio_media || memoryData.media_gallery || []).filter(m => m.path).map(m => ({ path: m.path, type: m.type, caption: m.caption })));
                   setIntroPath(memoryData.intro_video_path || '');
                   setExtraLetters(memoryData.letters || []);
                   setPinAction('KEEP');
@@ -829,8 +827,9 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </div>
 
             <form onSubmit={handleSaveEditor} className="space-y-4 text-xs">
-              <label className="flex gap-3 items-start p-4 rounded-xl border border-white/15 text-sm"><input type="checkbox" checked={videoConsent} disabled={movieBusy} onChange={e=>setVideoConsent(e.target.checked)}/><span>Tôi đồng ý gửi hình ảnh và âm thanh trong video tải lên cho Google Gemini để kiểm duyệt. Video vi phạm sẽ bị từ chối; quản trị viên xem được lịch sử tải, nhãn và lý do kiểm duyệt.</span></label>
-              <MemoryMovieEditor tag={currentTag} path={introPath} onChange={setIntroPath} onBusy={setMovieBusy} videoConsent={videoConsent}/>
+              {memoryData.media_warning&&<p role="status" className="p-3 rounded-xl border border-amber-300/30 text-amber-200">Một số tệp chưa phát được. Danh sách tệp đã lưu vẫn được giữ nguyên trong Studio; bạn có thể tải thêm hoặc thay thế video.</p>}
+              <label className="flex gap-3 items-start p-4 rounded-xl border border-white/15 text-sm"><input type="checkbox" checked={videoConsent} disabled={movieBusy} onChange={e=>setVideoConsent(e.target.checked)}/><span>Tôi đồng ý gửi hình ảnh và video tải lên cho Google Gemini để kiểm duyệt. Phương tiện vi phạm sẽ bị từ chối; quản trị viên xem được lịch sử tải, nhãn AI và lý do kiểm duyệt.</span></label>
+              <MemoryMovieEditor tag={currentTag} path={introPath} onChange={setIntroPath} onBusy={setMovieBusy} videoConsent={videoConsent} onAddToGallery={item=>setEditMedia(prev=>[...prev,item])}/>
               <div>
                 <label className="text-slate-300 font-semibold block mb-1">Tiêu đề kỷ niệm:</label>
                 <input
@@ -909,7 +908,14 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
 
               <section className="space-y-3"><h4 className="font-serif text-lg">02 · Những lá thư bổ sung</h4>{extraLetters.map((letter,index)=><div key={index} className="space-y-2 p-3 border border-white/10 rounded-xl"><label className="store-label">Tiêu đề thư<input className="store-input" required maxLength={200} value={letter.title} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,title:e.target.value}:x))}/></label><label className="store-label">Nội dung<textarea className="store-input" required maxLength={10000} rows={5} value={letter.body} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,body:e.target.value}:x))}/></label><button type="button" onClick={()=>setExtraLetters(prev=>prev.filter((_,i)=>i!==index))}>Gỡ thư</button></div>)}<button type="button" disabled={extraLetters.length>=10} className="store-button" onClick={()=>setExtraLetters(prev=>[...prev,{title:'Một lời nhắn dành cho bạn',body:''}])}>Thêm thư tay</button></section>
               <MemoryMediaEditor tag={currentTag} items={editMedia} onChange={setEditMedia} audio={editAudioUrl} onAudio={setEditAudioUrl} onBusy={setMovieBusy} videoConsent={videoConsent}/>
-              <VideoLabelEditor key={currentTag} tag={currentTag} items={editMedia} introPath={introPath} onBusy={setMovieBusy} consent={videoConsent} refreshKey={movieBusy} onApproved={path=>setEditMedia(prev=>prev.some(m=>m.path===path)?prev:[...prev,{path,type:'video',caption:'Video đã kiểm duyệt'}])}/>
+              <details className="p-3 border border-white/10 rounded-xl bg-black/20">
+                <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-200 select-none">
+                  Xem thêm nhật ký tải lên & chẩn đoán kiểm duyệt
+                </summary>
+                <div className="mt-3">
+                  <VideoLabelEditor key={currentTag} tag={currentTag} items={editMedia} introPath={introPath} onBusy={setMovieBusy} consent={videoConsent} refreshKey={movieBusy} onApproved={path=>setEditMedia(prev=>prev.some(m=>m.path===path)?prev:[...prev,{path,type:'video',caption:'Video đã kiểm duyệt'}])}/>
+                </div>
+              </details>
               <details className="p-4 border border-white/10 rounded-xl" open><summary className="cursor-pointer font-semibold text-slate-200">Quản lý sổ lưu niệm ({guestEntries.length} lời nhắn)</summary>
                 <div className="space-y-3 mt-3">
                   {guestEntries.map(entry => (

@@ -25,16 +25,20 @@ const small=new Blob(['video fixture'],{type:'video/mp4'});
 let googleCalls=[];
 const google=async(url,options)=>{googleCalls.push({url,options});return googleResponse();};
 assert.deepEqual((await labelVideo(small,'private-key',{fetchImpl:google})).labels,['Biển','Du lịch']);
-assert.match(googleCalls[0].url,/gemini-3.7-flash:generateContent/);
+const currentModel=process.env.GEMINI_VIDEO_MODEL||'gemini-3.7-flash';
+assert.match(googleCalls[0].url,new RegExp(`${currentModel}:generateContent`));
 assert.ok(JSON.parse(googleCalls[0].options.body).contents[0].parts[0].inlineData);
 const generation=JSON.parse(googleCalls[0].options.body).generationConfig;
 assert.equal(generation.responseSchema.properties.labels.items.enum,undefined);
 assert.equal(generation.responseSchema.properties.labels.maxItems,8);
-assert.equal(generation.thinkingConfig.thinkingLevel,'low');
+if(currentModel.startsWith('gemini-3.'))assert.equal(generation.thinkingConfig.thinkingLevel,'low');
+const origModel=process.env.GEMINI_VIDEO_MODEL;
 process.env.GEMINI_VIDEO_MODEL='gemini-2.5-flash';
-try{await labelVideo(small,'key',{fetchImpl:google});assert.match(googleCalls.at(-1).url,/gemini-2.5-flash:generateContent/);}finally{delete process.env.GEMINI_VIDEO_MODEL;}
+try{await labelVideo(small,'key',{fetchImpl:google});assert.match(googleCalls.at(-1).url,/gemini-2.5-flash:generateContent/);}finally{if(origModel!==undefined)process.env.GEMINI_VIDEO_MODEL=origModel;else delete process.env.GEMINI_VIDEO_MODEL;}
 
-await assert.rejects(()=>labelVideo(new Blob(['x'],{type:'image/png'}),'key'),/MP4/);
+await assert.rejects(()=>labelVideo(new Blob(['x'],{type:'application/pdf'}),'key'),/MP4/);
+const imageResult=await labelVideo(new Blob(['fake image'],{type:'image/png'}),'key',{fetchImpl:google});
+assert.equal(imageResult.approved,true);
 assert.equal((await labelVideo(small,'key',{fetchImpl:async()=>Response.json({candidates:[{finishReason:'SAFETY'}]})})).approved,false);
 const providerBlock=await labelVideo(small,'key',{fetchImpl:async()=>Response.json({promptFeedback:{blockReason:'SAFETY',safetyRatings:[{category:'HARM_CATEGORY_SEXUALLY_EXPLICIT',blocked:true}]}})});
 assert.deepEqual(providerBlock.violations,['SEXUAL_EXPLICIT']);

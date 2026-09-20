@@ -11,6 +11,12 @@ export const routes=[
     const page=integer(c.query.get('page'),0),status=c.query.get('status');
     let query=c.client.from('video_upload_events').select('id,created_at,user_id,author_name,tag,path,status,labels,violations,reason,model,policy_version').order('created_at',{ascending:false}).order('id',{ascending:false});
     if(status){if(!['uploaded','processing','ready','rejected','failed'].includes(status))throw Object.assign(new Error('Trạng thái không hợp lệ.'),{status:400});query=query.eq('status',status);}
+    const category=c.query.get('category');
+    if(category==='intro')query=query.ilike('path','%intro%');
+    else if(category==='gallery')query=query.not('path','ilike','%intro%');
+    const mediaType=c.query.get('media_type');
+    if(mediaType==='image')query=query.or('path.ilike.%.jpg,path.ilike.%.jpeg,path.ilike.%.png,path.ilike.%.webp');
+    else if(mediaType==='video')query=query.or('path.ilike.%.mp4,path.ilike.%.webm');
     const user=c.query.get('user'),raw=c.query.get('search')||'';
     const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if(user){if(!uuid.test(user))throw Object.assign(new Error('User ID không hợp lệ.'),{status:400});query=query.eq('user_id',user);}

@@ -30,11 +30,13 @@ const scenarios = [
     supabase.auth.getSession=async()=>({data:{session:null}});
     globalThis.fetch=async url=>Response.json(url==='/api/memory-media'
       ?{urls:{},blocked:['emo-test/video'],unavailable:['emo-test/photo'],warning:'Media unavailable'}
-      :{success:true,is_unlocked:true,letter:'Private letter',intro_video_path:'emo-test/video',audio_url:'storage://emo-test/song',media_gallery:[{type:'image',url:'storage://emo-test/photo'},{type:'video',url:'storage://emo-test/video'}]});
+      :{success:true,is_owner:true,is_unlocked:true,letter:'Private letter',intro_video_path:'emo-test/video',audio_url:'storage://emo-test/song',media_gallery:[{type:'image',url:'storage://emo-test/photo'},{type:'video',url:'storage://emo-test/video'}]});
     const result=await m.fetchMemoryView('emo-test');
     assert.equal(result.success,true);assert.equal(result.data.letter,'Private letter');
     assert.deepEqual(result.data.media_gallery,[]);assert.equal(result.data.intro_video_url,null);
     assert.equal(result.data.audio_url,undefined);assert.equal(result.data.media_warning,'Media unavailable');
+    assert.deepEqual(result.data.studio_media.map(item=>item.path),['emo-test/photo','emo-test/video'],'Studio preserves saved media even when playback fails');
+    assert.equal(result.data.intro_video_path,'emo-test/video');assert.equal(result.data.audio_path,'storage://emo-test/song');
   `],
   ['configured server denial and errors never fall back', true, `
     const { supabase } = await import('./src/lib/supabaseClient.js');
