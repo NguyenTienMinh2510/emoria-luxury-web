@@ -163,7 +163,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
     if(currentTag)loadMemory(currentTag);else setLoading(false);
   }, [currentTag,currentUser]);
   useEffect(()=>{setCurrentTag(initialTag);},[initialTag]);
-  useEffect(()=>{if(isEditorOpen&&memoryData?.is_owner)callStore('rpc_memory_guestbook',{p_tag:currentTag}).then(setGuestEntries).catch(e=>setStudioError(e.message));},[isEditorOpen,currentTag]);
+  useEffect(()=>{if(isEditorOpen&&memoryData?.is_owner)callStore('rpc_memory_guestbook',{p_tag:currentTag}).then(res=>setGuestEntries(res||[])).catch(()=>{setGuestEntries((memoryData?.guestbook||[]).map(g=>({...g,author_name:g.author||g.author_name})));});},[isEditorOpen,currentTag,memoryData]);
   useEffect(()=>{const warn=e=>{if(isEditorOpen){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[isEditorOpen]);
 
   // Handle PIN Unlock

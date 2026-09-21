@@ -105,6 +105,7 @@ export const routes=[
   route('POST','/memories/([^/]+)/claims','user',c=>rpc(c,'rpc_claim_nfc_chip',{p_tag_uid:c.params[0],p_claim_code:c.body.code}),201),
   route('PATCH','/memories/([^/]+)','user',c=>rpc(c,'rpc_update_memory_space',{p_tag_uid:c.params[0],p_payload:c.body})),
   route('POST','/memories/([^/]+)/guestbook','public',c=>rpc(c,'rpc_guestbook',{p_tag:c.params[0],p_token:c.body.grant??null,p_name:c.body.name,p_message:c.body.message,p_relationship:c.body.relationship||''}),201),
+  route('POST','/memories/([^/]+)/guestbook/manage','user',c=>rpc(c,'rpc_memory_guestbook',{p_tag:c.params[0],p_id:c.body.id||null,p_action:c.body.action||'list'})),
   route('PATCH','/admin/memories/([^/]+)/availability','admin',c=>c.db(c.client.from('memory_spaces').update({availability_status:c.body.status,unlock_at:c.body.unlockDate||null,updated_at:new Date().toISOString()}).eq('tag_uid',c.params[0]).select('tag_uid').single())),
   route('GET','/me/profile','user',c=>rpc(c,'rpc_get_my_profile')),
   route('PATCH','/me/profile','user',async c=>{

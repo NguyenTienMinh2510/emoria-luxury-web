@@ -21,6 +21,7 @@ export async function callStore(name,args={}) {
     case 'rpc_issue_chip': return apiRequest('/admin/orders/'+id(a.p_order_id)+'/chips',{method:'POST',body:{itemId:a.p_item_id}});
     case 'rpc_expire_orders': return apiRequest('/admin/orders/expirations',{method:'POST',body:{}});
     case 'rpc_memory_operations': return a.p_tag?apiRequest('/admin/memories/'+id(a.p_tag)+'/suspension',{method:'PATCH',body:{suspended:a.p_suspended}}):apiRequest('/admin/memories');
+    case 'rpc_memory_guestbook': return apiRequest('/memories/'+id(a.p_tag)+'/guestbook/manage',{method:'POST',body:{id:a.p_id||null,action:a.p_action||'list'}});
     case 'rpc_marketing_report': return apiRequest('/admin/reports/marketing?'+new URLSearchParams({days:a.p_days??30,test:a.p_test??false}));
     case 'rpc_contact': return apiRequest('/contacts',{method:'POST',body:{name:a.p_name,phone:a.p_phone,note:a.p_note}});
     default: throw new Error('Thao tác cửa hàng chưa được hỗ trợ.');
