@@ -123,6 +123,7 @@ const OFFLINE_SEED_MEMORIES = {
     // Nội dung mật chỉ trả về sau khi mở khóa PIN
     _private_letter: 'Gửi Hương Giang, kỷ niệm 1000 ngày bên nhau. Cảm ơn em đã luôn là ánh sáng dịu êm nhất cuộc đời anh...',
     _pin_hash: '40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58', // SHA-256 của '1000'
+    pin_hint: 'Kỷ niệm bao nhiêu ngày yêu thương của hai đứa mình?',
     audio_title: 'VoiceMemo - Lời Thì Thầm 1000 Ngày',
     audio_url: 'https://cdn.pixabay.com/download/audio/2022/11/06/audio_29114f6b21.mp3?filename=lofi-study-112191.mp3',
     is_protected: true,
@@ -236,6 +237,7 @@ export async function fetchMemoryView(tagUid, grantToken = null) {
     audio_title: mem.audio_title,
     audio_url: mem.audio_url,
     is_protected: mem.is_protected,
+    pin_hint: mem.is_protected && mem.pin_hint ? mem.pin_hint : null,
     is_unlocked: isUnlocked,
     // CHỐNG RÒ RỈ: Nếu chưa mở khóa thì letter là NULL
     letter: isUnlocked ? (mem.letter || mem._private_letter) : null,
@@ -368,9 +370,11 @@ export async function updateMemorySpace(tagUid, payload) {
   if (payload.pin_action === 'SET' && payload.pin_code) {
     mem.is_protected = true;
     mem._pin_hash = await sha256(payload.pin_code.trim());
+    mem.pin_hint = payload.pin_hint ? String(payload.pin_hint).trim() : null;
   } else if (payload.pin_action === 'REMOVE') {
     mem.is_protected = false;
     mem._pin_hash = null;
+    mem.pin_hint = null;
   }
   if (payload.pin_action === 'SET' || payload.pin_action === 'REMOVE') {
     for (const [token, grant] of demoGrants) {

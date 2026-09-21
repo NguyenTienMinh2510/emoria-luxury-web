@@ -1,3 +1,4 @@
+import NfcLanding from './components/NfcLanding';
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import AnalyticsConsent from './components/AnalyticsConsent';
@@ -47,6 +48,7 @@ export default function App() {
   const [recovery, setRecovery] = useState(false);
   const [routeReady, setRouteReady] = useState(false);
   const [systemReady,setSystemReady]=useState(false);
+  const [chipId,setChipId]=useState('');
   const [currentTag, setCurrentTag] = useState('emoria-lumen');
   const [selectedArticleSlug, setSelectedArticleSlug] = useState('nghe-thuat-che-tac-da-quy-emoria');
   const [activeSection, setActiveSection] = useState('collection');
@@ -153,6 +155,7 @@ export default function App() {
         setTrackingRequest({ id: orderId, token, paymentResult: payment });
         setCurrentView('shop');
       } else if(q.get('article')) { setSelectedArticleSlug(q.get('article'));setCurrentView('article-detail'); }
+      else if(q.get('chip')) {setChipId(q.get('chip'));setCurrentView('nfc');}
       else if(q.get('tag') || q.get('memory')) {setCurrentTag(q.get('tag') || q.get('memory'));setCurrentView('memory');}
       else {setCurrentView(['home','shop','memory','articles','about','admin'].includes(q.get('view')) ? q.get('view') : 'home');if(q.get('view')==='memory')setCurrentTag('');}
       setRouteReady(true);
@@ -163,12 +166,13 @@ export default function App() {
   useEffect(()=>{
     if(!routeReady)return;
     const url=new URL(window.location.href);
-    ['view','tag','memory','article','payment','orderId','token'].forEach(key=>url.searchParams.delete(key));
+    ['chip','view','tag','memory','article','payment','orderId','token'].forEach(key=>url.searchParams.delete(key));
     if(currentView==='article-detail')url.searchParams.set('article',selectedArticleSlug);
+    else if(currentView==='nfc')url.searchParams.set('chip',chipId);
     else if(currentView==='memory') {if(currentTag)url.searchParams.set('tag',currentTag);else url.searchParams.set('view','memory');}
     else if(currentView!=='home')url.searchParams.set('view',currentView);
     if(url.href!==window.location.href)window.history.pushState({},'',url);
-  },[currentView,currentTag,selectedArticleSlug,routeReady]);
+  },[currentView,currentTag,chipId,selectedArticleSlug,routeReady]);
 
   // Cart Handlers
   const handleAddToCart = (product, quantity = 1) => {
@@ -429,6 +433,7 @@ export default function App() {
         )}
 
         {/* VIEW 3: DEDICATED MEMORY SPACE VAULT SHOWCASE */}
+        {currentView==='nfc'&&<NfcLanding chipId={chipId} onResolved={handleOpenMemoryViewer} onMyMemories={()=>{setCurrentTag('');setCurrentView('memory');}}/>}
         {currentView === 'memory' && (
           <MemorySpaceView
             key={authSession.user?.id || 'guest'}
@@ -679,6 +684,11 @@ export default function App() {
         currentUser={currentUser}
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
+        onNavigateToMemory={() => {
+          setIsAuthOpen(false);
+          setCurrentView('memory');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
     </div>

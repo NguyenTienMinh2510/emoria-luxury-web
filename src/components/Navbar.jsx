@@ -1,3 +1,4 @@
+import {useLanguage,LanguageSwitcher} from '../i18n/LanguageProvider';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, User, ShoppingBag, Menu, X, Sparkles, SmartphoneNfc, Store, Compass, BookOpen, Shield } from 'lucide-react';
@@ -16,6 +17,7 @@ export default function Navbar({
   onSelectView,
   sandbox=false,
 }) {
+  const {t}=useLanguage();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,7 +84,7 @@ export default function Navbar({
               }`}
             >
               <Compass className="w-3.5 h-3.5" />
-              <span>Trang Chủ</span>
+              <span>{t("Trang Chủ","Home")}</span>
             </button>
 
             <button
@@ -94,7 +96,7 @@ export default function Navbar({
               }`}
             >
               <Store className="w-3.5 h-3.5" />
-              <span>Cửa Hàng</span>
+              <span>{t("Cửa Hàng","Shop")}</span>
             </button>
 
             <button
@@ -106,7 +108,7 @@ export default function Navbar({
               }`}
             >
               <SmartphoneNfc className="w-3.5 h-3.5" />
-              <span>Kỷ Niệm</span>
+              <span>{t("Kỷ Niệm","Memories")}</span>
             </button>
 
             <button
@@ -118,7 +120,7 @@ export default function Navbar({
               }`}
             >
               <BookOpen className="w-3.5 h-3.5" />
-              <span>Bài Viết</span>
+              <span>{t("Bài Viết","Journal")}</span>
             </button>
 
             <button
@@ -130,7 +132,7 @@ export default function Navbar({
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Giới Thiệu</span>
+              <span>{t("Giới Thiệu","About")}</span>
             </button>
 
             {isAdmin && (
@@ -143,7 +145,7 @@ export default function Navbar({
                 }`}
               >
                 <Shield className="w-3.5 h-3.5 text-amber-400" />
-                <span>Quản Trị</span>
+                <span>{t("Quản Trị","Admin")}</span>
               </button>
             )}
           </div>
@@ -151,6 +153,7 @@ export default function Navbar({
           {/* Right Action Bar: Search, Cart, User Profile */}
           <div className="flex items-center gap-2 sm:gap-3">
 
+            <LanguageSwitcher/>
             {/* Search Input Bar (Visible from lg) */}
             <form
               onSubmit={handleSearchSubmit}
@@ -162,7 +165,7 @@ export default function Navbar({
                 id="search-input"
                 name="search"
                 type="text"
-                placeholder="Tìm trang sức..."
+                placeholder={t("Tìm trang sức...","Search jewelry...")}
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -174,18 +177,18 @@ export default function Navbar({
               />
               <button
                 type="submit"
-                aria-label="Tìm kiếm"
+                aria-label={t("Tìm kiếm","Search")}
                 className="absolute right-2 text-slate-400 hover:text-white transition-colors"
               >
                 <Search className="w-3.5 h-3.5" />
               </button>
             </form>
 
-            {isAdmin&&<button onClick={()=>handleSwitchView('admin')} className="hidden sm:block min-h-11 px-2 sm:px-3 text-xs rounded-xl border border-white/20" aria-current={currentView==='admin'?'page':undefined}>Quản trị</button>}
+            {isAdmin&&<button onClick={()=>handleSwitchView('admin')} className="hidden sm:block min-h-11 px-2 sm:px-3 text-xs rounded-xl border border-white/20" aria-current={currentView==='admin'?'page':undefined}>{t("Quản trị","Admin")}</button>}
             {/* Shopping Cart Button */}
             <button
               onClick={onOpenCart}
-              aria-label="Giỏ hàng"
+              aria-label={t("Giỏ hàng","Cart")}
               className="relative p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center cursor-pointer min-w-[38px] min-h-[38px]"
             >
               <ShoppingBag className="w-5 h-5 stroke-[1.5]" />
@@ -199,7 +202,7 @@ export default function Navbar({
             {/* Auth / Account Profile Button */}
             <button
               onClick={onOpenAuth}
-              aria-label={currentUser?`Tài khoản ${currentUser}`:"Tài khoản"}
+              aria-label={currentUser?`Tài khoản ${currentUser}`:t("Tài khoản","Account")}
               className="p-1.5 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer min-h-[38px]"
             >
               <div className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold transition-all ${
@@ -215,7 +218,7 @@ export default function Navbar({
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="xl:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center min-w-[40px] min-h-[40px]"
-              aria-label="Mở menu" aria-expanded={mobileMenuOpen}
+              aria-label={t("Mở menu","Open menu")} aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -243,7 +246,7 @@ export default function Navbar({
                   }`}
                 >
                   <Compass className="w-3.5 h-3.5" />
-                  <span>Trang Chủ</span>
+                  <span>{t("Trang Chủ","Home")}</span>
                 </button>
 
                 <button
@@ -255,7 +258,7 @@ export default function Navbar({
                   }`}
                 >
                   <Store className="w-3.5 h-3.5" />
-                  <span>Cửa Hàng</span>
+                  <span>{t("Cửa Hàng","Shop")}</span>
                 </button>
 
                 <button
@@ -267,7 +270,7 @@ export default function Navbar({
                   }`}
                 >
                   <SmartphoneNfc className="w-3.5 h-3.5" />
-                  <span>Kỷ Niệm</span>
+                  <span>{t("Kỷ Niệm","Memories")}</span>
                 </button>
 
                 <button
@@ -279,7 +282,7 @@ export default function Navbar({
                   }`}
                 >
                   <BookOpen className="w-3.5 h-3.5" />
-                  <span>Bài Viết</span>
+                  <span>{t("Bài Viết","Journal")}</span>
                 </button>
 
                 <button
@@ -291,18 +294,18 @@ export default function Navbar({
                   }`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Giới Thiệu</span>
+                  <span>{t("Giới Thiệu","About")}</span>
                 </button>
               </div>
 
-              {isAdmin&&<button onClick={()=>handleSwitchView('admin')} className="w-full min-h-11 rounded-xl bg-white text-dark-950 font-semibold">Trang quản trị</button>}
+              {isAdmin&&<button onClick={()=>handleSwitchView('admin')} className="w-full min-h-11 rounded-xl bg-white text-dark-950 font-semibold">{t("Trang quản trị","Admin dashboard")}</button>}
               {/* Mobile Search */}
               <form onSubmit={handleSearchSubmit} className="relative mb-2">
                 <input
                   id="search-input-mobile"
                   name="search_mobile"
                   type="text"
-                  placeholder="Tìm kiếm trang sức..."
+                  placeholder={t("Tìm kiếm trang sức...","Search jewelry...")}
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -310,7 +313,7 @@ export default function Navbar({
                   }}
                   className="w-full h-10 pl-3 pr-8 rounded-xl text-sm bg-black/40 border border-white/20 text-white placeholder-slate-400 focus:outline-none"
                 />
-                <button type="submit" aria-label="Tìm kiếm" className="absolute right-3 top-2.5 text-slate-300">
+                <button type="submit" aria-label={t("Tìm kiếm","Search")} className="absolute right-3 top-2.5 text-slate-300">
                   <Search className="w-4 h-4" />
                 </button>
               </form>
@@ -325,7 +328,7 @@ export default function Navbar({
                   className="flex-1 h-10 flex items-center justify-center gap-2 text-xs font-medium text-slate-200 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer"
                 >
                   <SmartphoneNfc className="w-3.5 h-3.5 text-white" />
-                  <span>Thử Chạm NFC</span>
+                  <span>{t("Thử Chạm NFC","Try NFC")}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -334,7 +337,7 @@ export default function Navbar({
                   }}
                   className="h-10 flex items-center justify-center text-xs font-medium text-white px-4 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 cursor-pointer"
                 >
-                  Tài khoản
+                  {t("Tài khoản","Account")}
                 </button>
               </div>
             </motion.div>

@@ -47,14 +47,14 @@ try{
  assert.equal((await request('read',{})).status,401,'Locked labels inaccessible through HTTP');
  assert.equal((await request('analyze',{path,consent:true})).status,401,'Analysis requires HTTP authentication');
  await good(root.from('memory_video_labels').update({status:'failed',started_at:new Date(Date.now()-60000).toISOString()}).eq('path',path));
- const analyzed=await request('analyze',{path,consent:true},login.session.access_token);
+ const analyzed=await request('analyze',{path,consent:true,include_labels:true},login.session.access_token);
  assert.equal(analyzed.status,200,JSON.stringify(analyzed.data));assert.deepEqual(analyzed.data,{approved:true,reason:null});
  const read=await request('read',{},login.session.access_token);assert.equal(read.status,403,'Owner cannot read internal labels');
  await good(root.from('memory_spaces').update({intro_video_path:path}).eq('tag_uid',tag));
  await good(viewer.storage.from('emoria-memory').createSignedUrl(path,120));
  await good(root.from('memory_video_labels').update({status:'failed',started_at:new Date(Date.now()-60000).toISOString()}).eq('path',path));
  violations=['GRAPHIC_VIOLENCE'];
- const rejected=await request('analyze',{path,consent:true},login.session.access_token);
+ const rejected=await request('analyze',{path,consent:true,include_labels:true},login.session.access_token);
  assert.equal(rejected.status,200);assert.equal(rejected.data.approved,false);assert.match(rejected.data.reason,/Bạo lực/);
  assert.ok((await root.storage.from('emoria-memory').download(path)).error,'Rejected video bytes removed');
  assert.ok((await root.from('memory_spaces').update({intro_video_path:path}).eq('tag_uid',tag)).error,'Rejected video cannot be attached');
@@ -66,7 +66,7 @@ try{
  assert.ok((await good(admin.from('video_upload_events').select('id').eq('tag',tag))).length>0,'Admin can read audit log');const adminRead=await request('read',{},adminLogin.session.access_token);
  assert.deepEqual(adminRead.data.labels[path],['Thiên nhiên']);
  const api=async(route,token)=>{const r=await fetch(`http://127.0.0.1:${server.address().port}/api/v1${route}`,{headers:{Authorization:'Bearer '+token}});return {status:r.status,data:await r.json()};};
- const ownerUploads=await api(`/memories/${tag}/video-uploads`,login.session.access_token);
+ const ownerUploads=await api(`/memories/${tag}/video-uploads?include_labels=1`,login.session.access_token);
  assert.equal(ownerUploads.status,200);
  assert.ok(ownerUploads.data.uploads.some(row=>row.status==='rejected'));
  for(const row of ownerUploads.data.uploads){assert.equal(row.labels,undefined);assert.equal(row.violations,undefined);}
@@ -80,8 +80,8 @@ try{
  const rejectedHistory=await api('/admin/video-uploads?'+new URLSearchParams({search:tag,status:'rejected'}),adminLogin.session.access_token);
  assert.ok(rejectedHistory.data.length>0&&rejectedHistory.data.every(row=>row.status==='rejected'));
  await good(root.from('video_upload_events').insert(Array.from({length:27},()=>({user_id:owner,author_name:events[0].author_name,tag,path,status:'ready',labels:['Chủ đề tự do'],model:'fixture',policy_version:1,request_id:crypto.randomUUID()}))));
- const page0=(await api('/admin/video-uploads?'+new URLSearchParams({search:tag,user:owner,page:0}),adminLogin.session.access_token)).data;
- const page1=(await api('/admin/video-uploads?'+new URLSearchParams({search:tag,user:owner,page:1}),adminLogin.session.access_token)).data;
+ const page0=(await api('/admin/video-uploads?'+new URLSearchParams({search:tag,user:owner,page:0,history:true}),adminLogin.session.access_token)).data;
+ const page1=(await api('/admin/video-uploads?'+new URLSearchParams({search:tag,user:owner,page:1,history:true}),adminLogin.session.access_token)).data;
  assert.equal(page0.length,25);assert.ok(page1.length>0);
  assert.ok(page1.every(row=>row.user_id===owner&&!page0.some(first=>first.id===row.id)),'Account history pagination is stable');
  assert.equal((await api('/admin/video-uploads',login.session.access_token)).status,403);

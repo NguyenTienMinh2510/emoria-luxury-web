@@ -27,7 +27,8 @@ export default function AuthDialog({
   onLoginSuccess, 
   currentUser, 
   recovery = false, 
-  initialMode = 'login' 
+  initialMode = 'login',
+  onNavigateToMemory
 }) {
   // Auth Modes: 'login' | 'register' | 'forgot' | 'reset'
   const [mode, setMode] = useState('login');
@@ -534,7 +535,7 @@ export default function AuthDialog({
         {/* TAB 2: ĐƠN HÀNG CỦA BẠN */}
         {activeTab === 'orders' && (
           <div>
-            <CustomerOrders />
+            <CustomerOrders onNavigateToMemory={onNavigateToMemory} onClose={onClose} />
           </div>
         )}
 

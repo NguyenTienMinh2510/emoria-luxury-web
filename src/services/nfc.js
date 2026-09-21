@@ -7,12 +7,26 @@ export function nfcMemoryUrl(tag,origin=nfcOrigin()) {
   url.searchParams.set('tag',tag);return url.href;
 }
 export function readMemoryTag(message,origin=nfcOrigin()) {
+  const target=readNfcTarget(message,origin);
+  if(target.kind==='memory')return target.id;
+  throw new Error('Chip dùng link riêng; hãy mở bằng trình quét EMORIA.');
+}
+export function nfcChipUrl(id,origin=nfcOrigin()) {
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))throw new Error('Invalid chip ID');
+  const url=new URL('/',origin);
+  if(url.protocol!=='https:')throw new Error('NFC requires HTTPS');
+  url.searchParams.set('chip',id);return url.href;
+}
+export function readNfcTarget(message,origin=nfcOrigin()) {
   for(const record of message.records){
     if(record.recordType!=='url')continue;
     try{
       const url=new URL(new TextDecoder().decode(record.data));
       const tag=url.searchParams.get('tag');
-      if(url.origin===origin&&url.pathname==='/'&&url.searchParams.getAll('tag').length===1&&validTag(tag))return tag;
+      if(url.origin!==origin||url.pathname!=='/')continue;
+      const chip=url.searchParams.get('chip');
+      if(chip&&!tag&&url.searchParams.getAll('chip').length===1&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chip))return {kind:'chip',id:chip.toLowerCase()};
+      if(!chip&&url.searchParams.getAll('tag').length===1&&validTag(tag))return {kind:'memory',id:tag};
     }catch{/* Ignore non-URL records; never navigate to arbitrary NFC content. */}
   }
   throw new Error('Chip chưa chứa link kỷ vật EMORIA hợp lệ.');

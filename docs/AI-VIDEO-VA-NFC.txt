@@ -108,6 +108,16 @@ Cập nhật: 20/09/2026
 - Cần kiểm thử chip thật: ghi mới, chip chỉ đọc, ghi đè, quyền trình duyệt,
   Android và mở URL bằng iPhone. Các test hiện tại chưa thay thế kiểm tra này.
 
+8. TÀI KHOẢN & ĐA NGÔN NGỮ (I18N)
+- Quản trị viên có thể cấp quyền Memory Space trực tiếp cho tài khoản người dùng
+  (Owner được chỉnh sửa; Recipient chỉ được đọc và xem media qua server-signed URL).
+- Không gian kỷ vật có thể liên kết nhiều chip NFC (`nfc_links`) và hỗ trợ landing
+  tại `/nfc-chips/:id` tự động giải mã tag_uid tương ứng.
+- Quản trị kiểm duyệt video gộp các sự kiện theo từng tệp (mặc định gom nhóm và
+  đếm số lần thử lại / số sự kiện), có tùy chọn xem toàn bộ lịch sử chi tiết.
+- Hệ thống hỗ trợ đa ngôn ngữ toàn diện (Tiếng Việt mặc định, Tiếng Anh tùy chọn)
+  qua `LanguageProvider` và lưu ngôn ngữ vào `localStorage`.
+
 TÀI LIỆU CHÍNH THỨC
 https://ai.google.dev/gemini-api/docs/pricing
 https://ai.google.dev/gemini-api/docs/models/gemini-3.7-flash

@@ -1,3 +1,4 @@
+import MemoryAccountsAdmin from './MemoryAccountsAdmin';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -278,7 +279,8 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
             </div>
           </div>
 
-          <label className="sm:hidden store-label mb-6">Khu vực quản trị<select className="store-input" value={activeTab} onChange={e=>setActiveTab(e.target.value)}>{[['video-moderation','Kiểm duyệt video'],['marketing','Phân tích marketing'],['orders','Đơn hàng'],['catalog','Sản phẩm & kho'],['articles','Bài viết'],['moderation','Duyệt bình luận'],['nfc','Kỷ vật NFC'],['contacts','Liên hệ'],['store-settings','Cấu hình bán hàng'],['system','Bảo trì']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+          <button className="store-button mb-3" onClick={()=>setActiveTab('memories')}>Memory Space & Tài khoản</button>
+          <label className="sm:hidden store-label mb-6">Khu vực quản trị<select className="store-input" value={activeTab} onChange={e=>setActiveTab(e.target.value)}>{[['video-moderation','Kiểm duyệt video'],['marketing','Phân tích marketing'],['orders','Đơn hàng'],['catalog','Sản phẩm & kho'],['articles','Bài viết'],['moderation','Duyệt bình luận'],['memories','Memory Space & Tài khoản'],['nfc','Chip NFC'],['contacts','Liên hệ'],['store-settings','Cấu hình bán hàng'],['system','Bảo trì']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
           {/* Navigation Tabs */}
           <div className="hidden sm:flex flex-wrap gap-2 mb-4">{[['video-moderation','Kiểm duyệt video'],['marketing','Phân tích marketing'],['catalog','Sản phẩm & kho'],['store-settings','Cấu hình bán hàng'],['contacts','Liên hệ']].map(([key,label])=><button key={key} onClick={()=>setActiveTab(key)} className={activeTab===key?'store-button':'px-4 py-2 text-sm bg-white/5 rounded-xl'}>{label}</button>)}</div>
           <div className="hidden sm:flex flex-wrap items-center gap-2 mb-6 border-b border-white/10 pb-3">
@@ -479,6 +481,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
           )}
 
           {/* ================= TAB 3: NFC MEMORY TAGS ================= */}
+          {activeTab==='memories'&&<MemoryAccountsAdmin/>}
           {activeTab==='nfc'&&<NfcOperations/>}
 
           {/* ================= TAB: ARTICLES MANAGEMENT ================= */}

@@ -17,7 +17,7 @@ globalThis.fetch=async(input)=>{
     {type:'image',url:'storage://emo-test/disguised-video'},
     {type:'image',url:'storage://other/private'}
   ],audio_url:'storage://emo-test/song',intro_video_path:'emo-test/intro'});
-  if(url.includes('/memory_video_labels')){checks++;return missingTable?Response.json({code:'PGRST205',message:'Missing table'}, {status:404}):Response.json([{path:'emo-test/ready'}]);}
+  if(url.includes('/memory_video_labels')){checks++;return missingTable?Response.json({code:'PGRST205',message:'Missing table'}, {status:404}):Response.json([{path:'emo-test/ready'},{path:'emo-test/photo'}]);}
   if(url.includes('/object/info/'))return Response.json({content_type:url.endsWith('/song')?'audio/mpeg':url.endsWith('/disguised-video')?'video/mp4':'image/jpeg'});
   if(url.includes('/object/sign/')){
     const path=url.split('/object/sign/emoria-memory/')[1];signs.push(path);
@@ -34,14 +34,14 @@ async function call(){
 try{
   const normal=await call();assert.equal(normal.status,200);
   assert.deepEqual(Object.keys(normal.data.urls).sort(),['emo-test/photo','emo-test/ready','emo-test/song']);
-  assert.deepEqual(normal.data.blocked,['emo-test/pending','emo-test/rejected','emo-test/intro']);
+  assert.deepEqual(normal.data.blocked,['emo-test/pending','emo-test/rejected','emo-test/disguised-video','other/private','emo-test/intro']);
   assert.ok(!signs.some(path=>path.startsWith('other/')),'Never sign a foreign memory path');
   assert.ok(!signs.includes('emo-test/disguised-video'),'Gallery type cannot bypass video moderation');
   missingTable=true;signs=[];
   const degraded=await call();assert.equal(degraded.status,200);assert.ok(degraded.data.warning);
-  assert.deepEqual(Object.keys(degraded.data.urls).sort(),['emo-test/photo','emo-test/song']);
+  assert.deepEqual(Object.keys(degraded.data.urls).sort(),['emo-test/song']);
   assert.ok(!signs.includes('emo-test/ready'),'Missing moderation table must not approve video');
-  brokenImage=true;
+  missingTable=false;brokenImage=true;
   const partial=await call();assert.equal(partial.status,200);assert.ok(partial.data.urls['emo-test/song']);assert.ok(partial.data.unavailable.includes('emo-test/photo'));
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;signs=[];checks=0;
   const missingKey=await call();assert.equal(missingKey.status,200);assert.deepEqual(missingKey.data.urls,{});assert.ok(missingKey.data.warning);assert.equal(checks,0);assert.equal(signs.length,0);

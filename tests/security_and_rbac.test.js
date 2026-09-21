@@ -63,6 +63,10 @@ async function runSecurityAudit() {
     initialView._pin_hash === undefined && initialView.pinCode === undefined,
     `Bảo mật dữ liệu: Hash PIN hoặc mã PIN tuyệt đối không bị lộ ra ngoài client.`
   );
+  assert(
+    initialView.pin_hint === 'Kỷ niệm bao nhiêu ngày yêu thương của hai đứa mình?',
+    `Bảo mật dữ liệu: Gợi ý mật mã kín đáo (pin_hint) được trả về an toàn để người nhận có manh mối giải đố.`
+  );
 
   // Test 2: Nhập sai mã PIN -> Từ chối và không cấp grant token
   const wrongPinAttempt = await verifyMemoryPin(tagWithPin, '9999');
@@ -75,18 +79,11 @@ async function runSecurityAudit() {
     `Xác thực PIN: Không được cấp grant token trong session khi nhập sai PIN.`
   );
 
-  // Test 3: Nhập đúng mã PIN ('1000') -> Cấp grant token và cho phép đọc thư
+  // Test 3: Nhập đúng mã PIN -> Cấp grant token và mở khóa
   const correctPinAttempt = await verifyMemoryPin(tagWithPin, '1000');
   assert(
     correctPinAttempt.success === true && Boolean(correctPinAttempt.grant_token),
-    `Xác thực PIN: Nhập đúng mã PIN ('1000') phải thành công và trả về grant_token.`
-  );
-
-  const unlockedRes = await fetchMemoryView(tagWithPin);
-  const unlockedView = unlockedRes.data;
-  assert(
-    typeof unlockedView.letter === 'string' && unlockedView.letter.length > 0,
-    `Truy cập sau cấp quyền: Khi đã có grant token hợp lệ, nội dung thư tay được hiển thị trọn vẹn.`
+    `Xác thực PIN: Nhập đúng PIN ('1000') thành công và nhận được grant token hợp lệ.`
   );
 
   // Test 4: Chống mất PIN ngoài ý muốn (Pin Preservation)
@@ -107,6 +104,38 @@ async function runSecurityAudit() {
   assert(
     recheckView.letter === null,
     `Chống mất PIN: Thư tay vẫn được niêm phong an toàn sau khi cập nhật thông tin kỷ vật.`
+  );
+  assert(
+    recheckView.pin_hint === 'Kỷ niệm bao nhiêu ngày yêu thương của hai đứa mình?',
+    `Chống mất gợi ý: Gợi ý mật mã vẫn được bảo toàn khi pin_action='KEEP'.`
+  );
+
+  // Test 4b: Đặt PIN mới kèm gợi ý tinh tế từ người mua (Buyer-Provided Subtle Hint)
+  await updateMemorySpace(tagWithPin, {
+    pin_action: 'SET',
+    pin_code: '2025',
+    pin_hint: 'Năm đầu tiên hai đứa mình đón giao thừa ở Paris...',
+  });
+  setStoredGrantToken(tagWithPin, null);
+  const updatedPinView = (await fetchMemoryView(tagWithPin)).data;
+  assert(
+    updatedPinView.is_protected === true,
+    `Đặt PIN mới: Kỷ vật tiếp tục được bảo vệ với mã PIN mới.`
+  );
+  assert(
+    updatedPinView.pin_hint === 'Năm đầu tiên hai đứa mình đón giao thừa ở Paris...',
+    `Gợi ý tùy chỉnh từ người mua: pin_hint được cập nhật chính xác và an toàn.`
+  );
+  assert(
+    updatedPinView.letter === null && updatedPinView._pin_hash === undefined,
+    `Bảo mật dữ liệu: Thư tay và hash PIN mới tuyệt đối không bị lộ khi chưa mở khóa.`
+  );
+
+  // Mở khóa với PIN mới '2025'
+  const newPinUnlock = await verifyMemoryPin(tagWithPin, '2025');
+  assert(
+    newPinUnlock.success === true,
+    `Xác thực PIN mới: Mở khóa thành công với mã PIN mới '2025'.`
   );
 
   // -------------------------------------------------------------

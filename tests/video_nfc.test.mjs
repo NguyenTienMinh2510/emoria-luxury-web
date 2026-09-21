@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import handler from '../api/v1.js';
 import {labelVideo} from '../server/geminiVideo.js';
-import {nfcMemoryUrl,readMemoryTag,canUseNfc,nfcError} from '../src/services/nfc.js';
+import {nfcMemoryUrl,nfcChipUrl,readNfcTarget,readMemoryTag,canUseNfc,nfcError} from '../src/services/nfc.js';
 import {normalizeVideoLabels,moderationResult} from '../src/services/videoLabels.js';
 const record=url=>({recordType:'url',data:new DataView(new TextEncoder().encode(url).buffer)});
 const origin='https://emoria-luxury-web.vercel.app';
@@ -10,6 +10,10 @@ assert.equal(nfcMemoryUrl('emo-test'),origin+'/?tag=emo-test');
 assert.equal(readMemoryTag({records:[{recordType:'text'},record(origin+'/?tag=emo-test')]}),'emo-test');
 for(const url of ['https://evil.test/?tag=emo-test','javascript:alert(1)',origin+'/?tag=../private',origin+'/?tag=a&tag=b',origin+'/other?tag=abc'])assert.throws(()=>readMemoryTag({records:[record(url)]}));
 assert.throws(()=>nfcMemoryUrl('../private'));assert.throws(()=>nfcMemoryUrl('valid','http://insecure.test'));
+const chipId='12345678-1234-1234-1234-123456789abc';
+assert.equal(nfcChipUrl(chipId),origin+'/?chip='+chipId);
+assert.deepEqual(readNfcTarget({records:[record(nfcChipUrl(chipId))]}),{kind:'chip',id:chipId});
+for(const url of [origin+'/?chip=invalid',origin+'/?chip='+chipId+'&tag=a',origin+'/?chip='+chipId+'&chip='+chipId])assert.throws(()=>readNfcTarget({records:[record(url)]}));
 assert.equal(canUseNfc(),false);assert.match(nfcError({name:'NotAllowedError'}),/quyền/);
 assert.deepEqual(normalizeVideoLabels(['Biển','Biển','Du lịch']),['Biển','Du lịch']);
 assert.deepEqual(normalizeVideoLabels(['  Hội trại cuối hè! 🎉  ','hội trại cuối hè','Hội trại cuối hè','\u202e***','Chèo thuyền kayak']),['Hội trại cuối hè','Chèo thuyền kayak']);
@@ -54,7 +58,7 @@ await assert.rejects(()=>labelVideo(new Blob([new Uint8Array(11*1024*1024)],{typ
 
 process.env.SUPABASE_URL='https://video-fixture.supabase.co';process.env.SUPABASE_PUBLISHABLE_KEY='public-key';process.env.SUPABASE_SERVICE_ROLE_KEY='server-key';process.env.GEMINI_API_KEY='private-key';
 const originalFetch=globalThis.fetch;
-let owner=true,unlocked=true,cached=false,isAdmin=false,dbCalls=[],modelCalls=0,storedLabels;
+let reserveError=false,owner=true,unlocked=true,cached=false,isAdmin=false,dbCalls=[],modelCalls=0,storedLabels;
 globalThis.fetch=async(input,options={})=>{
   const url=String(input);dbCalls.push(url);
   if(url.startsWith('https://generativelanguage.googleapis.com')){modelCalls++;return googleResponse();}
@@ -62,7 +66,7 @@ globalThis.fetch=async(input,options={})=>{
   if(url.includes('/rpc/is_admin'))return Response.json(isAdmin);
   if(url.includes('/video_upload_events'))return Response.json([]);
   if(url.includes('/rpc/rpc_get_memory_view'))return Response.json({success:true,is_owner:owner,is_unlocked:unlocked,media_gallery:[{url:'storage://emo-test/file',type:'video'}]});
-  if(url.includes('/rpc/reserve_video_labels'))return Response.json(cached?{cached:true,labels:['Biển'],approved:true,violations:[]}:{cached:false,request_id:'lease-id'});
+  if(url.includes('/rpc/reserve_video_labels'))return reserveError?Response.json({message:'quota unavailable'}, {status:503}):Response.json(cached?{cached:true,labels:['Biển'],approved:true,violations:[]}:{cached:false,request_id:'lease-id'});
   if(url.includes('/storage/v1/object/'))return new Response(small,{headers:{'content-type':'video/mp4'}});
   if(url.includes('/memory_video_labels')){
     if(options.method==='PATCH'){storedLabels=JSON.parse(options.body);return Response.json([{path:'emo-test/file'}]);}
@@ -85,6 +89,7 @@ try{
   owner=true;assert.equal((await call('read',{})).status,403,'Owners do not see topic labels');
   isAdmin=true;assert.deepEqual((await call('read',{})).data.labels,{'emo-test/file':['Biển']});isAdmin=false;
   owner=true;const fresh=await call('analyze',body);assert.equal(fresh.status,200);assert.deepEqual(fresh.data,{approved:true,reason:null});assert.equal(modelCalls,1);assert.equal(storedLabels.status,'ready');assert.deepEqual(storedLabels.labels,['Biển','Du lịch']);
-  cached=true;const cacheResult=await call('analyze',body);assert.equal(cacheResult.status,200);assert.deepEqual(cacheResult.data,{approved:true,reason:null});assert.equal(modelCalls,1);
+  cached=true;const cacheResult=await call('analyze',{...body,include_labels:true});assert.equal(cacheResult.status,200);assert.deepEqual(cacheResult.data,{approved:true,reason:null});assert.equal(modelCalls,1);
+  reserveError=true;cached=false;const failed=await call('analyze',body);assert.ok(failed.status>=400);assert.equal(modelCalls,1,'Failed reservation must never bypass quota to call Google');
 }finally{globalThis.fetch=originalFetch;}
 console.log('PASS video/NFC: owner-only consent, private labels, model response validation, cache, Google cleanup, safe NFC URL parsing and open-domain label normalization. Hardware and live Gemini are separate checks.');

@@ -42,6 +42,8 @@ const {default:VideoModerationAdmin}=await compile('src/components/VideoModerati
 const adminVideoHtml=render(VideoModerationAdmin,{});
 assert.ok(adminVideoHtml.includes('User ID, tên tác giả hoặc mã kỷ vật'));
 assert.ok(adminVideoHtml.includes('Tìm kiếm'));
+assert.ok(adminVideoHtml.includes('Khoảng cách gộp đợt:'));
+assert.ok(adminVideoHtml.includes('Bộ lọc phân loại &amp; trạng thái'));
 const fixtureOrderId='EMO-1234567890ABCDEF1234567890ABCDEF';
 const memo=bankTransferMemo(fixtureOrderId);
 const bankHtml=render(BankAppPayment,{bank:'970418',account:'00123456789',owner:'TEST ONLY',order:{id:fixtureOrderId,totals:{finalTotal:123000}}});
@@ -65,3 +67,30 @@ assert.ok(moderationHtml.includes('bình luận gốc cần được duyệt'));
 assert.match(moderationHtml, /<button[^>]*disabled=""[^>]*>Duyệt<\/button>/);
 assert.ok(render(CommentModeration,{comments:[],onModerate:()=>{}}).includes('Không có bình luận trong mục này.'));
 console.log('PASS render: login/register disappear for authenticated user; charts handle empty/zero/90-day data with readable table. This is a render check, not a mobile browser test.');
+
+// Bundle the provider and components together so they share one React context.
+const localeEntry=path.join(target,'locale-entry.jsx');
+fs.writeFileSync(localeEntry,`import React from 'react';import LanguageProvider,{translate,readLanguage} from '../../src/i18n/LanguageProvider.jsx';import MemoryAccountsAdmin from '../../src/components/MemoryAccountsAdmin.jsx';import NfcOperations from '../../src/components/NfcOperations.jsx';import VideoModerationAdmin from '../../src/components/VideoModerationAdmin.jsx';import Navbar from '../../src/components/Navbar.jsx';export {translate,readLanguage};export default function Fixture(){return <LanguageProvider initialLanguage="en"><Navbar/><MemoryAccountsAdmin/><NfcOperations/><VideoModerationAdmin/></LanguageProvider>;}`);
+const localized=await compile(localeEntry,'locale-render');const english=render(localized.default,{});
+for(const text of ['Memory Spaces &amp; accounts','NFC chips &amp; independent links','Media moderation','Show individual events','Language'])assert.ok(english.includes(text),text);
+assert.equal(localized.translate('en','Xin chào {name}','Hello {name}',{name:'Sam'}),'Hello Sam');
+assert.equal(localized.translate('vi','Xin chào','Hello'),'Xin chào');
+globalThis.localStorage={getItem:()=> 'en'};assert.equal(localized.readLanguage(),'en');
+globalThis.localStorage={getItem:()=>{throw new Error('blocked');}};assert.equal(localized.readLanguage(),'vi');delete globalThis.localStorage;
+console.log('PASS i18n render: shared VI/EN context, admin spaces/chips/media and navigation, stored language and unavailable storage fallback.');
+
+const {default:LuxuryUnboxing}=await compile('src/components/LuxuryUnboxingExperience.jsx','unboxing');
+const unboxHtml=render(LuxuryUnboxing,{hasIntroVideo:true});
+assert.ok(unboxHtml.includes('EMORIA'));
+assert.ok(unboxHtml.includes('Chạm để mở bức thư'));
+
+const {default:AiMuse}=await compile('src/components/AiLetterMuseModal.jsx','ai-muse');
+const museHtml=render(AiMuse,{isOpen:true,onClose:()=>{},onApply:()=>{},author:'Alex',recipient:'Taylor'});
+assert.ok(museHtml.includes('Trợ Lý Chắp Bút Thư Tay Kỷ Vật'));
+assert.ok(museHtml.includes('Khởi tạo Thư tay'));
+
+const {default:CuratedMelodies}=await compile('src/components/CuratedMelodiesModal.jsx','curated-melodies');
+const melodiesHtml=render(CuratedMelodies,{isOpen:true,onClose:()=>{},onSelectMelody:()=>{}});
+assert.ok(melodiesHtml.includes('Kho Giai Điệu Chọn Lọc Emoria'));
+assert.ok(melodiesHtml.includes('Clair de Lune'));
+console.log('PASS luxury unboxing and AI muse render: wax seal, crystal chime chords, letter muse prompts, and curated melodies modal.');

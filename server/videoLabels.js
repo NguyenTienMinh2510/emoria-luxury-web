@@ -15,7 +15,7 @@ export async function readVideoUploads(c) {
   const view=await c.db(c.client.rpc('rpc_get_memory_view',{p_tag_uid:tag,p_grant_token:null}));
   if(!view.is_owner||!view.is_unlocked)throw fail(403,'Chỉ chủ sở hữu được xem kết quả tải video.');
   if(!process.env.SUPABASE_SERVICE_ROLE_KEY)return {uploads:[],warning:'Chức năng kiểm duyệt chưa được cấu hình.'};
-  const includeLabels=c.query.get('include_labels')==='1'||c.query.get('include_labels')==='true';
+  const includeLabels=view.is_admin===true&&(c.query.get('include_labels')==='1'||c.query.get('include_labels')==='true');
   const columns=includeLabels?'path,status,labels,reason,policy_version,started_at':'path,status,reason,policy_version,started_at';
   const result=await serverClient().from('memory_video_labels').select(columns).eq('tag',tag).order('started_at',{ascending:false}).limit(100);
   if(['42P01','PGRST205'].includes(result.error?.code))return {uploads:[],warning:'Chức năng kiểm duyệt đang chờ cập nhật dữ liệu.'};
@@ -36,21 +36,8 @@ export async function analyzeVideo(c) {
   const key=process.env.GEMINI_API_KEY;
   if(!key)throw fail(503,'Chưa cấu hình GEMINI_API_KEY trên server.');
   const client=serverClient();
-  let lease;
-  try {
-    lease=await c.db(client.rpc('reserve_video_labels',{p_user:c.user.id,p_tag:tag,p_path:path}));
-  } catch(rpcError) {
-    const existing=await client.from('memory_video_labels').select('*').eq('path',path).maybeSingle();
-    if(existing.data?.status==='ready'&&existing.data?.policy_version===1){
-      return publicResult(existing.data,c.body.include_labels);
-    }
-    const token=crypto.randomUUID();
-    await client.from('memory_video_labels').upsert({
-      path,tag,requested_by:c.user.id,status:'processing',request_id:token,started_at:new Date().toISOString()
-    });
-    lease={cached:false,request_id:token};
-  }
-  if(lease.cached)return publicResult(lease,c.body.include_labels);
+  const lease=await c.db(client.rpc('reserve_video_labels',{p_user:c.user.id,p_tag:tag,p_path:path}));
+  if(lease.cached)return publicResult(lease,view.is_admin===true&&c.body.include_labels===true);
   try {
     const download=await client.storage.from('emoria-memory').download(path);
     if(download.error)throw fail(422,'Không thể đọc phương tiện đã tải lên.');
@@ -64,7 +51,7 @@ export async function analyzeVideo(c) {
       const removed=await client.storage.from('emoria-memory').remove([path]);
       if(removed.error)console.warn('Rejected media cleanup pending');
     }
-    return publicResult(result,c.body.include_labels);
+    return publicResult(result,view.is_admin===true&&c.body.include_labels===true);
   }catch(error){
     await client.from('memory_video_labels').update({status:'failed',reason:'Chưa hoàn tất kiểm duyệt do lỗi kỹ thuật; không kết luận vi phạm.'}).eq('path',path).eq('request_id',lease.request_id).eq('status','processing');
     throw error.status?error:fail(503,'Kiểm duyệt bị gián đoạn. Phương tiện chưa được sử dụng; hãy thử lại sau.');

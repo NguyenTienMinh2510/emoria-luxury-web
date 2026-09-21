@@ -1,28 +1,40 @@
 // Explicit resource routes. SQL functions remain the transaction boundary.
 import {normalizeCheckout} from '../src/services/checkoutPayload.js';
 import {analyzeVideo,readVideoLabels,readVideoUploads} from './videoLabels.js';
+import {craftLetter} from './geminiLetter.js';
 const route=(method,path,access,run,status)=>({method,pattern:new RegExp(`^${path}$`),access,run,status});
 const rpc=(c,name,args={})=>c.db(c.client.rpc(name,args));
 const integer=(value,fallback,max=10000)=>{const n=Number(value??fallback);if(!Number.isInteger(n)||n<0||n>max)throw Object.assign(new Error('Tham số phân trang không hợp lệ.'),{status:400});return n;};
 const pick=(body,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(body,k)).map(k=>[k,body[k]]));
 const settingKeys=['sandbox','sales_enabled','cod_enabled','transfer_enabled','shipping_fee','free_shipping_from','gift_fee','reservation_minutes','bank_bin','bank_account','bank_owner','contact_email','contact_phone','address','ga4_measurement_id','shipping_policy','return_policy','privacy_policy'];
 export const routes=[
+  route('POST','/ai/craft-letter','user',craftLetter),
+  route('GET','/admin/accounts','admin',c=>rpc(c,'rpc_admin_accounts',{p_search:(c.query.get('search')||'').slice(0,120)})),
+  route('POST','/admin/memories','admin',c=>rpc(c,'rpc_admin_create_memory',{p_owner:c.body.ownerId,p_title:c.body.title}),201),
+  route('POST','/admin/orders/([^/]+)/memories','admin',c=>rpc(c,'rpc_admin_create_memory',{p_owner:null,p_title:c.body.title||'Memory Space',p_order:c.params[0],p_item:c.body.itemId}),201),
+  route('PUT','/admin/memories/([^/]+)/owner','admin',c=>rpc(c,'rpc_admin_memory_account',{p_tag:c.params[0],p_user:c.body.userId,p_role:'owner',p_version:c.body.version})),
+  route('PUT','/admin/memories/([^/]+)/recipients/([^/]+)','admin',c=>rpc(c,'rpc_admin_memory_account',{p_tag:c.params[0],p_user:c.params[1],p_role:'recipient'})),
+  route('DELETE','/admin/memories/([^/]+)/recipients/([^/]+)','admin',c=>rpc(c,'rpc_admin_memory_account',{p_tag:c.params[0],p_user:c.params[1],p_role:'recipient',p_remove:true})),
+  route('GET','/admin/nfc-chips','admin',c=>rpc(c,'rpc_admin_nfc_links',{p_search:(c.query.get('search')||'').slice(0,120),p_offset:integer(c.query.get('page'),0)*25})),
+  route('POST','/admin/nfc-chips','admin',c=>rpc(c,'rpc_admin_save_nfc_link',{p_id:null,p_payload:pick(c.body,['label','memoryTag','active'])}),201),
+  route('PATCH','/admin/nfc-chips/([^/]+)','admin',c=>rpc(c,'rpc_admin_save_nfc_link',{p_id:c.params[0],p_payload:pick(c.body,['label','memoryTag','active','version'])})),
+  route('GET','/nfc-chips/([^/]+)','public',async c=>{
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.params[0]))throw Object.assign(new Error('Chip not found'),{status:404});
+    const result=await rpc(c,'rpc_resolve_nfc_link',{p_id:c.params[0]});
+    if(!result)throw Object.assign(new Error('Chip is unassigned or disabled'),{status:404});
+    return result;
+  }),
   route('GET','/admin/video-uploads','admin',c=>{
-    const page=integer(c.query.get('page'),0),status=c.query.get('status');
-    let query=c.client.from('video_upload_events').select('id,created_at,user_id,author_name,tag,path,status,labels,violations,reason,model,policy_version').order('created_at',{ascending:false}).order('id',{ascending:false});
-    if(status){if(!['uploaded','processing','ready','rejected','failed'].includes(status))throw Object.assign(new Error('Trạng thái không hợp lệ.'),{status:400});query=query.eq('status',status);}
-    const category=c.query.get('category');
-    if(category==='intro')query=query.ilike('path','%intro%');
-    else if(category==='gallery')query=query.not('path','ilike','%intro%');
-    const mediaType=c.query.get('media_type');
-    if(mediaType==='image')query=query.or('path.ilike.%.jpg,path.ilike.%.jpeg,path.ilike.%.png,path.ilike.%.webp');
-    else if(mediaType==='video')query=query.or('path.ilike.%.mp4,path.ilike.%.webm');
-    const user=c.query.get('user'),raw=c.query.get('search')||'';
-    const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if(user){if(!uuid.test(user))throw Object.assign(new Error('User ID không hợp lệ.'),{status:400});query=query.eq('user_id',user);}
-    const term=raw.normalize('NFC').replace(/[^\p{L}\p{M}\p{N} -]/gu,' ').replace(/\s+/g,' ').trim().slice(0,120);
-    if(term)query=uuid.test(term)?query.eq('user_id',term):query.or(`author_name.ilike.%${term}%,tag.ilike.%${term}%`);
-    return c.db(query.range(page*25,page*25+24));
+    const status=c.query.get('status')||'',category=c.query.get('category')||'',type=c.query.get('media_type')||'',user=c.query.get('user')||null;
+    if(!['','uploaded','processing','ready','rejected','failed'].includes(status)||!['','intro','gallery'].includes(category)||!['','image','video'].includes(type)||user&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user))throw Object.assign(new Error('Invalid media filter'),{status:400});
+    return rpc(c,'rpc_admin_media_uploads',{p_search:(c.query.get('search')||'').slice(0,120),p_user:user,p_status:status,p_category:category,p_type:type,p_offset:integer(c.query.get('page'),0)*25,p_history:c.query.get('history')==='true'});
+  }),
+  route('POST','/admin/video-uploads/override','admin',async c=>{
+    const path=typeof c.body?.path==='string'?c.body.path.trim():'';
+    if(!path||path.length>500)throw Object.assign(new Error('Đường dẫn tệp không hợp lệ.'),{status:400});
+    const reason=typeof c.body?.reason==='string'&&c.body.reason.trim()?c.body.reason.trim():'Đã duyệt đặc cách bởi Quản trị viên';
+    await c.db(c.client.from('memory_video_labels').update({status:'ready',violations:[],reason,model:'admin-override'}).eq('path',path));
+    return {success:true,path,status:'ready',reason};
   }),
   route('POST','/memories/([^/]+)/video-labels/analyze','user',analyzeVideo),
   route('POST','/memories/([^/]+)/video-labels/read','admin',readVideoLabels),
@@ -35,7 +47,7 @@ export const routes=[
   route('GET','/me/memories','user',c=>rpc(c,'rpc_my_memories')),
   route('GET','/memories/([^/]+)/ownership','user',async c=>{
     const memories=await rpc(c,'rpc_my_memories');
-    return {isOwner:memories.some(m=>m.tag_uid===c.params[0])};
+    return {isOwner:memories.some(m=>m.tag_uid===c.params[0]&&m.role==='owner')};
   }),
   route('PATCH','/admin/system/maintenance','admin',async c=>{
     const data=await c.db(c.client.from('system_settings').select('value').eq('key','maintenance_config').single());
@@ -74,7 +86,7 @@ export const routes=[
   route('POST','/contacts','public',c=>rpc(c,'rpc_contact',{p_name:c.body.name,p_phone:c.body.phone,p_note:c.body.note}),201),
   route('GET','/admin/contacts','admin',c=>c.db(c.client.from('contact_requests').select('*').order('created_at',{ascending:false}).limit(100))),
   route('PATCH','/admin/contacts/([^/]+)','admin',c=>c.db(c.client.from('contact_requests').update({resolved:c.body.resolved===true}).eq('id',c.params[0]).select('id').single())),
-  route('GET','/admin/memories','admin',c=>rpc(c,'rpc_memory_operations')),
+  route('GET','/admin/memories','admin',c=>rpc(c,'rpc_admin_memory_spaces',{p_search:(c.query.get('search')||'').slice(0,120),p_offset:integer(c.query.get('page'),0)*25})),
   route('PATCH','/admin/memories/([^/]+)/suspension','admin',c=>rpc(c,'rpc_memory_operations',{p_tag:c.params[0],p_suspended:c.body.suspended})),
   route('GET','/articles','public',c=>rpc(c,'rpc_get_published_articles',{p_category:c.query.get('category'),p_search:c.query.get('search'),p_limit:integer(c.query.get('limit'),12,100),p_offset:integer(c.query.get('offset'),0)})),
   route('GET','/articles/([^/]+)','public',c=>rpc(c,'rpc_get_article_detail',{p_slug:c.params[0]})),

@@ -12,19 +12,19 @@ export default async function handler(req,res){
   if(error||!data?.is_unlocked)return send(403,{error:'Không có quyền xem media.'});
   const paths=[...new Set([...(data.media_gallery||[]).map(m=>m.url),data.audio_url,data.intro_video_path?'storage://'+data.intro_video_path:null].filter(x=>x?.startsWith('storage://')).map(x=>x.slice(10)))];
   const result={};
-  const videoPaths=[...(data.media_gallery||[]).filter(m=>m.type==='video').map(m=>m.url?.replace(/^storage:\/\//,'')),data.intro_video_path].filter(Boolean);
+  const moderatedPaths=[...(data.media_gallery||[]).filter(m=>['video','image'].includes(m.type)&&m.url?.startsWith('storage://')).map(m=>m.url?.replace(/^storage:\/\//,'')),data.intro_video_path].filter(Boolean);
   const unavailable=[];
   let warning=null;
-  if(!process.env.SUPABASE_SERVICE_ROLE_KEY)return send(200,{urls:{},blocked:videoPaths,unavailable:paths,expires_in:120,warning:'Media tạm thời chưa sẵn sàng. Bạn vẫn có thể đọc nội dung kỷ vật.'});
+  if(!process.env.SUPABASE_SERVICE_ROLE_KEY)return send(200,{urls:{},blocked:moderatedPaths,unavailable:paths,expires_in:120,warning:'Media tạm thời chưa sẵn sàng. Bạn vẫn có thể đọc nội dung kỷ vật.'});
   const admin=createClient(base,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false},global:{fetch:(url,options)=>fetch(url,{...options,signal:AbortSignal.timeout(15000)})}});
   const allowed=new Set();
-  if(videoPaths.length){
-    const check=await admin.from('memory_video_labels').select('path').eq('tag',body.tag).eq('status','ready').in('path',videoPaths);
-    // Fail closed for video, but preserve letters/photos when moderation is unavailable.
-    if(check.error)warning='Video tạm thời chưa sẵn sàng để kiểm tra quyền phát. Các nội dung khác vẫn xem được.';
+  if(moderatedPaths.length){
+    const check=await admin.from('memory_video_labels').select('path').eq('tag',body.tag).eq('status','ready').in('path',moderatedPaths);
+    // Fail closed for uploaded images/videos, preserving letters and audio when moderation is unavailable.
+    if(check.error)warning='Ảnh/video tạm thời chưa sẵn sàng để kiểm tra quyền xem. Các nội dung khác vẫn xem được.';
     else check.data.forEach(row=>allowed.add(row.path));
   }
-  const blocked=videoPaths.filter(path=>!allowed.has(path));
+  const blocked=moderatedPaths.filter(path=>!allowed.has(path));
   await Promise.all(paths.map(async path=>{
     if(path.split('/')[0]!==body.tag||blocked.includes(path)){unavailable.push(path);return;}
     try{
@@ -32,7 +32,7 @@ export default async function handler(req,res){
         // Gallery types are editable; never let a video disguised as an image bypass moderation.
         const info=await admin.storage.from('emoria-memory').info(path);
         const mime=info.data?.contentType||info.data?.metadata?.mimetype;
-        if(info.error||!['image/jpeg','image/png','image/webp','audio/mpeg','audio/wav','audio/ogg','audio/mp4'].includes(mime))throw new Error('Unverified media');
+        if(info.error||!['audio/mpeg','audio/wav','audio/ogg','audio/mp4'].includes(mime))throw new Error('Unverified media');
       }
       const signed=await admin.storage.from('emoria-memory').createSignedUrl(path,120);
       if(signed.error||!signed.data?.signedUrl)throw new Error('Unavailable');

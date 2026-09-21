@@ -1,3 +1,4 @@
+import {useLanguage} from '../i18n/LanguageProvider';
 import React, {useEffect, useRef, useState} from 'react';
 import {supabase} from '../lib/supabaseClient.js';
 import {uploadModeratedMedia, moderateUploadedMedia, fetchMediaUploads} from '../services/videoUpload.js';
@@ -6,6 +7,7 @@ import {UploadCloud, RefreshCw, Trash2, CheckCircle2, AlertTriangle, Film} from 
 import MediaModerationModal from './MediaModerationModal.jsx';
 
 export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoConsent=false, onAddToGallery}) {
+  const {t}=useLanguage();
   const [clips,setClips]=useState([]),[music,setMusic]=useState(null),[keepAudio,setKeepAudio]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState(0),[result,setResult]=useState(null),[preview,setPreview]=useState('');
   const [isDragging,setIsDragging]=useState(false);
   const [modInfo,setModInfo]=useState({status:'',labels:[],reason:''});
@@ -59,14 +61,14 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
     if(busy)return;
     setBusy(true);onBusy?.(true);setError('');setGallerySuccess('');
     try{await action();}
-    catch(e){if(mounted.current)setError(e.name==='AbortError'?'Đã hủy ghép video.':e.message);}
+    catch(e){if(mounted.current)setError(e.name==='AbortError'?t("Đã hủy ghép video.","Video assembly cancelled."):e.message);}
     finally{abort.current=null;onBusy?.(false);if(mounted.current)setBusy(false);}
   };
 
   const handleUploadFile=async file=>{
     if(!file)return;
     if(!['video/mp4','video/webm'].includes(file.type)||file.size>MOVIE_LIMITS.outputBytes){
-      throw new Error('Video phải là định dạng MP4 hoặc WebM, dung lượng tối đa 50 MB.');
+      throw new Error(t("Video phải là định dạng MP4 hoặc WebM, dung lượng tối đa 50 MB.","Choose an MP4 or WebM video, up to 50 MB."));
     }
     const uploaded=await uploadModeratedMedia(tag,file,videoConsent,'intro');
     onChange(uploaded.path);
@@ -102,7 +104,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
   };
 
   const chooseClips=async files=>run(async()=>{
-    if(clips.length+files.length>MOVIE_LIMITS.files)throw new Error('Tối đa 12 cảnh.');
+    if(clips.length+files.length>MOVIE_LIMITS.files)throw new Error(t("Tối đa 12 cảnh.","Up to 12 scenes."));
     const added=[];
     try{
       for(const file of files){
@@ -130,7 +132,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
           caption:result.name||'Phim kỷ niệm từ ảnh'
         });
       }
-      setGallerySuccess('Đã thêm video vào Bộ sưu tập Kỷ niệm thành công!');
+      setGallerySuccess(t("Đã thêm video vào Bộ sưu tập Kỷ niệm thành công!","Video added to the memory gallery!"));
     });
   };
 
@@ -141,11 +143,11 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
         <div>
           <div className="flex items-center gap-2">
             <Film className="w-4 h-4 text-amber-300" />
-            <p className="text-amber-200 text-xs uppercase tracking-widest font-semibold">01 · Video Đại Diện Mở Thư</p>
+            <p className="text-amber-200 text-xs uppercase tracking-widest font-semibold">{t("01 · Video Đại Diện Mở Thư","01 · Opening video")}</p>
           </div>
-          <h3 className="font-serif text-xl text-white mt-1">Khoảnh khắc đặc biệt (Intro Movie)</h3>
+          <h3 className="font-serif text-xl text-white mt-1">{t("Khoảnh khắc đặc biệt (Intro Movie)","Your opening film")}</h3>
           <p className="text-slate-400 text-xs mt-1 leading-relaxed">
-            Video này sẽ phát một lần khi người nhận mở thư/hộp kỷ niệm. Chỉ có <strong className="text-slate-200">duy nhất 1 video đại diện</strong>; nếu tải video mới sẽ tự động thay thế video cũ.
+            {t("Video này sẽ phát một lần khi người nhận mở thư/hộp kỷ niệm. Chỉ có","This video plays before the recipient opens the letters. There is")} <strong className="text-slate-200">{t("duy nhất 1 video đại diện","only one opening video")}</strong>{t("; nếu tải video mới sẽ tự động thay thế video cũ.","; uploading a new video replaces the previous one.")}
           </p>
         </div>
       </div>
@@ -156,7 +158,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-semibold text-slate-200">Video đại diện hiện tại</span>
+              <span className="text-xs font-semibold text-slate-200">{t("Video đại diện hiện tại","Current opening video")}</span>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -165,7 +167,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
                 className="text-xs text-red-300 hover:text-red-200 flex items-center gap-1 hover:underline cursor-pointer"
                 onClick={()=>onChange('')}
               >
-                <Trash2 className="w-3.5 h-3.5" /> Gỡ video
+                <Trash2 className="w-3.5 h-3.5" /> {t("Gỡ video","Remove video")}
               </button>
             </div>
           </div>
@@ -188,19 +190,19 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
               <div className="flex items-center gap-2 text-xs">
                 {modInfo.status==='ready' ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-medium">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Đã kiểm duyệt an toàn
+                    <CheckCircle2 className="w-3.5 h-3.5" /> {t("Đã kiểm duyệt an toàn","Approved")}
                   </span>
                 ) : modInfo.status==='rejected' ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/20 border border-red-500/30 text-red-300 font-medium">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Bị từ chối kiểm duyệt
+                    <AlertTriangle className="w-3.5 h-3.5" /> {t("Bị từ chối kiểm duyệt","Rejected")}
                   </span>
                 ) : modInfo.status==='processing' ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 font-medium">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Đang kiểm duyệt với Gemini...
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> {t("Đang kiểm duyệt với Gemini...","Reviewing with Gemini...")}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-700/50 border border-white/10 text-amber-200 font-medium">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Chưa hoàn tất kiểm duyệt
+                    <AlertTriangle className="w-3.5 h-3.5" /> {t("Chưa hoàn tất kiểm duyệt","Review incomplete")}
                   </span>
                 )}
               </div>
@@ -214,7 +216,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
                   className="px-3 py-1 rounded-lg text-xs bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/40 text-amber-200 font-medium flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${retrying?'animate-spin':''}`} />
-                  {retrying ? 'Đang thử lại...' : 'Kiểm duyệt lại với AI'}
+                  {retrying ? t("Đang thử lại...","Retrying...") : t("Kiểm duyệt lại với AI","Retry AI review")}
                 </button>
               )}
             </div>
@@ -231,7 +233,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
               <div className="pt-1">
                 <div className="mb-1.5">
                   <span className="text-[11px] font-semibold text-amber-200 uppercase tracking-wider">
-                    Chủ đề kỷ vật:
+                    {t("Chủ đề kỷ vật:","Memory topics:")}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -251,7 +253,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
           {/* Vùng thay thế video khác */}
           <div className="pt-2">
             <label className="store-label !mb-0 text-slate-300">
-              Chọn video khác để <strong className="text-amber-300">thay thế video này</strong>:
+              {t("Chọn video khác để","Choose another video to")} <strong className="text-amber-300">{t("thay thế video này","replace this video")}</strong>:
               <input
                 disabled={busy||retrying}
                 type="file"
@@ -296,10 +298,10 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
               <UploadCloud className="w-6 h-6" />
             </div>
             <p className="text-sm font-semibold text-white">
-              Kéo & thả video mở đầu vào đây, hoặc <span className="text-amber-300 underline">bấm để chọn</span>
+              {t("Kéo & thả video mở đầu vào đây, hoặc","Drop an opening video here, or")} <span className="text-amber-300 underline">{t("bấm để chọn","click to choose")}</span>
             </p>
             <p className="text-xs text-slate-400">
-              Hỗ trợ định dạng MP4 hoặc WebM (tối đa 50 MB). Model Gemini sẽ tự động kiểm duyệt và trả về nhãn AI.
+              {t("Hỗ trợ định dạng MP4 hoặc WebM (tối đa 50 MB). Model Gemini sẽ tự động kiểm duyệt và trả về nhãn AI.","Supports MP4 and WebM (up to 50 MB). Gemini automatically checks the content.")}
             </p>
           </div>
         </div>
@@ -308,16 +310,16 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
       {/* KHU VỰC 3: GHÉP ẢNH & CLIP THÀNH VIDEO (SLIDESHOW MAKER) */}
       <details className="rounded-xl border border-white/10 bg-black/30 p-4">
         <summary className="cursor-pointer font-semibold text-sm text-slate-200 select-none hover:text-amber-200">
-          <span>Tạo video kỷ niệm từ ảnh & clip</span>
+          <span>{t("Tạo video kỷ niệm từ ảnh & clip","Create a memory film from photos & clips")}</span>
         </summary>
 
         <div className="space-y-4 pt-4 text-xs">
           <p className="text-slate-400 leading-relaxed">
-            Bạn có nhiều hình ảnh đẹp? Hãy ghép chúng thành 1 thước phim kỷ niệm kèm nhạc nền. Sau khi ghép xong, bạn có thể chọn <strong className="text-slate-200">đặt làm Video đại diện</strong> hoặc <strong className="text-slate-200">thêm vào Bộ sưu tập Kỷ niệm</strong>.
+            {t("Bạn có nhiều hình ảnh đẹp? Hãy ghép chúng thành 1 thước phim kỷ niệm kèm nhạc nền. Sau khi ghép xong, bạn có thể chọn","Combine photos and clips with music. When finished, you can")} <strong className="text-slate-200">{t("đặt làm Video đại diện","use it as the opening video")}</strong> {t("hoặc","or")} <strong className="text-slate-200">{t("thêm vào Bộ sưu tập Kỷ niệm","add it to the memory gallery")}</strong>.
           </p>
 
           <label className="store-label">
-            Thêm ảnh hoặc clip nguồn:
+            {t("Thêm ảnh hoặc clip nguồn:","Add source photos or clips:")}
             <input
               multiple
               disabled={busy}
@@ -351,14 +353,14 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
                   className="px-2 py-1 bg-red-500/20 text-red-300 rounded hover:bg-red-500/30"
                   onClick={()=>setClips(prev=>prev.filter(x=>x.id!==c.id))}
                 >
-                  Gỡ
+                  {t("Gỡ","Remove")}
                 </button>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 {c.kind==='image' ? (
                   <label className="store-label">
-                    Thời lượng (giây)
+                    {t("Thời lượng (giây)","Duration (seconds)")}
                     <input
                       className="store-input"
                       type="number"
@@ -372,7 +374,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
                 ) : (
                   <>
                     <label className="store-label">
-                      Bắt đầu (giây)
+                      {t("Bắt đầu (giây)","Start (seconds)")}
                       <input
                         type="number"
                         className="store-input"
@@ -385,7 +387,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
                       />
                     </label>
                     <label className="store-label">
-                      Kết thúc (giây)
+                      {t("Kết thúc (giây)","End (seconds)")}
                       <input
                         type="number"
                         className="store-input"
@@ -401,7 +403,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
                 )}
               </div>
               <label className="store-label">
-                Phụ đề trên cảnh
+                {t("Phụ đề trên cảnh","Scene caption")}
                 <input
                   className="store-input"
                   maxLength={100}
@@ -415,7 +417,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
 
           {/* Nhạc nền */}
           <label className="store-label">
-            Nhạc nền ghép phim (tùy chọn)
+            {t("Nhạc nền ghép phim (tùy chọn)","Background music (optional)")}
             <input
               type="file"
               accept="audio/*"
@@ -423,7 +425,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
               onChange={e=>{
                 const f=e.target.files?.[0];
                 if(f&&(!f.type.startsWith('audio/')||f.size>50*1024*1024)){
-                  setError('Nhạc nền tối đa 50 MB.');
+                  setError(t("Nhạc nền tối đa 50 MB.","Background music must be no larger than 50 MB."));
                   return;
                 }
                 setMusic(f||null);
@@ -432,9 +434,9 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
           </label>
           {music && (
             <div className="flex items-center justify-between p-2 rounded bg-white/5">
-              <span>Đã chọn: {music.name}</span>
+              <span>{t("Đã chọn:","Selected:")} {music.name}</span>
               <button type="button" disabled={busy} className="text-red-300 hover:underline" onClick={()=>setMusic(null)}>
-                Gỡ nhạc
+                {t("Gỡ nhạc","Remove music")}
               </button>
             </div>
           )}
@@ -446,7 +448,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
               disabled={busy}
               onChange={e=>setKeepAudio(e.target.checked)}
             />
-            <span>Giữ âm thanh gốc trong các clip video</span>
+            <span>{t("Giữ âm thanh gốc trong các clip video","Keep original clip audio")}</span>
           </label>
 
           {/* Nút Render */}
@@ -474,16 +476,16 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
               setPreview(url);
             })}
           >
-            Ghép thành video ngay
+            {t("Ghép thành video ngay","Create video")}
           </button>
 
           {busy && (
             <div role="status" className="space-y-1.5 p-3 rounded-xl bg-black/60 border border-white/10">
               <progress className="w-full h-2 rounded bg-white/10" max="1" value={progress}/>
               <div className="flex justify-between items-center text-xs text-slate-300">
-                <span>Đang xử lý / kết xuất phim · {Math.round(progress*100)}%</span>
+                <span>{t("Đang xử lý / kết xuất phim ·","Rendering film ·")} {Math.round(progress*100)}%</span>
                 <button type="button" className="text-red-300 hover:underline" onClick={()=>abort.current?.abort()}>
-                  Hủy ghép
+                  {t("Hủy ghép","Cancel rendering")}
                 </button>
               </div>
             </div>
@@ -492,7 +494,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
           {/* KẾT QUẢ RENDER: LIÊN KẾT 2 LỰA CHỌN RÕ RÀNG */}
           {result && (
             <div className="p-4 rounded-xl bg-black/70 border border-amber-400/30 space-y-3">
-              <p className="font-semibold text-amber-200">Đã xuất video thành công ({(result.size/1024/1024).toFixed(1)} MB)!</p>
+              <p className="font-semibold text-amber-200">{t("Đã xuất video thành công (","Video created (")}{(result.size/1024/1024).toFixed(1)} MB)!</p>
               <video controls playsInline src={preview} className="w-full max-h-56 rounded-lg bg-black object-contain"/>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -502,7 +504,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
                   className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-semibold text-xs transition cursor-pointer"
                   onClick={()=>run(()=>handleUploadFile(result))}
                 >
-                  Đặt làm Video đại diện
+                  {t("Đặt làm Video đại diện","Use as opening video")}
                 </button>
 
                 <button
@@ -511,7 +513,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
                   className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 transition cursor-pointer"
                   onClick={handleAddRenderedToGallery}
                 >
-                  Thêm vào Bộ sưu tập Kỷ niệm
+                  {t("Thêm vào Bộ sưu tập Kỷ niệm","Add to memory gallery")}
                 </button>
 
                 <a
@@ -519,7 +521,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
                   href={preview}
                   download={result.name||'emoria-memory-movie.webm'}
                 >
-                  Tải video về máy
+                  {t("Tải video về máy","Download video")}
                 </a>
               </div>
 
@@ -533,14 +535,14 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
 
       {error && <p role="alert" className="text-red-300 text-xs">{error}</p>}
       <p className="text-[11px] text-slate-400">
-        Mẹo: Sau khi tải video đại diện, nhớ bấm <strong className="text-slate-200">“Lưu thay đổi”</strong> ở cuối Studio để cập nhật cho chip NFC.
+        {t("Mẹo: Sau khi tải video đại diện, nhớ bấm","After uploading the opening video, select")} <strong className="text-slate-200">{t("“Lưu thay đổi”","“Save changes”")}</strong> {t("ở cuối Studio để cập nhật cho chip NFC.","at the bottom of Studio to update your memory.")}
       </p>
 
       {/* Pop-up chờ xử lý & kiểm duyệt AI */}
       <MediaModerationModal
         isOpen={busy || retrying}
-        title="Đang tải lên & kiểm duyệt video"
-        detail="Hệ thống đang kiểm tra nội dung và tự động phân tích nhãn chủ đề cho video mở đầu. Quá trình thường chỉ mất vài giây, vui lòng giữ tab này mở..."
+        title={t("Đang tải lên & kiểm duyệt video","Uploading & moderating video")}
+        detail={t("Hệ thống đang kiểm tra nội dung và tự động phân tích nhãn chủ đề cho video mở đầu. Quá trình thường chỉ mất vài giây, vui lòng giữ tab này mở...","We are checking your opening video. Please keep this tab open until moderation finishes.")}
       />
     </section>
   );

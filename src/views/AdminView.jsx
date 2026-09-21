@@ -1,3 +1,5 @@
+import MemoryAccountsAdmin from '../components/MemoryAccountsAdmin';
+import {useLanguage} from '../i18n/LanguageProvider';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -40,6 +42,7 @@ export default function AdminView({
   onNavigateToHome,
   onRefresh
 }) {
+  const {t}=useLanguage();
   // Tabs: 'orders' | 'marketing' | 'nfc' | 'settings' | 'articles' | 'moderation'
   const [activeTab, setActiveTab] = useState('orders');
   
@@ -221,11 +224,11 @@ export default function AdminView({
             EMORIA LUXURY
           </span>
           <h2 className="font-serif text-xl sm:text-2xl font-bold text-white mt-2 mb-2 uppercase">
-            Bảng Quản Trị Hệ Thống
+            {t("Bảng Quản Trị Hệ Thống","Admin dashboard")}
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6 font-light">
-            Trang này chỉ dành cho tài khoản có quyền Quản trị viên (Admin). 
-            {currentUser ? ` Bạn đang đăng nhập với tài khoản: ${currentUser}.` : ' Vui lòng đăng nhập bằng tài khoản Quản trị để tiếp tục.'}
+            {t("Trang này chỉ dành cho tài khoản có quyền Quản trị viên (Admin).","This page requires an administrator account.")} 
+            {currentUser ? ` Bạn đang đăng nhập với tài khoản: ${currentUser}.` : t("Vui lòng đăng nhập bằng tài khoản Quản trị để tiếp tục.","Sign in as an administrator to continue.")}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -234,14 +237,14 @@ export default function AdminView({
               className="store-button flex items-center justify-center gap-2 min-h-11"
             >
               <Key className="w-4 h-4" />
-              <span>{currentUser ? 'Đổi Tài Khoản Quản Trị' : 'Đăng Nhập Quản Trị Viên'}</span>
+              <span>{currentUser ? t("Đổi Tài Khoản Quản Trị","Switch admin account") : t("Đăng Nhập Quản Trị Viên","Admin sign in")}</span>
             </button>
             <button
               onClick={onNavigateToHome}
               className="px-5 py-2.5 rounded-full border border-white/20 hover:bg-white/10 text-slate-200 text-sm font-semibold transition-all flex items-center justify-center gap-2 min-h-11"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Về Trang Chủ</span>
+              <span>{t("Về Trang Chủ","Back to Home")}</span>
             </button>
           </div>
         </div>
@@ -251,13 +254,14 @@ export default function AdminView({
 
   // TABS CONFIGURATION
   const tabs = [
-    { id:'video-moderation',label:'Kiểm Duyệt Video',icon:Shield },
-    { id: 'orders', label: 'Đơn Hàng & Vận Chuyển', icon: Package },
-    { id: 'marketing', label: 'Báo Cáo & GA4', icon: BarChart3 },
-    { id: 'nfc', label: 'Kỷ Vật & Chip NFC', icon: SmartphoneNfc },
-    { id: 'settings', label: 'Cấu Hình Cửa Hàng', icon: Settings },
-    { id: 'articles', label: 'Tạp Chí & Bài Viết', icon: BookOpen },
-    { id: 'moderation', label: 'Duyệt Bình Luận', icon: MessageSquare, badge: adminComments.filter(c => c.status === 'pending').length },
+    { id:'video-moderation',label:t("Kiểm Duyệt Video","AI media moderation"),icon:Shield },
+    { id: 'orders', label: t("Đơn Hàng & Vận Chuyển","Orders & shipping"), icon: Package },
+    { id: 'marketing', label: t("Báo Cáo & GA4","Reports & GA4"), icon: BarChart3 },
+    { id: 'memories', label: t('Memory Space & Tài khoản','Memory Spaces & Accounts'), icon: UserCheck },
+    { id: 'nfc', label: 'Chip NFC', icon: SmartphoneNfc },
+    { id: 'settings', label: t("Cấu Hình Cửa Hàng","Store settings"), icon: Settings },
+    { id: 'articles', label: t("Tạp Chí & Bài Viết","Journal & articles"), icon: BookOpen },
+    { id: 'moderation', label: t("Duyệt Bình Luận","Comment moderation"), icon: MessageSquare, badge: adminComments.filter(c => c.status === 'pending').length },
   ];
 
   return (
@@ -270,10 +274,10 @@ export default function AdminView({
             <button
               onClick={onNavigateToHome}
               className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border border-white/10 shadow-sm"
-              title="Quay lại trang chủ"
+              title={t("Quay lại trang chủ","Back to Home")}
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Về Trang Chủ</span>
+              <span>{t("Về Trang Chủ","Back to Home")}</span>
             </button>
 
             <div className="h-4 w-px bg-white/15 hidden sm:block" />
@@ -284,7 +288,7 @@ export default function AdminView({
               </div>
               <div>
                 <h1 className="text-base sm:text-lg font-serif font-bold text-white tracking-wide flex items-center gap-2">
-                  <span>Trung Tâm Quản Trị EMORIA</span>
+                  <span>{t("Trung Tâm Quản Trị EMORIA","EMORIA Admin")}</span>
                   <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 font-mono font-bold">
                     Admin
                   </span>
@@ -304,13 +308,13 @@ export default function AdminView({
               onClick={loadData}
               disabled={isLoadingOrders}
               className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-all flex items-center gap-1.5 text-xs cursor-pointer"
-              title="Tải lại dữ liệu quản trị"
+              title={t("Tải lại dữ liệu quản trị","Refresh admin data")}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Làm mới</span>
+              <span className="hidden sm:inline">{t("Làm mới","Refresh")}</span>
             </button>
             <div className="text-right hidden sm:block">
-              <p className="text-[11px] text-slate-400 font-medium">Tài khoản quản trị:</p>
+              <p className="text-[11px] text-slate-400 font-medium">{t("Tài khoản quản trị:","Administrator:")}</p>
               <p className="text-xs font-semibold text-white">{currentUser}</p>
             </div>
           </div>
@@ -351,13 +355,13 @@ export default function AdminView({
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="font-serif text-2xl font-bold text-white">Quản Lý Đơn Hàng & Giao Nhận</h2>
-                  <p className="text-xs text-slate-400 mt-1">Duyệt chuyển trạng thái đơn, kiểm tra thanh toán VietQR / COD và chuẩn bị chip NFC.</p>
+                  <h2 className="font-serif text-2xl font-bold text-white">{t("Quản Lý Đơn Hàng & Giao Nhận","Orders & delivery")}</h2>
+                  <p className="text-xs text-slate-400 mt-1">{t("Duyệt chuyển trạng thái đơn, kiểm tra thanh toán VietQR / COD và chuẩn bị chip NFC.","Manage order status, VietQR / COD payments and gift preparation.")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder="Mã đơn, SĐT hoặc mã vận đơn"
+                    placeholder={t("Mã đơn, SĐT hoặc mã vận đơn","Order ID, phone or tracking number")}
                     value={orderSearch}
                     onChange={(e) => {setOrderSearch(e.target.value);setOrderPage(0);}}
                     className="store-input !py-2 text-xs w-full sm:w-64"
@@ -366,17 +370,17 @@ export default function AdminView({
               </div>
 
               <PaymentReview/>
-              <div className="flex flex-wrap items-center gap-3"><label className="store-label">Lọc trạng thái<select className="store-input" value={orderStatus} onChange={e=>{setOrderStatus(e.target.value);setOrderPage(0);}}>{[['','Tất cả'],['pending_payment','Chờ thanh toán / duyệt'],['confirmed','Đã tiếp nhận'],['crafting_nfc','Đang chuẩn bị'],['shipping','Đang giao'],['completed','Đã giao'],['cancelled','Đã hủy']].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><button className="store-button" disabled={!orderPage||isLoadingOrders} onClick={()=>setOrderPage(p=>p-1)}>Trước</button><span>Trang {orderPage+1}</span><button className="store-button" disabled={orders.length<25||isLoadingOrders} onClick={()=>setOrderPage(p=>p+1)}>Sau</button></div>
+              <div className="flex flex-wrap items-center gap-3"><label className="store-label">{t("Lọc trạng thái","Filter status")}<select className="store-input" value={orderStatus} onChange={e=>{setOrderStatus(e.target.value);setOrderPage(0);}}>{[['',t("Tất cả","All")],['pending_payment',t("Chờ thanh toán / duyệt","Awaiting payment / review")],['confirmed',t("Đã tiếp nhận","Accepted")],['crafting_nfc',t("Đang chuẩn bị","Preparing")],['shipping',t("Đang giao","Shipping")],['completed',t("Đã giao","Delivered")],['cancelled',t("Đã hủy","Cancelled")]].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><button className="store-button" disabled={!orderPage||isLoadingOrders} onClick={()=>setOrderPage(p=>p-1)}>{t("Trước","Previous")}</button><span>Trang {orderPage+1}</span><button className="store-button" disabled={orders.length<25||isLoadingOrders} onClick={()=>setOrderPage(p=>p+1)}>{t("Sau","Next")}</button></div>
               {isLoadingOrders ? (
                 <div className="p-12 text-center text-slate-400">
                   <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 text-slate-500" />
-                  <p className="text-sm">Đang tải danh sách đơn hàng...</p>
+                  <p className="text-sm">{t("Đang tải danh sách đơn hàng...","Loading orders...")}</p>
                 </div>
               ) : orders.length === 0 ? (
                 <div className="p-12 text-center border border-dashed border-white/15 rounded-2xl bg-white/[0.02]">
                   <Package className="w-10 h-10 text-slate-500 mx-auto mb-3" />
-                  <p className="text-sm text-slate-300 font-semibold">Chưa có đơn hàng nào.</p>
-                  <p className="text-xs text-slate-500 mt-1">Các đơn đặt mua từ Cửa Hàng sẽ xuất hiện tại đây.</p>
+                  <p className="text-sm text-slate-300 font-semibold">{t("Chưa có đơn hàng nào.","No orders yet.")}</p>
+                  <p className="text-xs text-slate-500 mt-1">{t("Các đơn đặt mua từ Cửa Hàng sẽ xuất hiện tại đây.","Shop orders will appear here.")}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -395,15 +399,15 @@ export default function AdminView({
                             ord.status === 'cancelled' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
                             'bg-white/10 text-slate-300 border border-white/15'
                           }`}>
-                            {ord.status === 'pending_payment' ? (['paid','overpaid'].includes(ord.paymentStatus)?'Đã thanh toán · Chờ duyệt':'Chờ thanh toán') :
-                             ord.status === 'confirmed' ? 'Đã xác nhận' :
-                             ord.status === 'crafting_nfc' ? 'Đang chuẩn bị NFC' :
-                             ord.status === 'shipping' ? 'Đang giao hàng' :
-                             ord.status === 'completed' ? 'Hoàn tất' : 'Đã hủy'}
+                            {ord.status === 'pending_payment' ? (['paid','overpaid'].includes(ord.paymentStatus)?t("Đã thanh toán · Chờ duyệt","Paid · awaiting review"):t("Chờ thanh toán","Awaiting payment")) :
+                             ord.status === 'confirmed' ? t("Đã xác nhận","Confirmed") :
+                             ord.status === 'crafting_nfc' ? t("Đang chuẩn bị NFC","Preparing gift") :
+                             ord.status === 'shipping' ? t("Đang giao hàng","Shipping") :
+                             ord.status === 'completed' ? t("Hoàn tất","Completed") : t("Đã hủy","Cancelled")}
                           </span>
                           {ord.isTest && (
                             <span className="px-2 py-0.5 rounded text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              Đơn Thử Nghiệm
+                              {t("Đơn Thử Nghiệm","Test order")}
                             </span>
                           )}
                         </div>
@@ -414,26 +418,26 @@ export default function AdminView({
 
                       <div className="grid sm:grid-cols-3 gap-4 text-xs">
                         <div>
-                          <p className="text-slate-400">Khách hàng:</p>
-                          <p className="font-bold text-white mt-0.5">{ord.customerName || 'Khách vãng lai'}</p>
+                          <p className="text-slate-400">{t("Khách hàng:","Customer:")}</p>
+                          <p className="font-bold text-white mt-0.5">{ord.customerName || t("Khách vãng lai","Guest")}</p>
                           <p className="text-slate-400 font-mono mt-0.5">{ord.phone}</p>
                           <p className="text-slate-400 mt-1 line-clamp-2">{ord.address}</p>
                         </div>
                         <div>
-                          <p className="text-slate-400">Thanh toán:</p>
+                          <p className="text-slate-400">{t("Thanh toán:","Payment:")}</p>
                           <p className="font-bold text-white mt-0.5 uppercase">{ord.paymentMethod}</p>
                           <p className="text-slate-300 font-semibold mt-1">
-                            Tổng: {new Intl.NumberFormat('vi-VN').format(ord.totals?.finalTotal || 0)} đ
+                            {t("Tổng:","Total:")} {new Intl.NumberFormat('vi-VN').format(ord.totals?.finalTotal || 0)} đ
                           </p>
                           {ord.hasGiftBox && (
                             <p className="text-amber-300 mt-1 flex items-center gap-1 text-[11px]">
-                              <span>✦ Có gói hộp quà EMORIA</span>
+                              <span>{t("✦ Có gói hộp quà EMORIA","✦ EMORIA gift wrapping")}</span>
                             </p>
                           )}
                         </div>
                         <div className="flex flex-col justify-between gap-3">
                           <div>
-                            <p className="text-slate-400">Thao tác duyệt đơn:</p>
+                            <p className="text-slate-400">{t("Thao tác duyệt đơn:","Order actions:")}</p>
                             <div className="flex items-center gap-2 mt-1.5">
                               {ord.status === 'pending_payment' && (
                                 <button
@@ -441,7 +445,7 @@ export default function AdminView({
                                   disabled={updatingOrderId === ord.id || !['paid','overpaid'].includes(ord.paymentStatus)}
                                   className="px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-xs font-semibold border border-sky-500/30 transition-all cursor-pointer"
                                 >
-                                  Duyệt đơn đã thanh toán
+                                  {t("Duyệt đơn đã thanh toán","Approve paid order")}
                                 </button>
                               )}
                               {ord.status === 'confirmed' && (
@@ -450,7 +454,7 @@ export default function AdminView({
                                   disabled={updatingOrderId === ord.id}
                                   className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-all cursor-pointer"
                                 >
-                                  Bắt đầu chuẩn bị
+                                  {t("Bắt đầu chuẩn bị","Start preparation")}
                                 </button>
                               )}
                               {['pending_payment','confirmed','crafting_nfc'].includes(ord.status) && (
@@ -459,7 +463,7 @@ export default function AdminView({
                                   disabled={updatingOrderId === ord.id}
                                   className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-semibold border border-red-500/30 transition-all cursor-pointer"
                                 >
-                                  Hủy Đơn
+                                  {t("Hủy Đơn","Cancel order")}
                                 </button>
                               )}
                             </div>
@@ -486,12 +490,9 @@ export default function AdminView({
           )}
 
           {/* 3. NFC & MEMORY SPACES TAB */}
+          {activeTab==='memories'&&<MemoryAccountsAdmin/>}
           {activeTab === 'nfc' && (
             <div className="space-y-6">
-              <div>
-                <h2 className="font-serif text-2xl font-bold text-white">Quản Lý Chip NFC & Không Gian Kỷ Niệm</h2>
-                <p className="text-xs text-slate-400 mt-1">Cấp phát mã định danh chip, bàn giao mã nhận quyền (Claim Code) và kiểm soát trạng thái kỷ niệm.</p>
-              </div>
               <NfcOperations onRefresh={loadData} />
             </div>
           )}
@@ -501,8 +502,8 @@ export default function AdminView({
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="font-serif text-2xl font-bold text-white">Cấu Hình Cửa Hàng & Toàn Hệ Thống</h2>
-                  <p className="text-xs text-slate-400 mt-1">Bật/tắt chế độ thử nghiệm (Sandbox banner), nhận đơn, COD, ngân hàng VietQR và danh mục sản phẩm.</p>
+                  <h2 className="font-serif text-2xl font-bold text-white">{t("Cấu Hình Cửa Hàng & Toàn Hệ Thống","Store & system settings")}</h2>
+                  <p className="text-xs text-slate-400 mt-1">{t("Bật/tắt chế độ thử nghiệm (Sandbox banner), nhận đơn, COD, ngân hàng VietQR và danh mục sản phẩm.","Configure sandbox mode, orders, COD, VietQR bank details and the catalog.")}</p>
                 </div>
                 <div className="flex items-center gap-1.5 p-1 rounded-xl bg-black/60 border border-white/10 self-start sm:self-auto">
                   <button
@@ -510,21 +511,21 @@ export default function AdminView({
                     onClick={() => setSettingsSubSection('settings')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${settingsSubSection === 'settings' ? 'bg-white text-dark-950 shadow-md' : 'text-slate-300 hover:text-white'}`}
                   >
-                    Cấu Hình & Sandbox
+                    {t("Cấu Hình & Sandbox","Settings & sandbox")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setSettingsSubSection('catalog')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${settingsSubSection === 'catalog' ? 'bg-white text-dark-950 shadow-md' : 'text-slate-300 hover:text-white'}`}
                   >
-                    Sản Phẩm & Tồn Kho
+                    {t("Sản Phẩm & Tồn Kho","Products & stock")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setSettingsSubSection('contacts')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${settingsSubSection === 'contacts' ? 'bg-white text-dark-950 shadow-md' : 'text-slate-300 hover:text-white'}`}
                   >
-                    Yêu Cầu Liên Hệ
+                    {t("Yêu Cầu Liên Hệ","Contact requests")}
                   </button>
                 </div>
               </div>
@@ -539,15 +540,15 @@ export default function AdminView({
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="font-serif text-2xl font-bold text-white">Tạp Chí & Bài Viết Chế Tác</h2>
-                  <p className="text-xs text-slate-400 mt-1">Biên tập các câu chuyện thương hiệu, kỹ nghệ đính đá và hướng dẫn trang sức NFC.</p>
+                  <h2 className="font-serif text-2xl font-bold text-white">{t("Tạp Chí & Bài Viết Chế Tác","Journal & craft stories")}</h2>
+                  <p className="text-xs text-slate-400 mt-1">{t("Biên tập các câu chuyện thương hiệu, kỹ nghệ đính đá và hướng dẫn trang sức NFC.","Edit brand stories, craft articles and NFC jewelry guides.")}</p>
                 </div>
                 <button
                   onClick={handleOpenCreateArticle}
                   className="store-button flex items-center gap-2 min-h-11 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Viết Bài Mới</span>
+                  <span>{t("Viết Bài Mới","New article")}</span>
                 </button>
               </div>
 
@@ -585,14 +586,14 @@ export default function AdminView({
                         onClick={() => handleToggleArticleStatus(art)}
                         className="text-slate-300 hover:text-white underline cursor-pointer"
                       >
-                        {art.status === 'published' ? 'Ẩn về nháp' : 'Xuất bản ngay'}
+                        {art.status === 'published' ? t("Ẩn về nháp","Unpublish") : t("Xuất bản ngay","Publish now")}
                       </button>
                       <button
                         onClick={() => handleOpenEditArticle(art)}
                         className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold flex items-center gap-1.5 cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
-                        <span>Sửa bài</span>
+                        <span>{t("Sửa bài","Edit article")}</span>
                       </button>
                     </div>
                   </div>
@@ -605,7 +606,7 @@ export default function AdminView({
                   <div className="relative w-full max-w-3xl max-h-[90dvh] overflow-y-auto rounded-3xl border border-white/20 bg-dark-900 p-6 sm:p-8 text-white space-y-4">
                     <div className="flex items-center justify-between pb-3 border-b border-white/10">
                       <h3 className="font-serif text-xl font-bold">
-                        {editingArticleId ? 'Chỉnh Sửa Bài Viết' : 'Soạn Thảo Bài Viết Mới'}
+                        {editingArticleId ? t("Chỉnh Sửa Bài Viết","Edit article") : t("Soạn Thảo Bài Viết Mới","New article")}
                       </h3>
                       <button 
                         onClick={() => setIsEditorOpen(false)}
@@ -617,18 +618,18 @@ export default function AdminView({
 
                     <div className="space-y-3 text-xs">
                       <div>
-                        <label className="store-label">Tiêu đề bài viết</label>
+                        <label className="store-label">{t("Tiêu đề bài viết","Article title")}</label>
                         <input
                           type="text"
                           value={articleForm.title}
                           onChange={(e) => setArticleForm({ ...articleForm, title: e.target.value })}
                           className="store-input"
-                          placeholder="Ví dụ: Nghệ thuật chế tác trang sức S925..."
+                          placeholder={t("Ví dụ: Nghệ thuật chế tác trang sức S925...","e.g. The art of S925 jewelry...")}
                         />
                       </div>
                       <div className="grid sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="store-label">Chuyên mục</label>
+                          <label className="store-label">{t("Chuyên mục","Category")}</label>
                           <input
                             type="text"
                             value={articleForm.category}
@@ -637,7 +638,7 @@ export default function AdminView({
                           />
                         </div>
                         <div>
-                          <label className="store-label">Ảnh bìa (URL)</label>
+                          <label className="store-label">{t("Ảnh bìa (URL)","Cover image URL")}</label>
                           <input
                             type="text"
                             value={articleForm.cover_image}
@@ -647,7 +648,7 @@ export default function AdminView({
                         </div>
                       </div>
                       <div>
-                        <label className="store-label">Tóm tắt ngắn (Excerpt)</label>
+                        <label className="store-label">{t("Tóm tắt ngắn (Excerpt)","Excerpt")}</label>
                         <textarea
                           rows={2}
                           value={articleForm.excerpt}
@@ -656,7 +657,7 @@ export default function AdminView({
                         />
                       </div>
                       <div>
-                        <label className="store-label">Nội dung chi tiết (Markdown)</label>
+                        <label className="store-label">{t("Nội dung chi tiết (Markdown)","Content (Markdown)")}</label>
                         <textarea
                           rows={8}
                           value={articleForm.content}
@@ -671,21 +672,21 @@ export default function AdminView({
                         onClick={() => setIsEditorOpen(false)}
                         className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
                       >
-                        Hủy
+                        {t("Hủy","Cancel")}
                       </button>
                       <button
                         onClick={() => handleSaveArticle('draft')}
                         disabled={savingArticle}
                         className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold"
                       >
-                        Lưu Nháp
+                        {t("Lưu Nháp","Save draft")}
                       </button>
                       <button
                         onClick={() => handleSaveArticle('published')}
                         disabled={savingArticle}
                         className="store-button"
                       >
-                        {savingArticle ? 'Đang lưu...' : 'Xuất Bản'}
+                        {savingArticle ? t("Đang lưu...","Saving...") : t("Xuất Bản","Publish")}
                       </button>
                     </div>
                   </div>

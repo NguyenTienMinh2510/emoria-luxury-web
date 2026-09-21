@@ -62,11 +62,20 @@ try{
   assert.equal(calls.at(-1).body.p_tracking,'SHIP-123');
   // Both Vite and Vercel paths dispatch the same route.
   assert.equal((await request('GET','/api/v1?resource=admin%2Forders&page=0',undefined,'admin-token')).status,200);
+  isAdmin=false;
+  assert.equal((await request('POST','/api/v1/admin/video-uploads/override',{path:'emo-test/sample.mp4'},'customer-token')).status,403);
+  isAdmin=true;
+  const overrideRes=await request('POST','/api/v1/admin/video-uploads/override',{path:'emo-test/sample.mp4',reason:'Duyệt đặc cách test'},'admin-token');
+  assert.equal(overrideRes.status,200);
+  assert.equal(overrideRes.body?.status,'ready');
   calls=[];
   await request('POST','/api/v1/memories/fixture/access',{grant:'private-grant'});
   assert.equal(calls.at(-1).body.p_grant_token,'private-grant');assert.ok(!calls.at(-1).url.includes('private-grant'));
   dbError={code:'42501',message:'permission denied'};
   assert.equal((await request('PATCH','/api/v1/memories/fixture',{letter:'private'},'customer-token')).status,403);
+  const aiLetter=await request('POST','/api/v1/ai/craft-letter',{occasion:'anniversary',tone:'romantic',recipient:'Taylor',author:'Alex'},'customer-token');
+  assert.equal(aiLetter.status,200);
+  assert.ok(aiLetter.body?.letter?.includes('Taylor')&&aiLetter.body?.letter?.includes('Alex'));
   assert.equal(r.headers['Cache-Control'],'no-store');
-  console.log('PASS REST API: all protected routes, caller JWT/RLS, idempotency payload, server pricing, tracking errors, shipping, private grants, rewrite routing');
+  console.log('PASS REST API: all protected routes, caller JWT/RLS, idempotency payload, server pricing, tracking errors, shipping, private grants, rewrite routing, AI letter craft');
 }finally{globalThis.fetch=originalFetch;}

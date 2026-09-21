@@ -1,18 +1,23 @@
+import {useLanguage} from '../i18n/LanguageProvider';
 import {apiRequest} from '../services/apiClient.js';
 import NfcTools from '../components/NfcTools';
 import VideoLabelEditor from '../components/VideoLabelEditor';
 import MemoryMediaEditor from '../components/MemoryMediaEditor';
 import MemoryMovieEditor from '../components/MemoryMovieEditor';
 import MemoryCinema from '../components/MemoryCinema';
+import LuxuryUnboxingExperience from '../components/LuxuryUnboxingExperience';
+import AiLetterMuseModal from '../components/AiLetterMuseModal';
+import CuratedMelodiesModal from '../components/CuratedMelodiesModal';
+import confetti from 'canvas-confetti';
 import {callStore} from '../services/catalogService';
 import {useStore} from '../components/StoreProvider';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   SmartphoneNfc, Volume2, VolumeX, Play, Pause, Heart, Mail, 
   Share2, Lock, Unlock, Sparkles, Calendar, User, Eye, Send, 
   ChevronLeft, ChevronRight, CheckCircle2, ShieldCheck, Image as ImageIcon,
-  Edit3, Key, Clock, AlertTriangle, Save, X, Loader2, ArrowLeft
+  Edit3, Key, Clock, AlertTriangle, Save, X, Loader2, ArrowLeft, Music, Feather, Film
 } from 'lucide-react';
 import { 
   fetchMemoryView, 
@@ -24,6 +29,7 @@ import {
 } from '../services/memoryService';
 
 export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToHome, onNavigateToShop, currentUser, onOpenAuth, onSelectTag }) {
+  const {t, language}=useLanguage();
   const {settings}=useStore();
   const [editMedia,setEditMedia]=useState([]);
   const [videoConsent,setVideoConsent]=useState(false);
@@ -59,8 +65,22 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   // 3 Hành động PIN rõ ràng: 'KEEP' | 'SET' | 'REMOVE' (Tránh xóa nhầm PIN khi update title)
   const [pinAction, setPinAction] = useState('KEEP');
   const [newPinCode, setNewPinCode] = useState('');
+  const [editPinHint, setEditPinHint] = useState('');
   const [isSavingEditor, setIsSavingEditor] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [studioStep, setStudioStep] = useState(1);
+
+  const studioProgress = useMemo(() => {
+    let score = 0;
+    if (editTitle?.trim()) score += 15;
+    if (editAuthor?.trim() || editRecipient?.trim()) score += 15;
+    if (editLetter?.trim()) score += 25;
+    if (editAudioUrl?.trim()) score += 15;
+    if (introPath?.trim()) score += 15;
+    if (editMedia?.length > 0) score += 10;
+    if (pinAction === 'KEEP' || (pinAction === 'SET' && newPinCode) || pinAction === 'REMOVE') score += 5;
+    return Math.min(100, score);
+  }, [editTitle, editAuthor, editRecipient, editLetter, editAudioUrl, introPath, editMedia, pinAction, newPinCode]);
 
   const [isPlaying,setIsPlaying]=useState(false),[audioError,setAudioError]=useState('');
   const audioRef=useRef(null);
@@ -77,6 +97,12 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   const [guestMessage, setGuestMessage] = useState('');
   const [guestSuccess, setGuestSuccess] = useState(false);
   const [isSendingGuest, setIsSendingGuest] = useState(false);
+
+  // Unboxing, AI Muse & Curated Melodies Modal States
+  const [showUnboxing, setShowUnboxing] = useState(false);
+  const [isAiMuseOpen, setIsAiMuseOpen] = useState(false);
+  const [isCuratedMelodiesOpen, setIsCuratedMelodiesOpen] = useState(false);
+  const [reactionSent, setReactionSent] = useState('');
 
   // Load showcase memories list for dropdown
   useEffect(() => {
@@ -111,11 +137,18 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         setEditMedia((res.data.studio_media||res.data.media_gallery||[]).filter(m=>m.path).map(m=>({path:m.path,type:m.type,caption:m.caption})));
         setPinAction('KEEP');
         setNewPinCode('');
+        setEditPinHint(res.data.pin_hint || '');
+
+        // Trigger unboxing ceremony for recipient/guest if not yet unboxed in this session
+        const alreadyUnboxed = (typeof sessionStorage !== 'undefined') && sessionStorage.getItem('emoria_unboxed_' + tag);
+        if (!res.data.is_owner && !alreadyUnboxed && !res.data.is_protected) {
+          setShowUnboxing(true);
+        }
       } else {
-        setErrorMessage(res.message || 'Không thể tải dữ liệu kỷ vật.');
+        setErrorMessage(res.message || t("Không thể tải dữ liệu kỷ vật.","Could not load this memory."));
       }
     } catch (err) {
-      setErrorMessage(err.message || 'Lỗi khi tải dữ liệu.');
+      setErrorMessage(err.message || t("Lỗi khi tải dữ liệu.","Could not load data."));
     } finally {
       if(sequence!==loadSequence.current)return;
       setLoading(false);
@@ -145,11 +178,12 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         // Sau khi đúng PIN -> Fetch lại dữ liệu với Grant Token để nhận nội dung thư thật
         await loadMemory(currentTag);
         setPinInput('');
+        setShowUnboxing(true);
       } else {
-        setPinError(result.message || 'Mã PIN bảo mật không chính xác.');
+        setPinError(result.message || t("Mã PIN bảo mật không chính xác.","Incorrect PIN."));
       }
     } catch (err) {
-      setPinError(err.message || 'Lỗi khi xác thực mã PIN.');
+      setPinError(err.message || t("Lỗi khi xác thực mã PIN.","Could not verify PIN."));
     } finally {
       setIsVerifyingPin(false);
     }
@@ -172,7 +206,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         setClaimError(res.message);
       }
     } catch (err) {
-      setClaimError(err.message || 'Lỗi khi nhận quyền sở hữu.');
+      setClaimError(err.message || t("Lỗi khi nhận quyền sở hữu.","Could not claim ownership."));
     } finally {
       setIsClaiming(false);
     }
@@ -183,6 +217,18 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
     e.preventDefault();
     if(movieBusy||isSavingEditor)return;
     setStudioError('');
+
+    if (!editTitle?.trim()) {
+      setStudioError(t("Vui lòng nhập tiêu đề kỷ niệm tại Bước 1.", "Please enter a memory title in Step 1."));
+      setStudioStep(1);
+      return;
+    }
+    if (pinAction === 'SET' && (!newPinCode || newPinCode.length < 4)) {
+      setStudioError(t("Vui lòng nhập mã PIN mới gồm 4-6 chữ số tại Bước 3.", "Please enter a 4-6 digit PIN in Step 3."));
+      setStudioStep(3);
+      return;
+    }
+
     setIsSavingEditor(true);
 
     try {
@@ -200,6 +246,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         audio_url: editAudioUrl,
         pin_action: pinAction,
         pin_code: pinAction === 'SET' ? newPinCode : null,
+        pin_hint: pinAction === 'SET' ? (editPinHint.trim() || null) : (pinAction === 'REMOVE' ? null : (editPinHint.trim() || null)),
       });
 
       setSaveSuccess(true);
@@ -209,7 +256,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         setIsEditorOpen(false);
       }, 1000);
     } catch (err) {
-      setStudioError(err.message || 'Lỗi khi lưu thay đổi.');
+      setStudioError(err.message || t("Lỗi khi lưu thay đổi.","Could not save changes."));
     } finally {
       setIsSavingEditor(false);
     }
@@ -234,7 +281,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
       await loadMemory(currentTag);
       setTimeout(() => setGuestSuccess(false), 4000);
     } catch (err) {
-      alert(err.message || 'Lỗi khi gửi lời chúc.');
+      alert(err.message || t("Lỗi khi gửi lời chúc.","Could not send your message."));
     } finally {
       setIsSendingGuest(false);
     }
@@ -246,24 +293,26 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         {onNavigateToHome && (
           <button className="text-slate-300 hover:text-white underline text-xs font-semibold flex items-center gap-1 cursor-pointer" onClick={onNavigateToHome}>
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Trang chủ</span>
+            <span>{t("Trang chủ","Home")}</span>
           </button>
         )}
         {onNavigateToShop && (
           <button className="text-slate-400 hover:text-slate-200 underline text-xs cursor-pointer" onClick={onNavigateToShop}>
-            ← Cửa hàng
+            {t("← Cửa hàng","← Shop")}
           </button>
         )}
       </div>
-      <h1 className="font-serif text-4xl">Kỷ vật của bạn</h1><NfcTools onRead={tag=>{setCurrentTag(tag);onSelectTag?.(tag);}} />
-      <p className="text-slate-400">Chuẩn bị món quà theo ba bước: nhận quyền bằng mã trong đơn hàng, thêm video và thư tay, rồi xem thử trước khi tặng.</p>
-      {!currentUser&&<button className="store-button" onClick={onOpenAuth}>Đăng nhập để chuẩn bị quà</button>}
+      <h1 className="font-serif text-4xl">{t('Kỷ vật của bạn','Your Memory Spaces')}</h1>
+      <p className="text-slate-400">{t('Mở kỷ vật được cấp cho tài khoản ngay tại đây, không cần chip NFC. Chủ sở hữu có thể vào Studio; người nhận chỉ xem nội dung.','Open spaces assigned to your account here without an NFC chip. Owners can use Studio; recipients can view the content.')}</p>
+      {!currentUser&&<button className="store-button" onClick={onOpenAuth}>{t('Đăng nhập để xem kỷ vật được cấp','Sign in to view your assigned memories')}</button>}
       <div className="grid sm:grid-cols-2 gap-4">
-        {allMemories.map(m=><button key={m.tag_uid} className="text-left p-5 border border-white/15 rounded-2xl hover:bg-white/5" onClick={()=>{setCurrentTag(m.tag_uid);onSelectTag?.(m.tag_uid);}}><span className="font-serif text-xl">{m.title}</span><span className="block text-xs text-slate-400 mt-2">{m.jewelry_name||m.tag_uid}</span></button>)}
+        {allMemories.map(m=><button key={m.tag_uid} className="text-left p-5 border border-white/15 rounded-2xl hover:bg-white/5" onClick={()=>{setCurrentTag(m.tag_uid);onSelectTag?.(m.tag_uid);}}><span className="font-serif text-xl">{m.title}</span><span className="block text-xs text-slate-400 mt-2">{m.jewelry_name||m.tag_uid}</span><span className="block text-sm mt-2 text-amber-200">{m.role==='owner'?t('Chủ sở hữu · có thể chỉnh sửa','Owner · can edit'):m.role==='recipient'?t('Người nhận · chỉ xem','Recipient · view only'):t('Kỷ vật mẫu','Demo memory')}</span></button>)}
       </div>
+      {currentUser&&!allMemories.length&&<p>{t('Chưa có kỷ vật được cấp cho tài khoản này.','No memories have been assigned to this account yet.')}</p>}
+      <details className="border border-white/15 rounded-xl p-4"><summary className="cursor-pointer">{t('Mở bằng chip NFC (tùy chọn)','Open with NFC chip (optional)')}</summary><NfcTools onRead={tag=>{setCurrentTag(tag);onSelectTag?.(tag);}}/></details>
       <form className="space-y-3" onSubmit={e=>{e.preventDefault();const tag=tagInput.trim().toLowerCase();if(/^[a-z0-9-]{1,64}$/.test(tag)){setCurrentTag(tag);onSelectTag?.(tag);}}}>
-        <label className="store-label">Bạn đã nhận chip? Nhập mã kỷ vật trên thẻ<input required pattern="[a-zA-Z0-9-]{1,64}" className="store-input" value={tagInput} onChange={e=>setTagInput(e.target.value)} placeholder="emo-…"/></label>
-        <button className="store-button">Mở kỷ vật</button>
+        <label className="store-label">{t('Hoặc nhập mã kỷ vật bạn được chia sẻ','Or enter a shared memory ID')}<input required pattern="[a-zA-Z0-9-]{1,64}" className="store-input" value={tagInput} onChange={e=>setTagInput(e.target.value)} placeholder="emo-…"/></label>
+        <button className="store-button">{t("Mở kỷ vật","Open memory")}</button>
       </form>
     </div>
   );
@@ -271,7 +320,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
     return (
       <div className="w-full min-h-screen bg-dark-950 flex flex-col items-center justify-center text-slate-300 gap-3">
         <Sparkles className="w-8 h-8 animate-spin text-white" />
-        <p className="font-serif text-sm uppercase tracking-widest">Đang mở kỷ niệm của bạn…</p>
+        <p className="font-serif text-sm uppercase tracking-widest">{t("Đang mở kỷ niệm của bạn…","Opening your memory…")}</p>
       </div>
     );
   }
@@ -280,14 +329,14 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
     return (
       <div className="w-full min-h-screen bg-dark-950 flex flex-col items-center justify-center p-4 text-center">
         <AlertTriangle className="w-12 h-12 text-amber-400 mb-3" />
-        <h3 className="font-serif text-xl font-bold text-white mb-2">Thông Báo Truy Xuất Kỷ Vật</h3>
-        <p className="text-xs text-slate-400 max-w-md mb-6">{errorMessage || 'Không tìm thấy dữ liệu.'}</p>
+        <h3 className="font-serif text-xl font-bold text-white mb-2">{t("Thông Báo Truy Xuất Kỷ Vật","Memory access")}</h3>
+        <p className="text-xs text-slate-400 max-w-md mb-6">{errorMessage || t("Không tìm thấy dữ liệu.","No data found.")}</p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={() => loadMemory(currentTag)}
             className="px-6 py-2.5 rounded-full bg-white text-dark-950 font-bold text-xs uppercase cursor-pointer hover:bg-slate-200 transition-all"
           >
-            Thử tải lại kỷ vật
+            {t("Thử tải lại kỷ vật","Reload memory")}
           </button>
           {onNavigateToHome && (
             <button
@@ -295,7 +344,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase border border-white/20 cursor-pointer transition-all flex items-center gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Về Trang Chủ</span>
+              <span>{t("Về Trang Chủ","Back to Home")}</span>
             </button>
           )}
         </div>
@@ -319,7 +368,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/15 border border-white/15 text-xs text-slate-200 hover:text-white transition-all cursor-pointer shadow-sm"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Quay lại Trang Chủ</span>
+            <span>{t("Quay lại Trang Chủ","Back to Home")}</span>
           </button>
         ) : <div />}
         {onNavigateToShop && (
@@ -327,12 +376,12 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             onClick={onNavigateToShop}
             className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
-            Khám phá Cửa Hàng →
+            {t("Khám phá Cửa Hàng →","Explore the Shop →")}
           </button>
         )}
       </div>
 
-      <details className="max-w-5xl mx-auto px-4 sm:px-6 mb-4"><summary className="cursor-pointer text-sm">Mở kỷ vật khác bằng NFC</summary><NfcTools onRead={tag=>{setCurrentTag(tag);onSelectTag?.(tag);}} /></details>
+      <details className="max-w-5xl mx-auto px-4 sm:px-6 mb-4"><summary className="cursor-pointer text-sm">{t("Mở kỷ vật khác bằng NFC","Open another memory with NFC")}</summary><NfcTools onRead={tag=>{setCurrentTag(tag);onSelectTag?.(tag);}} /></details>
       {/* 1. Header Toolbar */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 mb-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
@@ -347,8 +396,9 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 {memoryData.is_admin && (
                   <span className="px-1.5 py-0.2 rounded text-[9px] bg-red-500/20 text-red-300 border border-red-500/30">ADMIN</span>
                 )}
+                {memoryData.is_recipient&&!memoryData.is_owner&&<span className="text-sky-200 text-[9px]">{t('NGƯỜI NHẬN · CHỈ XEM','RECIPIENT · VIEW ONLY')}</span>}
                 {memoryData.is_owner && (
-                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">CHỦ SỞ HỮU</span>
+                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">{t("CHỦ SỞ HỮU","OWNER")}</span>
                 )}
               </p>
               <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
@@ -364,11 +414,11 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
           <div className="flex flex-col min-[480px]:flex-row w-full sm:w-auto min-w-0 gap-2">
             <select
               value={currentTag}
-              aria-label="Chọn kỷ vật của bạn"
+              aria-label={t("Chọn kỷ vật của bạn","Choose your memory")}
               onChange={(e) => {setCurrentTag(e.target.value);onSelectTag?.(e.target.value);}}
               className="w-full sm:max-w-64 min-h-11 min-w-0 px-3 py-1.5 text-sm rounded-xl bg-black/60 border border-white/20 text-slate-200 focus:outline-none focus:border-white/50 cursor-pointer"
             >
-              {!allMemories.some(m=>m.tag_uid===currentTag)&&<option value={currentTag}>Kỷ vật đang mở</option>}
+              {!allMemories.some(m=>m.tag_uid===currentTag)&&<option value={currentTag}>{t("Kỷ vật đang mở","Current memory")}</option>}
               {allMemories.map((m) => (
                 <option key={m.tag_uid} value={m.tag_uid}>
                   {m.title} ({m.tag_uid})
@@ -377,7 +427,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </select>
 
             {/* If Owner or Admin: Show Studio Button. If Not: Show Claim Chip Button */}
-            {(memoryData.is_owner || memoryData.is_admin) ? (
+            {memoryData.is_owner ? (
               <button
                 onClick={() => {
                   setEditTitle(memoryData.title || '');
@@ -391,23 +441,26 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                   setIntroPath(memoryData.intro_video_path || '');
                   setExtraLetters(memoryData.letters || []);
                   setPinAction('KEEP');
+                  setNewPinCode('');
+                  setEditPinHint(memoryData.pin_hint || '');
                   setStudioError('');
                   callStore('rpc_memory_guestbook', { p_tag: currentTag, p_action: 'list' }).then(res => setGuestEntries(res || [])).catch(() => {});
+                  setStudioStep(1);
                   setIsEditorOpen(true);
                 }}
                 className="px-3.5 py-1.5 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                <span>Chỉnh Sửa (Studio)</span>
+                <span>{t("Chỉnh Sửa (Studio)","Edit in Studio")}</span>
               </button>
-            ) : (
+            ) : !memoryData.is_recipient && (
               <button
                 onClick={() => currentUser?setIsClaimModalOpen(true):onOpenAuth?.()}
                 className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Đăng ký quyền sở hữu chiếc trang sức này"
+                title={t("Đăng ký quyền sở hữu chiếc trang sức này","Claim this memory")}
               >
                 <Key className="w-3.5 h-3.5" />
-                <span>{currentUser?'Tôi là người chuẩn bị quà':'Đăng nhập để chuẩn bị quà'}</span>
+                <span>{currentUser?t("Tôi là người chuẩn bị quà","I have a legacy claim code"):t('Đăng nhập để xem kỷ vật được cấp','Sign in to view your assigned memories')}</span>
               </button>
             )}
           </div>
@@ -428,10 +481,10 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </div>
 
             <h3 className="font-serif text-2xl font-bold text-white mb-2 uppercase">
-              Kỷ Vật Đang Được Niêm Phong
+              {t("Kỷ Vật Đang Được Niêm Phong","This memory is sealed")}
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6 font-light">
-              Người tặng đã cài đặt chế độ hẹn giờ mở niêm phong cho chiếc trang sức này. Thời khắc cảm xúc sẽ chính thức mở ra vào:
+              {t("Người tặng đã cài đặt chế độ hẹn giờ mở niêm phong cho chiếc trang sức này. Thời khắc cảm xúc sẽ chính thức mở ra vào:","The sender has scheduled this memory to open at:")}
             </p>
 
             <div className="p-4 rounded-2xl bg-black/60 border border-amber-500/30 text-amber-300 font-mono text-sm sm:text-base font-bold mb-6">
@@ -439,7 +492,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </div>
 
             <p className="text-xs text-slate-400 italic">
-              “Một món quà bất ngờ luôn xứng đáng để chờ đợi từng giây phút.”
+              {t("“Một món quà bất ngờ luôn xứng đáng để chờ đợi từng giây phút.”","“Some surprises are worth waiting for.”")}
             </p>
           </motion.div>
         </div>
@@ -456,18 +509,36 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </div>
 
             <h3 className="font-serif text-2xl font-bold text-white mb-2 uppercase">
-              Kỷ Niệm Được Khóa Bảo Mật
+              {t("Kỷ Niệm Được Khóa Bảo Mật","Private memory")}
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed mb-6 font-light">
-              Không gian kỷ niệm này được cài đặt mã PIN bảo vệ riêng tư. Vui lòng nhập mã để giải mã chip NFC.
+              {t("Đăng nhập bằng tài khoản được cấp quyền hoặc nhập PIN do người tặng chia sẻ để mở kỷ vật riêng tư.","Sign in with an assigned account or enter the sender’s PIN to view this private memory.")}
             </p>
 
+            {memoryData.pin_hint && (
+              <div className="mb-6 p-4 rounded-2xl bg-gradient-to-br from-amber-500/15 via-yellow-500/10 to-amber-600/5 border border-amber-400/40 text-left shadow-lg">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Key className="w-3.5 h-3.5 text-amber-300" />
+                  <span className="text-[11px] uppercase tracking-wider font-semibold text-amber-300">
+                    {t("Gợi ý từ người thương", "Clue from your sender")}
+                  </span>
+                </div>
+                <p className="font-serif text-sm sm:text-base text-amber-100/95 italic leading-relaxed pl-2 border-l-2 border-amber-400/50 my-1.5">
+                  “{memoryData.pin_hint}”
+                </p>
+                <p className="text-[10px] text-amber-300/70 mt-1">
+                  {t("✦ Hãy nhớ lại dấu mốc hoặc kỷ niệm đặc biệt chỉ hai người mới biết.", "✦ Recall the shared milestone or intimate memory that only the two of you know.")}
+                </p>
+              </div>
+            )}
+
+            {!currentUser&&<button type="button" className="store-button mb-4 w-full" onClick={onOpenAuth}>{t('Đăng nhập tài khoản được cấp quyền','Sign in with an assigned account')}</button>}
             <form onSubmit={handleVerifyPin} className="space-y-4">
               <input
                 type="password"
                 maxLength={6}
-                placeholder="Nhập mã PIN"
-                aria-label="Mã PIN kỷ vật"
+                placeholder={t("Nhập mã PIN","Enter PIN")}
+                aria-label={t("Mã PIN kỷ vật","Memory PIN")}
                 inputMode="numeric"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
@@ -488,7 +559,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 ) : (
                   <Unlock className="w-4 h-4" />
                 )}
-                <span>Mở Khóa Kỷ Niệm</span>
+                <span>{t("Mở Khóa Kỷ Niệm","Unlock memory")}</span>
               </button>
             </form>
           </motion.div>
@@ -498,7 +569,17 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
       ) : (
         /* 4. MAIN MEMORY SPACE (Đã mở khóa hoặc công khai) */
         <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-10">
-          {memoryData.intro_video_url&&<button className="store-button" onClick={()=>{audioRef.current?.pause();setIsPlaying(false);setMovieDone(false);}}>▶ {memoryData.is_owner?'Xem trải nghiệm người nhận':'Xem lại bộ phim kỷ niệm'}</button>}
+          <div className="flex flex-wrap items-center gap-3">
+            {memoryData.intro_video_url&&<button className="store-button" onClick={()=>{audioRef.current?.pause();setIsPlaying(false);setMovieDone(false);}}>▶ {memoryData.is_owner?t("Xem trải nghiệm người nhận","Preview recipient experience"):t("Xem lại bộ phim kỷ niệm","Replay memory film")}</button>}
+            <button
+              type="button"
+              onClick={() => setShowUnboxing(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400/20 to-yellow-500/20 hover:from-amber-400/30 hover:to-yellow-500/30 text-amber-300 border border-amber-400/30 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            >
+              <Mail className="w-3.5 h-3.5 text-amber-300" />
+              <span>{t("Nghi thức mở quà", "Unboxing ceremony")}</span>
+            </button>
+          </div>
           
           {/* A. Hero Card */}
           <motion.div
@@ -509,11 +590,11 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             <div className="flex flex-wrap items-center justify-center gap-3 mb-6 text-xs text-slate-300">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>Kỷ niệm: {memoryData.date || 'Chưa cập nhật'}</span>
+                <span>{t("Kỷ niệm:","Memory:")} {memoryData.date || t("Chưa cập nhật","Not set")}</span>
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20">
                 <Eye className="w-3.5 h-3.5" />
-                <span>Lượt mở {memoryData.tap_count || 1} lần</span>
+                <span>{t("Lượt mở","Visits")} {memoryData.tap_count || 1} {t("lần","times")}</span>
               </span>
             </div>
 
@@ -522,9 +603,9 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-300 font-light mb-6 flex items-center justify-center gap-2">
-              <span>Từ: <strong className="text-white font-medium">{memoryData.author || 'Người thương'}</strong></span>
+              <span>{t("Từ:","From:")} <strong className="text-white font-medium">{memoryData.author || 'Người thương'}</strong></span>
               <span>✦</span>
-              <span>Gửi đến: <strong className="text-white font-medium">{memoryData.recipient || 'Người thương'}</strong></span>
+              <span>{t("Gửi đến:","To:")} <strong className="text-white font-medium">{memoryData.recipient || 'Người thương'}</strong></span>
             </p>
 
             {memoryData.quote && (
@@ -536,7 +617,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             )}
           </motion.div>
 
-          {memoryData.audio_url&&<section className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 space-y-4"><h3 className="font-serif text-xl">{memoryData.audio_title||'Giai điệu dành cho bạn'}</h3><p className="text-sm text-slate-400">Bật nhạc khi đọc những lá thư của chúng mình.</p><audio key={memoryData.audio_url} ref={audioRef} controls preload="metadata" src={memoryData.audio_url} className="w-full" onError={()=>setAudioError('Chưa phát được audio. Bạn có thể tải lại kỷ vật rồi thử lại.')} onPlay={()=>setIsPlaying(true)} onPause={()=>setIsPlaying(false)}/>{audioError&&<p role="alert" className="text-amber-200 text-sm">{audioError} <button className="underline" onClick={()=>{setAudioError('');loadMemory(currentTag);}}>Tải lại</button></p>}</section>}
+          {memoryData.audio_url&&<section className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 space-y-4"><h3 className="font-serif text-xl">{memoryData.audio_title||t("Giai điệu dành cho bạn","Music for you")}</h3><p className="text-sm text-slate-400">{t("Bật nhạc khi đọc những lá thư của chúng mình.","Play music while reading our letters.")}</p><audio key={memoryData.audio_url} ref={audioRef} controls preload="metadata" src={memoryData.audio_url} className="w-full" onError={()=>setAudioError(t("Chưa phát được audio. Bạn có thể tải lại kỷ vật rồi thử lại.","Audio could not play. Reload the memory and try again."))} onPlay={()=>setIsPlaying(true)} onPause={()=>setIsPlaying(false)}/>{audioError&&<p role="alert" className="text-amber-200 text-sm">{audioError} <button className="underline" onClick={()=>{setAudioError('');loadMemory(currentTag);}}>{t("Tải lại","Reload")}</button></p>}</section>}
 
           {/* C. Hand-written Secret Letter (Chỉ hiển thị khi đã mở khóa PIN thành công) */}
           {memoryData.letter && (
@@ -545,7 +626,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-white" />
                   <h3 className="text-base font-bold text-white uppercase font-serif">
-                    Bức Thư Tay Mật Mã
+                    {t("Bức Thư Tay Mật Mã","A private letter")}
                   </h3>
                 </div>
 
@@ -553,7 +634,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                   onClick={() => setIsLetterOpen(!isLetterOpen)}
                   className="px-4 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 transition-all cursor-pointer"
                 >
-                  {isLetterOpen ? 'Gấp Thư Lại' : 'Mở Niêm Phong'}
+                  {isLetterOpen ? t("Gấp Thư Lại","Close letter") : t("Mở Niêm Phong","Open letter")}
                 </button>
               </div>
 
@@ -568,7 +649,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                     <div className="p-6 sm:p-8 rounded-2xl bg-black/60 border border-white/15 text-slate-200 font-serif text-sm sm:text-base leading-relaxed whitespace-pre-line shadow-inner">
                       {memoryData.letter}
                       <div className="mt-8 pt-4 border-t border-white/10 text-right text-xs italic font-sans text-slate-400">
-                        — {memoryData.author || 'Người gửi'}
+                        — {memoryData.author || t("Người gửi","Sender")}
                       </div>
                     </div>
                   </motion.div>
@@ -578,8 +659,8 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                     className="py-10 border border-dashed border-white/20 rounded-2xl text-center cursor-pointer hover:border-white/50 transition-colors bg-black/20"
                   >
                     <Mail className="w-8 h-8 text-white/50 mx-auto mb-2" />
-                    <p className="text-sm font-semibold text-white">Lá thư tay đã được giải mã</p>
-                    <p className="text-xs text-slate-400 mt-1">Bấm vào đây để mở đọc những dòng tâm sự vĩnh cửu</p>
+                    <p className="text-sm font-semibold text-white">{t("Lá thư tay đã được giải mã","Your letter is unlocked")}</p>
+                    <p className="text-xs text-slate-400 mt-1">{t("Bấm vào đây để mở đọc những dòng tâm sự vĩnh cửu","Tap here to read your letter")}</p>
                   </div>
                 )}
               </AnimatePresence>
@@ -594,7 +675,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 <div className="flex items-center gap-2">
                   <ImageIcon className="w-4 h-4 text-white" />
                   <h3 className="text-base font-bold text-white uppercase font-serif">
-                    Khoảnh Khắc Kỷ Niệm ({memoryData.media_gallery.length})
+                    {t("Khoảnh Khắc Kỷ Niệm (","Memory moments (")}{memoryData.media_gallery.length})
                   </h3>
                 </div>
 
@@ -643,10 +724,10 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
           <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
             <h3 className="text-base font-bold text-white uppercase font-serif mb-2 flex items-center gap-2">
               <Heart className="w-4 h-4 text-white fill-current" />
-              <span>Sổ Lưu Niệm & Lời Chúc Gửi Tới Kỷ Vật</span>
+              <span>{t("Sổ Lưu Niệm & Lời Chúc Gửi Tới Kỷ Vật","Guestbook & wishes")}</span>
             </h3>
             <p className="text-xs text-slate-400 mb-6">
-              Viết một lời nhắn cho người nhận. Lời nhắn sẽ xuất hiện sau khi người chuẩn bị quà duyệt.
+              {t("Viết một lời nhắn cho người nhận. Lời nhắn sẽ xuất hiện sau khi người chuẩn bị quà duyệt.","Leave a message for the recipient. It will appear after the owner approves it.")}
             </p>
 
             <div className="space-y-3 mb-6">
@@ -669,13 +750,13 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                               await callStore('rpc_memory_guestbook', { p_tag: currentTag, p_id: entry.id, p_action: 'delete' });
                               await loadMemory(currentTag);
                             } catch (err) {
-                              alert(err.message || 'Lỗi khi xóa lời nhắn.');
+                              alert(err.message || t("Lỗi khi xóa lời nhắn.","Could not delete the message."));
                             }
                           }
                         }}
                         className="text-[11px] text-red-400 hover:text-red-300 underline cursor-pointer"
                       >
-                        Xóa lời nhắn này
+                        {t("Xóa lời nhắn này","Delete this message")}
                       </button>
                     </div>
                   )}
@@ -683,12 +764,62 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               ))}
             </div>
 
+            {/* Heartfelt Sentiments to Gift Giver */}
+            <div className="mb-6 p-4 rounded-2xl bg-black/40 border border-white/10 space-y-2.5">
+              <p className="text-xs font-semibold text-amber-200 flex items-center gap-1.5 font-serif">
+                <Heart className="w-3.5 h-3.5 fill-amber-400/40 text-amber-300" />
+                <span>{t("Gửi lời cảm xúc ấm áp đến người tặng quà:", "Send heartfelt warmth to the gift giver:")}</span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { textVi: 'Gửi một cái ôm ấm áp', textEn: 'Sending a warm hug' },
+                  { textVi: 'Thương mến gửi trao', textEn: 'With all my love' },
+                  { textVi: 'Món quà vô cùng ý nghĩa', textEn: 'Deeply touched by your gift' },
+                  { textVi: 'Cảm ơn người thương', textEn: 'Thank you from my heart' }
+                ].map((reaction, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const authorName = guestAuthor || memoryData.recipient || (language === 'en' ? 'Beloved recipient' : 'Người nhận thương mến');
+                        const msg = language === 'en' ? reaction.textEn : reaction.textVi;
+                        await callStore('rpc_memory_guestbook', {
+                          p_tag: currentTag,
+                          p_action: 'add',
+                          p_author: authorName,
+                          p_relationship: language === 'en' ? 'Recipient' : 'Người nhận',
+                          p_message: msg
+                        });
+                        setReactionSent(msg);
+                        setTimeout(() => setReactionSent(''), 3000);
+                        try { confetti({ particleCount: 35, spread: 60, origin: { y: 0.8 } }); } catch {}
+                        loadMemory(currentTag);
+                      } catch {
+                        // fallback
+                      }
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-b from-white/[0.06] to-white/[0.02] hover:from-amber-400/20 hover:to-amber-500/10 text-slate-200 hover:text-amber-200 border border-white/10 hover:border-amber-400/40 text-xs font-medium transition-all active:scale-95 flex items-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    <Heart className="w-3 h-3 text-amber-300/80 fill-amber-300/20" />
+                    <span>{language === 'en' ? reaction.textEn : reaction.textVi}</span>
+                  </button>
+                ))}
+              </div>
+              {reactionSent && (
+                <p className="text-[11px] text-emerald-300 flex items-center gap-1 font-mono">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{t("Đã gửi trọn vẹn yêu thương đến người tặng quà.", "Your warmth has been lovingly sent to the giver.")}</span>
+                </p>
+              )}
+            </div>
+
             <form onSubmit={handleSendGuestbook} className="p-4 rounded-2xl bg-black/50 border border-white/15 space-y-3">
-              <p className="text-xs font-semibold text-white">Gửi thêm lời chúc mới:</p>
+              <p className="text-xs font-semibold text-white">{t("Gửi thêm lời chúc mới:","Leave a wish:")}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   type="text"
-                  placeholder="Tên của bạn..."
+                  placeholder={t("Tên của bạn...","Your name...")}
                   value={guestAuthor}
                   onChange={(e) => setGuestAuthor(e.target.value)}
                   className="px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-xs text-white focus:outline-none"
@@ -707,7 +838,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               </div>
 
               <textarea
-                placeholder="Viết lời nhắn gửi hoặc lời chúc yêu thương tại đây..."
+                placeholder={t("Viết lời nhắn gửi hoặc lời chúc yêu thương tại đây...","Write your message or wish here...")}
                 rows={3}
                 value={guestMessage}
                 onChange={(e) => setGuestMessage(e.target.value)}
@@ -719,7 +850,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 {guestSuccess ? (
                   <span className="text-xs text-emerald-400 flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Đã lưu lời chúc, đang chờ duyệt.</span>
+                    <span>{t("Đã lưu lời chúc, đang chờ duyệt.","Your message is awaiting approval.")}</span>
                   </span>
                 ) : <span />}
 
@@ -729,7 +860,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                   className="px-4 py-2 rounded-xl bg-white text-dark-950 text-xs font-bold uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow disabled:opacity-50"
                 >
                   {isSendingGuest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                  <span>Lưu Lời Nhắn</span>
+                  <span>{t("Lưu Lời Nhắn","Save message")}</span>
                 </button>
               </div>
             </form>
@@ -741,7 +872,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 onClick={onNavigateToShop}
                 className="px-6 py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/15 text-xs font-semibold tracking-wider uppercase transition-all"
               >
-                ← Quay lại Cửa Hàng Trang Sức
+                {t("← Quay lại Cửa Hàng Trang Sức","← Back to the Shop")}
               </button>
             </div>
           )}
@@ -762,7 +893,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
               <div className="flex items-center gap-2">
                 <Key className="w-5 h-5 text-amber-400" />
-                <h3 className="font-bold text-white text-base uppercase">Nhận Quyền Sở Hữu Chip NFC</h3>
+                <h3 className="font-bold text-white text-base uppercase">{t("Nhận Quyền Sở Hữu Chip NFC","Claim a legacy Memory Space")}</h3>
               </div>
               <button onClick={() => setIsClaimModalOpen(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
@@ -770,17 +901,17 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </div>
 
             <p className="text-xs text-slate-300 mb-4 font-light leading-relaxed">
-              Mỗi món trang sức Emoria đi kèm thẻ bảo hành kim loại chứa <strong>Mã Xác Nhận Claim Code</strong> một lần duy nhất. Nhập mã để gắn quyền sở hữu vào tài khoản của bạn.
+              {t("Mỗi món trang sức Emoria đi kèm thẻ bảo hành kim loại chứa","For older gifts, use the")} <strong>{t("Mã Xác Nhận Claim Code","one-time claim code")}</strong> {t("một lần duy nhất. Nhập mã để gắn quyền sở hữu vào tài khoản của bạn.","provided with the gift to assign ownership to your account.")}
             </p>
 
             <form onSubmit={handleClaim} className="space-y-4">
               <div>
                 <label className="text-[11px] text-slate-400 block mb-1">
-                  Mã nhận quyền được cung cấp cùng đơn hàng:
+                  {t("Mã nhận quyền được cung cấp cùng đơn hàng:","Claim code supplied with the order:")}
                 </label>
                 <input
                   type="text"
-                  placeholder="Nhập mã nhận quyền"
+                  placeholder={t("Nhập mã nhận quyền","Enter claim code")}
                   value={claimCodeInput}
                   onChange={(e) => setClaimCodeInput(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl bg-black/60 border border-white/20 text-white text-xs font-mono uppercase focus:outline-none focus:border-white/50"
@@ -796,7 +927,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 className="w-full py-2.5 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase hover:bg-slate-200 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isClaiming && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>Xác Nhận Quyền Sở Hữu</span>
+                <span>{t("Xác Nhận Quyền Sở Hữu","Confirm ownership")}</span>
               </button>
             </form>
           </div>
@@ -807,7 +938,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
       {isEditorOpen && (
         <div 
           className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
-          onClick={() => {if(window.confirm('Đóng và bỏ thay đổi chưa lưu?'))setIsEditorOpen(false);}}
+          onClick={() => {if(window.confirm(t("Đóng và bỏ thay đổi chưa lưu?","Close and discard unsaved changes?")))setIsEditorOpen(false);}}
         >
           <div 
             className="w-full max-w-2xl my-2 sm:my-8 p-4 sm:p-8 rounded-3xl bg-dark-900 border border-white/25 shadow-2xl text-slate-100 max-h-[90dvh] overflow-y-auto"
@@ -817,238 +948,530 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               <div className="flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-white" />
                 <div>
-                  <h3 className="font-bold text-white text-lg uppercase font-serif">Studio Quản Lý Kỷ Vật</h3>
-                  <p className="text-xs text-slate-400">Chủ sở hữu Chip #{memoryData.tag_uid}</p>
+                  <h3 className="font-bold text-white text-lg uppercase font-serif">{t("Studio Quản Lý Kỷ Vật","Memory Studio")}</h3>
+                  <p className="text-xs text-slate-400">{t("Chủ sở hữu Chip #","Memory owner #")}{memoryData.tag_uid}</p>
                 </div>
               </div>
-              <button onClick={() => {if(window.confirm('Đóng và bỏ thay đổi chưa lưu?'))setIsEditorOpen(false);}} className="text-slate-400 hover:text-white">
+              <button onClick={() => {if(window.confirm(t("Đóng và bỏ thay đổi chưa lưu?","Close and discard unsaved changes?")))setIsEditorOpen(false);}} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditor} className="space-y-4 text-xs">
-              {memoryData.media_warning&&<p role="status" className="p-3 rounded-xl border border-amber-300/30 text-amber-200">Một số tệp chưa phát được. Danh sách tệp đã lưu vẫn được giữ nguyên trong Studio; bạn có thể tải thêm hoặc thay thế video.</p>}
-              <label className="flex gap-3 items-start p-4 rounded-xl border border-white/15 text-sm"><input type="checkbox" checked={videoConsent} disabled={movieBusy} onChange={e=>setVideoConsent(e.target.checked)}/><span>Tôi đồng ý gửi hình ảnh và video tải lên cho Google Gemini để kiểm duyệt. Phương tiện vi phạm sẽ bị từ chối; quản trị viên xem được lịch sử tải, nhãn AI và lý do kiểm duyệt.</span></label>
-              <MemoryMovieEditor tag={currentTag} path={introPath} onChange={setIntroPath} onBusy={setMovieBusy} videoConsent={videoConsent} onAddToGallery={item=>setEditMedia(prev=>[...prev,item])}/>
-              <div>
-                <label className="text-slate-300 font-semibold block mb-1">Tiêu đề kỷ niệm:</label>
-                <input
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
-                  required
+            {/* Progress & Step Indicators */}
+            <div className="mb-6 space-y-3 pb-4 border-b border-white/10">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-300 flex items-center gap-1.5 font-medium">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{t("Hành trình Sáng tác Kỷ vật", "Memory Crafting Journey")}</span>
+                </span>
+                <span className="font-mono text-amber-300 font-bold text-xs">{t("Hoàn thiện", "Ready")}: {studioProgress}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-amber-400 via-yellow-300 to-emerald-400 rounded-full transition-all duration-500"
+                  style={{ width: `${studioProgress}%` }}
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Tên người tặng / gửi (Từ: ...):</label>
-                  <input
-                    type="text"
-                    value={editAuthor}
-                    onChange={(e) => setEditAuthor(e.target.value)}
-                    placeholder="Ví dụ: Minh Hoàng"
-                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Tên người nhận (Gửi đến: ...):</label>
-                  <input
-                    type="text"
-                    value={editRecipient}
-                    onChange={(e) => setEditRecipient(e.target.value)}
-                    placeholder="Ví dụ: Thiên Thanh"
-                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
-                  />
-                </div>
+              {/* Step Navigation Tabs */}
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setStudioStep(1)}
+                  className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                    studioStep === 1
+                      ? 'bg-amber-400/15 border-amber-400/50 text-white shadow-sm'
+                      : 'bg-black/30 border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  }`}
+                >
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-300 flex items-center gap-1">
+                    <Feather className="w-3 h-3" />
+                    <span>{t("Bước 1", "Step 1")}</span>
+                  </span>
+                  <span className="text-xs font-medium line-clamp-1">{t("Lời Trao Gửi & Nhạc", "Message & Music")}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStudioStep(2)}
+                  className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                    studioStep === 2
+                      ? 'bg-amber-400/15 border-amber-400/50 text-white shadow-sm'
+                      : 'bg-black/30 border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  }`}
+                >
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-300 flex items-center gap-1">
+                    <Film className="w-3 h-3" />
+                    <span>{t("Bước 2", "Step 2")}</span>
+                  </span>
+                  <span className="text-xs font-medium line-clamp-1">{t("Khoảnh Khắc & Phim", "Moments & Film")}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStudioStep(3)}
+                  className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                    studioStep === 3
+                      ? 'bg-amber-400/15 border-amber-400/50 text-white shadow-sm'
+                      : 'bg-black/30 border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  }`}
+                >
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-300 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>{t("Bước 3", "Step 3")}</span>
+                  </span>
+                  <span className="text-xs font-medium line-clamp-1">{t("Niêm Phong & Xem Trước", "Seal & Preview")}</span>
+                </button>
               </div>
+            </div>
 
-              <div>
-                <label className="text-slate-300 font-semibold block mb-1">Câu trích dẫn (Golden Quote):</label>
-                <input
-                  type="text"
-                  value={editQuote}
-                  onChange={(e) => setEditQuote(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-300 font-semibold block mb-1">Nội dung bức thư tay tâm sự (Riêng tư):</label>
-                <textarea
-                  rows={6}
-                  value={editLetter}
-                  onChange={(e) => setEditLetter(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none leading-relaxed"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Tên bản thu âm / bài hát:</label>
-                  <input
-                    type="text"
-                    value={editAudioTitle}
-                    onChange={(e) => setEditAudioTitle(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
-                  />
+            <form onSubmit={handleSaveEditor} className="space-y-5 text-xs">
+              {/* Notifications */}
+              {studioError && (
+                <div role="alert" className="p-3 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                  <span>{studioError}</span>
                 </div>
-
-                <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Đường dẫn audio đã tải:</label>
-                  <input
-                    type="text"
-                    value={editAudioUrl}
-                    readOnly
-                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <section className="space-y-3"><h4 className="font-serif text-lg">02 · Những lá thư bổ sung</h4>{extraLetters.map((letter,index)=><div key={index} className="space-y-2 p-3 border border-white/10 rounded-xl"><label className="store-label">Tiêu đề thư<input className="store-input" required maxLength={200} value={letter.title} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,title:e.target.value}:x))}/></label><label className="store-label">Nội dung<textarea className="store-input" required maxLength={10000} rows={5} value={letter.body} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,body:e.target.value}:x))}/></label><button type="button" onClick={()=>setExtraLetters(prev=>prev.filter((_,i)=>i!==index))}>Gỡ thư</button></div>)}<button type="button" disabled={extraLetters.length>=10} className="store-button" onClick={()=>setExtraLetters(prev=>[...prev,{title:'Một lời nhắn dành cho bạn',body:''}])}>Thêm thư tay</button></section>
-              <MemoryMediaEditor tag={currentTag} items={editMedia} onChange={setEditMedia} audio={editAudioUrl} onAudio={setEditAudioUrl} onBusy={setMovieBusy} videoConsent={videoConsent}/>
-              <details className="p-3 border border-white/10 rounded-xl bg-black/20">
-                <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-200 select-none">
-                  Xem thêm nhật ký tải lên & chẩn đoán kiểm duyệt
-                </summary>
-                <div className="mt-3">
-                  <VideoLabelEditor key={currentTag} tag={currentTag} items={editMedia} introPath={introPath} onBusy={setMovieBusy} consent={videoConsent} refreshKey={movieBusy} onApproved={path=>setEditMedia(prev=>prev.some(m=>m.path===path)?prev:[...prev,{path,type:'video',caption:'Video đã kiểm duyệt'}])}/>
-                </div>
-              </details>
-              <details className="p-4 border border-white/10 rounded-xl" open><summary className="cursor-pointer font-semibold text-slate-200">Quản lý sổ lưu niệm ({guestEntries.length} lời nhắn)</summary>
-                <div className="space-y-3 mt-3">
-                  {guestEntries.map(entry => (
-                    <div key={entry.id} className="p-3 rounded-xl bg-black/50 border border-white/10 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-white">{entry.author_name} ({entry.relationship || 'Khách'})</span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] ${entry.is_hidden ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
-                          {entry.is_hidden ? 'Đang ẩn' : 'Đang hiển thị'}
-                        </span>
-                      </div>
-                      <p className="whitespace-pre-wrap text-slate-300">{entry.message}</p>
-                      <div className="flex gap-4 text-xs pt-1">
-                        <button
-                          type="button"
-                          className="text-amber-300 hover:underline cursor-pointer"
-                          onClick={async () => {
-                            try {
-                              const res = await callStore('rpc_memory_guestbook', { p_tag: currentTag, p_id: entry.id, p_action: entry.is_hidden ? 'approve' : 'hide' });
-                              setGuestEntries(res || []);
-                              await loadMemory(currentTag);
-                            } catch (e) {
-                              setStudioError(e.message);
-                            }
-                          }}
-                        >
-                          {entry.is_hidden ? '✓ Cho phép hiển thị' : '👁 Ẩn lời nhắn'}
-                        </button>
-                        <button
-                          type="button"
-                          className="text-red-400 hover:underline cursor-pointer"
-                          onClick={async () => {
-                            if (window.confirm(`Xóa vĩnh viễn lời nhắn của "${entry.author_name}"?`)) {
-                              try {
-                                const res = await callStore('rpc_memory_guestbook', { p_tag: currentTag, p_id: entry.id, p_action: 'delete' });
-                                setGuestEntries(res || []);
-                                await loadMemory(currentTag);
-                              } catch (e) {
-                                setStudioError(e.message);
-                              }
-                            }
-                          }}
-                        >
-                          🗑 Xóa lời nhắn
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {!guestEntries.length && <p className="text-slate-400 text-xs">Chưa có lời nhắn nào trong sổ lưu niệm.</p>}
-                </div>
-              </details>
-              {studioError&&<p role="alert" className="text-red-300">{studioError}</p>}
-              {/* 3 HÀNH ĐỘNG PIN RÕ RÀNG: KEEP / SET / REMOVE (CHỐNG MẤT PIN KHI UPDATE TITLE) */}
-              <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3 mt-4">
-                <p className="font-semibold text-white">Chính Sách Khóa Mã PIN Bảo Mật:</p>
-                
-                <div className="flex flex-wrap gap-4 text-xs">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="pinAction"
-                      value="KEEP"
-                      checked={pinAction === 'KEEP'}
-                      onChange={() => setPinAction('KEEP')}
-                      className="accent-white"
-                    />
-                    <span>Giữ nguyên trạng thái PIN hiện tại</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="pinAction"
-                      value="SET"
-                      checked={pinAction === 'SET'}
-                      onChange={() => setPinAction('SET')}
-                      className="accent-white"
-                    />
-                    <span>Đặt / Đổi Mã PIN Mới</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="pinAction"
-                      value="REMOVE"
-                      checked={pinAction === 'REMOVE'}
-                      onChange={() => setPinAction('REMOVE')}
-                      className="accent-white"
-                    />
-                    <span>Gỡ bỏ PIN (Công khai)</span>
-                  </label>
-                </div>
-
-                {pinAction === 'SET' && (
-                  <div className="pt-2">
-                    <label className="text-[11px] text-slate-300 block mb-1">Nhập Mã PIN mới (4-6 chữ số):</label>
-                    <input
-                      type="password"
-                      maxLength={6}
-                      value={newPinCode}
-                      onChange={(e) => setNewPinCode(e.target.value)}
-                      placeholder="Nhập 4-6 số..."
-                      className="w-48 px-3 py-1.5 rounded-xl bg-black/80 border border-white/30 text-white font-mono text-center tracking-widest text-sm focus:outline-none"
-                      required={pinAction === 'SET'}
-                    />
-                  </div>
-                )}
-              </div>
-
+              )}
               {saveSuccess && (
                 <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Đã cập nhật dữ liệu kỷ vật an toàn!</span>
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{t("Đã cập nhật dữ liệu kỷ vật an toàn!","Memory saved successfully!")}</span>
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => {if(window.confirm('Đóng và bỏ thay đổi chưa lưu?'))setIsEditorOpen(false);}}
-                  className="px-4 py-2 rounded-xl bg-white/10 text-slate-300 hover:text-white"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingEditor||movieBusy}
-                  className="px-6 py-2 rounded-xl bg-white text-dark-950 font-bold uppercase tracking-wider hover:bg-slate-200 cursor-pointer shadow-silver-glow flex items-center gap-2 disabled:opacity-50"
-                >
-                  {isSavingEditor && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>Lưu Thay Đổi</span>
-                </button>
-              </div>
+              {/* BƯỚC 1: LỜI TRAO GỬI & NHẠC NỀN */}
+              {studioStep === 1 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">{t("Tiêu đề kỷ niệm:","Memory title:")}</label>
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder={t("Ví dụ: Ánh Sáng Nơi Trái Tim","e.g. Lumen of the Heart")}
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none focus:border-amber-400/50 text-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">{t("Tên người tặng / gửi (Từ: ...):","Sender name (From):")}</label>
+                      <input
+                        type="text"
+                        value={editAuthor}
+                        onChange={(e) => setEditAuthor(e.target.value)}
+                        placeholder={t("Ví dụ: Minh Hoàng","e.g. Alex")}
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">{t("Tên người nhận (Gửi đến: ...):","Recipient name (To):")}</label>
+                      <input
+                        type="text"
+                        value={editRecipient}
+                        onChange={(e) => setEditRecipient(e.target.value)}
+                        placeholder={t("Ví dụ: Thiên Thanh","e.g. Taylor")}
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">{t("Câu trích dẫn (Golden Quote):","Featured quote:")}</label>
+                    <input
+                      type="text"
+                      value={editQuote}
+                      onChange={(e) => setEditQuote(e.target.value)}
+                      placeholder={t("“Dù ở bất cứ nơi đâu, em vẫn luôn là ánh sáng của anh.”", "“Wherever you are, you are my guiding light.”")}
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-slate-300 font-semibold">{t("Nội dung bức thư tay tâm sự (Riêng tư):","Private letter:")}</label>
+                      <button
+                        type="button"
+                        onClick={() => setIsAiMuseOpen(true)}
+                        className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-dark-950 font-bold text-[11px] uppercase tracking-wider flex items-center gap-1 shadow-sm hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <Feather className="w-3.5 h-3.5" />
+                        <span>{t("Chắp bút thư tay", "Letter Muse")}</span>
+                      </button>
+                    </div>
+                    <textarea
+                      rows={6}
+                      value={editLetter}
+                      onChange={(e) => setEditLetter(e.target.value)}
+                      placeholder={t("Viết những lời tâm sự chân thành gửi đến người thương...", "Write your deepest thoughts for your beloved...")}
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none leading-relaxed"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-slate-300 font-semibold">{t("Tên bản thu âm / bài hát:","Recording / song title:")}</label>
+                        <button
+                          type="button"
+                          onClick={() => setIsCuratedMelodiesOpen(true)}
+                          className="px-2 py-0.5 rounded-lg bg-white/10 hover:bg-white/20 text-amber-300 border border-amber-400/30 text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-all"
+                        >
+                          <Music className="w-3 h-3" />
+                          <span>{t("♫ Chọn từ kho nhạc", "♫ Curated Music")}</span>
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={editAudioTitle}
+                        onChange={(e) => setEditAudioTitle(e.target.value)}
+                        placeholder={t("Ví dụ: Clair de Lune","e.g. Clair de Lune")}
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">{t("Đường dẫn audio đã tải:","Uploaded audio path:")}</label>
+                      <input
+                        type="text"
+                        value={editAudioUrl}
+                        readOnly
+                        placeholder={t("Chọn từ kho nhạc hoặc tải lên ở Bước 2","Select from library or upload in Step 2")}
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-slate-300 focus:outline-none font-mono text-[11px]"
+                      />
+                    </div>
+                  </div>
+
+                  <section className="space-y-3 pt-2">
+                    <h4 className="font-serif text-sm font-semibold text-slate-200">{t("Những lá thư bổ sung (Tùy chọn)","Additional letters (Optional)")}</h4>
+                    {extraLetters.map((letter,index)=>(
+                      <div key={index} className="space-y-2 p-3 border border-white/10 rounded-xl bg-black/30">
+                        <label className="store-label">{t("Tiêu đề thư","Letter title")}<input className="store-input" required maxLength={200} value={letter.title} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,title:e.target.value}:x))}/></label>
+                        <label className="store-label">{t("Nội dung","Content")}<textarea className="store-input" required maxLength={10000} rows={4} value={letter.body} onChange={e=>setExtraLetters(prev=>prev.map((x,i)=>i===index?{...x,body:e.target.value}:x))}/></label>
+                        <button type="button" className="text-red-400 hover:text-red-300 text-[11px] underline cursor-pointer" onClick={()=>setExtraLetters(prev=>prev.filter((_,i)=>i!==index))}>{t("Gỡ thư này","Remove letter")}</button>
+                      </div>
+                    ))}
+                    <button type="button" disabled={extraLetters.length>=10} className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-xs flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50" onClick={()=>setExtraLetters(prev=>[...prev,{title:t('Một lời nhắn dành cho bạn','A note for you'),body:''}])}>+ {t("Thêm thư tay khác","Add another letter")}</button>
+                  </section>
+
+                  {/* Step 1 Navigation */}
+                  <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => {if(window.confirm(t("Đóng và bỏ thay đổi chưa lưu?","Close and discard unsaved changes?")))setIsEditorOpen(false);}}
+                      className="px-4 py-2 rounded-xl bg-white/10 text-slate-300 hover:text-white cursor-pointer"
+                    >
+                      {t("Hủy","Cancel")}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        disabled={isSavingEditor||movieBusy}
+                        className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold cursor-pointer disabled:opacity-50 transition-all"
+                      >
+                        {t("Lưu nhanh","Quick save")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStudioStep(2)}
+                        className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-dark-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 cursor-pointer shadow-silver-glow flex items-center gap-1.5 transition-all"
+                      >
+                        <span>{t("Tiếp tục: Khoảnh Khắc & Phim","Continue: Moments & Film")}</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* BƯỚC 2: KHOẢNH KHẮC & PHIM KỶ NIỆM */}
+              {studioStep === 2 && (
+                <div className="space-y-4">
+                  {memoryData.media_warning&&<p role="status" className="p-3 rounded-xl border border-amber-300/30 text-amber-200">{t("Một số tệp chưa phát được. Danh sách tệp đã lưu vẫn được giữ nguyên trong Studio; bạn có thể tải thêm hoặc thay thế video.","Some files cannot play yet. Your saved files remain in Studio; you can upload or replace media.")}</p>}
+                  
+                  <label className="flex gap-3 items-start p-4 rounded-xl border border-white/15 bg-black/30 text-xs leading-relaxed">
+                    <input type="checkbox" checked={videoConsent} disabled={movieBusy} onChange={e=>setVideoConsent(e.target.checked)} className="mt-0.5 accent-amber-400" />
+                    <span className="text-slate-300">{t("Tôi đồng ý gửi hình ảnh và video tải lên cho Google Gemini để kiểm duyệt. Phương tiện vi phạm sẽ bị từ chối; quản trị viên xem được lịch sử tải, nhãn AI và lý do kiểm duyệt.","I consent to sending uploaded images and videos to Google Gemini for moderation. Violating content is rejected; administrators can see upload history, AI labels and moderation reasons.")}</span>
+                  </label>
+
+                  <div className="space-y-2">
+                    <h4 className="font-serif text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+                      <Film className="w-4 h-4 text-amber-300" />
+                      <span>{t("Video đại diện (Phim kỷ niệm mở đầu)","Featured Intro Film")}</span>
+                    </h4>
+                    <MemoryMovieEditor tag={currentTag} path={introPath} onChange={setIntroPath} onBusy={setMovieBusy} videoConsent={videoConsent} onAddToGallery={item=>setEditMedia(prev=>[...prev,item])}/>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <h4 className="font-serif text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-amber-300" />
+                      <span>{t("Bộ sưu tập hình ảnh & âm thanh kỷ vật","Photo Gallery & Audio")}</span>
+                    </h4>
+                    <MemoryMediaEditor tag={currentTag} items={editMedia} onChange={setEditMedia} audio={editAudioUrl} onAudio={setEditAudioUrl} onBusy={setMovieBusy} videoConsent={videoConsent}/>
+                  </div>
+
+                  <details className="p-3 border border-white/10 rounded-xl bg-black/20">
+                    <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-200 select-none">
+                      {t("Xem thêm nhật ký tải lên & chẩn đoán kiểm duyệt","Upload status & moderation details")}
+                    </summary>
+                    <div className="mt-3">
+                      <VideoLabelEditor key={currentTag} tag={currentTag} items={editMedia} introPath={introPath} onBusy={setMovieBusy} consent={videoConsent} refreshKey={movieBusy} onApproved={path=>setEditMedia(prev=>prev.some(m=>m.path===path)?prev:[...prev,{path,type:'video',caption:t("Video đã kiểm duyệt","Reviewed video")}])}/>
+                    </div>
+                  </details>
+
+                  {/* Step 2 Navigation */}
+                  <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setStudioStep(1)}
+                      className="px-4 py-2 rounded-xl bg-white/10 text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>{t("← Lời Trao Gửi","← Message & Music")}</span>
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        disabled={isSavingEditor||movieBusy}
+                        className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold cursor-pointer disabled:opacity-50 transition-all"
+                      >
+                        {t("Lưu nhanh","Quick save")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStudioStep(3)}
+                        className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-dark-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 cursor-pointer shadow-silver-glow flex items-center gap-1.5 transition-all"
+                      >
+                        <span>{t("Tiếp tục: Niêm Phong & Xem Trước","Continue: Seal & Preview")}</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* BƯỚC 3: NIÊM PHONG & XEM TRƯỚC */}
+              {studioStep === 3 && (
+                <div className="space-y-4">
+                  {/* Recipient Experience Preview Card */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-transparent border border-amber-400/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                    <div>
+                      <p className="font-semibold text-white flex items-center gap-1.5 text-xs">
+                        <Eye className="w-4 h-4 text-amber-300" />
+                        <span>{t("Xem Trước Trải Nghiệm Người Nhận", "Preview Recipient Experience")}</span>
+                      </p>
+                      <p className="text-[11px] text-slate-300 font-light mt-0.5 leading-relaxed">
+                        {t("Mở bức thư hoàng gia và phát phim kỷ niệm đúng như người nhận sẽ trải nghiệm khi chạm chip.", "Open the wax-sealed royal letter and watch the memory film exactly as your recipient will see it.")}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditorOpen(false);
+                        setShowUnboxing(true);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-dark-950 font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-silver-glow"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>{t("Xem Trước Ngay", "Preview Now")}</span>
+                    </button>
+                  </div>
+
+                  {/* 3 HÀNH ĐỘNG PIN RÕ RÀNG: KEEP / SET / REMOVE */}
+                  <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3">
+                    <p className="font-semibold text-white flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-amber-300" />
+                      <span>{t("Chính Sách Khóa Mã PIN Bảo Mật:","PIN privacy settings:")}</span>
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-4 text-xs">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pinAction"
+                          value="KEEP"
+                          checked={pinAction === 'KEEP'}
+                          onChange={() => setPinAction('KEEP')}
+                          className="accent-white"
+                        />
+                        <span>{t("Giữ nguyên trạng thái PIN hiện tại","Keep current PIN settings")}</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pinAction"
+                          value="SET"
+                          checked={pinAction === 'SET'}
+                          onChange={() => setPinAction('SET')}
+                          className="accent-white"
+                        />
+                        <span>{t("Đặt / Đổi Mã PIN Mới","Set / change PIN")}</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pinAction"
+                          value="REMOVE"
+                          checked={pinAction === 'REMOVE'}
+                          onChange={() => setPinAction('REMOVE')}
+                          className="accent-white"
+                        />
+                        <span>{t("Gỡ bỏ PIN (Công khai)","Remove PIN (public)")}</span>
+                      </label>
+                    </div>
+
+                    {pinAction === 'KEEP' && memoryData?.is_protected && (
+                      <div className="pt-2 p-3 rounded-xl bg-amber-500/10 border border-amber-400/20 text-xs space-y-1">
+                        <p className="text-slate-300">
+                          <span className="text-amber-300 font-semibold">{t("Trạng thái:", "Status:")}</span> {t("Kỷ vật đang được bảo vệ bằng mã PIN.", "This memory is protected by a PIN.")}
+                        </p>
+                        {memoryData.pin_hint ? (
+                          <p className="text-slate-300">
+                            <span className="text-amber-300 font-semibold">{t("Gợi ý hiện tại:", "Current clue:")}</span> “{memoryData.pin_hint}”
+                          </p>
+                        ) : (
+                          <p className="text-slate-400 italic">
+                            {t("Chưa có câu đố / gợi ý nào được đặt.", "No riddle or clue is set.")}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-slate-400">
+                          {t("Chọn 'Đặt / Đổi Mã PIN Mới' ở trên nếu bạn muốn cập nhật lại mật mã hoặc câu đố gợi ý.", "Select 'Set / change PIN' above if you wish to change your PIN or update the riddle.")}
+                        </p>
+                      </div>
+                    )}
+
+                    {pinAction === 'SET' && (
+                      <div className="pt-2 space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] text-slate-300 font-medium block">
+                            {t("1. Nhập Mã PIN mới (4-6 chữ số bí mật):", "1. New Secret PIN (4–6 digits):")}
+                          </label>
+                          <input
+                            type="password"
+                            maxLength={6}
+                            value={newPinCode}
+                            onChange={(e) => setNewPinCode(e.target.value)}
+                            placeholder={t("Nhập 4-6 số...", "Enter 4–6 digits...")}
+                            className="w-48 px-3 py-1.5 rounded-xl bg-black/80 border border-white/30 text-white font-mono text-center tracking-widest text-sm focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] text-slate-300 font-medium block">
+                            {t("2. Gợi ý mật mã tinh tế (Câu đố tình yêu / kỷ niệm dành riêng cho người nhận):", "2. Subtle Clue / Riddle for your beloved:")}
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={150}
+                            value={editPinHint}
+                            onChange={(e) => setEditPinHint(e.target.value)}
+                            placeholder={t("Ví dụ: Ngày hai đứa mình lần đầu gặp nhau ở quán quen, 4 số năm sinh mèo cưng...", "e.g. The day we first met at our favorite cafe, four digits of our anniversary...")}
+                            className="w-full px-3 py-2 rounded-xl bg-black/80 border border-white/30 text-white text-xs focus:outline-none focus:border-amber-400 placeholder-slate-500"
+                          />
+                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-400/20 text-[11px] text-amber-200/90 leading-relaxed space-y-1">
+                            <p className="font-semibold text-amber-300 flex items-center gap-1">
+                              <span>✦ {t("Nguyên tắc gợi ý lãng mạn & bảo mật:", "Romantic & Safe Clue Rules:")}</span>
+                            </p>
+                            <p>
+                              {t("• Hãy đặt câu hỏi hoặc gợi nhắc về một khoảnh khắc thiêng liêng chỉ có hai người hiểu (ví dụ: ngày kỷ niệm, địa danh hẹn hò đầu tiên).", "• Ask a question or recall an intimate memory only the two of you share (e.g. anniversary, first date location).")}
+                            </p>
+                            <p className="text-amber-400 font-medium">
+                              {t("• Tuyệt đối KHÔNG viết thẳng các con số mật mã vào đây để người nhận được tận hưởng trọn vẹn cảm giác giải đố bất ngờ.", "• Do NOT write the raw PIN digits here directly so your recipient enjoys the sweet surprise of solving the clue.")}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quản lý sổ lưu niệm */}
+                  <details className="p-4 border border-white/10 rounded-xl bg-black/30" open>
+                    <summary className="cursor-pointer font-semibold text-slate-200">
+                      {t("Quản lý sổ lưu niệm (","Manage guestbook (")}{guestEntries.length} {t("lời nhắn)","messages)")}
+                    </summary>
+                    <div className="space-y-3 mt-3">
+                      {guestEntries.map(entry => (
+                        <div key={entry.id} className="p-3 rounded-xl bg-black/50 border border-white/10 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-white">{entry.author_name} ({entry.relationship || t("Khách","Guest")})</span>
+                            <span className={`px-2 py-0.5 rounded text-[10px] ${entry.is_hidden ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                              {entry.is_hidden ? t("Đang ẩn","Hidden") : t("Đang hiển thị","Visible")}
+                            </span>
+                          </div>
+                          <p className="whitespace-pre-wrap text-slate-300">{entry.message}</p>
+                          <div className="flex gap-4 text-xs pt-1">
+                            <button
+                              type="button"
+                              className="text-amber-300 hover:underline cursor-pointer"
+                              onClick={async () => {
+                                try {
+                                  const res = await callStore('rpc_memory_guestbook', { p_tag: currentTag, p_id: entry.id, p_action: entry.is_hidden ? 'approve' : 'hide' });
+                                  setGuestEntries(res || []);
+                                  await loadMemory(currentTag);
+                                } catch (e) {
+                                  setStudioError(e.message);
+                                }
+                              }}
+                            >
+                              {entry.is_hidden ? t("✓ Cho phép hiển thị","✓ Approve") : t("👁 Ẩn lời nhắn","👁 Hide message")}
+                            </button>
+                            <button
+                              type="button"
+                              className="text-red-400 hover:underline cursor-pointer"
+                              onClick={async () => {
+                                if (window.confirm(`Xóa vĩnh viễn lời nhắn của "${entry.author_name}"?`)) {
+                                  try {
+                                    const res = await callStore('rpc_memory_guestbook', { p_tag: currentTag, p_id: entry.id, p_action: 'delete' });
+                                    setGuestEntries(res || []);
+                                    await loadMemory(currentTag);
+                                  } catch (e) {
+                                    setStudioError(e.message);
+                                  }
+                                }
+                              }}
+                            >
+                              {t("🗑 Xóa lời nhắn","🗑 Delete message")}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {!guestEntries.length && <p className="text-slate-400 text-xs">{t("Chưa có lời nhắn nào trong sổ lưu niệm.","No guestbook messages yet.")}</p>}
+                    </div>
+                  </details>
+
+                  {/* Step 3 Navigation / Submit */}
+                  <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setStudioStep(2)}
+                      className="px-4 py-2 rounded-xl bg-white/10 text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>{t("← Khoảnh Khắc & Phim","← Moments & Film")}</span>
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {if(window.confirm(t("Đóng và bỏ thay đổi chưa lưu?","Close and discard unsaved changes?")))setIsEditorOpen(false);}}
+                        className="px-4 py-2 rounded-xl bg-white/10 text-slate-300 hover:text-white cursor-pointer"
+                      >
+                        {t("Hủy","Cancel")}
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingEditor||movieBusy}
+                        className="px-6 py-2 rounded-xl bg-white text-dark-950 font-bold uppercase tracking-wider hover:bg-slate-200 cursor-pointer shadow-silver-glow flex items-center gap-2 disabled:opacity-50 transition-all"
+                      >
+                        {isSavingEditor && <Loader2 className="w-4 h-4 animate-spin" />}
+                        <span>{t("Hoàn Tất & Lưu Thay Đổi","Save All Changes")}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </form>
           </div>
         </div>
@@ -1067,7 +1490,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             <button
               onClick={() => setFullScreenImage(null)}
               className="absolute -top-10 right-0 p-1.5 rounded-full bg-white/10 hover:bg-white text-white hover:text-dark-950 transition-all cursor-pointer"
-              title="Đóng (ESC)"
+              title={t("Đóng (ESC)","Close (ESC)")}
             >
               <X className="w-5 h-5" />
             </button>
@@ -1093,6 +1516,42 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
           </div>
         </div>
       )}
+
+      {/* Luxury Unboxing Ceremony */}
+      {showUnboxing && memoryData && (
+        <LuxuryUnboxingExperience
+          hasIntroVideo={Boolean(memoryData.intro_video_url)}
+          onUnboxed={() => {
+            setShowUnboxing(false);
+            try { sessionStorage.setItem('emoria_unboxed_' + currentTag, '1'); } catch {}
+            if (memoryData.intro_video_url) {
+              setMovieDone(false);
+            } else {
+              setIsLetterOpen(true);
+            }
+          }}
+        />
+      )}
+
+      {/* AI Letter Muse Modal */}
+      <AiLetterMuseModal
+        isOpen={isAiMuseOpen}
+        onClose={() => setIsAiMuseOpen(false)}
+        author={editAuthor}
+        recipient={editRecipient}
+        onApply={(letter) => setEditLetter(letter)}
+      />
+
+      {/* Curated Melodies Modal */}
+      <CuratedMelodiesModal
+        isOpen={isCuratedMelodiesOpen}
+        onClose={() => setIsCuratedMelodiesOpen(false)}
+        currentAudioUrl={editAudioUrl}
+        onSelectMelody={({ title, url }) => {
+          setEditAudioTitle(title);
+          setEditAudioUrl(url);
+        }}
+      />
 
     </div>
   );

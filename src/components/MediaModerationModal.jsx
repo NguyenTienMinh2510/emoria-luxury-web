@@ -1,10 +1,12 @@
+import {useLanguage} from '../i18n/LanguageProvider';
 import React from 'react';
 
 export default function MediaModerationModal({
   isOpen,
-  title = "Đang tải lên & kiểm duyệt nội dung",
-  detail = "Hệ thống đang kiểm tra nội dung và gắn nhãn chủ đề tự động. Quá trình xử lý thường chỉ mất vài giây, vui lòng giữ tab này mở..."
+  title,
+  detail
 }) {
+  const {t}=useLanguage();
   if (!isOpen) return null;
 
   return (
@@ -25,10 +27,10 @@ export default function MediaModerationModal({
 
         <div className="space-y-1.5">
           <h4 className="font-serif text-lg text-white font-bold tracking-wide">
-            {title}
+            {title||t('Đang tải lên & kiểm duyệt nội dung','Uploading & reviewing content')}
           </h4>
           <p className="text-xs text-slate-300 leading-relaxed font-light">
-            {detail}
+            {detail||t('Hệ thống đang kiểm tra nội dung. Vui lòng giữ tab này mở cho đến khi hoàn tất.','We are reviewing your content. Please keep this tab open until it finishes.')}
           </p>
         </div>
 
@@ -38,7 +40,7 @@ export default function MediaModerationModal({
         </div>
 
         <p className="text-[11px] text-slate-500 font-mono">
-          Đang xử lý an toàn · Vui lòng không đóng cửa sổ
+          {t("Đang xử lý an toàn · Vui lòng không đóng cửa sổ","Processing · Please keep this window open")}
         </p>
       </div>
     </div>
