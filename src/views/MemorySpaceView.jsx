@@ -29,7 +29,7 @@ import {
 } from '../services/memoryService';
 
 export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToHome, onNavigateToShop, currentUser, onOpenAuth, onSelectTag }) {
-  const {t, language}=useLanguage();
+  const {t, tBilingual, language}=useLanguage();
   const {settings}=useStore();
   const [editMedia,setEditMedia]=useState([]);
   const [videoConsent,setVideoConsent]=useState(false);
@@ -84,9 +84,25 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
 
   const [isPlaying,setIsPlaying]=useState(false),[audioError,setAudioError]=useState('');
   const audioRef=useRef(null);
+  const letterVideoRef=useRef(null);
 
   // Letter Reveal State
   const [isLetterOpen, setIsLetterOpen] = useState(false);
+
+  // Tự động phát video tâm sự ngay khi mở thư
+  useEffect(() => {
+    if (isLetterOpen && letterVideoRef.current) {
+      const playPromise = letterVideoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          if (letterVideoRef.current) {
+            letterVideoRef.current.muted = true;
+            letterVideoRef.current.play().catch(() => {});
+          }
+        });
+      }
+    }
+  }, [isLetterOpen, memoryData?.intro_video_url]);
 
   // Lightbox Media Preview
   const [fullScreenImage, setFullScreenImage] = useState(null);
@@ -617,16 +633,16 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             )}
           </motion.div>
 
-          {memoryData.audio_url&&<section className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 space-y-4"><h3 className="font-serif text-xl">{memoryData.audio_title||t("Giai điệu dành cho bạn","Music for you")}</h3><p className="text-sm text-slate-400">{t("Bật nhạc khi đọc những lá thư của chúng mình.","Play music while reading our letters.")}</p><audio key={memoryData.audio_url} ref={audioRef} controls preload="metadata" src={memoryData.audio_url} className="w-full" onError={()=>setAudioError(t("Chưa phát được audio. Bạn có thể tải lại kỷ vật rồi thử lại.","Audio could not play. Reload the memory and try again."))} onPlay={()=>setIsPlaying(true)} onPause={()=>setIsPlaying(false)}/>{audioError&&<p role="alert" className="text-amber-200 text-sm">{audioError} <button className="underline" onClick={()=>{setAudioError('');loadMemory(currentTag);}}>{t("Tải lại","Reload")}</button></p>}</section>}
+          {memoryData.audio_url&&<section className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 space-y-4"><h3 className="font-serif text-xl">{memoryData.audio_title||tBilingual("Giai điệu dành cho bạn","Music for you")}</h3><p className="text-sm text-slate-400">{t("Bật nhạc khi đọc những lá thư của chúng mình.","Play music while reading our letters.")}</p><audio key={memoryData.audio_url} ref={audioRef} controls preload="metadata" src={memoryData.audio_url} className="w-full" onError={()=>setAudioError(t("Chưa phát được audio. Bạn có thể tải lại kỷ vật rồi thử lại.","Audio could not play. Reload the memory and try again."))} onPlay={()=>setIsPlaying(true)} onPause={()=>setIsPlaying(false)}/>{audioError&&<p role="alert" className="text-amber-200 text-sm">{audioError} <button className="underline" onClick={()=>{setAudioError('');loadMemory(currentTag);}}>{t("Tải lại","Reload")}</button></p>}</section>}
 
-          {/* C. Hand-written Secret Letter (Chỉ hiển thị khi đã mở khóa PIN thành công) */}
-          {memoryData.letter && (
+          {/* C. Hand-written Secret Letter & Spotlight Video (Chỉ hiển thị khi đã mở khóa PIN thành công) */}
+          {(memoryData.letter || memoryData.intro_video_url) && (
             <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-white" />
-                  <h3 className="text-base font-bold text-white uppercase font-serif">
-                    {t("Bức Thư Tay Mật Mã","A private letter")}
+                  <Mail className="w-4 h-4 text-amber-300" />
+                  <h3 className="text-base font-bold text-white uppercase font-serif tracking-wide">
+                    {tBilingual("Bức Thư Tay Mật Mã","A Private Letter")}
                   </h3>
                 </div>
 
@@ -644,23 +660,61 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="overflow-hidden"
+                    className="overflow-hidden space-y-6"
                   >
-                    <div className="p-6 sm:p-8 rounded-2xl bg-black/60 border border-white/15 text-slate-200 font-serif text-sm sm:text-base leading-relaxed whitespace-pre-line shadow-inner">
-                      {memoryData.letter}
-                      <div className="mt-8 pt-4 border-t border-white/10 text-right text-xs italic font-sans text-slate-400">
-                        — {memoryData.author || t("Người gửi","Sender")}
+                    {/* Video Tâm Sự - Spotlight Centerpiece tự bật khi mở thư */}
+                    {memoryData.intro_video_url && (
+                      <div className="rounded-2xl overflow-hidden border-2 border-amber-400/40 shadow-[0_20px_50px_rgba(0,0,0,0.95),0_0_35px_rgba(212,175,55,0.25)] bg-black">
+                        <div className="px-4 py-2.5 bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-transparent border-b border-white/10 flex items-center justify-between text-xs text-amber-200">
+                          <span className="flex items-center gap-2 font-medium tracking-wide">
+                            <Film className="w-4 h-4 text-amber-400 animate-pulse" />
+                            <span>{tBilingual("Thước Phim Tâm Sự Cùng Bức Thư", "Heartfelt Video with Letter")}</span>
+                          </span>
+                          <span className="text-[10px] uppercase tracking-widest text-amber-300 font-semibold px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30">
+                            {t("Tự động phát", "Auto Playing")}
+                          </span>
+                        </div>
+                        <div className="relative aspect-video w-full bg-black">
+                          <video
+                            ref={letterVideoRef}
+                            key={`letter-video-${memoryData.intro_video_url}`}
+                            src={memoryData.intro_video_url}
+                            autoPlay
+                            playsInline
+                            controls
+                            preload="auto"
+                            className="w-full h-full object-contain"
+                            onPlay={() => {
+                              audioRef.current?.pause();
+                              setIsPlaying(false);
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Dòng Thư Tay */}
+                    {memoryData.letter && (
+                      <div className="p-6 sm:p-8 rounded-2xl bg-black/60 border border-white/15 text-slate-200 font-serif text-sm sm:text-base leading-relaxed whitespace-pre-line shadow-inner">
+                        {memoryData.letter}
+                        <div className="mt-8 pt-4 border-t border-white/10 text-right text-xs italic font-sans text-slate-400">
+                          — {memoryData.author || t("Người gửi","Sender")}
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 ) : (
                   <div 
                     onClick={() => setIsLetterOpen(true)}
-                    className="py-10 border border-dashed border-white/20 rounded-2xl text-center cursor-pointer hover:border-white/50 transition-colors bg-black/20"
+                    className="py-10 border border-dashed border-white/20 rounded-2xl text-center cursor-pointer hover:border-amber-400/50 transition-colors bg-black/20 group"
                   >
-                    <Mail className="w-8 h-8 text-white/50 mx-auto mb-2" />
-                    <p className="text-sm font-semibold text-white">{t("Lá thư tay đã được giải mã","Your letter is unlocked")}</p>
-                    <p className="text-xs text-slate-400 mt-1">{t("Bấm vào đây để mở đọc những dòng tâm sự vĩnh cửu","Tap here to read your letter")}</p>
+                    <Mail className="w-8 h-8 text-amber-300/70 group-hover:text-amber-300 mx-auto mb-2 transition-colors" />
+                    <p className="text-sm font-semibold text-white">
+                      {tBilingual("Lá thư tay & thước phim đã được giải mã","Letter & Film Unlocked")}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {tBilingual("Bấm vào đây để mở và đón nhận khoảnh khắc xúc động","Tap here to open and experience the heartfelt moments")}
+                    </p>
                   </div>
                 )}
               </AnimatePresence>
@@ -675,7 +729,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 <div className="flex items-center gap-2">
                   <ImageIcon className="w-4 h-4 text-white" />
                   <h3 className="text-base font-bold text-white uppercase font-serif">
-                    {t("Khoảnh Khắc Kỷ Niệm (","Memory moments (")}{memoryData.media_gallery.length})
+                    {tBilingual("Khoảnh Khắc Kỷ Niệm (","Memory moments (")}{memoryData.media_gallery.length})
                   </h3>
                 </div>
 
@@ -724,7 +778,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
           <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
             <h3 className="text-base font-bold text-white uppercase font-serif mb-2 flex items-center gap-2">
               <Heart className="w-4 h-4 text-white fill-current" />
-              <span>{t("Sổ Lưu Niệm & Lời Chúc Gửi Tới Kỷ Vật","Guestbook & wishes")}</span>
+              <span>{tBilingual("Sổ Lưu Niệm & Lời Chúc Gửi Tới Kỷ Vật","Guestbook & wishes")}</span>
             </h3>
             <p className="text-xs text-slate-400 mb-6">
               {t("Viết một lời nhắn cho người nhận. Lời nhắn sẽ xuất hiện sau khi người chuẩn bị quà duyệt.","Leave a message for the recipient. It will appear after the owner approves it.")}

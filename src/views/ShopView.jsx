@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, Filter, ShoppingBag, Eye, SmartphoneNfc, Sparkles, 
@@ -7,6 +7,8 @@ import {
 import { useStore } from '../components/StoreProvider';
 import PaymentStatus from '../components/PaymentStatus';
 import { trackOrderSecure } from '../services/orderBackendService';
+import { useLanguage, BilingualText } from '../i18n/LanguageProvider';
+const VirtualTryOnModal=lazy(()=>import('../components/VirtualTryOnModal'));
 
 export default function ShopView({
   initialSearch = '',
@@ -16,6 +18,7 @@ export default function ShopView({
   onOpenNfcDemo,
   onOpenCart,
 }) {
+  const { t, tBilingual, language } = useLanguage();
   const { products, settings, loading: catalogLoading, error: catalogError } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   useEffect(() => { setSearchQuery(initialSearch); }, [initialSearch]);
@@ -23,6 +26,8 @@ export default function ShopView({
   const [priceFilter, setPriceFilter] = useState('all');
   const [sortBy, setSortBy] = useState('popular');
   const [activeTab, setActiveTab] = useState('catalog'); // 'catalog' | 'tracking'
+  const [tryOnId,setTryOnId]=useState(null);
+  const tryOnProduct=products.find(p=>p.id===tryOnId);
   
   // Order Tracking State
   const [trackingInput, setTrackingInput] = useState('');
@@ -34,10 +39,10 @@ export default function ShopView({
   useEffect(()=>{if(!initialTracking)return;let active=true;setActiveTab('tracking');setTrackingInput(initialTracking.id);setTrackingToken(initialTracking.token||'');setTrackingError('');setTrackingResults(null);setIsSearchingOrder(true);trackOrderSecure(initialTracking.id,initialTracking.token).then(order=>{if(active)setTrackingResults([order]);}).catch(e=>{if(active)setTrackingError(e.message);}).finally(()=>{if(active)setIsSearchingOrder(false);});return()=>{active=false;};},[initialTracking]);
   // Danh mục sản phẩm
   const categories = [
-    { id: 'all', label: 'Tất Cả Sản Phẩm' },
-    { id: 'Dây chuyền', label: 'Dây Chuyền S925' },
-    { id: 'Nhẫn', label: 'Nhẫn Cặp & Đơn' },
-    { id: 'Vòng tay', label: 'Vòng Tay & Lắc' },
+    { id: 'all', label: t('Tất Cả Sản Phẩm', 'All Collections') },
+    { id: 'Dây chuyền', label: t('Dây Chuyền S925', 'S925 Pendants') },
+    { id: 'Nhẫn', label: t('Nhẫn Cặp & Đơn', 'Couple & Solitaire Rings') },
+    { id: 'Vòng tay', label: t('Vòng Tay & Lắc', 'Bracelets & Bangles') },
   ];
 
   // Lọc và sắp xếp sản phẩm
@@ -101,15 +106,18 @@ export default function ShopView({
         <div className="relative z-10 text-center max-w-3xl mx-auto pt-6 pb-8 border-b border-white/10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/15 text-xs text-slate-300 tracking-widest uppercase mb-4 backdrop-blur-md">
             <Sparkles className="w-3.5 h-3.5 text-white/80" />
-            <span>Emoria Luxury Boutique • S925 & NFC Technology</span>
+            <span className="notranslate" translate="no">Emoria Luxury Boutique • S925 & NFC Technology</span>
           </div>
 
           <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-metallic uppercase leading-tight mb-4">
-            Cửa Hàng Trang Sức Bạc
+            {tBilingual('Cửa Hàng Trang Sức Bạc', 'Fine Silver Jewelry Boutique')}
           </h1>
           
           <p className="text-sm sm:text-base text-slate-300 font-light leading-relaxed mb-6">
-            Mỗi chế tác trang sức Bạc Ý S925 cao cấp là một kiệt tác thủ công độc bản, ẩn chứa vi chip NFC lưu trữ hình ảnh, âm thanh và lời nhắn trên máy chủ.
+            <BilingualText
+              vi="Mỗi chế tác trang sức Bạc Ý S925 cao cấp là một kiệt tác thủ công độc bản, ẩn chứa vi chip NFC lưu trữ hình ảnh, âm thanh và lời nhắn trên máy chủ."
+              en="Each fine S925 sterling silver jewelry creation is a bespoke masterpiece, holding an NFC microchip to safeguard your memories, audio, and letters."
+            />
           </p>
 
           {/* Sub Navigation Tabs: Cửa Hàng vs Tra Cứu Đơn Hàng */}
@@ -123,7 +131,7 @@ export default function ShopView({
               }`}
             >
               <ShoppingBag className="w-4 h-4" />
-              <span>Duyệt Sản Phẩm ({products.length})</span>
+              <span>{t('Duyệt Sản Phẩm ({count})', 'Boutique Collection ({count})', { count: products.length })}</span>
             </button>
 
             <button
@@ -135,7 +143,7 @@ export default function ShopView({
               }`}
             >
               <Truck className="w-4 h-4" />
-              <span>Tra Cứu Đơn Hàng</span>
+              <span>{t('Tra Cứu Đơn Hàng', 'Track Order')}</span>
             </button>
           </div>
 
@@ -315,10 +323,27 @@ export default function ShopView({
                             <span>NFC Chip</span>
                           </span>
                         )}
+                        {product.tryOnAvailable && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase bg-amber-400 text-dark-950 shadow-md flex items-center gap-1">
+                            <Sparkles className="w-2.5 h-2.5" />
+                            <span>Ướm AR</span>
+                          </span>
+                        )}
                       </div>
 
-                      {/* Quick Hover Overlay: NFC Demo & Detail View */}
-                      <div className="absolute inset-0 bg-dark-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2 p-4 backdrop-blur-xs">
+                      {/* Quick Hover Overlay: AR Try-On, NFC Demo & Detail View */}
+                      <div className="absolute inset-0 bg-dark-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2 p-3 backdrop-blur-xs z-10">
+                        {product.tryOnAvailable && (
+                          <button
+                            onClick={() => setTryOnId(product.id)}
+                            className="px-3 py-2 rounded-xl bg-amber-300 hover:bg-amber-200 text-dark-950 font-bold text-xs transition-all duration-200 flex items-center gap-1.5 shadow-lg cursor-pointer hover:scale-105"
+                            title="Ướm thử gương AR"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-dark-950" />
+                            <span>Ướm AR</span>
+                          </button>
+                        )}
+
                         <button
                           onClick={() => onSelectProduct(product.id)}
                           className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 cursor-pointer"
@@ -339,6 +364,23 @@ export default function ShopView({
                       </div>
                     </div>
 
+                    {product.tryOnAvailable && (
+                      <div className="px-4 pt-3">
+                        <button
+                          onClick={() => setTryOnId(product.id)}
+                          className="w-full min-h-11 rounded-xl border border-amber-300/40 text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 text-xs font-bold tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(250,204,21,0.15)] hover:border-amber-300"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                          <span>
+                            {product.category === 'Nhẫn'
+                              ? t('Ướm thử nhẫn · AR', 'Try on ring · AR')
+                              : product.category === 'Vòng tay'
+                                ? t('Ướm thử vòng tay · AR', 'Try on bracelet · AR')
+                                : t('Ướm thử lên cổ · AR', 'Try on necklace · AR')}
+                          </span>
+                        </button>
+                      </div>
+                    )}
                     {/* Product Info */}
                     <div className="p-4 flex-1 flex flex-col justify-between">
                       <div>
@@ -574,6 +616,7 @@ export default function ShopView({
 
       </div>
 
+      {tryOnProduct&&<Suspense fallback={<div role="status" className="fixed inset-0 z-[100] grid place-items-center bg-black/90 text-white">{t('Đang mở gương AR…','Opening AR mirror…')}</div>}><VirtualTryOnModal key={tryOnProduct.id} product={tryOnProduct} settings={settings} onAddToCart={onAddToCart} onClose={()=>setTryOnId(null)}/></Suspense>}
     </div>
   );
 }

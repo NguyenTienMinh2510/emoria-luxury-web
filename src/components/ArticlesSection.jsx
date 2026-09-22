@@ -2,8 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, Eye, Heart, Clock } from 'lucide-react';
 import { getPublishedArticles } from '../services/articleService';
+import { useLanguage, BilingualText } from '../i18n/LanguageProvider';
+import { getLuxuryArticleTranslation } from '../services/aiTranslationService';
 
 export default function ArticlesSection({ onSelectArticle, onNavigateToArticles, isAdmin = false }) {
+  const { t, tBilingual, language } = useLanguage();
   const [featuredArticles, setFeaturedArticles] = useState([]);
 
   useEffect(() => {
@@ -27,13 +30,16 @@ export default function ArticlesSection({ onSelectArticle, onNavigateToArticles,
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold tracking-widest text-slate-300 uppercase mb-3 shadow-silver-glow">
               <Sparkles className="w-3.5 h-3.5 text-slate-300 animate-pulse" />
-              <span>Góc Nhìn Nghệ Nhân</span>
+              <span>{tBilingual('Góc Nhìn Nghệ Nhân', 'Artisan Perspectives')}</span>
             </div>
             <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-normal tracking-wide text-metallic">
-              CÂU CHUYỆN & TINH HOA
+              {tBilingual('CÂU CHUYỆN & TINH HOA', 'STORIES & MASTERPIECES')}
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 mt-2 font-light max-w-xl">
-              Khám phá nghệ thuật chế tác kim hoàn, triết lý lưu giữ ký ức và những công nghệ đột phá định hình tương lai của EMORIA.
+              <BilingualText
+                vi="Khám phá nghệ thuật chế tác kim hoàn, triết lý lưu giữ ký ức và những công nghệ đột phá định hình tương lai của EMORIA."
+                en="Explore fine jewelry artistry, sentimental memory philosophies, and breakthrough technology shaping the future of EMORIA."
+              />
             </p>
           </div>
 
@@ -41,76 +47,84 @@ export default function ArticlesSection({ onSelectArticle, onNavigateToArticles,
             onClick={onNavigateToArticles}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white/5 border border-white/15 hover:bg-white/10 text-xs font-semibold tracking-wider text-slate-200 hover:text-white uppercase transition-all duration-300 cursor-pointer w-fit shadow-inner group"
           >
-            <span>Xem Tất Cả Bài Viết</span>
+            <span>{t('Xem Tất Cả Bài Viết', 'View All Articles')}</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
 
         {/* 3 Featured Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {featuredArticles.map((article, index) => (
-            <motion.article
-              key={article.id}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              onClick={() => onSelectArticle(article.slug)}
-              className="group relative rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/30 overflow-hidden cursor-pointer backdrop-blur-xl transition-all duration-300 hover:shadow-silver-glow flex flex-col justify-between"
-            >
-              <div>
-                {/* Image Cover */}
-                <div className="relative aspect-[16/10] overflow-hidden">
-                  <img
-                    src={article.cover_image}
-                    alt={article.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/20 to-transparent" />
-                  
-                  {/* Category Pill */}
-                  <div className="absolute top-4 left-4">
-                    <span className="px-3 py-1 rounded-full bg-dark-950/80 backdrop-blur-md border border-white/15 text-[10px] font-semibold tracking-wider text-slate-200 uppercase">
-                      {article.category}
-                    </span>
+          {featuredArticles.map((article, index) => {
+            const luxury = language === 'en' ? getLuxuryArticleTranslation(article.slug) : null;
+            const displayTitle = luxury?.title || article.title;
+            const displayExcerpt = luxury?.excerpt || article.excerpt;
+
+            return (
+              <motion.article
+                key={article.id}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                onClick={() => onSelectArticle(article.slug)}
+                className="group relative rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/30 overflow-hidden cursor-pointer backdrop-blur-xl transition-all duration-300 hover:shadow-silver-glow flex flex-col justify-between"
+              >
+                <div>
+                  {/* Image Cover */}
+                  <div className="relative aspect-[16/10] overflow-hidden">
+                    <img
+                      src={article.cover_image}
+                      alt={displayTitle}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/20 to-transparent" />
+                    
+                    {/* Category Pill */}
+                    <div className="absolute top-4 left-4">
+                      <span className="px-3 py-1 rounded-full bg-dark-950/80 backdrop-blur-md border border-white/15 text-[10px] font-semibold tracking-wider text-slate-200 uppercase">
+                        {t(article.category, article.category === 'Chế tác & Nghệ thuật' ? 'Art & Craft' : article.category === 'Công nghệ & NFC' ? 'Tech & NFC' : article.category)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-6">
+                    <div className="text-[11px] text-slate-400 mb-2 font-mono">
+                      {article.published_at 
+                        ? new Date(article.published_at).toLocaleDateString(language === 'en' ? 'en-US' : 'vi-VN') 
+                        : t('Mới cập nhật', 'Recently updated')}
+                    </div>
+                    <h3 className={`font-serif text-lg font-medium text-white group-hover:text-metallic transition-colors line-clamp-2 mb-3 ${luxury ? 'notranslate' : ''}`} translate={luxury ? 'no' : 'yes'}>
+                      {displayTitle}
+                    </h3>
+                    <p className={`text-xs text-slate-300 font-light line-clamp-3 leading-relaxed ${luxury ? 'notranslate' : ''}`} translate={luxury ? 'no' : 'yes'}>
+                      {displayExcerpt}
+                    </p>
                   </div>
                 </div>
 
-                {/* Content */}
-                <div className="p-6">
-                  <div className="text-[11px] text-slate-400 mb-2 font-mono">
-                    {article.published_at ? new Date(article.published_at).toLocaleDateString('vi-VN') : 'Mới cập nhật'}
-                  </div>
-                  <h3 className="font-serif text-lg font-medium text-white group-hover:text-metallic transition-colors line-clamp-2 mb-3">
-                    {article.title}
-                  </h3>
-                  <p className="text-xs text-slate-300 font-light line-clamp-3 leading-relaxed">
-                    {article.excerpt}
-                  </p>
-                </div>
-              </div>
-
-              <div className="px-6 pb-6 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
-                <div className="flex items-center gap-3">
-                  {isAdmin && (
-                    <span className="flex items-center gap-1" title="Lượt xem bài viết (chỉ admin hiển thị)">
-                      <Eye className="w-3.5 h-3.5" />
-                      {article.view_count || 0}
+                <div className="px-6 pb-6 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
+                  <div className="flex items-center gap-3">
+                    {isAdmin && (
+                      <span className="flex items-center gap-1" title="Lượt xem bài viết (chỉ admin hiển thị)">
+                        <Eye className="w-3.5 h-3.5" />
+                        {article.view_count || 0}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <Heart className="w-3.5 h-3.5 text-rose-400" />
+                      {article.likes_count || 0}
                     </span>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <Heart className="w-3.5 h-3.5 text-rose-400" />
-                    {article.likes_count || 0}
+                  </div>
+
+                  <span className="font-semibold text-white group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                    <span>{t('Khám phá', 'Explore')}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
-
-                <span className="font-semibold text-white group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                  <span>Khám phá</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </span>
-              </div>
-            </motion.article>
-          ))}
+              </motion.article>
+            );
+          })}
         </div>
 
       </div>

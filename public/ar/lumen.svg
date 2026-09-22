@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="188" viewBox="0 0 160 188">
+ <defs>
+  <linearGradient id="silver" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".3" stop-color="#8d98a7"/><stop offset=".5" stop-color="#f8fafc"/><stop offset=".75" stop-color="#666e79"/><stop offset="1" stop-color="#e5e7eb"/></linearGradient>
+  <radialGradient id="enamel"><stop stop-color="#444b52"/><stop offset="1" stop-color="#101216"/></radialGradient>
+ </defs>
+ <ellipse cx="80" cy="20" rx="10" ry="16" fill="none" stroke="url(#silver)" stroke-width="5"/>
+ <circle cx="80" cy="107" r="74" fill="url(#silver)"/>
+ <circle cx="80" cy="107" r="66" fill="url(#enamel)" stroke="#d5dae0" stroke-width="3"/>
+ <circle cx="80" cy="107" r="70" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="2 4"/>
+ <path d="M80 55 87 87 111 70 98 98 129 106 98 114 112 144 87 125 80 158 73 125 47 144 62 114 31 106 62 98 49 70 73 87Z" fill="url(#silver)" stroke="#eceef2" stroke-width="1"/>
+ <circle cx="80" cy="107" r="19" fill="#bfa17a" stroke="#f8e3c3" stroke-width="2"/>
+ <path d="m80 92 13 8-3 17-17 2-8-14Z" fill="#e8edf3" stroke="#fff"/>
+ <path d="m80 92 1 15 12-7m-12 7 9 10m-9-10-8 12m8-12-16-2" stroke="#fff" fill="none"/>
+</svg>

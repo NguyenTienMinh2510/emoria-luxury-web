@@ -1,8 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowUpRight, SmartphoneNfc } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
+  const { language, t } = useLanguage();
+  const isEn = language === 'en';
   return (
     <section 
       id="collection" 
@@ -48,9 +51,16 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
               <span className="h-[1px] w-16 bg-gradient-to-r from-slate-400 to-transparent" />
             </h3>
             
-            <p className="font-sans text-sm sm:text-base text-slate-300 max-w-lg leading-relaxed font-light">
-              Lấy cảm hứng từ những vì tinh tú mùa hạ và dải ngân hà vĩnh cửu. Bộ đôi vòng tay bạc S925 tích hợp vi chip NFC kép, kết nối câu chuyện tình yêu và lưu giữ mọi khoảnh khắc bí mật chỉ thuộc về hai người.
-            </p>
+            <div className="space-y-1.5 max-w-lg">
+              <p className="font-sans text-sm sm:text-base text-slate-300 leading-relaxed font-light">
+                Lấy cảm hứng từ những vì tinh tú mùa hạ và dải ngân hà vĩnh cửu. Bộ đôi vòng tay bạc S925 tích hợp vi chip NFC kép, kết nối câu chuyện tình yêu và lưu giữ mọi khoảnh khắc bí mật chỉ thuộc về hai người.
+              </p>
+              {isEn && (
+                <p className="text-xs text-slate-400 italic leading-relaxed font-light pl-3 border-l border-amber-400/30">
+                  Inspired by summer stars and the eternal cosmos. Solid S925 silver bracelet pair featuring dual NFC chips, bridging love stories and preserving private intimate moments.
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Action Buttons: High-Impact Luxury CTAs */}
@@ -59,7 +69,7 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
               href="#products"
               className="cta-luxury-gold !h-12 !px-8 text-xs sm:text-sm !w-full sm:!w-auto flex items-center justify-center gap-2.5 shadow-[0_0_30px_rgba(250,204,21,0.6)]"
             >
-              <span>Xem Sản Phẩm</span>
+              <span>{isEn ? "Xem Sản Phẩm · View Collection" : "Xem Sản Phẩm"}</span>
               <ArrowUpRight className="w-4 h-4" />
             </a>
 
@@ -68,7 +78,7 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
               className="cta-luxury-secondary !h-12 !px-7 text-xs sm:text-sm !w-full sm:!w-auto flex items-center justify-center gap-2.5"
             >
               <SmartphoneNfc className="w-4 h-4 text-amber-300" />
-              <span>Chạm Thử NFC</span>
+              <span>{isEn ? "Chạm Thử NFC · NFC Tap Demo" : "Chạm Thử NFC"}</span>
             </button>
           </div>
         </motion.div>

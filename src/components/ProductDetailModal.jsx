@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star, ShoppingBag, SmartphoneNfc, Shield, Check, Plus, Minus, Gift } from 'lucide-react';
 import { useStore } from '../components/StoreProvider';
+import { useLanguage } from '../i18n/LanguageProvider';
+const VirtualTryOnModal=lazy(()=>import('./VirtualTryOnModal'));
 
 export default function ProductDetailModal({ productId, onClose, onAddToCart, onOpenNfcDemo }) {
+  const { language, t } = useLanguage();
+  const isEn = language === 'en';
   const { products, settings, loading: catalogLoading, error: catalogError } = useStore();
   const product = products.find(p => p.id === productId);
 
@@ -12,6 +16,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
   const [selectedSize, setSelectedSize] = useState(product?.variants?.find(v => v.stock > 0)?.size || defaultSizes[0]);
   const [isGift, setIsGift] = useState(false);
   const [added, setAdded] = useState(false);
+  const [tryOn,setTryOn]=useState(false);
 
   const selectedVariant = product?.variants?.find(v => v.size === selectedSize);
   const canBuy = settings?.sales_enabled && product?.active && selectedVariant?.stock >= quantity;
@@ -35,7 +40,9 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
 
   return (
     <AnimatePresence>
+      {tryOn&&<Suspense fallback={<div role="status" className="fixed inset-0 z-[100] grid place-items-center bg-black/90 text-white">{t('Đang mở gương AR…','Opening AR mirror…')}</div>}><VirtualTryOnModal product={product} settings={settings} initialSize={selectedSize} onClose={()=>setTryOn(false)} onAddToCart={onAddToCart}/></Suspense>}
       <div 
+        inert={tryOn||undefined}
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/85 backdrop-blur-xl"
         onClick={onClose}
       >
@@ -73,7 +80,10 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs text-slate-400 uppercase tracking-widest">{product.category}</span>
                   <span className="text-xs text-white/30">•</span>
-                  <span className="text-xs text-slate-400">{product.material}</span>
+                  <span className="text-xs text-slate-400">
+                    {product.material}
+                    {isEn && <span className="text-amber-200/80"> · Sterling Silver S925</span>}
+                  </span>
                 </div>
                 <h3 className="text-2xl sm:text-3xl font-serif font-bold text-white">
                   {product.name}
@@ -86,7 +96,6 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                   {product.formattedPrice}
                 </span>
                 {product.rating > 0 && <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-200">
-                  <span>{product.rating}</span>
                   <Star className="w-4 h-4 fill-slate-200 text-slate-200" />
                   <span className="text-xs text-slate-400 font-normal">({product.reviewsCount} đánh giá)</span>
                 </div>}
@@ -101,7 +110,20 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
               {product.benefits?.length > 0 && <div className="text-sm text-slate-300"><h4 className="font-semibold text-white mb-2">Đi kèm sản phẩm</h4><ul className="list-disc pl-5 space-y-1">{product.benefits.map(text => <li key={text}>{text}</li>)}</ul></div>}
               {product.specifications?.length > 0 && <details className="text-sm border border-white/10 rounded-xl p-3"><summary className="cursor-pointer min-h-[44px] flex items-center">Thông số sản phẩm</summary><dl className="space-y-3 pt-2">{product.specifications.map(([label,value]) => <div key={label} className="grid sm:grid-cols-2 gap-1"><dt className="text-slate-400">{label}</dt><dd className="break-words">{value}</dd></div>)}</dl></details>}
 
+
               {/* Size selection */}
+              {product.tryOnAvailable && (
+                <button
+                  onClick={() => setTryOn(true)}
+                  className="w-full min-h-12 border border-amber-100/40 rounded-xl bg-amber-100/5 text-amber-100 font-semibold text-sm hover:bg-amber-100/10 transition-colors flex items-center justify-center gap-2"
+                >
+                  {product.category === 'Nhẫn'
+                    ? t('Ướm thử nhẫn · AR', 'Try on ring · AR')
+                    : product.category === 'Vòng tay'
+                      ? t('Ướm thử vòng tay · AR', 'Try on bracelet · AR')
+                      : t('Ướm thử lên cổ · AR', 'Try on necklace · AR')}
+                </button>
+              )}
               {defaultSizes.length > 1 && (
                 <div className="space-y-1.5 pt-1">
                   <label className="text-xs font-semibold text-slate-300 block">
@@ -189,12 +211,12 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                   {added ? (
                     <>
                       <Check className="w-4 h-4 text-emerald-600" />
-                      <span>Đã thêm vào giỏ!</span>
+                      <span>{isEn ? 'Đã thêm vào giỏ! · Added!' : 'Đã thêm vào giỏ!'}</span>
                     </>
                   ) : (
                     <>
                       <ShoppingBag className="w-4 h-4" />
-                      <span>{canBuy ? 'Thêm Vào Giỏ Hàng' : 'Chưa có hàng để bán'}</span>
+                      <span>{canBuy ? (isEn ? 'Thêm Vào Giỏ Hàng · Add To Cart' : 'Thêm Vào Giỏ Hàng') : (isEn ? 'Tạm Hết Hàng · Sold Out' : 'Chưa có hàng để bán')}</span>
                     </>
                   )}
                 </button>
@@ -205,6 +227,17 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
           </div>
         </motion.div>
       </div>
+      {tryOn && (
+        <Suspense fallback={<div role="status" className="fixed inset-0 z-[100] grid place-items-center bg-black/90 text-white">{t('Đang mở gương AR…', 'Opening AR mirror…')}</div>}>
+          <VirtualTryOnModal
+            key={product.id}
+            product={product}
+            settings={settings}
+            onAddToCart={onAddToCart}
+            onClose={() => setTryOn(false)}
+          />
+        </Suspense>
+      )}
     </AnimatePresence>
   );
 }

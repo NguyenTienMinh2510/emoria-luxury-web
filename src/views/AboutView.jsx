@@ -6,12 +6,16 @@ import {
   Gem, Compass, Gift, History, MapPin, Phone, Mail, Navigation,
   Building2, ExternalLink
 } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 export default function AboutView({ 
   onNavigateToShop, 
   onNavigateToMemory, 
   onOpenNfcDemo 
 }) {
+  const { language, t } = useLanguage();
+  const isEn = language === 'en';
+
   return (
     <div className="min-h-screen bg-dark-950 text-slate-100 selection:bg-slate-200 selection:text-dark-950 overflow-x-hidden pt-20 sm:pt-24 pb-20">
       
@@ -40,14 +44,26 @@ export default function AboutView({
             <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-normal text-white tracking-wide leading-tight max-w-4xl">
               Nơi Nghệ Thuật Kim Hoàn Giao Thoa Cùng <span className="text-metallic italic font-light">Kỷ Niệm Vĩnh Cửu</span>
             </h1>
+            {isEn && (
+              <p className="font-serif italic text-xs sm:text-sm text-amber-200/80 tracking-widest uppercase mt-2">
+                Where Master Craftsmanship Meets Eternal Memories
+              </p>
+            )}
 
             {/* Slogan */}
-            <div className="flex items-center justify-center gap-3 mt-4 mb-8">
-              <span className="w-12 h-px bg-gradient-to-r from-transparent via-slate-400 to-transparent" />
-              <p className="font-sans font-medium text-xs sm:text-sm md:text-base tracking-[0.3em] uppercase text-slate-300">
-                MỘT CHẠM MỞ KÍ ỨC · TRỌN ĐỜI GIỮ YÊU THƯƠNG
-              </p>
-              <span className="w-12 h-px bg-gradient-to-r from-transparent via-slate-400 to-transparent" />
+            <div className="flex flex-col items-center justify-center mt-4 mb-8">
+              <div className="flex items-center justify-center gap-3">
+                <span className="w-12 h-px bg-gradient-to-r from-transparent via-slate-400 to-transparent" />
+                <p className="font-sans font-medium text-xs sm:text-sm md:text-base tracking-[0.3em] uppercase text-slate-300">
+                  MỘT CHẠM MỞ KÍ ỨC · TRỌN ĐỜI GIỮ YÊU THƯƠNG
+                </p>
+                <span className="w-12 h-px bg-gradient-to-r from-transparent via-slate-400 to-transparent" />
+              </div>
+              {isEn && (
+                <p className="text-[10px] sm:text-xs text-slate-400 font-sans tracking-[0.2em] uppercase mt-1">
+                  One Tap To Awaken Memories · Lifetime Of Cherished Love
+                </p>
+              )}
             </div>
 
             <p className="font-sans text-base sm:text-lg text-slate-300 font-light max-w-2xl mx-auto leading-relaxed mb-10">
@@ -60,7 +76,7 @@ export default function AboutView({
                 onClick={onNavigateToShop}
                 className="cta-luxury-gold !px-8 !py-3.5 shadow-[0_0_30px_rgba(250,204,21,0.6)]"
               >
-                <span>Khám Phá Cửa Hàng</span>
+                <span>{isEn ? "Khám Phá Cửa Hàng · Explore Shop" : "Khám Phá Cửa Hàng"}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
@@ -69,7 +85,7 @@ export default function AboutView({
                 className="cta-luxury-secondary !px-7 !py-3.5"
               >
                 <Smartphone className="w-4 h-4 text-slate-300" />
-                <span>Trải Nghiệm "Một Chạm"</span>
+                <span>{isEn ? "Trải Nghiệm \"Một Chạm\" · One-Tap Demo" : "Trải Nghiệm \"Một Chạm\""}</span>
               </button>
             </div>
           </motion.div>
@@ -78,19 +94,27 @@ export default function AboutView({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-16 pt-10 border-t border-white/10">
             <div className="p-5 rounded-2xl glass-panel border border-white/10 text-center">
               <p className="font-serif text-2xl sm:text-3xl font-bold text-white mb-1">100%</p>
-              <p className="text-xs text-slate-400 font-sans tracking-wider uppercase">Bạc Ý S925 Đúc Khối</p>
+              <p className="text-xs text-slate-400 font-sans tracking-wider uppercase">
+                Bạc Ý S925 Đúc Khối {isEn && <span className="block text-[10px] text-amber-200/70">Solid Italian S925</span>}
+              </p>
             </div>
             <div className="p-5 rounded-2xl glass-panel border border-white/10 text-center">
               <p className="font-serif text-2xl sm:text-3xl font-bold text-amber-300 mb-1">0.5 Giây</p>
-              <p className="text-xs text-slate-400 font-sans tracking-wider uppercase">Tốc Độ Chạm Đọc NFC</p>
+              <p className="text-xs text-slate-400 font-sans tracking-wider uppercase">
+                Tốc Độ Chạm Đọc NFC {isEn && <span className="block text-[10px] text-amber-200/70">0.5s NFC Instant Tap</span>}
+              </p>
             </div>
             <div className="p-5 rounded-2xl glass-panel border border-white/10 text-center">
               <p className="font-serif text-2xl sm:text-3xl font-bold text-white mb-1">IP68</p>
-              <p className="text-xs text-slate-400 font-sans tracking-wider uppercase">Chuẩn Kháng Nước &amp; Bụi</p>
+              <p className="text-xs text-slate-400 font-sans tracking-wider uppercase">
+                Chuẩn Kháng Nước &amp; Bụi {isEn && <span className="block text-[10px] text-amber-200/70">IP68 Water Resistant</span>}
+              </p>
             </div>
             <div className="p-5 rounded-2xl glass-panel border border-white/10 text-center">
               <p className="font-serif text-2xl sm:text-3xl font-bold text-emerald-400 mb-1">Trọn Đời</p>
-              <p className="text-xs text-slate-400 font-sans tracking-wider uppercase">Lưu Giữ Kỷ Niệm Số</p>
+              <p className="text-xs text-slate-400 font-sans tracking-wider uppercase">
+                Lưu Giữ Kỷ Niệm Số {isEn && <span className="block text-[10px] text-amber-200/70">Lifetime Memory Vault</span>}
+              </p>
             </div>
           </div>
         </section>

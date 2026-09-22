@@ -2,12 +2,20 @@
 import {normalizeCheckout} from '../src/services/checkoutPayload.js';
 import {analyzeVideo,readVideoLabels,readVideoUploads} from './videoLabels.js';
 import {craftLetter} from './geminiLetter.js';
+import {tryOnConfig} from './tryOn.js';
 const route=(method,path,access,run,status)=>({method,pattern:new RegExp(`^${path}$`),access,run,status});
 const rpc=(c,name,args={})=>c.db(c.client.rpc(name,args));
 const integer=(value,fallback,max=10000)=>{const n=Number(value??fallback);if(!Number.isInteger(n)||n<0||n>max)throw Object.assign(new Error('Tham số phân trang không hợp lệ.'),{status:400});return n;};
 const pick=(body,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(body,k)).map(k=>[k,body[k]]));
 const settingKeys=['sandbox','sales_enabled','cod_enabled','transfer_enabled','shipping_fee','free_shipping_from','gift_fee','reservation_minutes','bank_bin','bank_account','bank_owner','contact_email','contact_phone','address','ga4_measurement_id','shipping_policy','return_policy','privacy_policy'];
 export const routes=[
+  route('GET','/products/([^/]+)/try-on','public',async c=>{
+    const config=tryOnConfig(c.params[0]);
+    if(!config)throw Object.assign(new Error('AR is not available for this product.'),{status:404});
+    const product=await c.db(c.client.from('checkout_products').select('id,active').eq('id',c.params[0]).maybeSingle());
+    if(!product?.active)throw Object.assign(new Error('Product unavailable.'),{status:404});
+    return config;
+  }),
   route('POST','/ai/craft-letter','user',craftLetter),
   route('GET','/admin/accounts','admin',c=>rpc(c,'rpc_admin_accounts',{p_search:(c.query.get('search')||'').slice(0,120)})),
   route('POST','/admin/memories','admin',c=>rpc(c,'rpc_admin_create_memory',{p_owner:c.body.ownerId,p_title:c.body.title}),201),
@@ -52,7 +60,7 @@ export const routes=[
   }),
   route('GET','/catalog','public',async c=>{
     const [products,settings]=await Promise.all([c.db(c.client.from('checkout_products').select('*, checkout_variants(*)').order('id')),c.db(c.client.from('store_settings').select('*').eq('id',true).single())]);
-    return {products,settings};
+    return {products:products.map(product=>({...product,try_on_available:product.active&&!!tryOnConfig(product.id)})),settings};
   }),
   route('PUT','/admin/products/([^/]+)','admin',c=>rpc(c,'rpc_save_catalog',{p_id:c.params[0],p_expected:c.body.expected??null,p_product:c.body.product,p_variants:c.body.variants})),
   route('PATCH','/admin/settings','admin',c=>c.db(c.client.from('store_settings').update(pick(c.body,settingKeys)).eq('id',true).select('id').single())),

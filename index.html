@@ -10,9 +10,122 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700;900&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Great+Vibes&family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+    <!-- Complete suppression of Google Translate banner, toolbar, popups and tooltips -->
+    <style>
+      .goog-te-banner-frame,
+      iframe.goog-te-banner-frame,
+      .goog-te-banner-frame.skiptranslate,
+      iframe.skiptranslate,
+      .skiptranslate iframe,
+      #goog-gt-tt,
+      .goog-te-balloon-frame,
+      .goog-tooltip,
+      .goog-tooltip:hover,
+      .VIpgJd-ZVi9od-ORHb,
+      .VIpgJd-ZVi9od-ORHb-OEVmcd,
+      .VIpgJd-ZVi9od-ORHb-Oxf9ae,
+      .VIpgJd-ZVi9od-aZ2wEe,
+      .VIpgJd-ZVi9od-vH1Gmf,
+      .VIpgJd-ZVi9od-l4eHX-hSRGPd,
+      .VIpgJd-yAWNEb-L7lbkb,
+      .VIpgJd-ZVi9od-xl07Ob-lTBxed,
+      iframe[id*=":container"],
+      iframe[id*=":1.container"],
+      iframe[id*=":2.container"],
+      iframe[class*="VIpgJd"],
+      iframe[src*="translate.google"],
+      iframe[src="javascript:''"],
+      div.skiptranslate:not(#google_translate_element) {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        height: 0px !important;
+        max-height: 0px !important;
+        width: 0px !important;
+        position: absolute !important;
+        top: -99999px !important;
+        left: -99999px !important;
+        z-index: -99999 !important;
+        overflow: hidden !important;
+      }
+      body {
+        top: 0px !important;
+        position: static !important;
+      }
+      html {
+        top: 0px !important;
+      }
+      .goog-text-highlight {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+    </style>
   </head>
   <body class="bg-dark-900 text-slate-100 selection:bg-slate-300 selection:text-dark-950 font-sans antialiased overflow-x-hidden w-full max-w-[100vw]">
     <div id="root"></div>
+
+    <!-- Google Website Translator Engine (Full Page Translation Coverage) -->
+    <div id="google_translate_element" style="display:none !important;" aria-hidden="true"></div>
+    <script type="text/javascript">
+      function googleTranslateElementInit() {
+        try {
+          if (window.google && window.google.translate) {
+            new window.google.translate.TranslateElement({
+              pageLanguage: 'vi',
+              includedLanguages: 'en,vi',
+              autoDisplay: false
+            }, 'google_translate_element');
+          }
+        } catch (e) {
+          /* fail gracefully if offline or in sandbox */
+        }
+      }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer></script>
+    <script type="text/javascript">
+      (function() {
+        function suppressBanner() {
+          try {
+            if (document.body && document.body.style.top && document.body.style.top !== '0px') {
+              document.body.style.setProperty('top', '0px', 'important');
+              document.body.style.setProperty('position', 'static', 'important');
+            }
+            var badElements = document.querySelectorAll('.goog-te-banner-frame, iframe.goog-te-banner-frame, iframe[class*="VIpgJd"], iframe[id*=":container"], iframe.skiptranslate, #goog-gt-tt, .goog-te-balloon-frame, .VIpgJd-ZVi9od-ORHb-Oxf9ae');
+            for (var i = 0; i < badElements.length; i++) {
+              badElements[i].style.setProperty('display', 'none', 'important');
+              badElements[i].style.setProperty('visibility', 'hidden', 'important');
+              badElements[i].style.setProperty('height', '0px', 'important');
+              badElements[i].style.setProperty('opacity', '0', 'important');
+              badElements[i].style.setProperty('pointer-events', 'none', 'important');
+              badElements[i].style.setProperty('top', '-99999px', 'important');
+              badElements[i].style.setProperty('position', 'absolute', 'important');
+            }
+          } catch(e) {}
+        }
+        var count = 0;
+        var timer = setInterval(function() {
+          suppressBanner();
+          count++;
+          if (count > 60) clearInterval(timer);
+        }, 100);
+        if (window.MutationObserver) {
+          var obs = new MutationObserver(function() {
+            suppressBanner();
+          });
+          if (document.documentElement) {
+            obs.observe(document.documentElement, {
+              childList: true,
+              subtree: true,
+              attributes: true,
+              attributeFilter: ['style', 'class']
+            });
+          }
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

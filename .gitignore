@@ -1,4 +1,5 @@
 node_modules
+public/ar/runtime/
 dist
 .env
 .env.*.local

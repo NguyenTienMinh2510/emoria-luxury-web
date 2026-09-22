@@ -242,3 +242,69 @@
 
 button:focus-visible, a:focus-visible { outline: 2px solid #e2e8f0; outline-offset: 3px; }
 
+/* ==========================================================================
+   Google Website Translator - Seamless Dark Luxury Integration
+   ========================================================================== */
+.goog-te-banner-frame,
+iframe.goog-te-banner-frame,
+.goog-te-banner-frame.skiptranslate,
+iframe.skiptranslate,
+.skiptranslate iframe,
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.goog-tooltip,
+.goog-tooltip:hover,
+.VIpgJd-ZVi9od-ORHb,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.VIpgJd-ZVi9od-ORHb-Oxf9ae,
+.VIpgJd-ZVi9od-aZ2wEe,
+.VIpgJd-ZVi9od-vH1Gmf,
+.VIpgJd-ZVi9od-l4eHX-hSRGPd,
+.VIpgJd-yAWNEb-L7lbkb,
+.VIpgJd-ZVi9od-xl07Ob-lTBxed,
+iframe[id*=":container"],
+iframe[id*=":1.container"],
+iframe[id*=":2.container"],
+iframe[class*="VIpgJd"],
+iframe[src*="translate.google"],
+iframe[src="javascript:''"],
+div.skiptranslate:not(#google_translate_element) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0px !important;
+  max-height: 0px !important;
+  width: 0px !important;
+  position: absolute !important;
+  top: -99999px !important;
+  left: -99999px !important;
+  z-index: -99999 !important;
+  overflow: hidden !important;
+}
+
+body {
+  top: 0px !important;
+  position: static !important;
+}
+
+html {
+  top: 0px !important;
+}
+
+#google_translate_element {
+  display: none !important;
+}
+
+.goog-text-highlight {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Brand protection: prevent translation on specified classes */
+.notranslate,
+[translate="no"] {
+  -webkit-transform: translateZ(0);
+}
+

@@ -12,5 +12,6 @@ dist
 *.md
 *.txt
 test-accounts.json
-scripts
+scripts/*.py
+!scripts/prepare-ar-assets.mjs
 supabase

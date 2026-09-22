@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   SlidersHorizontal, Star, ShoppingBag, SmartphoneNfc, 
@@ -6,6 +6,17 @@ import {
 } from 'lucide-react';
 import { categories } from '../data/products';
 import { useStore } from './StoreProvider';
+import { useLanguage } from '../i18n/LanguageProvider';
+
+const VirtualTryOnModal = lazy(() => import('./VirtualTryOnModal'));
+
+const CATEGORY_TRANSLATIONS = {
+  'Tất cả': 'All',
+  'Vòng tay': 'Bracelets',
+  'Nhẫn': 'Rings',
+  'Dây chuyền': 'Necklaces',
+  'Móc khóa': 'Keychains'
+};
 
 export default function ProductCatalog({ 
   onSelectProduct, 
@@ -14,10 +25,13 @@ export default function ProductCatalog({
   onNavigateToShop,
   searchQuery = '' 
 }) {
+  const { language, t } = useLanguage();
+  const isEn = language === 'en';
   const { products, settings, loading: catalogLoading, error: catalogError } = useStore();
   const [activeCategory, setActiveCategory] = useState('Tất cả');
   const [sortBy, setSortBy] = useState('default');
   const [addedIds, setAddedIds] = useState([]);
+  const [tryOnProduct, setTryOnProduct] = useState(null);
   
   const scrollContainerRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -151,6 +165,7 @@ export default function ProductCatalog({
             <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
               {categories.map((cat) => {
                 const isActive = activeCategory === cat;
+                const enLabel = isEn && CATEGORY_TRANSLATIONS[cat] ? ` · ${CATEGORY_TRANSLATIONS[cat]}` : '';
                 return (
                   <button
                     key={cat}
@@ -161,7 +176,8 @@ export default function ProductCatalog({
                         : 'text-slate-300 hover:text-white hover:bg-white/5 border border-white/5'
                     }`}
                   >
-                    {cat}
+                    <span>{cat}</span>
+                    {enLabel && <span className="opacity-75 text-[11px] font-normal">{enLabel}</span>}
                   </button>
                 );
               })}
@@ -250,10 +266,25 @@ export default function ProductCatalog({
                         className="w-full h-full object-cover object-center group-hover:scale-108 transition-transform duration-500 select-none"
                       />
 
-                      {/* NFC Featured Circular Badge on top-right */}
-                      {product.hasNFC && (
-                        <div className="absolute top-3 right-3 z-10">
+                      {/* Top Action Badges (AR & NFC) */}
+                      <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+                        {product.tryOnAvailable && (
                           <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTryOnProduct(product);
+                            }}
+                            title={product.category === 'Nhẫn' ? t('Ướm thử nhẫn · AR', 'Try on ring · AR') : product.category === 'Vòng tay' ? t('Ướm thử vòng tay · AR', 'Try on bracelet · AR') : t('Ướm thử lên cổ · AR', 'Try on necklace · AR')}
+                            className="h-9 px-2.5 rounded-full bg-dark-950/90 backdrop-blur-md border border-amber-300/50 text-amber-200 flex items-center justify-center gap-1 text-[11px] font-bold shadow-lg hover:scale-105 hover:border-amber-300 hover:bg-amber-400/20 transition-all cursor-pointer"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                            <span>Ướm AR</span>
+                          </button>
+                        )}
+                        {product.hasNFC && (
+                          <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (onOpenNfcDemo) onOpenNfcDemo(product.id);
@@ -263,8 +294,8 @@ export default function ProductCatalog({
                           >
                             <SmartphoneNfc className="w-4 h-4 text-amber-300" />
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
 
                       {/* Tag / Category Badge */}
                       {product.tag && (
@@ -296,6 +327,7 @@ export default function ProductCatalog({
 
                       <p className="text-xs text-slate-300 font-light">
                         {product.material}
+                        {isEn && <span className="text-[10px] text-amber-200/70 font-normal"> · Sterling Silver S925</span>}
                       </p>
 
                       <div className="flex items-center justify-center gap-2 pt-1">
@@ -311,13 +343,32 @@ export default function ProductCatalog({
                       </div>
 
                       {/* High-Impact Visible CTA Button On Product Card */}
-                      <div className="pt-3">
+                      <div className="pt-3 space-y-2">
+                        {product.tryOnAvailable && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTryOnProduct(product);
+                            }}
+                            className="w-full py-2 px-3 rounded-xl border border-amber-100/40 text-amber-100 bg-amber-100/10 text-xs font-semibold hover:bg-amber-100/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                            <span>
+                              {product.category === 'Nhẫn'
+                                ? t('Ướm thử nhẫn · AR', 'Try on ring · AR')
+                                : product.category === 'Vòng tay'
+                                  ? t('Ướm thử vòng tay · AR', 'Try on bracelet · AR')
+                                  : t('Ướm thử lên cổ · AR', 'Try on necklace · AR')}
+                            </span>
+                          </button>
+                        )}
                         <button
                           onClick={(e) => handleAddToCart(product, e)}
                           className="cta-luxury-gold !w-full !py-2.5 !text-xs !tracking-wider shadow-[0_0_20px_rgba(250,204,21,0.5)]"
                         >
                           <ShoppingBag className="w-3.5 h-3.5" />
-                          <span>Khám Phá & Đặt Mua</span>
+                          <span>{isEn ? 'Khám Phá & Đặt Mua · Order Now' : 'Khám Phá & Đặt Mua'}</span>
                         </button>
                       </div>
                     </div>
@@ -361,6 +412,18 @@ export default function ProductCatalog({
           </div>
         )}
       </div>
+
+      {tryOnProduct && (
+        <Suspense fallback={<div role="status" className="fixed inset-0 z-[100] grid place-items-center bg-black/90 text-white">{t('Đang mở gương AR…', 'Opening AR mirror…')}</div>}>
+          <VirtualTryOnModal
+            key={tryOnProduct.id}
+            product={tryOnProduct}
+            settings={settings}
+            onAddToCart={onAddToCart}
+            onClose={() => setTryOnProduct(null)}
+          />
+        </Suspense>
+      )}
     </section>
   );
 }
