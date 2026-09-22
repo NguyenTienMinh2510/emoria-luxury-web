@@ -214,7 +214,8 @@ export default function VideoModerationAdmin() {
     setPage(0);
   };
 
-  const handleOverrideMedia = async mediaPath => {
+  const handleOverrideMedia = async row => {
+    const mediaPath=row.path;
     if (!mediaPath) return;
     const confirmed = window.confirm(
       t(
@@ -223,13 +224,15 @@ export default function VideoModerationAdmin() {
       )
     );
     if (!confirmed) return;
+    const reason=window.prompt(t('Lý do duyệt thủ công (10–500 ký tự):','Manual review reason (10–500 characters):'))?.trim();
+    if(!reason||reason.length<10||reason.length>500)return;
 
     setActionBusy(mediaPath);
     setOverrideMsg('');
     try {
       await apiRequest('/admin/video-uploads/override', {
         method: 'POST',
-        body: {path: mediaPath, reason: 'Đã duyệt đặc cách bởi Quản trị viên'}
+        body: {path: mediaPath, requestId: row.request_id, reason}
       });
       setOverrideMsg(t(`Đã duyệt đặc cách thành công cho tệp: ${mediaPath}`, `Successfully approved: ${mediaPath}`));
       setTimeout(() => setOverrideMsg(''), 4000);
@@ -587,10 +590,10 @@ export default function VideoModerationAdmin() {
                             </span>
                           </span>
 
-                          {(isRejected || final.status === 'failed') && (
+                          {(final.status === 'failed') && (
                             <button
                               type="button"
-                              onClick={() => handleOverrideMedia(final.path)}
+                              onClick={() => handleOverrideMedia(final)}
                               disabled={actionBusy === final.path}
                               className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 cursor-pointer transition shadow-sm"
                             >
@@ -804,10 +807,10 @@ export default function VideoModerationAdmin() {
                                             {statuses[event.status] || event.status}
                                           </span>
 
-                                          {(isEventRejected || event.status === 'failed') && (
+                                          {(event.status === 'failed') && (
                                             <button
                                               type="button"
-                                              onClick={() => handleOverrideMedia(event.path)}
+                                              onClick={() => handleOverrideMedia(event)}
                                               disabled={actionBusy === event.path}
                                               className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 cursor-pointer transition"
                                             >

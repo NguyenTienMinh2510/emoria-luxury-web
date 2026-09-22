@@ -31,7 +31,8 @@ export default async function handler(req,res){
     if(ref.length>=28) orderId=`EMO-${ref.toLowerCase()}`;
     else {
       const {data:matches,error:lookupError}=await client.from('orders').select('id').ilike('id',`EMO-${ref}%`).limit(2);
-      if(!lookupError&&matches?.length===1)orderId=matches[0].id;
+      if(lookupError)return send(503,{success:false,error:'Order lookup unavailable; retry required'});
+      if(matches?.length===1)orderId=matches[0].id;
     }
   }
   const {error,data}=await client.rpc('rpc_receive_bank_payment',{p_provider_id:body.id,p_test:mode==='test',p_reference:reference,p_account:account,p_order_id:orderId,p_amount:body.transferAmount,p_content:body.content});

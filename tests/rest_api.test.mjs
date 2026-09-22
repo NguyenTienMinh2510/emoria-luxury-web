@@ -64,10 +64,12 @@ try{
   assert.equal((await request('GET','/api/v1?resource=admin%2Forders&page=0',undefined,'admin-token')).status,200);
   isAdmin=false;
   assert.equal((await request('POST','/api/v1/admin/video-uploads/override',{path:'emo-test/sample.mp4'},'customer-token')).status,403);
-  isAdmin=true;
-  const overrideRes=await request('POST','/api/v1/admin/video-uploads/override',{path:'emo-test/sample.mp4',reason:'Duyệt đặc cách test'},'admin-token');
+  isAdmin=true;dbResult={success:true,status:'ready'};calls=[];
+  const overrideRes=await request('POST','/api/v1/admin/video-uploads/override',{path:'emo-test/sample.mp4',requestId:'12345678-1234-1234-1234-123456789abc',reason:'Duyệt đặc cách test'},'admin-token');
   assert.equal(overrideRes.status,200);
   assert.equal(overrideRes.body?.status,'ready');
+  assert.ok(calls.at(-1).url.endsWith('/rpc/rpc_admin_override_media'));
+  assert.equal(calls.at(-1).body.p_request,'12345678-1234-1234-1234-123456789abc');
   calls=[];
   await request('POST','/api/v1/memories/fixture/access',{grant:'private-grant'});
   assert.equal(calls.at(-1).body.p_grant_token,'private-grant');assert.ok(!calls.at(-1).url.includes('private-grant'));

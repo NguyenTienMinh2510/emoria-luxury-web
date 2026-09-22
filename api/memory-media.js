@@ -5,9 +5,9 @@ export default async function handler(req,res){
  if(req.method!=='POST')return send(405,{error:'Method not allowed'});
  try{
   let body=req.body;if(!body){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>4096)return send(413,{error:'Yêu cầu quá lớn.'});}body=JSON.parse(raw);}if(typeof body==='string')body=JSON.parse(body);
-  if(typeof body.tag!=='string'||body.tag.length>64)return send(400,{error:'Mã kỷ vật không hợp lệ.'});
+  if(!body||typeof body!=='object'||Array.isArray(body)||Buffer.byteLength(JSON.stringify(body))>4096||typeof body.tag!=='string'||!/^[a-z0-9][a-z0-9-]{0,63}$/.test(body.tag))return send(400,{error:'Mã kỷ vật không hợp lệ.'});
   const base=process.env.SUPABASE_URL||process.env.VITE_SUPABASE_URL,key=process.env.SUPABASE_PUBLISHABLE_KEY||process.env.VITE_SUPABASE_ANON_KEY||process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const caller=createClient(base,key,{auth:{persistSession:false},global:{headers:req.headers.authorization?{Authorization:req.headers.authorization}:{}}});
+  const caller=createClient(base,key,{auth:{persistSession:false},global:{headers:req.headers.authorization?{Authorization:req.headers.authorization}:{},fetch:(url,options)=>fetch(url,{...options,signal:AbortSignal.timeout(15000)})}});
   const {data,error}=await caller.rpc('rpc_get_memory_view',{p_tag_uid:body.tag,p_grant_token:body.grant||null});
   if(error||!data?.is_unlocked)return send(403,{error:'Không có quyền xem media.'});
   const paths=[...new Set([...(data.media_gallery||[]).map(m=>m.url),data.audio_url,data.intro_video_path?'storage://'+data.intro_video_path:null].filter(x=>x?.startsWith('storage://')).map(x=>x.slice(10)))];
@@ -26,7 +26,7 @@ export default async function handler(req,res){
   }
   const blocked=moderatedPaths.filter(path=>!allowed.has(path));
   await Promise.all(paths.map(async path=>{
-    if(path.split('/')[0]!==body.tag||blocked.includes(path)){unavailable.push(path);return;}
+    if(path.length>200||!/^[-a-zA-Z0-9_./]+$/.test(path)||path.split('/').some(part=>!part||part==='.'||part==='..')||path.split('/')[0]!==body.tag||blocked.includes(path)){unavailable.push(path);return;}
     try{
       if(!allowed.has(path)){
         // Gallery types are editable; never let a video disguised as an image bypass moderation.

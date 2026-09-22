@@ -1,0 +1,38 @@
+{
+  "baseCommit": "6685aa3",
+  "environment": "local Supabase only; Google and SePay mocked",
+  "findings": [
+    {
+      "id": "H1",
+      "proof": "Anonymous direct PostgREST SELECT reads a different account address."
+    },
+    {
+      "id": "H2",
+      "proof": "Direct internal RPC exposes audio and guestbook while locked; literal PIN hint is returned."
+    },
+    {
+      "id": "H3",
+      "proof": "Suspended memory remains readable through internal RPC with old grant; grant also survives suspend/resume."
+    },
+    {
+      "id": "H4",
+      "proof": "Concurrent verification of old PIN mints a valid grant AFTER PIN rotation."
+    },
+    {
+      "id": "H5",
+      "proof": "Anonymous caller creates a COD order directly through RPC; REST user gate and per-user rate cap bypassed. Server price remains correct."
+    },
+    {
+      "id": "M1",
+      "proof": "Verified admin override fails with 403 because its caller-role client has no UPDATE grant on memory_video_labels."
+    },
+    {
+      "id": "H6",
+      "proof": "Letter Muse dispatches private details without explicit consent or persistent quota. Google was mocked."
+    },
+    {
+      "id": "H7",
+      "proof": "Short bank memo lookup failure is acknowledged 200 and persisted unmatched, suppressing retries. No bank/production requests made."
+    }
+  ]
+}

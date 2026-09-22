@@ -29,13 +29,7 @@ export const routes=[
     if(!['','uploaded','processing','ready','rejected','failed'].includes(status)||!['','intro','gallery'].includes(category)||!['','image','video'].includes(type)||user&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user))throw Object.assign(new Error('Invalid media filter'),{status:400});
     return rpc(c,'rpc_admin_media_uploads',{p_search:(c.query.get('search')||'').slice(0,120),p_user:user,p_status:status,p_category:category,p_type:type,p_offset:integer(c.query.get('page'),0)*25,p_history:c.query.get('history')==='true'});
   }),
-  route('POST','/admin/video-uploads/override','admin',async c=>{
-    const path=typeof c.body?.path==='string'?c.body.path.trim():'';
-    if(!path||path.length>500)throw Object.assign(new Error('Đường dẫn tệp không hợp lệ.'),{status:400});
-    const reason=typeof c.body?.reason==='string'&&c.body.reason.trim()?c.body.reason.trim():'Đã duyệt đặc cách bởi Quản trị viên';
-    await c.db(c.client.from('memory_video_labels').update({status:'ready',violations:[],reason,model:'admin-override'}).eq('path',path));
-    return {success:true,path,status:'ready',reason};
-  }),
+  route('POST','/admin/video-uploads/override','admin',c=>rpc(c,'rpc_admin_override_media',{p_path:c.body.path,p_request:c.body.requestId,p_reason:c.body.reason})),
   route('POST','/memories/([^/]+)/video-labels/analyze','user',analyzeVideo),
   route('POST','/memories/([^/]+)/video-labels/read','admin',readVideoLabels),
   route('GET','/memories/([^/]+)/video-uploads','user',readVideoUploads),

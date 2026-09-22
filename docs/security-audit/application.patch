@@ -1,0 +1,249 @@
+--- a/api/sepay-webhook.js
++++ b/api/sepay-webhook.js
+@@ -31,7 +31,8 @@
+     if(ref.length>=28) orderId=`EMO-${ref.toLowerCase()}`;
+     else {
+       const {data:matches,error:lookupError}=await client.from('orders').select('id').ilike('id',`EMO-${ref}%`).limit(2);
+-      if(!lookupError&&matches?.length===1)orderId=matches[0].id;
++      if(lookupError)return send(503,{success:false,error:'Order lookup unavailable; retry required'});
++      if(matches?.length===1)orderId=matches[0].id;
+     }
+   }
+   const {error,data}=await client.rpc('rpc_receive_bank_payment',{p_provider_id:body.id,p_test:mode==='test',p_reference:reference,p_account:account,p_order_id:orderId,p_amount:body.transferAmount,p_content:body.content});
+--- a/api/memory-media.js
++++ b/api/memory-media.js
+@@ -5,9 +5,9 @@
+  if(req.method!=='POST')return send(405,{error:'Method not allowed'});
+  try{
+   let body=req.body;if(!body){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>4096)return send(413,{error:'Yêu cầu quá lớn.'});}body=JSON.parse(raw);}if(typeof body==='string')body=JSON.parse(body);
+-  if(typeof body.tag!=='string'||body.tag.length>64)return send(400,{error:'Mã kỷ vật không hợp lệ.'});
++  if(!body||typeof body!=='object'||Array.isArray(body)||Buffer.byteLength(JSON.stringify(body))>4096||typeof body.tag!=='string'||!/^[a-z0-9][a-z0-9-]{0,63}$/.test(body.tag))return send(400,{error:'Mã kỷ vật không hợp lệ.'});
+   const base=process.env.SUPABASE_URL||process.env.VITE_SUPABASE_URL,key=process.env.SUPABASE_PUBLISHABLE_KEY||process.env.VITE_SUPABASE_ANON_KEY||process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+-  const caller=createClient(base,key,{auth:{persistSession:false},global:{headers:req.headers.authorization?{Authorization:req.headers.authorization}:{}}});
++  const caller=createClient(base,key,{auth:{persistSession:false},global:{headers:req.headers.authorization?{Authorization:req.headers.authorization}:{},fetch:(url,options)=>fetch(url,{...options,signal:AbortSignal.timeout(15000)})}});
+   const {data,error}=await caller.rpc('rpc_get_memory_view',{p_tag_uid:body.tag,p_grant_token:body.grant||null});
+   if(error||!data?.is_unlocked)return send(403,{error:'Không có quyền xem media.'});
+   const paths=[...new Set([...(data.media_gallery||[]).map(m=>m.url),data.audio_url,data.intro_video_path?'storage://'+data.intro_video_path:null].filter(x=>x?.startsWith('storage://')).map(x=>x.slice(10)))];
+@@ -26,7 +26,7 @@
+   }
+   const blocked=moderatedPaths.filter(path=>!allowed.has(path));
+   await Promise.all(paths.map(async path=>{
+-    if(path.split('/')[0]!==body.tag||blocked.includes(path)){unavailable.push(path);return;}
++    if(path.length>200||!/^[-a-zA-Z0-9_./]+$/.test(path)||path.split('/').some(part=>!part||part==='.'||part==='..')||path.split('/')[0]!==body.tag||blocked.includes(path)){unavailable.push(path);return;}
+     try{
+       if(!allowed.has(path)){
+         // Gallery types are editable; never let a video disguised as an image bypass moderation.
+--- a/server/geminiVideo.js
++++ b/server/geminiVideo.js
+@@ -17,7 +17,7 @@
+   let file,fileName;
+   try {
+     let part;
+-    if(blob.size<=10*1024*1024||blob.type.startsWith('image/'))part={inlineData:{mimeType:blob.type,data:Buffer.from(await blob.arrayBuffer()).toString('base64')}};
++    if(blob.size<=10*1024*1024)part={inlineData:{mimeType:blob.type,data:Buffer.from(await blob.arrayBuffer()).toString('base64')}};
+     else {
+       const upload=await request(base+'/upload/v1beta/files',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Upload-Protocol':'resumable','X-Goog-Upload-Command':'start','X-Goog-Upload-Header-Content-Length':String(blob.size),'X-Goog-Upload-Header-Content-Type':blob.type},body:JSON.stringify({file:{display_name:'memory-media'}})});
+       const location=upload.headers.get('x-goog-upload-url');
+--- a/server/geminiLetter.js
++++ b/server/geminiLetter.js
+@@ -35,12 +35,21 @@
+     language = 'vi'
+   } = c.body || {};
+ 
++  for(const [field,max] of [['recipient',120],['author',120],['memoryHint',1000],['occasion',40],['tone',40],['language',2]]) {
++    const value=c.body?.[field];
++    if(value!==undefined&&(typeof value!=='string'||value.length>max))throw Object.assign(new Error('Invalid letter input: '+field),{status:422});
++  }
++  if(!['anniversary','proposal','birthday','gratitude','friendship'].includes(occasion)||!['romantic','poetic','warm','sincere'].includes(tone)||!['vi','en'].includes(language))throw Object.assign(new Error('Invalid letter options'),{status:422});
+   const key = process.env.GEMINI_API_KEY;
+   if (!key) {
+     return { letter: getFallbackLetter({ occasion, tone, recipient, author, memoryHint }) };
+   }
+ 
++  if(c.body.consent!==true)throw Object.assign(new Error('Consent is required before sending details to Google.'),{status:400});
++  const permitted=await c.db(c.client.rpc('reserve_letter_generation'));
++  if(!permitted)throw Object.assign(new Error('Up to 20 letters per UTC day, one request per 30 seconds.'),{status:429});
+   const model = process.env.GEMINI_LETTER_MODEL || process.env.GEMINI_VIDEO_MODEL || 'gemini-2.5-flash';
++  if(!/^gemini-[a-z0-9.-]+$/.test(model))throw Object.assign(new Error('Invalid letter model configuration'),{status:503});
+   const signal = AbortSignal.timeout(20000);
+ 
+   const prompt = language === 'en'
+@@ -88,7 +97,7 @@
+     const candidate = data.candidates?.[0];
+     const rawText = candidate?.content?.parts?.map(p => p.text || '').join('').trim();
+ 
+-    if (rawText && rawText.length > 20) {
++    if (candidate?.finishReason==='STOP' && rawText && rawText.length > 20 && rawText.length<=10000) {
+       return { letter: rawText };
+     }
+     return { letter: getFallbackLetter({ occasion, tone, recipient, author, memoryHint }) };
+--- a/server/routes.js
++++ b/server/routes.js
+@@ -29,13 +29,7 @@
+     if(!['','uploaded','processing','ready','rejected','failed'].includes(status)||!['','intro','gallery'].includes(category)||!['','image','video'].includes(type)||user&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user))throw Object.assign(new Error('Invalid media filter'),{status:400});
+     return rpc(c,'rpc_admin_media_uploads',{p_search:(c.query.get('search')||'').slice(0,120),p_user:user,p_status:status,p_category:category,p_type:type,p_offset:integer(c.query.get('page'),0)*25,p_history:c.query.get('history')==='true'});
+   }),
+-  route('POST','/admin/video-uploads/override','admin',async c=>{
+-    const path=typeof c.body?.path==='string'?c.body.path.trim():'';
+-    if(!path||path.length>500)throw Object.assign(new Error('Đường dẫn tệp không hợp lệ.'),{status:400});
+-    const reason=typeof c.body?.reason==='string'&&c.body.reason.trim()?c.body.reason.trim():'Đã duyệt đặc cách bởi Quản trị viên';
+-    await c.db(c.client.from('memory_video_labels').update({status:'ready',violations:[],reason,model:'admin-override'}).eq('path',path));
+-    return {success:true,path,status:'ready',reason};
+-  }),
++  route('POST','/admin/video-uploads/override','admin',c=>rpc(c,'rpc_admin_override_media',{p_path:c.body.path,p_request:c.body.requestId,p_reason:c.body.reason})),
+   route('POST','/memories/([^/]+)/video-labels/analyze','user',analyzeVideo),
+   route('POST','/memories/([^/]+)/video-labels/read','admin',readVideoLabels),
+   route('GET','/memories/([^/]+)/video-uploads','user',readVideoUploads),
+--- a/src/components/AiLetterMuseModal.jsx
++++ b/src/components/AiLetterMuseModal.jsx
+@@ -12,6 +12,7 @@
+   recipient = ''
+ }) {
+   const { t, language } = useLanguage();
++  const [consent,setConsent]=useState(false);
+   const [occasion, setOccasion] = useState('anniversary');
+   const [tone, setTone] = useState('romantic');
+   const [memoryHint, setMemoryHint] = useState('');
+@@ -28,6 +29,7 @@
+       const res = await apiRequest('/ai/craft-letter', {
+         method: 'POST',
+         body: {
++          consent,
+           occasion,
+           tone,
+           memoryHint,
+@@ -151,12 +153,13 @@
+             />
+           </div>
+ 
++          <label className="flex items-start gap-2 text-xs mb-4"><input type="checkbox" checked={consent} disabled={loading} onChange={e=>setConsent(e.target.checked)}/>{t('Tôi đồng ý gửi tên và kỷ niệm đã nhập cho Google để tạo thư.','I consent to sending the names and memories entered here to Google to create a letter.')}</label>
+           {/* Action Button: Generate */}
+           <div className="mb-6">
+             <button
+               type="button"
+               onClick={handleGenerate}
+-              disabled={loading}
++              disabled={loading||!consent}
+               className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-500 text-dark-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(212,175,55,0.35)] disabled:opacity-50"
+             >
+               {loading ? (
+--- a/src/components/VideoModerationAdmin.jsx
++++ b/src/components/VideoModerationAdmin.jsx
+@@ -214,7 +214,8 @@
+     setPage(0);
+   };
+ 
+-  const handleOverrideMedia = async mediaPath => {
++  const handleOverrideMedia = async row => {
++    const mediaPath=row.path;
+     if (!mediaPath) return;
+     const confirmed = window.confirm(
+       t(
+@@ -223,13 +224,15 @@
+       )
+     );
+     if (!confirmed) return;
++    const reason=window.prompt(t('Lý do duyệt thủ công (10–500 ký tự):','Manual review reason (10–500 characters):'))?.trim();
++    if(!reason||reason.length<10||reason.length>500)return;
+ 
+     setActionBusy(mediaPath);
+     setOverrideMsg('');
+     try {
+       await apiRequest('/admin/video-uploads/override', {
+         method: 'POST',
+-        body: {path: mediaPath, reason: 'Đã duyệt đặc cách bởi Quản trị viên'}
++        body: {path: mediaPath, requestId: row.request_id, reason}
+       });
+       setOverrideMsg(t(`Đã duyệt đặc cách thành công cho tệp: ${mediaPath}`, `Successfully approved: ${mediaPath}`));
+       setTimeout(() => setOverrideMsg(''), 4000);
+@@ -587,10 +590,10 @@
+                             </span>
+                           </span>
+ 
+-                          {(isRejected || final.status === 'failed') && (
++                          {(final.status === 'failed') && (
+                             <button
+                               type="button"
+-                              onClick={() => handleOverrideMedia(final.path)}
++                              onClick={() => handleOverrideMedia(final)}
+                               disabled={actionBusy === final.path}
+                               className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 cursor-pointer transition shadow-sm"
+                             >
+@@ -804,10 +807,10 @@
+                                             {statuses[event.status] || event.status}
+                                           </span>
+ 
+-                                          {(isEventRejected || event.status === 'failed') && (
++                                          {(event.status === 'failed') && (
+                                             <button
+                                               type="button"
+-                                              onClick={() => handleOverrideMedia(event.path)}
++                                              onClick={() => handleOverrideMedia(event)}
+                                               disabled={actionBusy === event.path}
+                                               className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 cursor-pointer transition"
+                                             >
+--- a/tests/rest_api.test.mjs
++++ b/tests/rest_api.test.mjs
+@@ -64,10 +64,12 @@
+   assert.equal((await request('GET','/api/v1?resource=admin%2Forders&page=0',undefined,'admin-token')).status,200);
+   isAdmin=false;
+   assert.equal((await request('POST','/api/v1/admin/video-uploads/override',{path:'emo-test/sample.mp4'},'customer-token')).status,403);
+-  isAdmin=true;
+-  const overrideRes=await request('POST','/api/v1/admin/video-uploads/override',{path:'emo-test/sample.mp4',reason:'Duyệt đặc cách test'},'admin-token');
++  isAdmin=true;dbResult={success:true,status:'ready'};calls=[];
++  const overrideRes=await request('POST','/api/v1/admin/video-uploads/override',{path:'emo-test/sample.mp4',requestId:'12345678-1234-1234-1234-123456789abc',reason:'Duyệt đặc cách test'},'admin-token');
+   assert.equal(overrideRes.status,200);
+   assert.equal(overrideRes.body?.status,'ready');
++  assert.ok(calls.at(-1).url.endsWith('/rpc/rpc_admin_override_media'));
++  assert.equal(calls.at(-1).body.p_request,'12345678-1234-1234-1234-123456789abc');
+   calls=[];
+   await request('POST','/api/v1/memories/fixture/access',{grant:'private-grant'});
+   assert.equal(calls.at(-1).body.p_grant_token,'private-grant');assert.ok(!calls.at(-1).url.includes('private-grant'));
+--- a/tests/sepay_webhook.test.mjs
++++ b/tests/sepay_webhook.test.mjs
+@@ -4,7 +4,7 @@
+ process.env.SEPAY_ACCOUNT_NUMBER='123456789';process.env.SEPAY_MODE='test';
+ process.env.VITE_SUPABASE_URL='https://fixture.supabase.co';process.env.SUPABASE_SERVICE_ROLE_KEY='fixture-server-key';
+ const key=process.env.SEPAY_WEBHOOK_KEY,order='EMO-'+'a'.repeat(28),calls=[];
+-globalThis.fetch=async(url,init)=>{calls.push(JSON.parse(init.body));return new Response(JSON.stringify({success:true}),{status:200,headers:{'Content-Type':'application/json'}});};
++globalThis.fetch=async(url,init)=>{if(String(url).includes('/orders?'))return Response.json([]);calls.push(JSON.parse(init.body));return new Response(JSON.stringify({success:true}),{status:200,headers:{'Content-Type':'application/json'}});};
+ const payload={id:123,transferType:'in',transferAmount:100000,accountNumber:'123456789',referenceCode:'REF123',content:`Thanh toan ${order}`};
+ async function invoke(body=payload,auth=`Apikey ${key}`,method='POST'){
+  const r={headers:{},setHeader(k,v){this.headers[k]=v;},end(v){this.body=JSON.parse(v);}};
+@@ -23,5 +23,8 @@
+ await invoke({...payload,content:'No order reference'});assert.equal(calls.at(-1).p_order_id,null);
+ globalThis.fetch=async()=>new Response(JSON.stringify({message:'DB failed'}),{status:500});
+ assert.equal((await invoke(payload)).statusCode,503);
++const beforeLookupFailure=calls.length;
++assert.equal((await invoke({...payload,content:'EMO'+'a'.repeat(20)})).statusCode,503);
++assert.equal(calls.length,beforeLookupFailure);
+ delete process.env.SEPAY_MODE;assert.equal((await invoke(payload)).statusCode,503);
+ console.log('PASS webhook: authenticated server-only processing, account and amount checks, bank memo normalization, unmatched journal, retry on DB failure, explicit test/live mode.');
+--- a/tests/video_labels_database.test.mjs
++++ b/tests/video_labels_database.test.mjs
+@@ -39,20 +39,23 @@
+  assert.ok((await root.rpc('reserve_video_labels',args)).error,'Duplicate job denied');
+  await good(root.from('memory_video_labels').update({status:'failed'}).eq('path',path));
+  assert.ok((await root.rpc('reserve_video_labels',args)).error,'Rapid retry denied');
+- await good(root.from('memory_video_labels').update({attempts:20,started_at:new Date(Date.now()-60000).toISOString()}).eq('path',path));
++ await good(root.from('video_upload_events').update({created_at:new Date(Date.now()-60000).toISOString()}).eq('tag',tag).eq('status','processing'));
++ await good(root.from('video_upload_events').insert(Array.from({length:19},()=>({user_id:owner,author_name:'Fixture',tag,path,status:'processing',model:'quota-fixture',policy_version:1,request_id:crypto.randomUUID(),created_at:new Date(Date.now()-60000).toISOString()}))));
+  assert.ok((await root.rpc('reserve_video_labels',args)).error,'Daily allowance enforced');
+- await good(root.from('memory_video_labels').update({attempts:1}).eq('path',path));
++ await good(root.from('video_upload_events').delete().eq('tag',tag).eq('model','quota-fixture'));
+  await good(root.from('memory_video_labels').update({status:'ready',labels:['Biển'],policy_version:1,violations:[]}).eq('path',path));
+  const cache=await good(root.rpc('reserve_video_labels',args));assert.equal(cache.cached,true);assert.deepEqual(cache.labels,['Biển']);
+  assert.equal((await request('read',{})).status,401,'Locked labels inaccessible through HTTP');
+  assert.equal((await request('analyze',{path,consent:true})).status,401,'Analysis requires HTTP authentication');
+  await good(root.from('memory_video_labels').update({status:'failed',started_at:new Date(Date.now()-60000).toISOString()}).eq('path',path));
++ await good(root.from('video_upload_events').update({created_at:new Date(Date.now()-60000).toISOString()}).eq('tag',tag).eq('status','processing'));
+  const analyzed=await request('analyze',{path,consent:true,include_labels:true},login.session.access_token);
+  assert.equal(analyzed.status,200,JSON.stringify(analyzed.data));assert.deepEqual(analyzed.data,{approved:true,reason:null});
+  const read=await request('read',{},login.session.access_token);assert.equal(read.status,403,'Owner cannot read internal labels');
+  await good(root.from('memory_spaces').update({intro_video_path:path}).eq('tag_uid',tag));
+  await good(viewer.storage.from('emoria-memory').createSignedUrl(path,120));
+  await good(root.from('memory_video_labels').update({status:'failed',started_at:new Date(Date.now()-60000).toISOString()}).eq('path',path));
++ await good(root.from('video_upload_events').update({created_at:new Date(Date.now()-60000).toISOString()}).eq('tag',tag).eq('status','processing'));
+  violations=['GRAPHIC_VIOLENCE'];
+  const rejected=await request('analyze',{path,consent:true,include_labels:true},login.session.access_token);
+  assert.equal(rejected.status,200);assert.equal(rejected.data.approved,false);assert.match(rejected.data.reason,/Bạo lực/);

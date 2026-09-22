@@ -12,6 +12,7 @@ export default function AiLetterMuseModal({
   recipient = ''
 }) {
   const { t, language } = useLanguage();
+  const [consent,setConsent]=useState(false);
   const [occasion, setOccasion] = useState('anniversary');
   const [tone, setTone] = useState('romantic');
   const [memoryHint, setMemoryHint] = useState('');
@@ -28,6 +29,7 @@ export default function AiLetterMuseModal({
       const res = await apiRequest('/ai/craft-letter', {
         method: 'POST',
         body: {
+          consent,
           occasion,
           tone,
           memoryHint,
@@ -151,12 +153,13 @@ export default function AiLetterMuseModal({
             />
           </div>
 
+          <label className="flex items-start gap-2 text-xs mb-4"><input type="checkbox" checked={consent} disabled={loading} onChange={e=>setConsent(e.target.checked)}/>{t('Tôi đồng ý gửi tên và kỷ niệm đã nhập cho Google để tạo thư.','I consent to sending the names and memories entered here to Google to create a letter.')}</label>
           {/* Action Button: Generate */}
           <div className="mb-6">
             <button
               type="button"
               onClick={handleGenerate}
-              disabled={loading}
+              disabled={loading||!consent}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-500 text-dark-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(212,175,55,0.35)] disabled:opacity-50"
             >
               {loading ? (

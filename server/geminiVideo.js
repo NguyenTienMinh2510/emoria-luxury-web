@@ -17,7 +17,7 @@ export async function labelVideo(blob,key,{fetchImpl=fetch,wait=ms=>new Promise(
   let file,fileName;
   try {
     let part;
-    if(blob.size<=10*1024*1024||blob.type.startsWith('image/'))part={inlineData:{mimeType:blob.type,data:Buffer.from(await blob.arrayBuffer()).toString('base64')}};
+    if(blob.size<=10*1024*1024)part={inlineData:{mimeType:blob.type,data:Buffer.from(await blob.arrayBuffer()).toString('base64')}};
     else {
       const upload=await request(base+'/upload/v1beta/files',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Upload-Protocol':'resumable','X-Goog-Upload-Command':'start','X-Goog-Upload-Header-Content-Length':String(blob.size),'X-Goog-Upload-Header-Content-Type':blob.type},body:JSON.stringify({file:{display_name:'memory-media'}})});
       const location=upload.headers.get('x-goog-upload-url');

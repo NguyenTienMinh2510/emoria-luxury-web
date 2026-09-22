@@ -1,0 +1,223 @@
+EMORIA — BACKEND SECURITY AUDIT
+Ngày kiểm tra: 22/09/2026
+Mốc source: 6685aa3e4e8cb45a2a198ef1f9cc00dd7f82e95f
+Supabase Cloud: svbmupgifhafrehdfomx — chỉ đọc metadata, policy, định nghĩa hàm và số lượng bản ghi.
+
+1. EXECUTIVE SECURITY RATING
+
+4/10 cho trạng thái trước vá. Đây là đánh giá kỹ thuật theo phạm vi kiểm tra, không phải chứng nhận an toàn hay kết quả pentest toàn hạ tầng.
+
+Tính toàn vẹn tiền và tồn kho có nền tảng tốt: tính giá từ catalog trong transaction, khóa hàng, ledger chống trùng, webhook dùng constant-time comparison, admin chỉ xác nhận sau khi nhận đủ tiền. Điểm yếu nghiêm trọng hơn nằm ở quyền đọc dữ liệu và ranh giới giữa REST API với Supabase RPC: khóa ở router không ngăn khách gọi thẳng RPC còn được cấp EXECUTE.
+
+Hai cấu hình nguy hiểm đã xác nhận trên Cloud: profiles cho phép SELECT công khai dù chứa email/địa chỉ/số điện thoại; get_memory_view_internal vẫn cho anon gọi. Local đã tái hiện việc đọc audio/guestbook khi chưa mở PIN và đọc thư qua RPC nội bộ khi memory bị admin đình chỉ, nếu người gọi giữ grant hợp lệ. Không phát hiện việc trả pin_hash hoặc thư trực tiếp cho mọi khách chưa mở khóa.
+
+Đã tái hiện 8 kịch bản trước vá bằng dữ liệu giả; bản vá candidate vượt 13 nhóm kiểm thử bảo mật sau vá. Không đọc nội dung kỷ vật thật, không chuyển tiền, không gửi dữ liệu riêng tư thật tới Google. Source ứng dụng đang dùng và production chưa được sửa/deploy trong đợt audit. SQL remediation chỉ đã áp dụng trên Docker local.
+
+Kiến trúc thực tế khác một phần bản đặc tả: api/v1.js là Node.js Vercel Function dùng router tự viết; không thấy Express hoặc Edge Runtime. Database Cloud là PostgreSQL 17.6. Backend gọi Supabase qua HTTP/PostgREST; không tự tạo pg connection pool. Đường gọi Supabase trực tiếp vẫn tồn tại bên cạnh REST API.
+
+Drift cần xử lý: Cloud chỉ ghi nhận hai migration 20260920050838 và 20260920053451 trong schema_migrations; schema cũ từng được nạp theo bundle. Các tính năng ngày 21/09 như account/NFC, kiểm duyệt ảnh và pin_hint chưa được đồng bộ lên Cloud tại thời điểm audit. Không được suy luận “GitHub đã có code” đồng nghĩa “database đã được nâng cấp”. Chưa xác minh SHA của deployment Vercel hiện hành.
+
+2. VULNERABILITY MATRIX
+
+Các đường dẫn/line sau tính từ root repository ở commit được ghi đầu báo cáo. Dòng có thể thay đổi sau khi áp dụng patch. IDs H1–H7/M1 khớp reproductions.json; H8 và các M/L còn lại là kiểm tra source/metadata, không phải tám exploit fixture đó.
+
+CRITICAL
+Không xác nhận được lỗi đạt mức Critical trong phạm vi này. Không có chứng cứ RCE, chiếm tài khoản admin hoặc tự ý ghi nhận tiền qua webhook không có khóa. Không nâng mức chỉ vì một hàm dùng SECURITY DEFINER.
+
+HIGH
+
+H1 — Hồ sơ cá nhân bị đọc công khai.
+  Evidence: supabase/migrations/20260913_init_emoria_schema.sql:211; supabase/migrations/20260917000100_user_profile_expansion.sql:10; supabase/production_schema_deploy.sql:237.
+  Cloud: policy SELECT USING(true), anon được SELECT. Có 9 hồ sơ có email, 4 hồ sơ có phone, 4 hồ sơ có address; không xuất giá trị cá nhân.
+  Tác động: không cần đăng nhập để đọc PII qua PostgREST. Bổ sung trường riêng tư vào bảng public đã mở rộng phạm vi lộ dữ liệu.
+  Repro: anon đọc địa chỉ fixture của account khác trên local.
+  Vá: policy SELECT chỉ cho chính chủ, revoke SELECT anon/PUBLIC. Admin cần dùng RPC có kiểm tra admin, không mở lại toàn bảng. Public author name của bài viết vẫn do RPC dự kiến trả có chọn trường.
+
+H2 — RPC nội bộ bỏ qua lớp lọc của public wrapper.
+  Evidence: supabase/migrations/20260917000200_fix_memory_tap_count_and_order_tracking.sql:11,99,108,227; supabase/migrations/20260921163000_pin_hint_support.sql:154,165,171.
+  Cloud: has_function_privilege(anon, get_memory_view_internal, EXECUTE)=true.
+  Tác động: audio_url và guestbook vẫn trả khi is_unlocked=false; admin_suspended chỉ được kiểm tra ở wrapper. Với grant còn hợp lệ, có thể đọc thư của memory đang bị đình chỉ bằng internal RPC. Không phải bằng chứng pin_hash bị lộ.
+  Vá: revoke EXECUTE internal từ PUBLIC/anon/authenticated, chỉ để wrapper SECURITY DEFINER gọi. Migration pin_hint đang REVOKE rồi GRANT lại ở dòng 171; hardening phải chạy sau migration này.
+
+H3 — Grant tồn tại qua thay đổi trạng thái.
+  Evidence: supabase/migrations/20260915104510_memory_cinema_and_operations.sql:72–77; supabase/migrations/20260913_init_emoria_schema.sql:567.
+  Repro local: suspend rồi resume vẫn mở được bằng grant trước đó. Cơ chế hiện tại chỉ xóa viewer grants ở một số nhánh thay PIN, không bao phủ mọi cập nhật owner/trạng thái/lịch mở.
+  Vá: trigger DB thu hồi toàn bộ grant khi PIN, is_protected, owner, admin_suspended, availability_status hoặc unlock_at thay đổi. Chặn cấp grant mới khi admin_suspended.
+
+H4 — Race xác thực PIN cũ và đổi PIN.
+  Evidence: supabase/migrations/20260913_init_emoria_schema.sql:422,442,472; supabase/migrations/20260915104510_memory_cinema_and_operations.sql:21.
+  Repro: verifier đọc hash cũ, chờ khóa memory_pin_failures; owner đổi PIN và xóa grants; verifier tiếp tục và tạo grant mới bằng PIN cũ. Grant đó mở được memory sau rotation.
+  Vá: verifier khóa cùng memory row bằng FOR UPDATE trước khi đọc hash/xử lý attempts; thu hồi bằng trigger cùng transaction. Test sau vá kiểm tra trường hợp cạnh tranh, không chỉ gọi đổi PIN tuần tự.
+
+H5 — Gọi thẳng checkout RPC để bỏ qua bắt buộc đăng nhập/rate limit REST.
+  Evidence: supabase/migrations/20260915114549_checkout_recovery_and_expiry.sql:4,18; api/v1.js:40; server/routes.js:65.
+  Cloud: anon vẫn EXECUTE rpc_create_order(uuid,jsonb). Local: anon tạo được COD order; giới hạn 30 đơn/giờ chỉ chạy khi auth.uid() khác NULL.
+  Tác động: đơn rác và giữ/cạn tồn kho. Không chứng minh sửa được giá: fixture gửi price=1 vẫn nhận subtotal=100000 đúng catalog.
+  Vá: revoke anon/PUBLIC và thêm auth.uid() bắt buộc ngay trong hàm DB.
+
+H6 — Letter Muse gửi dữ liệu sang Google không có consent và không có quota bền vững.
+  Evidence: server/geminiLetter.js:29,38,67; src/components/AiLetterMuseModal.jsx:28; server/routes.js:11.
+  Repro: account đã đăng nhập gọi hai lần, không consent, vẫn dispatch cả hai; Google được mock.
+  Tác động: tên và kỷ niệm người dùng được đưa vào prompt không có xác nhận riêng; có thể tiêu hao quota từ mọi account. Endpoint có auth, không phải public unauthenticated endpoint.
+  Vá: checkbox consent + server check trước dispatch; validation kiểu/độ dài/enum; RPC quota atomic 20/ngày UTC, cách 30 giây; không lưu prompt vào quota table. Không có key thì chỉ dùng template local, không dispatch Google.
+
+H7 — Lookup mã chuyển khoản ngắn lỗi nhưng SePay nhận HTTP 200.
+  Evidence: api/sepay-webhook.js:33–39; supabase/migrations/20260917011000_verified_bank_payments.sql:33–37.
+  Repro: lookup trả 503, handler vẫn gọi ledger với order_id=NULL và ACK 200. Event đã lưu unmatched; lần retry cùng provider_id được coi là duplicate, không tự ghép lại đơn.
+  Tác động: khách đã trả tiền nhưng đơn không tự ghi nhận; không phải tiền bị cộng hai lần.
+  Vá: trả 503 ngay khi lookupError, trước khi ghi ledger; test retry lookup thành công. Event unmatched thật sự đã có trong production cần quy trình đối soát có audit; patch không tự sửa lịch sử cũ.
+
+H8 — Bảng legacy nfc_tags có quyền đọc public đối với trường nhạy cảm.
+  Evidence: metadata Cloud, không tìm thấy definition tương ứng trong repository. Anon có SELECT; policy công khai; các cột gồm secret_token/message/media_urls.
+  Cloud hiện có 0 dòng: nguy cơ tiềm ẩn nếu tái sử dụng, chưa phải chứng cứ đã lộ nội dung.
+  Vá: REVOKE ALL cho anon/authenticated/PUBLIC trên bảng legacy nếu tồn tại. Không xóa bảng/dữ liệu.
+
+MEDIUM
+
+M1 — Duyệt AI thủ công bị lỗi 403 và thiếu giao dịch audit đúng nghĩa.
+  Evidence: server/routes.js:32–38; src/components/VideoModerationAdmin.jsx:217,590,807; supabase/migrations/20260920050838_video_labels.sql:16.
+  Repro: admin JWT hợp lệ vẫn bị từ chối do UPDATE bảng bằng caller-role client trong khi bảng đã revoke. Chưa phải người thường vượt quyền admin.
+  Nếu chỉ mở rộng GRANT để sửa 403: code còn không kiểm tra row thực sự được sửa, xóa violations, không ghi actor review, có thể duyệt file đã bị xóa hoặc kết quả lease cũ.
+  Vá: RPC riêng kiểm tra admin, lock row, request_id hiện hành, trạng thái failed, không có violations, object tồn tại, memory không đình chỉ; ghi actor và lý do. UI chỉ cho phục hồi lỗi kỹ thuật. Không khôi phục video rejected do nội dung vi phạm.
+
+M2 — Gợi ý PIN có thể chính là PIN.
+  Evidence: supabase/migrations/20260921163000_pin_hint_support.sql:32,38,156.
+  Repro: owner đặt hint=1111 cùng PIN1111; khách khóa vẫn nhận hint1111. Đây là thiếu guardrail cho dữ liệu do chủ sở hữu cung cấp, không phải SQL injection.
+  Vá: <=160 ký tự; từ chối hint có chuỗi 4–6 chữ số khớp bcrypt PIN; dọn hint rõ ràng không an toàn. Không thể phát hiện chắc chắn mọi cách diễn đạt PIN bằng chữ/ngữ nghĩa; cần hướng dẫn UX.
+
+M3 — Quota media tính từ state có thể bị xóa/thay thế.
+  Evidence: supabase/migrations/20260920053451_video_upload_moderation.sql:101–107; bản mở rộng tương ứng trong 20260921010000_media_moderation_expansion.sql.
+  count/sum trên memory_video_labels không phải ledger lượt dùng. Xóa memory làm cascade mất state; xóa/tải lại path và thay started_at ảnh hưởng bộ đếm, nhất là khi qua ngày.
+  Vá: đếm DISTINCT request_id từ video_upload_events status=processing dưới advisory lock hiện có. Lịch sử không cascade khi xóa memory. Test sau vá xóa state vẫn bị giới hạn 30 giây và 20 lượt/ngày. Retention audit phải luôn giữ ít nhất cửa sổ quota hiện hành.
+
+M4 — “Thu hồi ngay” không đúng với signed URL đã phát hành.
+  Evidence: api/memory-media.js:37; Storage owner SELECT policy trong 20260921153205_image_moderation_access.sql:26.
+  API cấp 120 giây sau kiểm tra quyền; đổi PIN/xóa grant không thu hồi token signed URL đã cấp. Owner còn có thể gọi Storage signing trực tiếp theo RLS và chọn TTL khác.
+  Cần kiến trúc delivery kiểm tra access version/quyền trên mỗi request nếu yêu cầu tuyệt đối. Bản vá grant không tuyên bố xử lý được giới hạn này; nội dung đã tải về càng không thể thu hồi từ thiết bị.
+  Nguồn: https://supabase.com/docs/guides/storage/serving/downloads
+  Cache/CDN cần kiểm tra riêng: https://supabase.com/docs/guides/storage/cdn/smart-cdn
+
+M5 — AI chạy đồng bộ, cleanup Google chỉ best effort.
+  Evidence: server/geminiVideo.js:10,49–52; server/videoLabels.js:39–60; vercel.json:3.
+  140s cho Google cộng download/DB/cleanup có thể hết tổng 180s. finally không bảo đảm chạy xong khi function bị kill; xóa Google file thất bại chỉ console.warn. State processing có lease timeout nhưng không có worker tự phục hồi bền vững.
+  Vá ngắn hạn có trong diff: ảnh >10MB cũng đi Files API thay vì base64 inline tới ~67MB cho file50MB. Xử lý timeout/retry/cleanup đầy đủ cần queue/outbox và worker ở mục 4.
+
+M6 — Quy tắc ảnh/video và database Cloud chưa cùng phiên bản.
+  Evidence: Cloud memory_owner_read chỉ lọc MIME video; repository bổ sung ảnh tại 20260921153205_image_moderation_access.sql:26.
+  Khi chỉ deploy frontend/API, các trigger/policy mới không tự có trên Cloud. Ảnh qua đường gọi trực tiếp Storage chưa hưởng các ràng buộc mới.
+  Phạm vi moderation hiện nay là file ở bucket emoria-memory theo loại/MIME. External gallery image URLs và legacy-unreviewed là ngoại lệ rõ trong migration; không được mô tả chúng là đã qua AI. MIME metadata do upload cung cấp cũng không tương đương kiểm định nội dung byte-level.
+  Cần đồng bộ schema và quyết định cách quản lý ngoại lệ legacy/external; không tự quét gửi lại ảnh cũ sang Google khi chưa có consent.
+
+M7 — Tra cứu chi tiết bằng số điện thoại không có giới hạn thử tương ứng.
+  Evidence: supabase/migrations/20260917011000_verified_bank_payments.sql:124–129.
+  Cần mã đơn ngẫu nhiên trước; mã đơn đơn độc chỉ trả bản che thông tin. Nhưng số điện thoại là yếu tố xác minh dễ được biết, đặc biệt khi kết hợp H1. Chưa chứng minh brute-force diện rộng trên Cloud.
+  Khuyến nghị: account hoặc lookup token bí mật cho dữ liệu đầy đủ; nếu cần phục hồi bằng phone, dùng OTP/rate limit tại DB hoặc gateway thật sự duy nhất. Không đổi contract này trong patch để tránh âm thầm phá flow tra cứu hiện tại.
+
+M8 — Partial payment giữ stock vô thời hạn nếu không có quy trình vận hành.
+  Evidence: supabase/migrations/20260917011000_verified_bank_payments.sql:94.
+  expire_orders chỉ xử lý paid_amount=0. Giữ lại đơn trả thiếu là đúng để không thất thoát tiền, nhưng không có deadline/review queue rõ ràng thì stock mắc kẹt. Cần thời hạn xử lý thủ công, đối soát/hoàn tiền; không tự hủy đơn đã nhận tiền bằng timer đơn giản.
+
+M9 — Mỗi lần đọc memory lại ghi “tap”.
+  Evidence: supabase/migrations/20260921163000_pin_hint_support.sql:139–142; bản cũ 20260917000200_fix_memory_tap_count_and_order_tracking.sql:84–87.
+  Cùng RPC dùng cho render, authorization và ký media nên nhiều lần ghi không đồng nghĩa nhiều lượt quét chip. Khách có thể spam RPC để phình bảng/tăng số liệu; COUNT(*) mỗi lần thêm tải.
+  Khuyến nghị: tách sự kiện mở memory/đọc chip, dedup theo session/time bucket và giới hạn; đọc quyền không ghi telemetry. SQL patch thêm index memory_id để giảm tác hại truy vấn, chưa thay đổi semantics thống kê.
+
+M10 — Bucket public legacy có policy upload rộng.
+  Evidence: Cloud storage.objects policy “Authenticated Users Upload Media”: chỉ yêu cầu bucket_id='emoria-media' và auth.role()='authenticated'; “Public Access Media” cho đọc public.
+  Đây không phải bucket private emoria-memory. Bất kỳ account có thể tải nội dung lên bucket legacy theo policy này, không thấy ràng buộc admin/path trong policy. Có nguy cơ lạm dụng lưu trữ/phát tán nội dung public.
+  Cần xác minh các flow catalog/article còn dùng bucket này rồi thu hẹp upload về admin hoặc namespace có quota. Không revoke mù bucket public trong patch vì chưa xác minh toàn bộ người tiêu dùng legacy.
+
+LOW
+
+L1 — search_path chưa thống nhất và thường bỏ pg_temp cuối danh sách.
+  Evidence: supabase/migrations/20260913_init_emoria_schema.sql:410; 20260920050838_video_labels.sql:22; metadata pg_proc Cloud.
+  Không xác nhận hijacking thực tế: anon/auth không có CREATE trong public/extensions, nhiều reference đã schema-qualified. Không phải mọi SECURITY DEFINER đều phải dùng chính xác chuỗi path trong đề bài.
+  Vá: SET search_path=pg_catalog,public,extensions,pg_temp cho các hàm SECURITY DEFINER ứng dụng public/private. Chỉ đặt schema tin cậy trước pg_temp; kiểm tra lại quyền CREATE khi triển khai.
+  Nguồn: https://www.postgresql.org/docs/18/sql-createfunction.html — Writing SECURITY DEFINER Functions Safely.
+
+L2 — Thiếu một số index FK và truy vấn lịch sử.
+  Evidence: pg_constraint/pg_index Cloud: 18 FK public không có index dẫn đầu phù hợp tại thời điểm kiểm tra. Điểm nóng gồm access_grants.memory_id, memory_media.memory_id, guestbook_entries.memory_id, nfc_tap_events.memory_id, memory_spaces.owner_id/order_id, bank/gateway events.order_id.
+  Không có nghĩa mọi FK bắt buộc thêm index. orders.user_id và order_items.order_id đã có index. Thiếu index gây quét/giữ khóa lâu hơn trong một số query/delete, không tự tạo table lock trong mọi lần checkout.
+  Vá chọn lọc: 9 index ở remediation.sql. Với dữ liệu lớn nên tách CREATE INDEX CONCURRENTLY ra ngoài transaction; fixture hiện nhỏ nên bản kiểm thử dùng DDL thường.
+
+L3 — Validation/deadline không đồng nhất ở media endpoint.
+  Evidence: api/memory-media.js:7–10,29.
+  Body Vercel pre-parsed bỏ qua giới hạn của vòng đọc stream; path chưa chặn rõ dot segments; caller RPC chưa có deadline riêng. Chưa xác nhận SSRF/path traversal: đích là Supabase cấu hình server và path chỉ lấy từ memory được phép đọc.
+  Vá: kiểm tra body object/byte length, tag regex, path length/ký tự/dot segments; 15s HTTP deadline cho caller client. JSON lỗi hiện vẫn có thể thành 503 ở catch chung; nên tách 400 khi hoàn thiện chuẩn lỗi API.
+
+L4 — CI chưa chạy kiểm thử authorization/concurrency trên database thật.
+  Evidence: .github/workflows/ci.yml:24–25; package.json scripts test:ci.
+  Baseline CI pass dù các lỗi H1–H7 tồn tại. Suite có nhiều mock/demo/static checks, không thay thế SQL integration. Cần job local Supabase, migration-from-scratch và kiểm tra ACL sau migration cuối.
+
+KIỂM TRA THEO SÁU VECTOR — ĐIỂM ĐÃ LÀM ĐÚNG VÀ GIỚI HẠN
+
+1) Tiền: api/sepay-webhook.js:13 dùng timingSafeEqual với độ dài byte bằng nhau; khóa tối thiểu32 ký tự. Đây là API-key authentication theo protocol đang dùng, không phải HMAC timestamp. Chống replay nhờ UNIQUE(is_test,provider_id), unique reference có điều kiện và transaction/row locks, không nhờ đồng hồ request. RPC nhận tiền chỉ service_role EXECUTE. Đã xem khóa theo order và idempotency; không thấy client có đường sửa trực tiếp ledger. H7 là lỗi mất ghép đơn, không phải duplicate credit.
+   Giá: 20260914_atomic_checkout.sql:87–108 đọc product.price, khóa variant FOR UPDATE theo thứ tự ổn định. rpc_issue_chip khóa order và kiểm số lượng item (20260915104510_memory_cinema_and_operations.sql:57–68). Không khẳng định đã load test toàn hệ thống; chưa thấy race oversell từ đoạn đã xét.
+
+2) PIN: bcrypt/bf cost10, salt riêng, không lưu raw PIN; UUID grant random, expires_at và memory_id được xét. Fixture kiểm hết hạn PASS. Hash và letter bị lọc ở trạng thái khóa như dự kiến; audio/guestbook và internal EXECUTE là lỗ hổng riêng. Rate limit PIN theo memory có thể bị cố tình khóa tạm bởi người biết tag; tăng bảo vệ edge theo IP/account phải đồng thời khóa đường RPC công khai nếu muốn hiệu quả.
+   Cần chốt policy: recipient được admin cấp account access hiện được mở không cần PIN (20260921163000_pin_hint_support.sql:120). Đây là yêu cầu phân quyền trước đó, nhưng khác phát biểu mới “recipient chưa nhập PIN không bao giờ xem”. Audit không âm thầm đổi chính sách. Nếu muốn account VÀ PIN cho recipient, cần thay điều kiện này và test riêng; owner vẫn cần flow chỉnh sửa hợp lệ.
+
+3) RLS/header: router dùng auth.getUser xác minh JWT rồi is_admin ở DB, không tin role/user_id client; đường thông thường giữ caller JWT để RLS có hiệu lực. Table privileges và RLS phải xét cùng nhau: một số bảng còn GRANT legacy nhưng không có policy write nên không đồng nghĩa có bypass. Chưa xác nhận SQL injection hoặc forge header thành admin. Hàm nội bộ EXECUTE nhầm và profile policy true là các lỗi có chứng cứ cụ thể.
+
+4) Storage: bucket memory private, không có owner UPDATE policy để ghi đè object đã duyệt. Ký URL dựa trên public view + moderation status + MIME/path; degraded thiếu key/table không trả file chưa duyệt và vẫn cho đọc thư. Pending/rejected/cross-memory fixture bị chặn. Không có fetch URL tùy ý từ body trong signer. Signed URL và external/legacy media còn các giới hạn M4/M6.
+
+5) Gemini: upload analysis có owner, consent, lease, 20/day, 30s, violation rejection và xóa Supabase file; labels admin-only. Provider/model lỗi fail closed cho media. Nguồn model được override env có regex; không kết luận model Free Tier tốt nhất/khả dụng vì audit không gọi Google thật. Letter Muse thiếu các cơ chế tương đương trước patch. AI phân loại không phải bảo đảm phát hiện 100% nội dung vi phạm; cần reviewer và cơ chế khiếu nại.
+
+6) Performance/input: không có direct pg pool cần chỉnh trong Node hiện tại. Cloud rolconfig: anon statement_timeout3s, authenticated8s, authenticator statement_timeout8s/lock_timeout8s; service_role không có rolconfig riêng, không suy ra timeout hiệu lực là vô hạn. AbortSignal hủy chờ HTTP không bảo đảm transaction DB dừng; cần DB statement/lock timeout và transaction ngắn. Router chặn body >512KiB, object shape; RPC args qua PostgREST, các regex kiểm tra đã xem không có dạng backtracking lồng nguy hiểm. Không tìm thấy prototype-pollution/SQLi đã tái hiện; Letter Muse cần enum/type bounds đã vá. Đây không phải fuzzing toàn bộ trường dữ liệu.
+
+3. CONCRETE CODE & SQL PATCHES
+
+Các file cùng thư mục:
+  application.patch — diff ứng dụng và test, git apply --check đã PASS trên commit6685aa3.
+  remediation.sql — transaction SQL, đã chạy thành công trên local Supabase17 và kiểm thử sau vá.
+  reproduce.mjs + reproductions.json — chứng cứ trước vá bằng dữ liệu giả.
+  verify-patches.mjs + verification.json — 13 nhóm kiểm thử sau vá.
+
+Phạm vi patch: H1–H8, M1–M3; giảm rủi ro payload M5; hardening/index L1–L3. Không tự xử lý các quyết định kiến trúc/vận hành M4, M6–M10 và recipient/PIN. Không tuyên bố áp dụng patch là đạt “zero leak” tuyệt đối.
+
+Validation đã hoàn thành:
+  - Source gốc: npm run test:ci PASS; npm run build PASS.
+  - Bản sao áp dụng application.patch: npm run test:ci PASS; npm run build PASS.
+  - Candidate + local DB đã vá: verify-patches.mjs PASS13 nhóm; tests/rest_database.test.mjs PASS; tests/memory_accounts_database.test.mjs PASS; tests/video_labels_database.test.mjs PASS.
+  - Các test Google/SePay dùng mock; test DB thật chỉ Docker55321. Không test giao dịch tiền thật hoặc NFC hardware.
+  - Build còn warning JS chunk khoảng1.09MB /300KB gzip; không phải lỗi build.
+
+Cách áp dụng có kiểm soát:
+  A. Trên branch/checkout của commit tương ứng, bảo toàn thay đổi mới của người khác:
+       git apply --check docs/security-audit/application.patch
+       git apply docs/security-audit/application.patch
+     Diff giữ newline của source; nếu HEAD đổi, review/rebase patch, không force bỏ qua hunk lỗi.
+
+  B. Đưa SQL thành migration mới sau cùng bằng Supabase CLI, kiểm tra DDL trước khi chạy.
+     Local dùng schema đầy đủ đến pin_hint_support. Script SQL là one-time migration, không phải chạy lặp tùy ý.
+     Cloud phải đối chiếu schema thật và migration history trước; không chạy db push mù tất cả các migration cũ đã từng được nạp bundle.
+     Với schema Cloud đang ghi nhận, nhóm tính năng21/09 cần theo thứ tự:
+       20260921010000_media_moderation_expansion.sql
+       20260921150917_memory_accounts_and_nfc_links.sql
+       20260921153205_image_moderation_access.sql
+       20260921163000_pin_hint_support.sql
+       migration hardening từ remediation.sql, SAU CÙNG.
+     Đây là thứ tự phụ thuộc, không phải xác nhận batch trên Cloud đã được test. Kiểm tra dữ liệu/backfill và quyền trước deploy; đặc biệt không để migration pin_hint mở lại EXECUTE sau hardening. Có thể đóng khẩn profile/internal grants độc lập trước khi đưa toàn bộ feature migration vào production.
+     SQL dùng pg_get_functiondef và kiểm tra đoạn định nghĩa mong đợi trước khi sửa PIN/quota; lệch schema sẽ rollback transaction thay vì âm thầm sửa nhầm. Index thường có thể khóa lúc tạo trên bảng lớn; cân nhắc bản CONCURRENTLY riêng.
+
+  C. Sau khi local migration đã áp dụng, tại root chạy:
+       node docs/security-audit/verify-patches.mjs
+       npm run test:ci
+       npm run build
+       npm run test:rest-db
+       npm run test:video-db
+       npm run test:memory-accounts-db
+     verify-patches.mjs mặc định import ứng dụng tại root; AUDIT_APPLICATION_ROOT chỉ dùng khi kiểm thử candidate riêng. Script bắt buộc API_URL local và dùng fixture tạm, cleanup trong finally. reproduce.mjs mong đợi lỗ hổng trước vá nên KHÔNG phải suite PASS sau vá.
+
+  D. Deploy ứng dụng sau SQL tương thích; kiểm tra lại anon ACL và admin review thật trên staging trước production. Không rollback bằng cách GRANT lại public để né lỗi UI. Cần backup schema/data và migration rollback phù hợp môi trường khi thực hiện production; audit hiện chưa thực hiện bước này.
+
+4. TOP 3 ARCHITECTURAL OPTIMIZATIONS
+
+1) Database là ranh giới phân quyền có thể kiểm chứng.
+   REST không thay thế RLS/EXECUTE ACL. Chỉ expose RPC đã chủ ý thiết kế; internal đặt private schema hoặc revoke rõ ràng. Public identity và private profile tách projection. Thêm CI dựng Supabase local từ schema chuẩn, chạy anonymous/owner/recipient/admin trực tiếp qua PostgREST, thử race và xác nhận ACL sau migration cuối. Chuẩn hóa lịch sử migration Cloud thay vì tiếp tục chồng các bundle khó đối chiếu.
+
+2) Job AI bền vững và đối soát thanh toán tách khỏi request người dùng.
+   Request tạo job có idempotency key, server quota và consent, trả202; worker claim lease và ghi kết quả có version. Lưu tên Google file cần cleanup trong outbox, retry có backoff, thu hồi job hết lease. Ledger thanh toán giữ immutable event; job reconciliation ghép lại unmatched dưới transaction/audit, không xóa event để “thử lại”. Admin đọc trạng thái cuối gọn, mở lịch sử khi cần; không xóa audit bằng chứng để làm UI sạch.
+
+3) Quyền media có phiên bản + vận hành quan sát được.
+   Nếu “thu hồi ngay” là cam kết bắt buộc, dùng endpoint/proxy kiểm quyền và access_version mỗi lần phục vụ media, hạn chế signing trực tiếp; cân nhắc byte-range streaming, cache policy và chi phí. Nếu giữ signed URLs120s thì mô tả đúng cửa sổ thu hồi và không hứa tức thì. Tách analytics NFC khỏi auth/read RPC; metrics cho webhook unmatched, payment partial quá hạn, AI failed/stale/cleanup backlog; thêm index theo query thực tế và kiểm tra p95 trước khi mở rộng.

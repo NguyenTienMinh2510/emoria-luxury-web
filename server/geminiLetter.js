@@ -35,12 +35,21 @@ export async function craftLetter(c) {
     language = 'vi'
   } = c.body || {};
 
+  for(const [field,max] of [['recipient',120],['author',120],['memoryHint',1000],['occasion',40],['tone',40],['language',2]]) {
+    const value=c.body?.[field];
+    if(value!==undefined&&(typeof value!=='string'||value.length>max))throw Object.assign(new Error('Invalid letter input: '+field),{status:422});
+  }
+  if(!['anniversary','proposal','birthday','gratitude','friendship'].includes(occasion)||!['romantic','poetic','warm','sincere'].includes(tone)||!['vi','en'].includes(language))throw Object.assign(new Error('Invalid letter options'),{status:422});
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     return { letter: getFallbackLetter({ occasion, tone, recipient, author, memoryHint }) };
   }
 
+  if(c.body.consent!==true)throw Object.assign(new Error('Consent is required before sending details to Google.'),{status:400});
+  const permitted=await c.db(c.client.rpc('reserve_letter_generation'));
+  if(!permitted)throw Object.assign(new Error('Up to 20 letters per UTC day, one request per 30 seconds.'),{status:429});
   const model = process.env.GEMINI_LETTER_MODEL || process.env.GEMINI_VIDEO_MODEL || 'gemini-2.5-flash';
+  if(!/^gemini-[a-z0-9.-]+$/.test(model))throw Object.assign(new Error('Invalid letter model configuration'),{status:503});
   const signal = AbortSignal.timeout(20000);
 
   const prompt = language === 'en'
@@ -88,7 +97,7 @@ Chỉ trả về toàn văn lá thư (gồm lời mở đầu và lời kết k�
     const candidate = data.candidates?.[0];
     const rawText = candidate?.content?.parts?.map(p => p.text || '').join('').trim();
 
-    if (rawText && rawText.length > 20) {
+    if (candidate?.finishReason==='STOP' && rawText && rawText.length > 20 && rawText.length<=10000) {
       return { letter: rawText };
     }
     return { letter: getFallbackLetter({ occasion, tone, recipient, author, memoryHint }) };

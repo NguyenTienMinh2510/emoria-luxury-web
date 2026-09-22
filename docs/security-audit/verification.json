@@ -1,0 +1,20 @@
+{
+  "baseCommit": "6685aa3",
+  "application": "application.patch candidate",
+  "database": "remediation.sql on local Docker only",
+  "passed": [
+    "Profile PII: anon denied, authenticated self-only",
+    "Hint cannot contain the literal PIN",
+    "Internal RPC revoked; locked public wrapper remains sanitized",
+    "Suspend/resume revokes old tokens and rejects PIN verification while suspended",
+    "Concurrent old PIN verification cannot survive PIN rotation",
+    "Expired grant rejected",
+    "Anonymous checkout RPC denied",
+    "Persistent letter quota: 30 seconds, 20/day, day rollover",
+    "Override: admin-only, current attempt only, recorded reviewer, known violations cannot be restored",
+    "Deleting mutable moderation state does not reset the rate limit",
+    "20 immutable AI reservations enforce daily quota after mutable row deletion",
+    "Letter AI requires consent, bounded input and quota before provider request",
+    "SePay lookup failure returns 503 without ledger write; retry matches order"
+  ]
+}
