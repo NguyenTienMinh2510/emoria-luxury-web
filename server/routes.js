@@ -10,10 +10,10 @@ const pick=(body,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(body,k))
 const settingKeys=['sandbox','sales_enabled','cod_enabled','transfer_enabled','shipping_fee','free_shipping_from','gift_fee','reservation_minutes','bank_bin','bank_account','bank_owner','contact_email','contact_phone','address','ga4_measurement_id','shipping_policy','return_policy','privacy_policy'];
 export const routes=[
   route('GET','/products/([^/]+)/try-on','public',async c=>{
-    const config=tryOnConfig(c.params[0]);
-    if(!config)throw Object.assign(new Error('AR is not available for this product.'),{status:404});
-    const product=await c.db(c.client.from('checkout_products').select('id,active').eq('id',c.params[0]).maybeSingle());
+    const product=await c.db(c.client.from('checkout_products').select('id,name,active,image_url,details').eq('id',c.params[0]).maybeSingle());
     if(!product?.active)throw Object.assign(new Error('Product unavailable.'),{status:404});
+    const config=tryOnConfig(c.params[0], product);
+    if(!config)throw Object.assign(new Error('AR is not available for this product.'),{status:404});
     return config;
   }),
   route('POST','/ai/craft-letter','user',craftLetter),
@@ -60,9 +60,15 @@ export const routes=[
   }),
   route('GET','/catalog','public',async c=>{
     const [products,settings]=await Promise.all([c.db(c.client.from('checkout_products').select('*, checkout_variants(*)').order('id')),c.db(c.client.from('store_settings').select('*').eq('id',true).single())]);
-    return {products:products.map(product=>({...product,try_on_available:product.active&&!!tryOnConfig(product.id)})),settings};
+    return {products:products.map(product=>({...product,try_on_available:product.active&&!!tryOnConfig(product.id,product)})),settings};
   }),
-  route('PUT','/admin/products/([^/]+)','admin',c=>rpc(c,'rpc_save_catalog',{p_id:c.params[0],p_expected:c.body.expected??null,p_product:c.body.product,p_variants:c.body.variants})),
+  route('PUT','/admin/products/([^/]+)','admin',async c=>{
+    const res=await rpc(c,'rpc_save_catalog',{p_id:c.params[0],p_expected:c.body.expected??null,p_product:c.body.product,p_variants:c.body.variants});
+    if(c.body.product?.details){
+      await c.db(c.client.from('checkout_products').update({details:c.body.product.details}).eq('id',c.params[0]));
+    }
+    return res;
+  }),
   route('PATCH','/admin/settings','admin',c=>c.db(c.client.from('store_settings').update(pick(c.body,settingKeys)).eq('id',true).select('id').single())),
   route('POST','/orders','user',c=>{
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.body.requestId||''))throw Object.assign(new Error('Thiếu requestId hợp lệ để chống tạo đơn trùng.'),{status:400});

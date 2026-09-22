@@ -8,7 +8,7 @@ export async function loadCatalog() {
   return {settings:{...settings,ga4_measurement_id:settings.ga4_measurement_id||import.meta.env?.VITE_GA4_MEASUREMENT_ID||''},products:(rows||[]).map(p=>{
     const desc=descriptions.find(item=>item.id===p.id)||{},variants=p.checkout_variants||[];
     return {category:'Trang sức',material:'',description:'',...desc,...p.details,unitsPerItem:p.units_per_item||1,id:p.id,name:p.name,price:Number(p.price),image:p.image_url||desc.image,formattedPrice:new Intl.NumberFormat('vi-VN').format(p.price)+' đ',variants,active:p.active,available:p.active&&variants.some(v=>v.stock>0),
-      tryOnAvailable:p.try_on_available===true || (p.active && p.id !== 'emoria-solaris-keyring'),
+      tryOnAvailable:p.try_on_available===true || p.active,
       snapshot:{name:p.name,price:Number(p.price),active:p.active,image:p.image_url,stocks:Object.fromEntries(variants.map(v=>[v.size,v.stock]))}};
   })};
 }

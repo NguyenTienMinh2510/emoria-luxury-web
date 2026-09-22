@@ -39,7 +39,7 @@ const BANK_BIN_NAMES = {
   '970424': 'Shinhan Bank'
 };
 
-export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderComplete, onTrack, currentUserId='guest', onOpenAuth }) {
+export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderComplete, onTrack, currentUserId='guest', onOpenAuth, onOpenPrivacy }) {
   const { settings } = useStore();
   const isLoggedIn = Boolean(currentUserId && currentUserId !== 'guest');
   const [pending,setPending]=useState(()=>readPendingCheckout(currentUserId));
@@ -246,6 +246,16 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
               {completedOrder.lookupToken && <div className="rounded-xl p-4 bg-white/5 text-left text-sm space-y-2"><p>Mã tra cứu riêng — hãy lưu lại:</p><code className="break-all select-all">{completedOrder.lookupToken}</code><p className="text-slate-400 text-xs">Dùng cùng mã đơn ở mục Tra cứu. Không chia sẻ mã này công khai.</p></div>}
               <div className="flex flex-wrap justify-center gap-3">{onTrack&&<button className="store-button" onClick={()=>onTrack(completedOrder)}>Tra cứu đơn vừa đặt</button>}<button className="store-button" onClick={async()=>{try{await navigator.clipboard.writeText(`Mã đơn: ${completedOrder.id}\nMã tra cứu riêng: ${completedOrder.lookupToken||''}`);setSubmitError('Đã sao chép thông tin tra cứu.');}catch{setSubmitError('Hãy chọn và sao chép mã hiển thị phía trên.');}}}>Sao chép mã tra cứu</button></div>{submitError&&<p role="status" className="text-sm">{submitError}</p>}
               <PaymentStatus order={completedOrder} autoRefresh/>
+              <p className="text-[11px] text-slate-400 text-center">
+                Thông tin đơn hàng và quyền riêng tư của bạn được bảo vệ theo{' '}
+                <button
+                  type="button"
+                  onClick={() => onOpenPrivacy && onOpenPrivacy()}
+                  className="text-amber-300 underline hover:text-amber-200 cursor-pointer"
+                >
+                  Chính sách bảo mật EMORIA
+                </button>
+              </p>
 
               {/* Bank transfer info if selected */}
               {completedOrder.paymentMethod === 'vietqr' && (
@@ -557,6 +567,20 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                   )}
                 </button>
               )}
+
+              <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 text-center pt-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>
+                  Thông tin cá nhân & dữ liệu đơn hàng được bảo mật chuẩn SSL. Xem{' '}
+                  <button
+                    type="button"
+                    onClick={() => onOpenPrivacy && onOpenPrivacy()}
+                    className="text-amber-300 underline hover:text-amber-200 cursor-pointer font-medium"
+                  >
+                    Chính sách bảo mật
+                  </button>
+                </span>
+              </div>
               </fieldset>
             </form>
           )}

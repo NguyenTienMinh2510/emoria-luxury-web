@@ -58,7 +58,7 @@ assert.equal(necklace3D.name,'NecklaceRoot');
 assert.equal(necklace3D.children[0].renderOrder,0); // Chest occluder
 assert.equal(necklace3D.children[1].renderOrder,1); // 3D Pendant
 
-assert.equal(tryOnConfig('emoria-solaris-keyring'),null);assert.equal(tryOnConfig('../../x'),null);assert.equal(tryOnConfig('emoria-lumen-duo').pendant,'/ar/lumen.svg');
+assert.equal(tryOnConfig('emoria-solaris-keyring').type,'ring');assert.equal(tryOnConfig('../../x'),null);assert.equal(tryOnConfig('emoria-lumen-duo').pendant,'/ar/lumen.svg');
 assert.equal(tryOnConfig('emoria-horizon').type,'ring');
 assert.equal(tryOnConfig('emoria-halo').type,'ring');
 assert.equal(tryOnConfig('emoria-faith').type,'necklace');
@@ -66,13 +66,18 @@ assert.equal(tryOnConfig('emoria-celestial-duo').type,'bracelet');
 assert.deepEqual(tryOnConfig('emoria-horizon').previewSizes,[16,17,18,19]);
 assert.equal(tryOnConfig('emoria-pulse').type,'bracelet');
 assert.deepEqual(tryOnConfig('emoria-pulse').previewSizes,[15,16,17,18]);
+// Custom product AR derivation & explicit details.ar
+const customRing=tryOnConfig('custom-ring',{name:'Nhẫn Tình Nhân',details:{category:'Nhẫn'},image_url:'/img/ring.png'});
+assert.equal(customRing.type,'ring');assert.equal(customRing.asset,'/img/ring.png');
+const customExplicit=tryOnConfig('custom-custom',{details:{ar:{type:'ring',defaultSize:18,finger:'index',scale:0.25}}});
+assert.equal(customExplicit.type,'ring');assert.equal(customExplicit.defaultSize,18);assert.equal(customExplicit.finger,'index');
 assert.equal(createHash('sha256').update(fs.readFileSync('public/ar/hand_landmarker.task')).digest('hex'),'fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1');
 assert.equal(createHash('sha256').update(fs.readFileSync('public/ar/pose_landmarker_lite.task')).digest('hex'),'59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a');
 const actualFetch=globalThis.fetch;process.env.SUPABASE_URL='https://ar-test.supabase.co';process.env.SUPABASE_PUBLISHABLE_KEY='fixture';let active=true,requests=0;
-globalThis.fetch=async(url,options)=>{requests++;assert.equal(options.method,'GET');assert.ok(String(url).includes('/checkout_products?select=id%2Cactive'));return Response.json({id:'emoria-lumen',active});};
+globalThis.fetch=async(url,options)=>{requests++;assert.equal(options.method,'GET');assert.ok(String(url).includes('/checkout_products?select='));return Response.json({id:'emoria-lumen',active,name:'EMORIA LUMEN',image_url:'/ar/lumen.svg'});};
 async function get(id,method='GET') {let result;await handler({method,url:'/api/v1/products/'+id+'/try-on',headers:method==='GET'?{}:{'content-type':'application/json'},body:method==='GET'?undefined:{}},{setHeader(){},end(raw){result={status:this.statusCode,data:JSON.parse(raw)};}});return result;}
 try{
- assert.equal((await get('emoria-solaris-keyring')).status,404);assert.equal(requests,0);
+ const solaris=await get('emoria-solaris-keyring');assert.equal(solaris.status,200);assert.equal(solaris.data.type,'ring');
  const r=await get('emoria-lumen');assert.equal(r.status,200);assert.deepEqual(r.data.previewLengths,[40,45,50]);assert.equal(r.data.productId,'emoria-lumen');
  assert.equal((await get('emoria-lumen','POST')).status,405);
  active=false;assert.equal((await get('emoria-lumen')).status,404);

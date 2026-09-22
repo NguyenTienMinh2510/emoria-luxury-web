@@ -28,7 +28,7 @@ import {
   getShowcaseMemoriesList 
 } from '../services/memoryService';
 
-export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToHome, onNavigateToShop, currentUser, onOpenAuth, onSelectTag }) {
+export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToHome, onNavigateToShop, currentUser, onOpenAuth, onSelectTag, onOpenPrivacy }) {
   const {t, tBilingual, language}=useLanguage();
   const {settings}=useStore();
   const [editMedia,setEditMedia]=useState([]);
@@ -578,6 +578,20 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 <span>{t("Mở Khóa Kỷ Niệm","Unlock memory")}</span>
               </button>
             </form>
+
+            {onOpenPrivacy && (
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{t("Bảo mật dữ liệu cá nhân theo", "Data secured under")}</span>
+                <button
+                  type="button"
+                  onClick={onOpenPrivacy}
+                  className="text-amber-300 hover:text-amber-200 underline font-medium cursor-pointer"
+                >
+                  {t("Chính sách Emoria", "Emoria Privacy Policy")}
+                </button>
+              </div>
+            )}
           </motion.div>
         </div>
       ) : memoryData.intro_video_url && !movieDone ? (
@@ -1440,6 +1454,22 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                       </div>
                     )}
                   </div>
+
+                  {onOpenPrivacy && (
+                    <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-3 text-xs text-slate-300">
+                      <span className="flex items-center gap-2 text-[11px]">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>{t("Kỷ vật được bảo vệ theo Chính sách bảo mật phần cứng & mã hóa Emoria.", "Protected under Emoria Hardware Security & Encryption Policy.")}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={onOpenPrivacy}
+                        className="text-amber-300 hover:text-amber-200 underline text-[11px] font-medium cursor-pointer whitespace-nowrap"
+                      >
+                        {t("Xem Chính sách", "Privacy Policy")}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Quản lý sổ lưu niệm */}
                   <details className="p-4 border border-white/10 rounded-xl bg-black/30" open>

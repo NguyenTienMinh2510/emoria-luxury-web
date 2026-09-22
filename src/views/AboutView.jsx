@@ -11,7 +11,8 @@ import { useLanguage } from '../i18n/LanguageProvider';
 export default function AboutView({ 
   onNavigateToShop, 
   onNavigateToMemory, 
-  onOpenNfcDemo 
+  onOpenNfcDemo,
+  onOpenPrivacy,
 }) {
   const { language, t } = useLanguage();
   const isEn = language === 'en';
@@ -37,7 +38,7 @@ export default function AboutView({
             {/* Atelier Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/20 text-xs sm:text-sm text-slate-200 font-sans uppercase tracking-[0.25em] mb-6 shadow-silver-glow">
               <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-              <span>EMORIA ATELIER · NGHỆ THUẬT &amp; CÔNG NGHỆ KỶ NIỆM</span>
+              <span>EMORIA · TRANG SỨC BẠC CÔNG NGHỆ S925 (EMORIA.VN)</span>
             </div>
 
             {/* Main Headline */}
@@ -410,6 +411,96 @@ export default function AboutView({
           </div>
         </section>
 
+        {/* 8. CHÍNH SÁCH BẢO MẬT PHẦN CỨNG & QUYỀN RIÊNG TƯ KỶ NIỆM (BA PRIVACY POLICY) */}
+        <section className="space-y-10">
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/15 text-xs text-emerald-400 font-sans tracking-[0.2em] uppercase shadow-silver-glow">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>TIÊU CHUẨN AN TOÀN · BẢO MẬT DỮ LIỆU CÔNG NGHỆ EMORIA</span>
+            </div>
+            <h3 className="font-serif text-2xl sm:text-4xl font-normal text-white">
+              Chính Sách Bảo Mật Không Gian Kỷ Niệm (Memory Space)
+            </h3>
+            <p className="text-sm text-slate-300 font-light leading-relaxed">
+              Những kỷ niệm và tâm tư được lưu giữ trên trang sức EMORIA là tài sản tinh thần vô giá. Chúng tôi tuân thủ nghiêm ngặt 4 nguyên tắc bảo vệ dữ liệu theo tiêu chuẩn quốc tế:
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 sm:p-8 rounded-3xl glass-panel border border-white/15 bg-white/[0.02] space-y-4 hover:border-emerald-400/30 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Cpu className="w-6 h-6 text-amber-300" />
+              </div>
+              <h4 className="font-serif text-lg font-bold text-white">
+                1. Chip NFC Là "Chìa Khóa Vật Lý" (Physical Key)
+              </h4>
+              <p className="text-xs sm:text-sm text-slate-300 font-light leading-relaxed">
+                Chip NTAG21 trên trang sức chỉ đóng vai trò là "chìa khóa vật lý" dẫn đến liên kết bảo mật. <strong>Tuyệt đối không lưu trữ trực tiếp hình ảnh, video hay thông tin cá nhân trên phần cứng kim loại</strong>, hạn chế tối đa nguy cơ rò rỉ dữ liệu khi người dùng bị thất lạc trang sức.
+              </p>
+            </div>
+
+            <div className="p-6 sm:p-8 rounded-3xl glass-panel border border-white/15 bg-white/[0.02] space-y-4 hover:border-emerald-400/30 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <Lock className="w-6 h-6 text-amber-300" />
+              </div>
+              <h4 className="font-serif text-lg font-bold text-white">
+                2. Quyền Thiết Lập Mã PIN Kỷ Niệm (Private Access)
+              </h4>
+              <p className="text-xs sm:text-sm text-slate-300 font-light leading-relaxed">
+                Người sở hữu có toàn quyền thiết lập mật mã (PIN code 4-6 số) kèm câu đố gợi ý tinh tế cho trang Memory Space. Khi chạm NFC, người nhận bắt buộc phải nhập đúng mã xác nhận mới có thể giải mã và xem toàn bộ bức thư tay cùng thước phim kỷ niệm.
+              </p>
+            </div>
+
+            <div className="p-6 sm:p-8 rounded-3xl glass-panel border border-white/15 bg-white/[0.02] space-y-4 hover:border-emerald-400/30 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <ShieldCheck className="w-6 h-6 text-emerald-400" />
+              </div>
+              <h4 className="font-serif text-lg font-bold text-white">
+                3. Mã Hóa Đường Truyền Chuẩn SSL/TLS 256-bit
+              </h4>
+              <p className="text-xs sm:text-sm text-slate-300 font-light leading-relaxed">
+                Mọi dữ liệu media (ảnh, video, bản ghi âm, văn bản thư tay) khi tải lên hệ thống lưu trữ đám mây của EMORIA đều được mã hóa bằng giao thức SSL/TLS chuẩn an ninh ngân hàng, đảm bảo tính bảo mật và toàn vẹn dữ liệu từ thiết bị đến máy chủ.
+              </p>
+            </div>
+
+            <div className="p-6 sm:p-8 rounded-3xl glass-panel border border-white/15 bg-white/[0.02] space-y-4 hover:border-emerald-400/30 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
+                <HeartHandshake className="w-6 h-6 text-emerald-400" />
+              </div>
+              <h4 className="font-serif text-lg font-bold text-white">
+                4. Cam Kết Không Bán Dữ Liệu &amp; Quyền Được Xóa
+              </h4>
+              <p className="text-xs sm:text-sm text-slate-300 font-light leading-relaxed">
+                EMORIA cam kết <strong>tuyệt đối không chia sẻ, bán hoặc chuyển giao</strong> thông tin cá nhân của Quý khách cho bên thứ ba vì mục đích thương mại. Quý khách có toàn quyền yêu cầu chỉnh sửa, ẩn hoặc xóa vĩnh viễn dữ liệu Memory Space của mình bất cứ lúc nào.
+              </p>
+            </div>
+          </div>
+
+          {/* Privacy Callout & Direct Trigger */}
+          <div className="p-6 sm:p-8 rounded-3xl glass-panel border border-white/20 bg-gradient-to-r from-emerald-500/10 via-amber-500/5 to-transparent flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+            <div className="space-y-1 text-center sm:text-left">
+              <p className="font-serif text-base sm:text-lg font-bold text-white flex items-center justify-center sm:justify-start gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <span>Minh Bạch &amp; Bảo Vệ Quyền Riêng Tư Của Bạn</span>
+              </p>
+              <p className="text-xs text-slate-300 font-light">
+                Chính sách bảo mật thông tin có hiệu lực chính thức trên website <strong>emoria.vn</strong> và qua email hỗ trợ <strong>emoria.jewelry@gmail.com</strong>.
+              </p>
+            </div>
+
+            {onOpenPrivacy && (
+              <button
+                type="button"
+                onClick={onOpenPrivacy}
+                className="cta-luxury-gold !py-2.5 !px-5 !text-xs !tracking-wider flex items-center gap-2 shrink-0 cursor-pointer whitespace-nowrap shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+              >
+                <span>Xem Toàn Văn Chính Sách</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </section>
+
         {/* 8. BOUTIQUE SHOWROOMS & GOOGLE MAPS LOCATION */}
         <section id="boutique-contact" className="space-y-12">
           {/* Section Header */}
@@ -559,6 +650,31 @@ export default function AboutView({
                   </a>
                 </div>
               </motion.div>
+
+              {/* Brand Central HQ / Customer Support Card */}
+              <div className="p-5 rounded-3xl glass-panel border border-white/10 bg-white/[0.02] text-xs text-slate-300 space-y-2.5">
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <span className="font-bold text-white uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Kênh Hỗ Trợ &amp; Tiếp Nhận Toàn Quốc</span>
+                  </span>
+                  <span className="text-amber-300 font-mono text-[10px] font-semibold">EMORIA.VN</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Email chính thức:</span>
+                    <a href="mailto:emoria.jewelry@gmail.com" className="text-white hover:text-amber-300 font-medium underline mt-0.5 inline-block">
+                      emoria.jewelry@gmail.com
+                    </a>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Tổng đài hỗ trợ 24/7:</span>
+                    <a href="tel:19006868" className="text-white hover:text-amber-300 font-medium mt-0.5 inline-block">
+                      1900 6868 · 0988 123 456
+                    </a>
+                  </div>
+                </div>
+              </div>
 
             </div>
 

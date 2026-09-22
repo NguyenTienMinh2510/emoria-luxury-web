@@ -2,7 +2,7 @@ import React from 'react';
 import { Shield, Sparkles, SmartphoneNfc, Heart } from 'lucide-react';
 import { useLanguage, BilingualText } from '../i18n/LanguageProvider';
 
-export default function Footer({ onSelectView }) {
+export default function Footer({ onSelectView, onOpenPrivacy }) {
   const { t, tBilingual } = useLanguage();
 
   return (
@@ -61,6 +61,14 @@ export default function Footer({ onSelectView }) {
             >
               {t('Về Chúng Tôi', 'About Us')}
             </button>
+            <button
+              type="button"
+              onClick={() => onOpenPrivacy && onOpenPrivacy()}
+              className="hover:text-amber-300 font-medium transition-colors cursor-pointer flex items-center gap-1.5 text-slate-300"
+            >
+              <Shield className="w-3.5 h-3.5 text-amber-400" />
+              <span>{t('Chính Sách Bảo Mật', 'Privacy Policy')}</span>
+            </button>
           </div>
 
           {/* Guarantees */}
@@ -78,7 +86,16 @@ export default function Footer({ onSelectView }) {
 
         {/* Copyright */}
         <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2">
-          <p>© 2026 EMORIA VIETNAM. All rights reserved.</p>
+          <p>
+            © 2026 EMORIA VIETNAM. All rights reserved. ·{' '}
+            <button
+              type="button"
+              onClick={() => onOpenPrivacy && onOpenPrivacy()}
+              className="text-slate-400 hover:text-amber-300 underline transition-colors cursor-pointer"
+            >
+              {t('Chính sách bảo mật dữ liệu', 'Data Privacy Policy')}
+            </button>
+          </p>
           <p>Designed with Dark Luxury &amp; NFC Smart Sentimental Architecture</p>
         </div>
       </div>

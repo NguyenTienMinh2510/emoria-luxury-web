@@ -25,6 +25,7 @@ import CartDrawer from './components/CartDrawer';
 import AuthModal from './components/AuthModal';
 import CheckoutModal from './components/CheckoutModal';
 import AdminView from './views/AdminView';
+import PrivacyPolicyModal from './components/PrivacyPolicyModal';
 import { 
   SmartphoneNfc, Shield, User, Key, Lock, Unlock, 
   Sparkles, CheckCircle2, ChevronUp, ChevronDown, Power, ArrowRight
@@ -82,6 +83,7 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [nfcModalState, setNfcModalState] = useState({ isOpen: false, productId: 'emoria-pulse' });
@@ -147,6 +149,11 @@ export default function App() {
       const payment=q.get('payment');
       const orderId=q.get('orderId');
       const token=q.get('token');
+      const policy=q.get('policy');
+      const privacy=q.get('privacy');
+      if (policy === 'privacy' || privacy === 'true' || window.location.hash === '#privacy') {
+        setIsPrivacyOpen(true);
+      }
       if (payment && orderId) {
         if (payment === 'success') {
           setCartItems([]);
@@ -160,8 +167,18 @@ export default function App() {
       else {setCurrentView(['home','shop','memory','articles','about','admin'].includes(q.get('view')) ? q.get('view') : 'home');if(q.get('view')==='memory')setCurrentTag('');}
       setRouteReady(true);
     };
-    readRoute();window.addEventListener('popstate',readRoute);
-    return ()=>window.removeEventListener('popstate',readRoute);
+    const handleHashChange = () => {
+      if (window.location.hash === '#privacy') {
+        setIsPrivacyOpen(true);
+      }
+    };
+    readRoute();
+    window.addEventListener('popstate',readRoute);
+    window.addEventListener('hashchange',handleHashChange);
+    return ()=>{
+      window.removeEventListener('popstate',readRoute);
+      window.removeEventListener('hashchange',handleHashChange);
+    };
   },[]);
   useEffect(()=>{
     if(!routeReady)return;
@@ -441,6 +458,7 @@ export default function App() {
             onOpenAuth={()=>setIsAuthOpen(true)}
             onSelectTag={setCurrentTag}
             initialTag={currentTag}
+            onOpenPrivacy={() => setIsPrivacyOpen(true)}
             onNavigateToHome={() => {
               setCurrentView('home');
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -495,6 +513,7 @@ export default function App() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onOpenNfcDemo={handleOpenNfcDemo}
+            onOpenPrivacy={() => setIsPrivacyOpen(true)}
           />
         )}
 
@@ -523,6 +542,7 @@ export default function App() {
             setCurrentView(view);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
+          onOpenPrivacy={() => setIsPrivacyOpen(true)}
         />
       )}
 
@@ -597,6 +617,18 @@ export default function App() {
                     Đăng xuất khỏi thiết bị
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPrivacyOpen(true);
+                    setIsSessionInfoOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 rounded-xl hover:bg-white/10 text-slate-300 font-medium transition-all cursor-pointer text-[11px] flex items-center gap-1.5"
+                >
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Chính sách bảo mật Emoria</span>
+                </button>
               </div>
 
               <div className="pt-2 border-t border-white/10 text-[10px] text-slate-500 leading-tight">
@@ -676,6 +708,7 @@ export default function App() {
         onOrderComplete={handleClearCart}
         onTrack={order=>{setTrackingRequest({id:order.id,token:order.lookupToken});setIsCheckoutOpen(false);setIsCartOpen(false);setCurrentView("shop");window.scrollTo({top:0});}}
         onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenPrivacy={() => setIsPrivacyOpen(true)}
       />}
 
       {/* Auth Modal */}
@@ -689,6 +722,12 @@ export default function App() {
           setCurrentView('memory');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
+      />
+
+      {/* Privacy Policy Modal (Bảo Mật Emoria) */}
+      <PrivacyPolicyModal
+        isOpen={isPrivacyOpen}
+        onClose={() => setIsPrivacyOpen(false)}
       />
 
     </div>
