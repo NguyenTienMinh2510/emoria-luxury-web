@@ -75,7 +75,11 @@ try{
   assert.equal(calls.at(-1).body.p_grant_token,'private-grant');assert.ok(!calls.at(-1).url.includes('private-grant'));
   dbError={code:'42501',message:'permission denied'};
   assert.equal((await request('PATCH','/api/v1/memories/fixture',{letter:'private'},'customer-token')).status,403);
-  const aiLetter=await request('POST','/api/v1/ai/craft-letter',{occasion:'anniversary',tone:'romantic',recipient:'Taylor',author:'Alex'},'customer-token');
+  dbError=null;dbResult=true;
+  if(process.env.GEMINI_API_KEY){
+    assert.equal((await request('POST','/api/v1/ai/craft-letter',{occasion:'anniversary',tone:'romantic',recipient:'Taylor',author:'Alex'},'customer-token')).status,400);
+  }
+  const aiLetter=await request('POST','/api/v1/ai/craft-letter',{occasion:'anniversary',tone:'romantic',recipient:'Taylor',author:'Alex',consent:true},'customer-token');
   assert.equal(aiLetter.status,200);
   assert.ok(aiLetter.body?.letter?.includes('Taylor')&&aiLetter.body?.letter?.includes('Alex'));
   assert.equal(r.headers['Cache-Control'],'no-store');
