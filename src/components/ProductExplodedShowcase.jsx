@@ -199,8 +199,39 @@ export default function ProductExplodedShowcase({
   // HARD SCROLL-LOCK MECHANISM WITH DWELL / RESISTANCE BUFFER:
   // Khóa cứng trang trong suốt 120 frames và GIỮ TRANG ở frame cuối để ngắm trọn vẹn,
   // chỉ khi người dùng cuộn tiếp một cách dứt khoát / mạnh mẽ mới cho trượt xuống tiếp
+  // HARD SCROLL-LOCK MECHANISM WITH DWELL / RESISTANCE BUFFER:
+  // Khóa cứng trang trong suốt 120 frames và GIỮ TRANG ở frame cuối để ngắm trọn vẹn,
+  // chỉ khi người dùng cuộn tiếp một cách dứt khoát / mạnh mẽ mới cho trượt xuống tiếp
   useEffect(() => {
+    // Utility check: Tuyệt đối không chặn cuộn nếu có modal/dialog mở hoặc người dùng thao tác ở phần tử khác
+    const isEventBlocked = (e) => {
+      // 1. Có bất kỳ modal nào đang mở hoặc body bị khóa cuộn
+      if (
+        document.body.style.overflow === 'hidden' ||
+        document.body.classList.contains('modal-open') ||
+        document.querySelector('[role="dialog"], [data-modal], .modal-container')
+      ) {
+        return true;
+      }
+
+      // 2. Phần tử mục tiêu nằm trong modal, drawer, nav, header hoặc bất kỳ container scroll nào
+      if (e.target && typeof e.target.closest === 'function') {
+        if (e.target.closest('[role="dialog"], [data-modal], header, nav, [data-no-scroll-lock], .overflow-y-auto, .overflow-y-scroll, .overflow-auto')) {
+          return true;
+        }
+      }
+
+      // 3. Phần tử mục tiêu nằm bên ngoài vùng showcase container
+      if (containerRef.current && e.target && !containerRef.current.contains(e.target)) {
+        return true;
+      }
+
+      return false;
+    };
+
     const handleWheel = (e) => {
+      if (isEventBlocked(e)) return;
+
       const atTop = window.scrollY <= 15;
       if (!atTop) return;
 
@@ -265,12 +296,16 @@ export default function ProductExplodedShowcase({
 
     // Touch support for mobile devices
     const handleTouchStart = (e) => {
+      if (isEventBlocked(e)) return;
+
       if (e.touches && e.touches[0]) {
         touchStartYRef.current = e.touches[0].clientY;
       }
     };
 
     const handleTouchMove = (e) => {
+      if (isEventBlocked(e)) return;
+
       const atTop = window.scrollY <= 15;
       if (!atTop) return;
       if (!e.touches || !e.touches[0]) return;

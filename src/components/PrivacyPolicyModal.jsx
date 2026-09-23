@@ -1,14 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShieldCheck, Lock, SmartphoneNfc, Check, Share2, Mail, Phone, MapPin, EyeOff } from 'lucide-react';
+import { X, ShieldCheck, Lock, SmartphoneNfc, Check, Share2, Mail, Phone, MapPin, EyeOff, ArrowUp } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 export default function PrivacyPolicyModal({ isOpen, onClose }) {
   const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const modalOverlayRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
-  // Prevent background scrolling and support Escape key
+  const handleScroll = (e) => {
+    if (e.target.scrollTop > 250) {
+      setShowScrollTop(true);
+    } else {
+      setShowScrollTop(false);
+    }
+  };
+
+  const scrollToTop = () => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Prevent background scrolling, support Escape key, and isolate scroll events
   useEffect(() => {
     if (!isOpen) return;
     const originalOverflow = document.body.style.overflow;
@@ -21,9 +35,26 @@ export default function PrivacyPolicyModal({ isOpen, onClose }) {
     };
     window.addEventListener('keydown', handleKeyDown);
 
+    // Isolate modal touch and wheel events so background listeners never intercept them
+    const overlay = modalOverlayRef.current;
+    const stopScrollBubble = (e) => {
+      e.stopPropagation();
+    };
+
+    if (overlay) {
+      overlay.addEventListener('wheel', stopScrollBubble, { passive: true });
+      overlay.addEventListener('touchmove', stopScrollBubble, { passive: true });
+      overlay.addEventListener('touchstart', stopScrollBubble, { passive: true });
+    }
+
     return () => {
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
+      if (overlay) {
+        overlay.removeEventListener('wheel', stopScrollBubble);
+        overlay.removeEventListener('touchmove', stopScrollBubble);
+        overlay.removeEventListener('touchstart', stopScrollBubble);
+      }
     };
   }, [isOpen]);
 
@@ -53,11 +84,15 @@ export default function PrivacyPolicyModal({ isOpen, onClose }) {
 
   return (
     <div
+      ref={modalOverlayRef}
       role="dialog"
+      data-modal="privacy-policy"
       aria-modal="true"
       aria-labelledby="privacy-policy-title"
       className="fixed inset-0 z-[120] flex items-center justify-center p-2.5 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md overflow-hidden"
       onClick={handleClose}
+      onWheel={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -126,10 +161,13 @@ export default function PrivacyPolicyModal({ isOpen, onClose }) {
         {/* Scrollable Content Body - Guaranteed Scroll on Mobile and Desktop */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-7 space-y-6 text-xs sm:text-sm leading-relaxed text-slate-300 pr-3 sm:pr-5 select-text"
+          data-no-scroll-lock="true"
+          onScroll={handleScroll}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-7 space-y-6 text-xs sm:text-sm leading-relaxed text-slate-300 pr-3 sm:pr-5 select-text touch-pan-y"
           style={{
             WebkitOverflowScrolling: 'touch',
             touchAction: 'pan-y',
+            overscrollBehavior: 'contain',
             scrollbarWidth: 'thin',
             scrollbarColor: 'rgba(255, 255, 255, 0.25) transparent'
           }}
@@ -286,6 +324,24 @@ export default function PrivacyPolicyModal({ isOpen, onClose }) {
             </div>
           </section>
         </div>
+
+        {/* Floating Scroll-to-Top Button */}
+        <AnimatePresence>
+          {showScrollTop && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 10 }}
+              type="button"
+              onClick={scrollToTop}
+              title={t('Lên đầu trang', 'Scroll to top')}
+              className="absolute bottom-16 right-4 sm:bottom-20 sm:right-7 z-30 p-2.5 rounded-full bg-dark-950/95 border border-amber-400/40 text-amber-300 shadow-[0_4px_20px_rgba(0,0,0,0.7)] hover:bg-amber-400/20 hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 text-xs backdrop-blur-md"
+            >
+              <ArrowUp className="w-4 h-4" />
+              <span className="hidden sm:inline text-[11px] font-medium">{t('Đầu trang', 'Top')}</span>
+            </motion.button>
+          )}
+        </AnimatePresence>
 
         {/* Footer Actions */}
         <div className="p-3.5 sm:p-5 border-t border-white/10 flex flex-wrap items-center justify-between bg-dark-950/90 gap-3 shrink-0">
