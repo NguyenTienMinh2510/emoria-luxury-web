@@ -133,19 +133,21 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
         <button onClick={onClose} aria-label={t('Đóng gương AR','Close AR mirror')} className="min-w-11 min-h-11 grid place-items-center rounded-full hover:bg-white/10"><X/></button>
       </header>
       <div className="grid md:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="relative bg-black min-h-72 flex justify-center overflow-hidden rounded-2xl m-3">
-          <video ref={video} playsInline muted autoPlay aria-hidden="true" className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"/>
-          <canvas ref={canvas} aria-label={t('Gương AR trực tiếp','Live AR mirror')} className={`relative w-full h-auto object-contain max-h-[58dvh] md:max-h-[72dvh] ${active?'':'invisible'}`}/>
-          {active && (
-            <ARFramingGuide
-              type={config?.type || 'necklace'}
-              status={status}
-              selectedFinger={selectedFinger}
-              showGuide={showGuide}
-              onToggleGuide={() => setShowGuide(prev => !prev)}
-              t={t}
-            />
-          )}
+        <div className="relative bg-black min-h-72 flex items-center justify-center overflow-hidden rounded-2xl m-3">
+          <div className="relative inline-flex items-center justify-center max-w-full max-h-[58dvh] md:max-h-[72dvh]">
+            <video ref={video} playsInline muted autoPlay aria-hidden="true" className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"/>
+            <canvas ref={canvas} aria-label={t('Gương AR trực tiếp','Live AR mirror')} className={`w-auto h-auto max-w-full max-h-[58dvh] md:max-h-[72dvh] object-contain rounded-xl block ${active?'':'invisible'}`}/>
+            {active && (
+              <ARFramingGuide
+                type={config?.type || 'necklace'}
+                status={status}
+                selectedFinger={selectedFinger}
+                showGuide={showGuide}
+                onToggleGuide={() => setShowGuide(prev => !prev)}
+                t={t}
+              />
+            )}
+          </div>
           {!active&&<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-gradient-to-b from-slate-900 to-black text-center">
             <img src={previewIcon} alt="" className="w-20 h-24 object-contain drop-shadow-md"/>
             <p className="font-serif text-2xl">{labels[status]}</p>
@@ -153,7 +155,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
               {isHand?(config?.type==='bracelet'?t('Giơ cổ tay hướng về camera ở nơi đủ sáng.','Show your wrist facing the camera in good lighting.'):t('Giơ mu bàn tay về phía camera, xòe nhẹ các ngón tay ở nơi đủ sáng.','Show the back of your hand to the camera with fingers spread slightly.')):t('Để camera thấy khuôn mặt và cả hai vai. Thử ở nơi đủ sáng, với nền đơn giản.','Show your face and both shoulders. Use good lighting and a simple background.')}
             </p>
           </div>}
-          {active&&<div className="absolute left-3 right-3 bottom-3 rounded-xl px-3 py-1.5 bg-black/80 text-xs text-center border border-white/10 shadow-lg z-20 backdrop-blur-sm" role="status">{labels[status]}</div>}
+          {active&&<div className="absolute left-3 right-3 bottom-3 rounded-xl px-3 py-1.5 bg-black/80 text-xs text-center border border-white/10 shadow-lg z-20 backdrop-blur-sm pointer-events-none" role="status">{labels[status]}</div>}
         </div>
         <div className="p-5 space-y-4">
           <p className="flex gap-2 text-xs text-slate-300"><ShieldCheck className="w-5 shrink-0 text-emerald-300"/>{t('Hình camera chỉ xử lý trên thiết bị, không tải lên máy chủ. Camera tắt khi đóng gương hoặc rời trang.','Camera images stay on your device. Camera stops when you close the mirror or leave the page.')}</p>
