@@ -6,6 +6,7 @@ import {apiRequest} from '../services/apiClient.js';
 import {NecklaceTracker} from '../services/arNecklaceTracker.js';
 import {HandTracker} from '../services/arHandTracker.js';
 import {tryOnConfig} from '../services/tryOnConfig.js';
+import ARFramingGuide from './ARFramingGuide.jsx';
 
 export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,initialSize}){
   const {t}=useLanguage(),video=useRef(),canvas=useRef(),engine=useRef(),dialog=useRef(),alive=useRef(true),close=useRef(onClose);
@@ -13,6 +14,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
   const [config,setConfig]=useState(null),[status,setStatus]=useState('intro'),[error,setError]=useState(''),[loadError,setLoadError]=useState(false),[retry,setRetry]=useState(0);
   const [length,setLength]=useState(45),[scale,setScale]=useState(1),[offset,setOffset]=useState(0),[manual,setManual]=useState(false),[added,setAdded]=useState(false),[photo,setPhoto]=useState(null);
   const [trySize,setTrySize]=useState(17),[selectedFinger,setSelectedFinger]=useState('ring');
+  const [showGuide,setShowGuide]=useState(true);
   const [size,setSize]=useState(initialSize||product.variants?.find(v=>v.stock>0)?.size||'');
   const variant=product.variants?.find(v=>v.size===size),canBuy=!!onAddToCart&&settings?.sales_enabled&&product.active&&variant?.stock>0;
   const active=['tracking','searching','loading-model','manual','manual-fallback'].includes(status);
@@ -134,6 +136,16 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
         <div className="relative bg-black min-h-72 flex justify-center overflow-hidden rounded-2xl m-3">
           <video ref={video} playsInline muted autoPlay aria-hidden="true" className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"/>
           <canvas ref={canvas} aria-label={t('Gương AR trực tiếp','Live AR mirror')} className={`relative w-full h-auto object-contain max-h-[58dvh] md:max-h-[72dvh] ${active?'':'invisible'}`}/>
+          {active && (
+            <ARFramingGuide
+              type={config?.type || 'necklace'}
+              status={status}
+              selectedFinger={selectedFinger}
+              showGuide={showGuide}
+              onToggleGuide={() => setShowGuide(prev => !prev)}
+              t={t}
+            />
+          )}
           {!active&&<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-gradient-to-b from-slate-900 to-black text-center">
             <img src={previewIcon} alt="" className="w-20 h-24 object-contain drop-shadow-md"/>
             <p className="font-serif text-2xl">{labels[status]}</p>
@@ -141,7 +153,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
               {isHand?(config?.type==='bracelet'?t('Giơ cổ tay hướng về camera ở nơi đủ sáng.','Show your wrist facing the camera in good lighting.'):t('Giơ mu bàn tay về phía camera, xòe nhẹ các ngón tay ở nơi đủ sáng.','Show the back of your hand to the camera with fingers spread slightly.')):t('Để camera thấy khuôn mặt và cả hai vai. Thử ở nơi đủ sáng, với nền đơn giản.','Show your face and both shoulders. Use good lighting and a simple background.')}
             </p>
           </div>}
-          {active&&<div className="absolute left-3 right-3 bottom-3 rounded-xl px-3 py-2 bg-black/75 text-xs text-center border border-white/10 shadow-lg" role="status">{labels[status]}</div>}
+          {active&&<div className="absolute left-3 right-3 bottom-3 rounded-xl px-3 py-1.5 bg-black/80 text-xs text-center border border-white/10 shadow-lg z-20 backdrop-blur-sm" role="status">{labels[status]}</div>}
         </div>
         <div className="p-5 space-y-4">
           <p className="flex gap-2 text-xs text-slate-300"><ShieldCheck className="w-5 shrink-0 text-emerald-300"/>{t('Hình camera chỉ xử lý trên thiết bị, không tải lên máy chủ. Camera tắt khi đóng gương hoặc rời trang.','Camera images stay on your device. Camera stops when you close the mirror or leave the page.')}</p>
@@ -177,7 +189,16 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
 
             <label className="block text-sm">{config?.type==='ring'?t('Độ to của nhẫn','Ring scale'):config?.type==='bracelet'?t('Độ to của vòng','Bracelet scale'):t('Kích thước mặt dây','Pendant scale')}<input aria-label="Scale slider" className="w-full h-11 accent-slate-200" type="range" min="0.65" max="1.6" step="0.05" value={scale} onChange={e=>setScale(Number(e.target.value))}/></label>
             <label className="block text-sm">{t('Vị trí cao / thấp','Vertical placement')}<input aria-label="Vertical placement" className="w-full h-11 accent-slate-200" type="range" min="-0.3" max="0.3" step="0.01" value={offset} onChange={e=>setOffset(Number(e.target.value))}/></label>
-            <div className="flex items-center justify-between gap-2"><label className="text-xs flex items-center gap-2 min-h-11 cursor-pointer"><input type="checkbox" checked={manual} disabled={!engine.current?.workerReady} onChange={e=>{setManual(e.target.checked);engine.current.setManual(e.target.checked);}}/>{t('Căn chỉnh thủ công','Manual placement')}</label><button aria-label={t('Đặt lại vị trí','Reset placement')} className="min-h-11 min-w-11 grid place-items-center rounded-lg hover:bg-white/10" onClick={()=>{setLength(45);setTrySize(config?.defaultSize||17);setScale(1);setOffset(0);}}><RotateCcw size={17}/></button></div>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs flex items-center gap-2 min-h-11 cursor-pointer"><input type="checkbox" checked={manual} disabled={!engine.current?.workerReady} onChange={e=>{setManual(e.target.checked);engine.current.setManual(e.target.checked);}}/>{t('Căn chỉnh thủ công','Manual placement')}</label>
+              <button aria-label={t('Đặt lại vị trí','Reset placement')} className="min-h-11 min-w-11 grid place-items-center rounded-lg hover:bg-white/10" onClick={()=>{setLength(45);setTrySize(config?.defaultSize||17);setScale(1);setOffset(0);}}><RotateCcw size={17}/></button>
+            </div>
+            <div className="flex items-center justify-between pt-1 border-t border-white/5">
+              <label className="text-xs flex items-center gap-2 cursor-pointer text-slate-300">
+                <input type="checkbox" checked={showGuide} onChange={e=>setShowGuide(e.target.checked)} className="rounded accent-amber-300"/>
+                {t('Hiện khung gợi ý căn chỉnh AR','Show AR framing guide')}
+              </label>
+            </div>
             <button disabled={!['tracking','manual','manual-fallback'].includes(status)} onClick={capture} className="w-full min-h-11 rounded-xl border border-white/25 flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-white/10 transition-colors"><Camera size={17}/>{t('Chụp ảnh gương','Capture mirror')}</button>
           </>}
           <p className="text-[11px] text-slate-400">{t('Mô phỏng thử trang sức để tham khảo phong cách, không đo kích thước thật. Che khuất theo tóc/quần áo chưa được mô phỏng. Kích cỡ thử không thay đổi phiên bản trong giỏ hàng.','A jewelry style preview, not a size measurement. Hair and clothing occlusion are not simulated. Preview size does not change the cart variant.')}{product.unitsPerItem===2?' '+t('Combo hiển thị một chiếc để thử.','The duo set previews one item.'):''}</p>

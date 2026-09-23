@@ -20,7 +20,29 @@ export function prepareModel(asset,type){
   asset.scale.setScalar(1000);asset.updateMatrixWorld(true);
   const bounds=new THREE.Box3().setFromObject(asset),size=bounds.getSize(new THREE.Vector3());
   if(!Number.isFinite(size.length())||size.length()<1||size.length()>2000)throw Error('Invalid model dimensions');
-  asset.traverse(o=>{if(o.isMesh)o.renderOrder=1;});
+  asset.traverse(o=>{
+    if(o.isMesh){
+      o.renderOrder=1;
+      if(o.material){
+        for(const m of [o.material].flat()){
+          if(m&&(m.isMeshStandardMaterial||m.isMeshPhysicalMaterial)){
+            if(m.metalness>0.2||!m.map){
+              m.metalness=Math.max(m.metalness,0.96);
+              m.roughness=clamp(m.roughness,0.12,0.22);
+              m.envMapIntensity=1.85;
+            }else{
+              m.envMapIntensity=1.4;
+            }
+            if('clearcoat' in m&&m.clearcoat===0){
+              m.clearcoat=0.6;
+              m.clearcoatRoughness=0.1;
+            }
+            m.needsUpdate=true;
+          }
+        }
+      }
+    }
+  });
   if(type==='bracelet')asset.position.z=19;
   root.add(asset);
   if(type==='ring'||type==='bracelet'){
@@ -43,14 +65,17 @@ export class AR3DScene{
     this.camera.position.z=2000;
     if(typeof document!=='undefined'){
       this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'default'});
-      this.renderer.setPixelRatio(1);this.renderer.setSize(width,height);this.domElement=this.renderer.domElement;
-      this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.1;
+      const pr=typeof window!=='undefined'&&window.devicePixelRatio?Math.min(window.devicePixelRatio,2):1;
+      this.renderer.setPixelRatio(pr);this.renderer.setSize(width,height);this.domElement=this.renderer.domElement;
+      this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;
       const pmrem=new THREE.PMREMGenerator(this.renderer),room=new RoomEnvironment();
       this.environment=pmrem.fromScene(room,.04);this.scene.environment=this.environment.texture;
       room.dispose();pmrem.dispose();
     }
-    const key=new THREE.DirectionalLight(0xffffff,2);key.position.set(-200,350,500);this.scene.add(key);
-    const fill=new THREE.DirectionalLight(0xdce8ff,.7);fill.position.set(250,-100,300);this.scene.add(fill);
+    const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(-200,350,500);this.scene.add(key);
+    const fill=new THREE.DirectionalLight(0xdce8ff,.85);fill.position.set(250,-100,300);this.scene.add(fill);
+    const skinBounce=new THREE.DirectionalLight(0xffdfd0,.9);skinBounce.position.set(0,-350,250);this.scene.add(skinBounce);
+    const rimSparkle=new THREE.DirectionalLight(0xffffff,1.2);rimSparkle.position.set(50,450,350);this.scene.add(rimSparkle);
   }
   async setModel(productId,type,options={}){
     this.options={...this.options,...options};
@@ -70,7 +95,7 @@ export class AR3DScene{
   setOptions(options){Object.assign(this.options,options);}
   updateChain(pose){
     if(!this.chain){
-      this.chain=new THREE.InstancedMesh(new THREE.TorusGeometry(.7,.13,6,12),new THREE.MeshStandardMaterial({color:0xc9d0da,metalness:1,roughness:.23}),160);
+      this.chain=new THREE.InstancedMesh(new THREE.TorusGeometry(.7,.13,6,12),new THREE.MeshStandardMaterial({color:0xdde4ed,metalness:0.98,roughness:.15,envMapIntensity:1.85}),160);
       this.chain.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.chain.frustumCulled=false;this.scene.add(this.chain);
     }
     // Link positions change only with chain length; body motion transforms one mesh.
