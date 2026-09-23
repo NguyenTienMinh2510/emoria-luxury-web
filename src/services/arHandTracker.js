@@ -108,24 +108,24 @@ export class HandTracker {
               angle: this.config.type==='ring'?-Math.PI/2:0,
               type: this.config.type
             }
-          : now - this.lastSeen < 350
+          : now - this.lastSeen < 650
           ? this.pose
           : null;
 
         if (pose && this.scene3d && this.scene3d.renderer) {
           this.scene3d.updatePose3D(pose, this.config.type);
           this.scene3d.render();
-          this.ctx.drawImage(this.scene3d.domElement, 0, 0);
+          this.ctx.drawImage(this.scene3d.domElement, 0, 0, width, height);
         } else if (pose) {
           if (this.config.type === 'ring') {
             drawRing(this.ctx, pose, null, {
               ...this.options,
-              ringScale: this.config.scale || 0.22
+              ringScale: this.config.scale || 0.28
             });
           } else {
             drawBracelet(this.ctx, pose, null, {
               ...this.options,
-              braceletScale: this.config.scale || 0.35
+              braceletScale: this.config.scale || 0.40
             });
           }
         }
@@ -134,7 +134,7 @@ export class HandTracker {
 
         if (!this.manual && this.workerReady) {
           this.state(pose ? 'tracking' : 'searching');
-          if (!this.busy && this.video.currentTime !== this.lastFrame && now - this.lastRequest >= 83) {
+          if (!this.busy && this.video.currentTime !== this.lastFrame && now - this.lastRequest >= 48) {
             this.lastRequest = now;
             this.lastFrame = this.video.currentTime;
             this.busy = true;

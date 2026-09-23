@@ -65,8 +65,7 @@ export class AR3DScene{
     this.camera.position.z=2000;
     if(typeof document!=='undefined'){
       this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'default'});
-      const pr=typeof window!=='undefined'&&window.devicePixelRatio?Math.min(window.devicePixelRatio,2):1;
-      this.renderer.setPixelRatio(pr);this.renderer.setSize(width,height);this.domElement=this.renderer.domElement;
+      this.renderer.setPixelRatio(1);this.renderer.setSize(width,height);this.domElement=this.renderer.domElement;
       this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;
       const pmrem=new THREE.PMREMGenerator(this.renderer),room=new RoomEnvironment();
       this.environment=pmrem.fromScene(room,.04);this.scene.environment=this.environment.texture;
@@ -102,11 +101,11 @@ export class AR3DScene{
     const span=pose.span,length=this.options.length||45;
     if(this.chainLength!==length){
       this.chainLength=length;
-      const drop=.12+(clamp(length,30,60)-40)*.02;
+      const drop=.02+(clamp(length,30,60)-40)*.012;
       const link=new THREE.Object3D(),step=1/310;
       for(let side=0;side<2;side++){
         const sign=side?1:-1;
-        const curve=new THREE.CubicBezierCurve3(new THREE.Vector3(sign*.18,.13,0),new THREE.Vector3(sign*.17,-drop*.65,0),new THREE.Vector3(sign*.07,-drop,0),new THREE.Vector3(0,-drop,0));
+        const curve=new THREE.CubicBezierCurve3(new THREE.Vector3(sign*.16,.09,0),new THREE.Vector3(sign*.14,-drop*.5,0),new THREE.Vector3(sign*.06,-drop,0),new THREE.Vector3(0,-drop,0));
         for(let i=0;i<80;i++){
           link.position.copy(curve.getPointAt(i/79));
           link.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),curve.getTangentAt(i/79));
@@ -122,7 +121,7 @@ export class AR3DScene{
   updatePose3D(pose,type){
     const model=this.activeModel;if(!model)return;model.visible=!!pose;if(!pose)return;
     const o=this.options,adjust=clamp(o.scale??1,.65,1.6);
-    const width=type==='necklace'?pose.span*(o.pendantScale||.09):type==='ring'?pose.span*.60*((o.size||17)/17)*((o.ringScale||.22)/.22):pose.span*((o.size||16)/16)*((o.braceletScale||.35)/.35);
+    const width=type==='necklace'?pose.span*(o.pendantScale||.18):type==='ring'?pose.span*.60*((o.size||17)/17)*((o.ringScale||.28)/.28):pose.span*((o.size||16)/16)*((o.braceletScale||.40)/.40);
     model.scale.setScalar(width/model.userData.widthMm*adjust);
     model.position.set(pose.x-this.width/2,this.height/2-pose.y-(type==='necklace'?0:pose.span*clamp(o.offset||0,-.3,.3)),0);
     if(pose.quaternion)model.quaternion.copy(pose.quaternion);

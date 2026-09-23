@@ -119,7 +119,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
     error: t('Camera chưa sẵn sàng','Camera unavailable')
   };
 
-  const previewIcon = config?.referenceImage || product.image || (config?.type==='ring'?'/assets/product_horizon.png':config?.type==='bracelet'?'/assets/product_pulse.png':'/ar/lumen.svg');
+  const previewImage = product.image || product.image_url || product.images?.[0] || config?.referenceImage || (config?.type==='ring'?'/assets/product_horizon.png':config?.type==='bracelet'?'/assets/product_pulse.png':'/assets/catalog/emoria-faith.png');
 
   return createPortal(<div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl p-2 sm:p-5 flex items-center justify-center" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <section translate="no" ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="tryon-title" className="notranslate w-full max-w-5xl max-h-[96dvh] overflow-y-auto rounded-3xl bg-[#101216] border border-white/15 text-slate-100 shadow-2xl outline-none">
@@ -133,10 +133,10 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
         <button onClick={onClose} aria-label={t('Đóng gương AR','Close AR mirror')} className="min-w-11 min-h-11 grid place-items-center rounded-full hover:bg-white/10"><X/></button>
       </header>
       <div className="grid md:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="relative bg-black min-h-72 flex items-center justify-center overflow-hidden rounded-2xl m-3">
-          <div className="relative inline-flex items-center justify-center max-w-full max-h-[58dvh] md:max-h-[72dvh]">
+        <div className="relative bg-[#0b0d12] min-h-[400px] md:min-h-[540px] flex items-center justify-center overflow-hidden rounded-2xl m-3 border border-white/10 shadow-2xl">
+          <div className="relative w-full h-full flex items-center justify-center">
             <video ref={video} playsInline muted autoPlay aria-hidden="true" className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"/>
-            <canvas ref={canvas} aria-label={t('Gương AR trực tiếp','Live AR mirror')} className={`w-auto h-auto max-w-full max-h-[58dvh] md:max-h-[72dvh] object-contain rounded-xl block ${active?'':'invisible'}`}/>
+            <canvas ref={canvas} aria-label={t('Gương AR trực tiếp','Live AR mirror')} className={`max-w-full max-h-[65dvh] md:max-h-[75dvh] w-auto h-auto object-contain rounded-xl block ${active?'':'invisible'}`}/>
             {active && (
               <ARFramingGuide
                 type={config?.type || 'necklace'}
@@ -148,10 +148,16 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
               />
             )}
           </div>
-          {!active&&<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-gradient-to-b from-slate-900 to-black text-center">
-            <img src={previewIcon} alt="" className="w-20 h-24 object-contain drop-shadow-md"/>
-            <p className="font-serif text-2xl">{labels[status]}</p>
-            <p className="text-sm text-slate-400 max-w-xs">
+          {!active&&<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-gradient-to-b from-[#131720] via-[#0b0d13] to-black text-center z-10">
+            <div className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-2xl bg-white/[0.04] border border-white/15 p-3 shadow-[0_12px_35px_rgba(0,0,0,0.8)] flex items-center justify-center backdrop-blur-md overflow-hidden group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-amber-400/20 via-amber-200/10 to-transparent blur-lg opacity-70 group-hover:opacity-100 transition-opacity" />
+              <img src={previewImage} alt={product.name} className="relative z-10 w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.7)] group-hover:scale-105 transition-transform duration-500" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-serif text-2xl text-amber-100/90 tracking-wide">{labels[status]}</p>
+              <p className="text-[11px] uppercase tracking-widest text-amber-200/60 font-medium">EMORIA LUXURY AR MIRROR</p>
+            </div>
+            <p className="text-sm text-slate-400 max-w-sm">
               {isHand?(config?.type==='bracelet'?t('Giơ cổ tay hướng về camera ở nơi đủ sáng.','Show your wrist facing the camera in good lighting.'):t('Giơ mu bàn tay về phía camera, xòe nhẹ các ngón tay ở nơi đủ sáng.','Show the back of your hand to the camera with fingers spread slightly.')):t('Để camera thấy khuôn mặt và cả hai vai. Thử ở nơi đủ sáng, với nền đơn giản.','Show your face and both shoulders. Use good lighting and a simple background.')}
             </p>
           </div>}

@@ -152,11 +152,11 @@ export default function ARFramingGuide({
               <circle cx="82" cy="70" r="1.8" fill="currentColor" opacity="0.75" />
 
               {/* Subtle chain hanging curve */}
-              <path d="M 42 53 Q 50 70 58 53" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2" opacity="0.6" />
+              <path d="M 42 50 Q 50 63 58 50" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 2" opacity="0.6" />
 
-              {/* Pendant Target Reticle (placed at y=70, matching exact pendantPose resting point) */}
+              {/* Pendant Target Reticle (placed at y=64, matching calibrated collarbone resting point) */}
               {!isTracking && (
-                <g transform="translate(50, 70)">
+                <g transform="translate(50, 64)">
                   <circle cx="0" cy="0" r="4.5" stroke="currentColor" strokeWidth="1.3" strokeDasharray="2 1.5" className="animate-spin" />
                   <circle cx="0" cy="0" r="1.5" fill="currentColor" />
                   <path d="M -7 0 L -3.5 0 M 3.5 0 L 7 0 M 0 -7 L 0 -3.5 M 0 3.5 L 0 7" stroke="currentColor" strokeWidth="0.9" />

@@ -41,14 +41,15 @@ export class NecklaceTracker {
         const now=performance.now(),{width,height}=this.canvas;
         if(now-(this.lastRender||0)<33){this.frame=requestAnimationFrame(this.render);return;}this.lastRender=now;
         this.ctx.save();this.ctx.translate(width,0);this.ctx.scale(-1,1);this.ctx.drawImage(this.video,0,0,width,height);
-        const pose=this.manual?{x:width/2,y:height*.57,z:0,span:Math.min(width*.7,height*.52),angle:0}:now-this.lastSeen<350?this.pose:null;
+        const pose=this.manual?{x:width/2,y:height*.57,z:0,span:Math.min(width*.7,height*.52),angle:0}:now-this.lastSeen<650?this.pose:null;
         if(pose){
-          if(!this.scene3d)drawNecklace(this.ctx,pose,this.image,{...this.options,pendantScale:this.config.pendantScale,chainOnly:!!(this.scene3d&&this.scene3d.renderer)});
+          const pScale=this.config.pendantScale||.18;
+          if(!this.scene3d)drawNecklace(this.ctx,pose,this.image,{...this.options,pendantScale:pScale,chainOnly:!!(this.scene3d&&this.scene3d.renderer)});
           if(this.scene3d&&this.scene3d.renderer){
-            const drop=pose.span*(.12+(clamp(this.options.length,30,60)-40)*.02);
+            const drop=pose.span*(.02+(clamp(this.options.length,30,60)-40)*.012);
             const pendantPose={
-              x:pose.x-Math.sin(pose.angle)*(drop+pose.span*(this.config.pendantScale||.09)*clamp(this.options.scale,.65,1.6)*(this.config.bailRatio||.68)),
-              y:pose.y+Math.cos(pose.angle)*(drop+pose.span*(this.config.pendantScale||.09)*clamp(this.options.scale,.65,1.6)*(this.config.bailRatio||.68))+pose.span*clamp(this.options.offset,-.3,.3),
+              x:pose.x-Math.sin(pose.angle)*drop,
+              y:pose.y+Math.cos(pose.angle)*(drop+pose.span*pScale*.35)+pose.span*clamp(this.options.offset,-.3,.3),
               span:pose.span,
               z:pose.z||0,
               angle:pose.angle
@@ -56,13 +57,13 @@ export class NecklaceTracker {
             this.scene3d.updatePose3D(pendantPose,'necklace');
             this.scene3d.updateChain(pose);
             this.scene3d.render();
-            this.ctx.drawImage(this.scene3d.domElement,0,0);
+            this.ctx.drawImage(this.scene3d.domElement,0,0,width,height);
           }
         }
         this.ctx.restore();
         if(!this.manual&&this.workerReady){
           this.state(pose?'tracking':'searching');
-          if(!this.busy&&this.video.currentTime!==this.lastFrame&&now-this.lastRequest>=83){
+          if(!this.busy&&this.video.currentTime!==this.lastFrame&&now-this.lastRequest>=48){
             this.lastRequest=now;this.lastFrame=this.video.currentTime;this.busy=true;
             const ratio=Math.min(1,512/Math.max(width,height));
             createImageBitmap(this.video,{resizeWidth:Math.round(width*ratio),resizeHeight:Math.round(height*ratio)}).then(bitmap=>{
