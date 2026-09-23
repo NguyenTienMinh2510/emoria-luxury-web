@@ -1,0 +1,64 @@
+EMORIA — AR models from Whisk reference images
+Updated 2026-09-23
+
+VIEW
+Run: npm run dev -- --port 3021
+Gallery: http://127.0.0.1:3021/ar-preview.html
+Choose a product, rotate/zoom, or click “Mở camera thử sản phẩm”.
+Direct example: http://127.0.0.1:3021/?view=shop&tryon=emoria-lumen
+The server must stay running. Phone camera requires HTTPS (production), or localhost on that device.
+This update is local; it has not been committed or deployed.
+
+ASSETS
+public/models/jewelry/emoria-{lumen,faith,sen,horizon,pulse,echo,halo}.glb
+Editable Blender source and roundtrip renders: docs/jewelry-blender/
+References: public/ar/*.jpg (7 supplied images; no Orbit image in this folder).
+Rebuild all with PowerShell:
+& 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe' --background --python-exit-code 1 --python scripts/build-jewelry-blender.py
+Rebuild only some: append -- lumen pulse
+Blender creates no external uploads and uses no paid service.
+Old build-lumen-blender.py and emoria-lumen-pendant/necklace.glb are legacy prototypes. The current AR uses emoria-lumen.glb.
+
+REST / RUNTIME
+GET /api/v1/products/:id/try-on verifies the product is active, returns the matching GLB and calibration.
+server/tryOn.js: curated 7 designs, supported duo aliases, optional details.ar overrides.
+Model URLs must be same-origin .glb paths. enabled:false disables AR.
+Products without a matching 3D asset no longer display an unrelated generic design.
+Horizon is a bracelet; Halo/Echo are rings; Lumen/Faith/Sen use necklace placement.
+For Sen this is a charm suspended on a simulated chain, not a claim that a chain is included in the order.
+GLB meters; +Y up, +Z ornament front; ring hole axis Y. Dimensions are inferred, not measured.
+Necklace chain is a separate instanced 3D mesh, adjusted to shoulder span and simulated length.
+Ring/wrist depth masks are geometric approximations. No hair/clothing segmentation.
+Hand orientation is optimized for a frontal view; the same model is displayed on either hand.
+
+PERFORMANCE
+Only the selected GLB is loaded when camera starts; Three.js remains in lazy AR chunks.
+~0.26–1.88 MB per new GLB, roughly 8,900–65,600 triangles.
+Meshes joined by material; necklace uses 160 links in one instanced draw, rebuilt only when length changes.
+Camera rendering capped around 30 fps; tracking requested at about 12 fps in a worker.
+Model scale responds to landmark span and size/placement controls.
+Camera tracks, workers, GPU buffers, environment maps and photo blob URLs released on close.
+Late model/camera results are discarded after close; missing GLB/WebGL produces a visible error.
+
+VISUAL LIMITS
+These are modeled interpretations of single reference photos, not exact scans or manufacturing CAD.
+Back sides, depth, chain wrap and dimensions are inferred. Preview is not a ring-size measurement.
+Crystal material is a real-time approximation; it does not simulate diamond caustics or spectral dispersion.
+Desktop browser and synthetic video tests do not establish tracking accuracy or frame rate on a physical iPhone.
+
+CHECKS
+npm run test:ci
+npm run build
+Tests cover GLB parsing/bounds, REST access and inactive assets, scaling, depth masks, chain reuse,
+late model disposal, camera permission race, hand worker result lifecycle, pose rejection and HTTPS guards.
+Local browser checks additionally use .local/ar-ui-harness.html and .local/ar-worker-check.html (not deployed).
+No schema migration or third-party AI calls required by this feature.
+
+Verified in this run:
+- All seven GLBs loaded in the browser gallery.
+- Real Pose Lite inference tracked the shoulder fixture; synthetic video composited Lumen and chain.
+- Real Hand Landmarker processed three frames without erroneous fallback.
+- Manual Halo preview, capture, close (tracks ended), 390px layout with no horizontal overflow.
+- Local REST returned active Lumen necklace, Horizon bracelet and Halo ring configurations.
+- npm run test:ci PASS; npm run build PASS (existing large main chunk warning remains).
+Physical-camera tracking on iOS/Android and production deployment were not performed in this run.

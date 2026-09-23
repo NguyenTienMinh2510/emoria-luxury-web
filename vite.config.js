@@ -18,6 +18,7 @@ export default defineConfig(({mode}) => {
     server.middlewares.use('/api/analytics',analyticsHandler);
     server.middlewares.use('/api/memory-media',memoryMediaHandler);
   }}],
+  build: {rollupOptions:{input:{main:'index.html',arPreview:'ar-preview.html',lumenPreview:'lumen-preview.html'}}},
   server: {
     port: 3000,
     host: '127.0.0.1',

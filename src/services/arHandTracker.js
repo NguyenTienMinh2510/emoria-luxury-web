@@ -58,7 +58,7 @@ export class HandTracker {
       await this.video.play();
       if (this.closed) return;
 
-      if (this.config.asset) {
+      if (this.config.asset && !this.config.modelUrl) {
         this.image = new Image();
         this.image.src = this.config.asset;
         await this.image.decode().catch(() => {});
@@ -69,23 +69,29 @@ export class HandTracker {
       this.canvas.height = this.video.videoHeight;
       this.ctx = this.canvas.getContext('2d', { alpha: false });
 
-      if (isWebGLAvailable()) {
+      if(this.config.modelUrl&&typeof window!=='undefined'&&!isWebGLAvailable())throw Object.assign(Error('WebGL2 required'),{name:'Unsupported3DError'});
+      if (this.config.modelUrl && isWebGLAvailable()) {
         try {
           this.scene3d = new AR3DScene(this.canvas.width, this.canvas.height);
-          this.scene3d.setModel(this.config.productId, this.config.type, {
+          await this.scene3d.setModel(this.config.productId, this.config.type, {
+            modelUrl: this.config.modelUrl,
             size: this.options.size,
+            offset: this.options.offset,
             scale: this.options.scale,
             ringScale: this.config.scale || 0.22,
             braceletScale: this.config.scale || 0.35
           });
-        } catch {
-          this.scene3d = null;
+        } catch (error) {
+          this.scene3d?.dispose();this.scene3d = null;
+          throw Object.assign(error,{name:"ModelLoadError"});
         }
       }
 
+      if(this.closed)return;
       this.render = () => {
         if (this.closed) return;
         const now = performance.now();
+        if(now-(this.lastRender||0)<33){this.frame=requestAnimationFrame(this.render);return;}this.lastRender=now;
         const { width, height } = this.canvas;
 
         this.ctx.save();
@@ -99,7 +105,7 @@ export class HandTracker {
               y: height * 0.55,
               z: 0,
               span: Math.min(width * 0.35, height * 0.3),
-              angle: 0,
+              angle: this.config.type==='ring'?-Math.PI/2:0,
               type: this.config.type
             }
           : now - this.lastSeen < 350
@@ -206,18 +212,10 @@ export class HandTracker {
     this.state('manual-fallback');
   }
 
-  setOptions(options) {
-    Object.assign(this.options, options);
-    if (this.scene3d) {
-      this.scene3d.setModel(this.config.productId, this.config.type, {
-        size: this.options.size,
-        scale: this.options.scale,
-        ringScale: this.config.scale || 0.22,
-        braceletScale: this.config.scale || 0.35
-      });
-    }
+  setOptions(options){
+    Object.assign(this.options,options);
+    this.scene3d?.setOptions({...this.options,pendantScale:this.config.pendantScale});
   }
-
   setManual(manual) {
     this.manual = manual || !this.workerReady;
     this.pose = null;

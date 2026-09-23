@@ -5,6 +5,7 @@ import {useLanguage} from '../i18n/LanguageProvider';
 import {apiRequest} from '../services/apiClient.js';
 import {NecklaceTracker} from '../services/arNecklaceTracker.js';
 import {HandTracker} from '../services/arHandTracker.js';
+import {tryOnConfig} from '../services/tryOnConfig.js';
 
 export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,initialSize}){
   const {t}=useLanguage(),video=useRef(),canvas=useRef(),engine=useRef(),dialog=useRef(),alive=useRef(true),close=useRef(onClose);
@@ -35,14 +36,26 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
 
   useEffect(()=>{
     let cancelled=false;setLoadError(false);setError('');
+    const applyConfig = data => {
+      setConfig(data);
+      if(data?.defaultLength)setLength(data.defaultLength);
+      if(data?.defaultSize)setTrySize(data.defaultSize);
+      if(data?.finger)setSelectedFinger(data.finger);
+    };
     apiRequest('/products/'+encodeURIComponent(product.id)+'/try-on').then(data=>{
       if(!cancelled){
-        setConfig(data);
-        if(data?.defaultLength)setLength(data.defaultLength);
-        if(data?.defaultSize)setTrySize(data.defaultSize);
-        if(data?.finger)setSelectedFinger(data.finger);
+        applyConfig(data);
       }
-    }).catch(()=>{if(!cancelled)setLoadError(true);});
+    }).catch(()=>{
+      if(!cancelled){
+        const fallback = tryOnConfig(product.id, product);
+        if(fallback){
+          applyConfig(fallback);
+        } else {
+          setLoadError(true);
+        }
+      }
+    });
     return()=>{cancelled=true;};
   },[product.id,retry]);
 
@@ -78,8 +91,8 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
     }
 
     try{await tracker.start();}catch(e){
-      if(!alive.current)return;
-      setStatus('error');setError(e.name==='NotAllowedError'?t('Camera chưa được cấp quyền. Cho phép camera trong cài đặt trình duyệt rồi thử lại.','Camera permission was denied. Allow camera access in browser settings and try again.'):e.name==='NotFoundError'?t('Không tìm thấy camera trên thiết bị.','No camera was found on this device.'):e.name==='NotReadableError'?t('Camera đang được ứng dụng khác sử dụng. Đóng ứng dụng đó rồi thử lại.','Camera is in use by another app. Close it and retry.'):t('Không mở được camera. Hãy thử Safari hoặc Chrome qua HTTPS.','Camera could not start. Try Safari or Chrome over HTTPS.'));
+      if(!alive.current||engine.current!==tracker)return;
+      setStatus('error');setError(e.name==='Unsupported3DError'?t('Thiết bị chưa bật WebGL2 để thử model 3D. Hãy bật tăng tốc đồ họa hoặc dùng trình duyệt khác.','WebGL2 is unavailable. Enable hardware acceleration or try another browser.'):e.name==='ModelLoadError'?t('Chưa tải được model 3D. Hãy kiểm tra kết nối rồi thử lại.','Could not load the 3D model. Check your connection and retry.'):e.name==='NotAllowedError'?t('Camera chưa được cấp quyền. Cho phép camera trong cài đặt trình duyệt rồi thử lại.','Camera permission was denied. Allow camera access in browser settings and try again.'):e.name==='NotFoundError'?t('Không tìm thấy camera trên thiết bị.','No camera was found on this device.'):e.name==='NotReadableError'?t('Camera đang được ứng dụng khác sử dụng. Đóng ứng dụng đó rồi thử lại.','Camera is in use by another app. Close it and retry.'):t('Không mở được camera. Hãy thử Safari hoặc Chrome qua HTTPS.','Camera could not start. Try Safari or Chrome over HTTPS.'));
     }
   }
 
@@ -104,11 +117,11 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
     error: t('Camera chưa sẵn sàng','Camera unavailable')
   };
 
-  const previewIcon = config?.type==='ring'?'/assets/product_horizon.png':config?.type==='bracelet'?'/assets/product_pulse.png':'/ar/lumen.svg';
+  const previewIcon = config?.referenceImage || product.image || (config?.type==='ring'?'/assets/product_horizon.png':config?.type==='bracelet'?'/assets/product_pulse.png':'/ar/lumen.svg');
 
   return createPortal(<div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl p-2 sm:p-5 flex items-center justify-center" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <section translate="no" ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="tryon-title" className="notranslate w-full max-w-5xl max-h-[96dvh] overflow-y-auto rounded-3xl bg-[#101216] border border-white/15 text-slate-100 shadow-2xl outline-none">
-      <header className="px-5 py-3 flex items-center justify-between border-b border-white/10">
+      <header className="sticky top-0 z-10 bg-[#101216] px-5 py-3 flex items-center justify-between border-b border-white/10">
         <div>
           <p className="text-[10px] uppercase tracking-[.25em] text-amber-100/70">
             EMORIA · {config?.type==='ring'?'VIRTUAL RING TRY-ON':config?.type==='bracelet'?'VIRTUAL BRACELET TRY-ON':'VIRTUAL TRY-ON'}
@@ -119,7 +132,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
       </header>
       <div className="grid md:grid-cols-[minmax(0,1fr)_300px]">
         <div className="relative bg-black min-h-72 flex justify-center overflow-hidden rounded-2xl m-3">
-          <video ref={video} playsInline muted autoPlay aria-hidden="true" className="absolute inset-0 w-full h-full object-contain -scale-x-100"/>
+          <video ref={video} playsInline muted autoPlay aria-hidden="true" className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"/>
           <canvas ref={canvas} aria-label={t('Gương AR trực tiếp','Live AR mirror')} className={`relative w-full h-auto object-contain max-h-[58dvh] md:max-h-[72dvh] ${active?'':'invisible'}`}/>
           {!active&&<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-gradient-to-b from-slate-900 to-black text-center">
             <img src={previewIcon} alt="" className="w-20 h-24 object-contain drop-shadow-md"/>
@@ -167,7 +180,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
             <div className="flex items-center justify-between gap-2"><label className="text-xs flex items-center gap-2 min-h-11 cursor-pointer"><input type="checkbox" checked={manual} disabled={!engine.current?.workerReady} onChange={e=>{setManual(e.target.checked);engine.current.setManual(e.target.checked);}}/>{t('Căn chỉnh thủ công','Manual placement')}</label><button aria-label={t('Đặt lại vị trí','Reset placement')} className="min-h-11 min-w-11 grid place-items-center rounded-lg hover:bg-white/10" onClick={()=>{setLength(45);setTrySize(config?.defaultSize||17);setScale(1);setOffset(0);}}><RotateCcw size={17}/></button></div>
             <button disabled={!['tracking','manual','manual-fallback'].includes(status)} onClick={capture} className="w-full min-h-11 rounded-xl border border-white/25 flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-white/10 transition-colors"><Camera size={17}/>{t('Chụp ảnh gương','Capture mirror')}</button>
           </>}
-          <p className="text-[11px] text-slate-400">{t('Mô phỏng 2D để tham khảo phong cách, không đo kích thước thật hay che khuất theo tóc/quần áo. Kích cỡ thử không thay đổi phiên bản trong giỏ hàng.','A 2D style preview, not a size measurement. Preview size does not change the cart variant.')}{product.unitsPerItem===2?' '+t('Combo hiển thị một chiếc để thử.','The duo set previews one item.'):''}</p>
+          <p className="text-[11px] text-slate-400">{t('Mô phỏng thử trang sức để tham khảo phong cách, không đo kích thước thật. Che khuất theo tóc/quần áo chưa được mô phỏng. Kích cỡ thử không thay đổi phiên bản trong giỏ hàng.','A jewelry style preview, not a size measurement. Hair and clothing occlusion are not simulated. Preview size does not change the cart variant.')}{product.unitsPerItem===2?' '+t('Combo hiển thị một chiếc để thử.','The duo set previews one item.'):''}</p>
           <div className="border-t border-white/10 pt-4 space-y-3">
             <label className="block text-xs">{t('Phiên bản mua','Purchase variant')}<select value={size} onChange={e=>{setSize(e.target.value);setAdded(false);}} className="w-full mt-2 min-h-11 rounded-xl bg-slate-900 border border-white/20 px-3">{product.variants?.map(v=><option key={v.size} value={v.size} disabled={v.stock<=0}>{v.size}{v.stock<=0?' · '+t('Hết hàng','Sold out'):''}</option>)}</select></label>
             <p className="font-serif text-xl">{product.formattedPrice}</p>

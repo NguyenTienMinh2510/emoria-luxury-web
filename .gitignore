@@ -25,3 +25,4 @@ scripts/finish-*.py
 .vercel
 .env*
 supabase/.temp/
+*.blend1

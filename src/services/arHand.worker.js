@@ -16,7 +16,7 @@ self.onmessage=async({data})=>{
       try{
         const result=model.detectForVideo(data.bitmap,data.time);
         self.postMessage({type:'hand',points:result.landmarks[0]||null});
-        result.close();
+        // HandLandmarkerResult contains arrays only (unlike PoseLandmarkerResult).
       }finally{
         data.bitmap.close();
       }

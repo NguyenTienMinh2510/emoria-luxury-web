@@ -1,0 +1,35 @@
+LUMEN — Blender reconstruction
+
+Build: Blender 5.2.2 LTS, background Python, no paid plug-ins or AI API.
+Command (PowerShell, adapt Blender path if needed):
+& 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe' --background --python scripts/build-lumen-blender.py
+
+Outputs:
+public/models/jewelry/emoria-lumen-pendant.glb
+public/models/jewelry/emoria-lumen-necklace.glb
+docs/lumen-blender/emoria-lumen.blend
+docs/lumen-blender/lumen-pendant-preview.png
+docs/lumen-blender/asset-info.json
+
+Reference: public/assets/catalog/emoria-lumen.png.
+This is an authored visual reconstruction, not a scan or manufacturing CAD.
+Diameter 28 mm and thickness are provisional. Back is plain inferred silver.
+Sun rays, pave layout and bail are approximations to the available image.
+No physical material composition or precise gemstone cut is certified.
+
+GLB uses meters, front +Z and up +Y. Origin is disk center.
+Bail anchor for AR: approximately (0, 0.018, 0) meters.
+Necklace file includes a separate static display chain, not a physically sized,
+rigged or simulated necklace. AR must deform/replace it to match body tracking.
+No catalog, database, deployment or AR routing is changed by this build.
+
+Four PBR materials: silver, gold, black enamel, crystal.
+Lighting/environment is required in Three.js for realistic metal reflections.
+GLB uses transmission/IOR-related extensions when exported by Blender;
+verify support in the target renderer, particularly on mobile.
+Studio lights, background and camera are saved in BLEND but excluded from GLB.
+The script joins by material to reduce draw calls and reports triangle counts.
+
+Before real sales use: confirm dimensions and rear design, review the visual
+match, calibrate scale/anchors, and test hand/body occlusion on real devices.
+

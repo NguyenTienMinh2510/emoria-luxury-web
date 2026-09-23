@@ -17,6 +17,7 @@ export function ringPose(points, width, height, finger = 'ring') {
   const pip = points[pipIdx];
 
   if (!mcp || !pip) return null;
+  if([mcp,pip,points[5],points[17]].some(p=>!p||![p.x,p.y,p.z??0].every(Number.isFinite)))return null;
   if (![mcp.x, mcp.y, pip.x, pip.y].every(Number.isFinite)) return null;
   if ([mcp, pip].some(p => p.x < 0.01 || p.x > 0.99 || p.y < 0.01 || p.y > 0.99)) return null;
 
@@ -45,6 +46,7 @@ export function ringPose(points, width, height, finger = 'ring') {
       const kz = -((pinkyBase.z || 0) - (indexBase.z || 0)) * width;
       const vKnuckle = new THREE.Vector3(kx, ky, kz).normalize();
       const vNorm = new THREE.Vector3().crossVectors(vKnuckle, vBone).normalize();
+      if(vNorm.z<0)vNorm.negate(); // Keep ornament visible on either hand in the frontal try-on range.
       if (vNorm.lengthSq() > 0.1) {
         const vTan = new THREE.Vector3().crossVectors(vBone, vNorm).normalize();
         const m = new THREE.Matrix4().makeBasis(vTan, vBone, vNorm);
@@ -72,6 +74,7 @@ export function braceletPose(points, width, height) {
   const pinkyBase = points[17];
 
   if (!wrist || !indexBase || !pinkyBase) return null;
+  if([wrist,indexBase,pinkyBase].some(p=>![p.x,p.y,p.z??0].every(Number.isFinite)))return null;
   if (![wrist.x, wrist.y, indexBase.x, indexBase.y, pinkyBase.x, pinkyBase.y].every(Number.isFinite)) return null;
   if ([wrist, indexBase, pinkyBase].some(p => p.x < 0.01 || p.x > 0.99 || p.y < 0.01 || p.y > 0.99)) return null;
 
@@ -101,9 +104,10 @@ export function braceletPose(points, width, height) {
   // 3D Quaternion Orientation for Bracelet
   let quaternion = null;
   try {
-    const vArm = new THREE.Vector3(armDx, -armDy, -armDz).normalize();
+    const vArm = new THREE.Vector3(-armDx, armDy, armDz).normalize();
     const vKnuckle = new THREE.Vector3(palmDx, -palmDy, -palmDz).normalize();
     const vNorm = new THREE.Vector3().crossVectors(vKnuckle, vArm).normalize();
+    if(vNorm.z<0)vNorm.negate();
     if (vNorm.lengthSq() > 0.1) {
       const vTan = new THREE.Vector3().crossVectors(vArm, vNorm).normalize();
       const m = new THREE.Matrix4().makeBasis(vTan, vArm, vNorm);
@@ -137,7 +141,7 @@ export function smoothHandPose(previous, next, dt) {
     y: previous.y + (next.y - previous.y) * alpha,
     z: (previous.z || 0) + ((next.z || 0) - (previous.z || 0)) * alpha,
     span: previous.span + (next.span - previous.span) * alpha,
-    angle: previous.angle + (next.angle - previous.angle) * alpha,
+    angle: previous.angle + Math.atan2(Math.sin(next.angle-previous.angle),Math.cos(next.angle-previous.angle))*alpha,
     quaternion,
     type: next.type
   };

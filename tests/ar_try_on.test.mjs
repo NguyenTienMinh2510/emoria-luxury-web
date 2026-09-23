@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
+import vm from 'node:vm';
 import {necklacePose,smoothPose,drawNecklace} from '../src/services/arGeometry.js';
 import {ringPose,braceletPose,smoothHandPose,drawRing,drawBracelet} from '../src/services/arHandGeometry.js';
 import {tryOnConfig} from '../server/tryOn.js';
@@ -23,12 +24,15 @@ const rPose=ringPose(handPoints,640,480,'ring');
 assert.ok(rPose&&rPose.type==='ring'&&rPose.span>50&&rPose.z===0);
 assert.equal(ringPose(null,640,480),null);
 assert.equal(ringPose([],640,480),null);
+const invalidDepth=structuredClone(handPoints);invalidDepth[13].z=Infinity;assert.equal(ringPose(invalidDepth,640,480),null);
 for(const patch of [{x:NaN},{x:-.1},{y:1.2}]){const bad=structuredClone(handPoints);Object.assign(bad[13],patch);assert.equal(ringPose(bad,640,480),null);}
 
 handPoints[0]={x:.5,y:.8,z:0};handPoints[5]={x:.35,y:.5,z:0};handPoints[17]={x:.65,y:.5,z:0};
 const bPose=braceletPose(handPoints,640,480);
 assert.ok(bPose&&bPose.type==='bracelet'&&bPose.span>150&&bPose.z===0);
 assert.equal(braceletPose(null,640,480),null);
+const otherHand=structuredClone(handPoints);[otherHand[5],otherHand[17]]=[otherHand[17],otherHand[5]];
+for(const p of [bPose,braceletPose(otherHand,640,480)])assert.ok(new THREE.Vector3(0,0,1).applyQuaternion(p.quaternion).z>0);
 
 const smoothRing=smoothHandPose(rPose,{...rPose,x:rPose.x+10},30);
 assert.ok(smoothRing.x>=rPose.x&&smoothRing.x<=rPose.x+10);
@@ -39,37 +43,57 @@ assert.ok(drawCalls.some(c=>c[0]==='ellipse'||c[0]==='arc'));
 drawBracelet(ctx,bPose,null,{braceletScale:0.35,size:16});
 assert.ok(drawCalls.some(c=>c[0]==='ellipse'));
 
-// Three.js 3D Model & Occlusion Mask Verification
-import {buildRingModel,buildBraceletModel,buildNecklaceModel} from '../src/services/ar3DRenderer.js';
-const ring3D=buildRingModel('emoria-horizon');
-assert.equal(ring3D.name,'RingRoot');
-assert.equal(ring3D.children[0].renderOrder,0); // Occluder cylinder
-assert.equal(ring3D.children[0].material.colorWrite,false); // Invisible mask
-assert.equal(ring3D.children[0].material.depthWrite,true); // Depth buffer write
-assert.equal(ring3D.children[1].renderOrder,1); // Metallic jewelry mesh
+// Real GLB dimensions, masks, scale updates and late-load disposal.
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {AR3DScene,prepareModel,disposeModel} from '../src/services/ar3DRenderer.js';
+for(const name of ['lumen','faith','sen','horizon','pulse','echo','halo']){
+ const c=tryOnConfig('emoria-'+name),bytes=fs.readFileSync('public'+c.modelUrl);
+ assert.equal(bytes.toString('ascii',0,4),'glTF');
+ const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+ const root=prepareModel(gltf.scene,c.type),box=new THREE.Box3().setFromObject(root);
+ assert.ok(box.getSize(new THREE.Vector3()).length()>15);
+ let tris=0;gltf.scene.traverse(o=>{if(o.isMesh)tris+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;});assert.ok(tris>1000&&tris<140000,name);
+ if(c.type!=='necklace')assert.ok(root.children.some(o=>o.material?.colorWrite===false));
+ const scene=new AR3DScene(640,480);scene.activeModel=root;scene.setOptions({scale:1,size:c.defaultSize,pendantScale:c.pendantScale});
+ scene.updatePose3D({x:320,y:240,span:200,angle:0},c.type);const first=root.scale.x;
+ scene.updatePose3D({x:320,y:240,span:400,angle:0},c.type);assert.equal(root.scale.x,first*2);
+ scene.setOptions({scale:1.5});scene.updatePose3D({x:320,y:240,span:400,angle:0},c.type);assert.equal(root.scale.x,first*3);
+ scene.dispose();
+}
+let resolveModel,disposed=0;const pending=new AR3DScene();
+const lateMesh=new THREE.Mesh(new THREE.BoxGeometry(.02,.02,.02),new THREE.MeshStandardMaterial());lateMesh.geometry.addEventListener('dispose',()=>disposed++);
+pending.loader={loadAsync:()=>new Promise(r=>resolveModel=r)};
+const loading=pending.setModel('x','ring',{modelUrl:'/models/jewelry/emoria-halo.glb'});pending.dispose();resolveModel({scene:lateMesh});await loading;assert.equal(disposed,1);assert.equal(pending.activeModel,null);
+const chainScene=new AR3DScene();chainScene.setOptions({length:45});chainScene.updateChain(pose);
+const chainVersion=chainScene.chain.instanceMatrix.version;chainScene.updateChain({...pose,x:400});
+assert.equal(chainScene.chain.instanceMatrix.version,chainVersion,'Body movement must not rebuild chain geometry');
+chainScene.setOptions({length:50});chainScene.updateChain(pose);assert.ok(chainScene.chain.instanceMatrix.version>chainVersion);chainScene.dispose();
+await assert.rejects(new AR3DScene().setModel('x','ring',{modelUrl:'https://untrusted.test/x.glb'}));
+assert.equal(tryOnConfig('emoria-lumen',{details:{ar:{enabled:false}}}),null);
+assert.equal(tryOnConfig('emoria-lumen',{details:{ar:{type:'necklace',modelUrl:'/models/custom.glb'}}}).modelUrl,'/models/custom.glb');
+assert.equal(tryOnConfig('emoria-lumen',{details:{ar:{type:'necklace',modelUrl:'//foreign.test/a.glb'}}}),null);
 
-const bracelet3D=buildBraceletModel('emoria-pulse');
-assert.equal(bracelet3D.name,'BraceletRoot');
-assert.equal(bracelet3D.children[0].renderOrder,0); // Wrist occluder
-assert.equal(bracelet3D.children[1].renderOrder,1); // 3D Cuff
+// Execute worker message lifecycle with actual result shape (no close() method).
+const messages=[],worker={postMessage:m=>messages.push(m),location:{origin:'http://localhost'}};
+const workerSource=fs.readFileSync('src/services/arHand.worker.js','utf8').replace(/^import .*;\s*/,'').replace('import.meta.env.DEV','false');
+vm.runInNewContext(workerSource,{self:worker,URL,console,FilesetResolver:{forVisionTasks:async()=>({})},HandLandmarker:{createFromOptions:async()=>({detectForVideo:()=>({landmarks:[],handedness:[],worldLandmarks:[]})})}});
+await worker.onmessage({data:{type:'init'}});let released=0;
+for(let i=0;i<3;i++)await worker.onmessage({data:{type:'frame',time:i,bitmap:{close(){released++;}}}});
+assert.deepEqual(messages.map(m=>m.type),['ready','hand','hand','hand']);assert.equal(released,3);
 
-const necklace3D=buildNecklaceModel('emoria-lumen');
-assert.equal(necklace3D.name,'NecklaceRoot');
-assert.equal(necklace3D.children[0].renderOrder,0); // Chest occluder
-assert.equal(necklace3D.children[1].renderOrder,1); // 3D Pendant
-
-assert.equal(tryOnConfig('emoria-solaris-keyring').type,'ring');assert.equal(tryOnConfig('../../x'),null);assert.equal(tryOnConfig('emoria-lumen-duo').pendant,'/ar/lumen.svg');
-assert.equal(tryOnConfig('emoria-horizon').type,'ring');
+assert.equal(tryOnConfig('emoria-solaris-keyring'),null);assert.equal(tryOnConfig('../../x'),null);assert.equal(tryOnConfig('emoria-lumen-duo').modelUrl,'/models/jewelry/emoria-lumen.glb');
+assert.equal(tryOnConfig('emoria-horizon').type,'bracelet');
 assert.equal(tryOnConfig('emoria-halo').type,'ring');
 assert.equal(tryOnConfig('emoria-faith').type,'necklace');
-assert.equal(tryOnConfig('emoria-celestial-duo').type,'bracelet');
-assert.deepEqual(tryOnConfig('emoria-horizon').previewSizes,[16,17,18,19]);
+assert.equal(tryOnConfig('emoria-celestial-duo'),null);
+assert.deepEqual(tryOnConfig('emoria-horizon').previewSizes,[15,16,17,18]);
 assert.equal(tryOnConfig('emoria-pulse').type,'bracelet');
 assert.deepEqual(tryOnConfig('emoria-pulse').previewSizes,[15,16,17,18]);
 // Custom product AR derivation & explicit details.ar
 const customRing=tryOnConfig('custom-ring',{name:'Nhẫn Tình Nhân',details:{category:'Nhẫn'},image_url:'/img/ring.png'});
-assert.equal(customRing.type,'ring');assert.equal(customRing.asset,'/img/ring.png');
-const customExplicit=tryOnConfig('custom-custom',{details:{ar:{type:'ring',defaultSize:18,finger:'index',scale:0.25}}});
+assert.equal(customRing,null,'No unrelated generic ring when no GLB exists');
+const customExplicit=tryOnConfig('custom-custom',{details:{ar:{type:'ring',modelUrl:'/models/custom.glb',defaultSize:18,finger:'index',scale:0.25}}});
 assert.equal(customExplicit.type,'ring');assert.equal(customExplicit.defaultSize,18);assert.equal(customExplicit.finger,'index');
 assert.equal(createHash('sha256').update(fs.readFileSync('public/ar/hand_landmarker.task')).digest('hex'),'fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1');
 assert.equal(createHash('sha256').update(fs.readFileSync('public/ar/pose_landmarker_lite.task')).digest('hex'),'59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a');
@@ -77,7 +101,7 @@ const actualFetch=globalThis.fetch;process.env.SUPABASE_URL='https://ar-test.sup
 globalThis.fetch=async(url,options)=>{requests++;assert.equal(options.method,'GET');assert.ok(String(url).includes('/checkout_products?select='));return Response.json({id:'emoria-lumen',active,name:'EMORIA LUMEN',image_url:'/ar/lumen.svg'});};
 async function get(id,method='GET') {let result;await handler({method,url:'/api/v1/products/'+id+'/try-on',headers:method==='GET'?{}:{'content-type':'application/json'},body:method==='GET'?undefined:{}},{setHeader(){},end(raw){result={status:this.statusCode,data:JSON.parse(raw)};}});return result;}
 try{
- const solaris=await get('emoria-solaris-keyring');assert.equal(solaris.status,200);assert.equal(solaris.data.type,'ring');
+ const solaris=await get('emoria-solaris-keyring');assert.equal(solaris.status,404);
  const r=await get('emoria-lumen');assert.equal(r.status,200);assert.deepEqual(r.data.previewLengths,[40,45,50]);assert.equal(r.data.productId,'emoria-lumen');
  assert.equal((await get('emoria-lumen','POST')).status,405);
  active=false;assert.equal((await get('emoria-lumen')).status,404);

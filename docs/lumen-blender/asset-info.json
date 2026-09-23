@@ -1,0 +1,27 @@
+{
+  "assets": [
+    {
+      "file": "emoria-lumen-pendant.glb",
+      "triangles": 36656,
+      "bytes": 1091176
+    },
+    {
+      "file": "emoria-lumen-necklace.glb",
+      "triangles": 75824,
+      "bytes": 1796920
+    }
+  ],
+  "diameter_mm": 28,
+  "dimensions_verified": false,
+  "rear": "plain inferred silver back",
+  "front_axis_gltf": "+Z",
+  "up_axis_gltf": "+Y",
+  "origin": "pendant disk center",
+  "bail_anchor_m": [
+    0,
+    0.018,
+    0
+  ],
+  "chain": "static display chain, separate mesh; requires AR deformation",
+  "reference": "public/assets/catalog/emoria-lumen.png"
+}

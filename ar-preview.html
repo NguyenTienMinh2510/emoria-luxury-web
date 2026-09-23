@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EMORIA · Jewelry 3D</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#10141c;color:#eee;font:15px system-ui}header{padding:20px 24px;border-bottom:1px solid #ffffff20;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}h1{margin:0;font:26px Georgia;letter-spacing:3px}small{color:#aeb7c6}main{display:grid;grid-template-columns:1fr 290px;height:calc(100dvh - 84px);min-height:500px}#stage{position:relative;min-width:0;touch-action:none}canvas{display:block;width:100%;height:100%}aside{padding:24px;background:#171e29;overflow:auto}label{display:block;margin:20px 0 8px}select,button,a.download{border:1px solid #ffffff30;background:#232e3e;color:white;padding:11px;border-radius:8px;font:inherit}select{width:100%}button{cursor:pointer}button:hover,a:hover{background:#37465c}.row{display:flex;gap:6px;flex-wrap:wrap}.download{display:block;text-align:center;text-decoration:none;margin:22px 0}p{line-height:1.6;color:#b4bfce;font-size:13px}#status{position:absolute;bottom:20px;left:20px;right:20px;pointer-events:none;color:#dce4f0;font-size:13px}input{width:100%}@media(max-width:720px){main{display:flex;flex-direction:column;height:auto;min-height:0}#stage{height:62dvh;min-height:340px}aside{overflow:visible}header{padding:16px}h1{font-size:23px}}
+</style>
+<header><h1>EMORIA / ATELIER</h1><small>Bản dựng Blender · Xem thử 3D</small></header>
+<main><section id="stage" aria-label="Trang sức 3D có thể xoay và phóng to"><div id="status" role="status">Đang tải model…</div></section>
+<aside><label for="asset">Sản phẩm</label><select id="asset"><option value="lumen">Lumen</option><option value="faith">Faith</option><option value="sen">Sen</option><option value="horizon">Horizon</option><option value="pulse">Pulse</option><option value="echo">Echo</option><option value="halo">Halo</option></select>
+<label>Góc nhìn</label><div class="row"><button id="front">Mặt trước</button><button id="angle">Góc nghiêng</button><button id="back">Mặt sau</button></div>
+<label for="light">Độ sáng môi trường</label><input id="light" type="range" min="0.3" max="2" step="0.1" value="1">
+<label><input id="rotate" type="checkbox" style="width:auto"> Tự xoay</label>
+<a class="download" id="camera">Mở camera thử sản phẩm</a><a class="download" id="download" download>Tải file GLB</a><details><summary>Ảnh Whisk tham chiếu</summary><img id="reference" alt="Ảnh tham chiếu của sản phẩm" style="width:100%;margin-top:12px;border-radius:8px"></details>
+<p>Kéo để xoay · Cuộn hoặc chụm hai ngón để phóng to.</p><p>Model dựng từ ảnh tham chiếu: mặt, viền, đá, khoen và vật liệu được tách riêng. Kích thước và mặt sau chưa được đối chiếu với sản phẩm thật.</p><p>Chọn “Mở camera thử sản phẩm” để thử trên vai, bàn tay hoặc cổ tay. Camera chỉ xử lý trên thiết bị.</p>
+</aside></main>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const stage=document.querySelector('#stage'),status=document.querySelector('#status');
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor('#10141c');renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;stage.prepend(renderer.domElement);
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(35,1,.0001,10),controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.autoRotateSpeed=1;controls.minDistance=.02;controls.maxDistance=1;
+const pmrem=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment(),env=pmrem.fromScene(room,.04);scene.environment=env.texture;room.dispose();pmrem.dispose();
+const loader=new GLTFLoader();let model,radius=.02,ticket=0;
+function view(direction){camera.position.copy(controls.target).add(new THREE.Vector3(...direction).normalize().multiplyScalar(radius/Math.sin(Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*Math.min(1,camera.aspect)))*1.08));controls.update();}
+async function load(){const id=++ticket,name=document.querySelector('#asset').value,url='/models/jewelry/emoria-'+name+'.glb';status.textContent='Đang tải model…';if(model)model.visible=false;
+document.querySelector('#download').href=url;document.querySelector('#camera').href='/?view=shop&tryon=emoria-'+name;document.querySelector('#reference').src='/ar/'+name+'.jpg';
+try{const gltf=await loader.loadAsync(url);if(id!==ticket){gltf.scene.traverse(o=>{if(o.isMesh){o.geometry.dispose();for(const m of [o.material].flat())m.dispose();}});return;}
+if(model){scene.remove(model);model.traverse(o=>{if(o.isMesh){o.geometry.dispose();for(const m of [o.material].flat())m.dispose();}});}model=gltf.scene;scene.add(model);
+const box=new THREE.Box3().setFromObject(model),sphere=box.getBoundingSphere(new THREE.Sphere());radius=sphere.radius;controls.target.copy(sphere.center);view(['echo','halo'].includes(name)?[.45,.9,1]:[.25,.12,1]);let tris=0;model.traverse(o=>{if(o.isMesh)tris+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;});status.textContent=Math.round(tris).toLocaleString('vi-VN')+' tam giác · GLB đã tải';
+}catch(e){status.textContent='Chưa tải được GLB. Model có thể đang được dựng; hãy tải lại trang khi hoàn tất.';console.error(e);}}
+document.querySelector('#asset').onchange=load;document.querySelector('#front').onclick=()=>view([0,0,1]);document.querySelector('#angle').onclick=()=>view([.6,.18,1]);document.querySelector('#back').onclick=()=>view([0,0,-1]);document.querySelector('#light').oninput=e=>scene.environmentIntensity=Number(e.target.value);document.querySelector('#rotate').onchange=e=>controls.autoRotate=e.target.checked;
+new ResizeObserver(()=>{const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}).observe(stage);
+renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera);});load();
+</script>
+</html>

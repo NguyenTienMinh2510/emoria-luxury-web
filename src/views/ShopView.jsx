@@ -26,7 +26,7 @@ export default function ShopView({
   const [priceFilter, setPriceFilter] = useState('all');
   const [sortBy, setSortBy] = useState('popular');
   const [activeTab, setActiveTab] = useState('catalog'); // 'catalog' | 'tracking'
-  const [tryOnId,setTryOnId]=useState(null);
+  const [tryOnId,setTryOnId]=useState(()=>new URLSearchParams(window.location.search).get('tryon'));
   const tryOnProduct=products.find(p=>p.id===tryOnId);
   
   // Order Tracking State
