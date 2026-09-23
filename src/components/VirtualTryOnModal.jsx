@@ -66,11 +66,11 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
   useEffect(()=>{
     if(!engine.current)return;
     if(isHand){
-      engine.current.setOptions({size:trySize,scale,offset,finger:selectedFinger});
+      engine.current.setOptions({size:trySize,scale:config?.type==='ring'?1:scale,offset,finger:selectedFinger});
     }else{
       engine.current.setOptions({length,scale,offset});
     }
-  },[length,trySize,selectedFinger,scale,offset,isHand]);
+  },[length,trySize,selectedFinger,scale,offset,isHand,config?.type]);
 
   async function start(){
     if(!config||status==='starting')return;
@@ -108,7 +108,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
   }
 
   const labels={
-    intro: config?.type==='ring'?t('Gương thử nhẫn','Your ring mirror'):config?.type==='bracelet'?t('Gương thử vòng tay','Your bracelet mirror'):t('Gương thử trang sức','Your jewelry mirror'),
+    intro: config?.type==='ring'?t('Gương trải nghiệm nhẫn','Your ring mirror'):config?.type==='bracelet'?t('Gương trải nghiệm vòng tay','Your bracelet mirror'):t('Gương trải nghiệm trang sức','Your jewelry mirror'),
     starting: t('Đang mở camera…','Opening camera…'),
     'loading-model': t('Đang tải bộ nhận diện trên thiết bị…','Loading on-device tracking…'),
     tracking: isHand?(config?.type==='bracelet'?t('Đã nhận diện cổ tay','Wrist detected'):t('Đã nhận diện bàn tay','Hand detected')):t('Đã nhận diện vai & cổ','Shoulders & neck detected'),
@@ -126,7 +126,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
       <header className="sticky top-0 z-10 bg-[#101216] px-5 py-3 flex items-center justify-between border-b border-white/10">
         <div>
           <p className="text-[10px] uppercase tracking-[.25em] text-amber-100/70">
-            EMORIA · {config?.type==='ring'?'VIRTUAL RING TRY-ON':config?.type==='bracelet'?'VIRTUAL BRACELET TRY-ON':'VIRTUAL TRY-ON'}
+            EMORIA · {config?.type==='ring'?'AR RING EXPERIENCE':config?.type==='bracelet'?'AR BRACELET EXPERIENCE':'AR JEWELRY EXPERIENCE'}
           </p>
           <h2 id="tryon-title" className="font-serif text-xl">{product.name}</h2>
         </div>
@@ -167,7 +167,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
           <p className="flex gap-2 text-xs text-slate-300"><ShieldCheck className="w-5 shrink-0 text-emerald-300"/>{t('Hình camera chỉ xử lý trên thiết bị, không tải lên máy chủ. Camera tắt khi đóng gương hoặc rời trang.','Camera images stay on your device. Camera stops when you close the mirror or leave the page.')}</p>
           {loadError&&<div role="alert" className="text-sm text-amber-200">{t('Chưa tải được cấu hình AR cho sản phẩm.','Could not load this product’s AR configuration.')} <button className="underline min-h-11" onClick={()=>setRetry(n=>n+1)}>{t('Thử lại','Retry')}</button></div>}
           {error&&<p role="alert" className="text-sm text-amber-200">{error}</p>}
-          {!active&&<button disabled={!config||status==='starting'} onClick={start} className="w-full min-h-12 rounded-xl bg-white text-black font-semibold disabled:opacity-40 flex items-center justify-center gap-2 shadow-silver-glow"><Camera size={18}/>{status==='starting'?t('Đang mở…','Starting…'):t('Bật camera để thử','Start camera')}</button>}
+          {!active&&<button disabled={!config||status==='starting'} onClick={start} className="w-full min-h-12 rounded-xl bg-white text-black font-semibold disabled:opacity-40 flex items-center justify-center gap-2 shadow-silver-glow"><Camera size={18}/>{status==='starting'?t('Đang mở…','Starting…'):t('Bật camera để trải nghiệm','Start camera')}</button>}
           {active&&<>
             {/* Necklace controls */}
             {config?.type==='necklace'&&config?.previewLengths&&<fieldset>
@@ -178,7 +178,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
             {/* Ring controls */}
             {config?.type==='ring'&&<>
               <fieldset>
-                <legend className="text-sm mb-2">{t('Size nhẫn mô phỏng','Simulated ring size')}</legend>
+                <legend className="text-sm mb-2">{t('Kích thước nhẫn theo sản phẩm','Ring size from product specs')}</legend>
                 <div className="flex gap-2">{config.previewSizes?.map(s=><button key={s} aria-pressed={trySize===s} onClick={()=>setTrySize(s)} className={`flex-1 min-h-11 rounded-xl border text-xs ${trySize===s?'bg-white text-black font-bold':'border-white/20'}`}>{s} mm</button>)}</div>
               </fieldset>
               <fieldset>
@@ -195,7 +195,17 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
               <div className="flex gap-2">{config.previewSizes.map(s=><button key={s} aria-pressed={trySize===s} onClick={()=>setTrySize(s)} className={`flex-1 min-h-11 rounded-xl border ${trySize===s?'bg-white text-black font-bold':'border-white/20'}`}>{s} cm</button>)}</div>
             </fieldset>}
 
-            <label className="block text-sm">{config?.type==='ring'?t('Độ to của nhẫn','Ring scale'):config?.type==='bracelet'?t('Độ to của vòng','Bracelet scale'):t('Kích thước mặt dây','Pendant scale')}<input aria-label="Scale slider" className="w-full h-11 accent-slate-200" type="range" min="0.65" max="1.6" step="0.05" value={scale} onChange={e=>setScale(Number(e.target.value))}/></label>
+            {config?.type==='ring'?(
+              <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3 text-xs text-slate-300 flex items-center justify-between">
+                <span className="text-slate-400">{t('Độ to chuẩn theo kích thước:','Size locked to product:')}</span>
+                <span className="font-semibold text-amber-200">{trySize} mm {t('(Đường kính lòng trong)','(Inner diameter)')}</span>
+              </div>
+            ):(
+              <label className="block text-sm">
+                {config?.type==='bracelet'?t('Độ to của vòng','Bracelet scale'):t('Kích thước mặt dây','Pendant scale')}
+                <input aria-label="Scale slider" className="w-full h-11 accent-slate-200" type="range" min="0.65" max="1.6" step="0.05" value={scale} onChange={e=>setScale(Number(e.target.value))}/>
+              </label>
+            )}
             <label className="block text-sm">{t('Vị trí cao / thấp','Vertical placement')}<input aria-label="Vertical placement" className="w-full h-11 accent-slate-200" type="range" min="-0.3" max="0.3" step="0.01" value={offset} onChange={e=>setOffset(Number(e.target.value))}/></label>
             <div className="flex items-center justify-between gap-2">
               <label className="text-xs flex items-center gap-2 min-h-11 cursor-pointer"><input type="checkbox" checked={manual} disabled={!engine.current?.workerReady} onChange={e=>{setManual(e.target.checked);engine.current.setManual(e.target.checked);}}/>{t('Căn chỉnh thủ công','Manual placement')}</label>
@@ -209,7 +219,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
             </div>
             <button disabled={!['tracking','manual','manual-fallback'].includes(status)} onClick={capture} className="w-full min-h-11 rounded-xl border border-white/25 flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-white/10 transition-colors"><Camera size={17}/>{t('Chụp ảnh gương','Capture mirror')}</button>
           </>}
-          <p className="text-[11px] text-slate-400">{t('Mô phỏng thử trang sức để tham khảo phong cách, không đo kích thước thật. Che khuất theo tóc/quần áo chưa được mô phỏng. Kích cỡ thử không thay đổi phiên bản trong giỏ hàng.','A jewelry style preview, not a size measurement. Hair and clothing occlusion are not simulated. Preview size does not change the cart variant.')}{product.unitsPerItem===2?' '+t('Combo hiển thị một chiếc để thử.','The duo set previews one item.'):''}</p>
+          <p className="text-[11px] text-slate-400">{t('Mô phỏng trải nghiệm trang sức AR để tham khảo phong cách. Che khuất theo tóc/quần áo chưa được mô phỏng. Kích cỡ AR không thay đổi phiên bản trong giỏ hàng.','An AR jewelry style preview. Hair and clothing occlusion are not simulated. Preview size does not change the cart variant.')}{product.unitsPerItem===2?' '+t('Combo hiển thị một chiếc để thử.','The duo set previews one item.'):''}</p>
           <div className="border-t border-white/10 pt-4 space-y-3">
             <label className="block text-xs">{t('Phiên bản mua','Purchase variant')}<select value={size} onChange={e=>{setSize(e.target.value);setAdded(false);}} className="w-full mt-2 min-h-11 rounded-xl bg-slate-900 border border-white/20 px-3">{product.variants?.map(v=><option key={v.size} value={v.size} disabled={v.stock<=0}>{v.size}{v.stock<=0?' · '+t('Hết hàng','Sold out'):''}</option>)}</select></label>
             <p className="font-serif text-xl">{product.formattedPrice}</p>

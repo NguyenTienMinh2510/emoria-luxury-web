@@ -118,10 +118,10 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
                   className="w-full min-h-12 border border-amber-100/40 rounded-xl bg-amber-100/5 text-amber-100 font-semibold text-sm hover:bg-amber-100/10 transition-colors flex items-center justify-center gap-2"
                 >
                   {product.category === 'Nhẫn'
-                    ? t('Ướm thử nhẫn · AR', 'Try on ring · AR')
+                    ? t('Trải nghiệm Nhẫn · AR', 'Try on Ring · AR')
                     : product.category === 'Vòng tay'
-                      ? t('Ướm thử vòng tay · AR', 'Try on bracelet · AR')
-                      : t('Ướm thử lên cổ · AR', 'Try on necklace · AR')}
+                      ? t('Trải nghiệm Vòng Tay · AR', 'Try on Bracelet · AR')
+                      : t('Trải nghiệm Dây Chuyền · AR', 'Try on Necklace · AR')}
                 </button>
               )}
               {defaultSizes.length > 1 && (

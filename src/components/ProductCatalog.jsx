@@ -275,11 +275,10 @@ export default function ProductCatalog({
                               e.stopPropagation();
                               setTryOnProduct(product);
                             }}
-                            title={product.category === 'Nhẫn' ? t('Ướm thử nhẫn · AR', 'Try on ring · AR') : product.category === 'Vòng tay' ? t('Ướm thử vòng tay · AR', 'Try on bracelet · AR') : t('Ướm thử lên cổ · AR', 'Try on necklace · AR')}
-                            className="h-9 px-2.5 rounded-full bg-dark-950/90 backdrop-blur-md border border-amber-300/50 text-amber-200 flex items-center justify-center gap-1 text-[11px] font-bold shadow-lg hover:scale-105 hover:border-amber-300 hover:bg-amber-400/20 transition-all cursor-pointer"
+                            title={product.category === 'Nhẫn' ? t('Trải nghiệm Nhẫn · AR', 'Try on Ring · AR') : product.category === 'Vòng tay' ? t('Trải nghiệm Vòng Tay · AR', 'Try on Bracelet · AR') : t('Trải nghiệm Dây Chuyền · AR', 'Try on Necklace · AR')}
+                            className="h-9 px-3 rounded-full bg-dark-950/90 backdrop-blur-md border border-amber-300/50 text-amber-200 flex items-center justify-center text-[11px] font-bold shadow-lg hover:scale-105 hover:border-amber-300 hover:bg-amber-400/20 transition-all cursor-pointer"
                           >
-                            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-                            <span>Ướm AR</span>
+                            <span>Trải Nghiệm AR</span>
                           </button>
                         )}
                         {product.hasNFC && (
@@ -351,15 +350,14 @@ export default function ProductCatalog({
                               e.stopPropagation();
                               setTryOnProduct(product);
                             }}
-                            className="w-full py-2 px-3 rounded-xl border border-amber-100/40 text-amber-100 bg-amber-100/10 text-xs font-semibold hover:bg-amber-100/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                            className="w-full py-2 px-3 rounded-xl border border-amber-100/40 text-amber-100 bg-amber-100/10 text-xs font-semibold hover:bg-amber-100/20 transition-all flex items-center justify-center cursor-pointer shadow-sm"
                           >
-                            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                             <span>
                               {product.category === 'Nhẫn'
-                                ? t('Ướm thử nhẫn · AR', 'Try on ring · AR')
+                                ? t('Trải nghiệm Nhẫn · AR', 'Try on Ring · AR')
                                 : product.category === 'Vòng tay'
-                                  ? t('Ướm thử vòng tay · AR', 'Try on bracelet · AR')
-                                  : t('Ướm thử lên cổ · AR', 'Try on necklace · AR')}
+                                  ? t('Trải nghiệm Vòng Tay · AR', 'Try on Bracelet · AR')
+                                  : t('Trải nghiệm Dây Chuyền · AR', 'Try on Necklace · AR')}
                             </span>
                           </button>
                         )}

@@ -22,11 +22,11 @@ export function drawNecklace(ctx,pose,image,{length=45,scale=1,offset=0,pendantS
   ctx.save();ctx.translate(pose.x,pose.y+span*clamp(offset,-.3,.3));ctx.rotate(pose.angle);
   const metal=ctx.createLinearGradient(-span*.16,0,span*.16,drop);
   metal.addColorStop(0,'#8b95a0');metal.addColorStop(.45,'#f8fafc');metal.addColorStop(1,'#a7b2bf');
-  ctx.beginPath();ctx.moveTo(-span*.16,-span*.09);
-  ctx.bezierCurveTo(-span*.14,drop*.65,-span*.06,drop,0,drop);
-  ctx.bezierCurveTo(span*.06,drop,span*.14,drop*.65,span*.16,-span*.09);
-  ctx.strokeStyle=metal;ctx.lineWidth=Math.max(1.3,span*.006);ctx.shadowColor='#0007';ctx.shadowBlur=2;ctx.stroke();
-  ctx.setLineDash([1,3]);ctx.lineWidth=Math.max(.7,span*.0025);ctx.strokeStyle='#fff9';ctx.stroke();ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(-span*.22,-span*.24);
+  ctx.bezierCurveTo(-span*.18,drop*.25,-span*.08,drop,0,drop);
+  ctx.bezierCurveTo(span*.08,drop,span*.18,drop*.25,span*.22,-span*.24);
+  ctx.strokeStyle=metal;ctx.lineWidth=Math.max(2.6,span*.012);ctx.shadowColor='#0007';ctx.shadowBlur=3;ctx.stroke();
+  ctx.setLineDash([1,3]);ctx.lineWidth=Math.max(1.3,span*.005);ctx.strokeStyle='#fff9';ctx.stroke();ctx.setLineDash([]);
   if(!chainOnly && image && image.complete && image.naturalWidth > 0){
     ctx.drawImage(image,-size/2,drop-size*.05,size,size*188/160);
   }

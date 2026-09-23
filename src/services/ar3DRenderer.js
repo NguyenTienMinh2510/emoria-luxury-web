@@ -94,7 +94,7 @@ export class AR3DScene{
   setOptions(options){Object.assign(this.options,options);}
   updateChain(pose){
     if(!this.chain){
-      this.chain=new THREE.InstancedMesh(new THREE.TorusGeometry(.7,.13,6,12),new THREE.MeshStandardMaterial({color:0xdde4ed,metalness:0.98,roughness:.15,envMapIntensity:1.85}),160);
+      this.chain=new THREE.InstancedMesh(new THREE.TorusGeometry(1.0,.28,8,16),new THREE.MeshStandardMaterial({color:0xdde4ed,metalness:0.98,roughness:.12,envMapIntensity:2.2}),200);
       this.chain.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.chain.frustumCulled=false;this.scene.add(this.chain);
     }
     // Link positions change only with chain length; body motion transforms one mesh.
@@ -102,14 +102,19 @@ export class AR3DScene{
     if(this.chainLength!==length){
       this.chainLength=length;
       const drop=.02+(clamp(length,30,60)-40)*.012;
-      const link=new THREE.Object3D(),step=1/310;
+      const link=new THREE.Object3D(),step=1/200;
       for(let side=0;side<2;side++){
         const sign=side?1:-1;
-        const curve=new THREE.CubicBezierCurve3(new THREE.Vector3(sign*.16,.09,0),new THREE.Vector3(sign*.14,-drop*.5,0),new THREE.Vector3(sign*.06,-drop,0),new THREE.Vector3(0,-drop,0));
-        for(let i=0;i<80;i++){
-          link.position.copy(curve.getPointAt(i/79));
-          link.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),curve.getTangentAt(i/79));
-          link.rotateY(i%2?Math.PI/2.5:0);link.scale.set(step,step*1.4,step);link.updateMatrix();this.chain.setMatrixAt(side*80+i,link.matrix);
+        const curve=new THREE.CubicBezierCurve3(
+          new THREE.Vector3(sign*.22,.24,0),
+          new THREE.Vector3(sign*.18,-drop*.2,0),
+          new THREE.Vector3(sign*.08,-drop,0),
+          new THREE.Vector3(0,-drop,0)
+        );
+        for(let i=0;i<100;i++){
+          link.position.copy(curve.getPointAt(i/99));
+          link.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),curve.getTangentAt(i/99));
+          link.rotateY(i%2?Math.PI/2.2:0);link.scale.set(step,step*1.45,step);link.updateMatrix();this.chain.setMatrixAt(side*100+i,link.matrix);
         }
       }
       this.chain.instanceMatrix.needsUpdate=true;

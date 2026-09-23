@@ -324,9 +324,8 @@ export default function ShopView({
                           </span>
                         )}
                         {product.tryOnAvailable && (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase bg-amber-400 text-dark-950 shadow-md flex items-center gap-1">
-                            <Sparkles className="w-2.5 h-2.5" />
-                            <span>Ướm AR</span>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase bg-amber-400 text-dark-950 shadow-md flex items-center">
+                            <span>Gương AR</span>
                           </span>
                         )}
                       </div>
@@ -336,11 +335,10 @@ export default function ShopView({
                         {product.tryOnAvailable && (
                           <button
                             onClick={() => setTryOnId(product.id)}
-                            className="px-3 py-2 rounded-xl bg-amber-300 hover:bg-amber-200 text-dark-950 font-bold text-xs transition-all duration-200 flex items-center gap-1.5 shadow-lg cursor-pointer hover:scale-105"
-                            title="Ướm thử gương AR"
+                            className="px-3 py-2 rounded-xl bg-amber-300 hover:bg-amber-200 text-dark-950 font-bold text-xs transition-all duration-200 flex items-center shadow-lg cursor-pointer hover:scale-105"
+                            title="Trải nghiệm gương AR"
                           >
-                            <Sparkles className="w-3.5 h-3.5 text-dark-950" />
-                            <span>Ướm AR</span>
+                            <span>Trải Nghiệm AR</span>
                           </button>
                         )}
 
@@ -368,15 +366,14 @@ export default function ShopView({
                       <div className="px-4 pt-3">
                         <button
                           onClick={() => setTryOnId(product.id)}
-                          className="w-full min-h-11 rounded-xl border border-amber-300/40 text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 text-xs font-bold tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(250,204,21,0.15)] hover:border-amber-300"
+                          className="w-full min-h-11 rounded-xl border border-amber-300/40 text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 text-xs font-bold tracking-wider transition-all flex items-center justify-center cursor-pointer shadow-[0_0_15px_rgba(250,204,21,0.15)] hover:border-amber-300"
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
                           <span>
                             {product.category === 'Nhẫn'
-                              ? t('Ướm thử nhẫn · AR', 'Try on ring · AR')
+                              ? t('Trải nghiệm Nhẫn · AR', 'Try on Ring · AR')
                               : product.category === 'Vòng tay'
-                                ? t('Ướm thử vòng tay · AR', 'Try on bracelet · AR')
-                                : t('Ướm thử lên cổ · AR', 'Try on necklace · AR')}
+                                ? t('Trải nghiệm Vòng Tay · AR', 'Try on Bracelet · AR')
+                                : t('Trải nghiệm Dây Chuyền · AR', 'Try on Necklace · AR')}
                           </span>
                         </button>
                       </div>
