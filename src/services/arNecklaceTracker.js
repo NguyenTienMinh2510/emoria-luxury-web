@@ -87,7 +87,7 @@ export class NecklaceTracker {
   fallback(){if(this.closed)return;clearTimeout(this.modelTimer);this.worker?.terminate();this.worker=null;this.workerReady=false;this.busy=false;this.manual=true;this.state('manual-fallback');}
   setOptions(options){
     Object.assign(this.options,options);
-    this.scene3d?.setOptions({shoulderReferenceMm:this.config.shoulderReferenceMm});
+    this.scene3d?.setOptions({...this.options,shoulderReferenceMm:this.config.shoulderReferenceMm});
   }
   setManual(manual){this.manual=manual||!this.workerReady;this.pose=null;this.lastSeen=0;this.state(this.manual?'manual':'searching');}
   snapshot(){

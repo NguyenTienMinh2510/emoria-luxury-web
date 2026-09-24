@@ -116,7 +116,8 @@ export class AR3DScene{
     const pixelsPerMm=(pose.scaleSpan||pose.span)/(this.options.shoulderReferenceMm||360);
     const lengthFactor=(this.options.length||45)/45;
     this.chain.scale.set(pixelsPerMm,pixelsPerMm*lengthFactor,pixelsPerMm);
-    this.chain.position.set(pose.x-this.width/2,this.height/2-pose.y,0);
+    const topShiftY=65*(lengthFactor-1)*pixelsPerMm;
+    this.chain.position.set(pose.x-this.width/2,this.height/2-pose.y-topShiftY,0);
     if(pose.quaternion)this.chain.quaternion.copy(pose.quaternion);
     else this.chain.rotation.set(0,0,-pose.angle);
   }

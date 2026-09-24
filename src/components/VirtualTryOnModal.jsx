@@ -85,11 +85,11 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
   useEffect(()=>{
     if(!engine.current)return;
     if(isHand){
-      engine.current.setOptions({size:trySize,scale:config?.type==='ring'?1:scale,offset,finger:selectedFinger});
+      engine.current.setOptions({size:trySize,scale:1,offset,finger:selectedFinger});
     }else{
-      engine.current.setOptions({length,scale,offset});
+      engine.current.setOptions({length,scale:1,offset});
     }
-  },[length,trySize,selectedFinger,scale,offset,isHand,config?.type]);
+  },[length,trySize,selectedFinger,offset,isHand,config?.type]);
 
   async function start(){
     if(!config||status==='starting')return;
@@ -106,9 +106,9 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
 
     engine.current=tracker;
     if(isHand){
-      tracker.setOptions({size:trySize,scale,offset,finger:selectedFinger});
+      tracker.setOptions({size:trySize,scale:1,offset,finger:selectedFinger});
     }else{
-      tracker.setOptions({length,scale,offset});
+      tracker.setOptions({length,scale:1,offset});
     }
 
     try{await tracker.start();}catch(e){
@@ -485,12 +485,6 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
               </div>
             </div>}
 
-            {config?.type==='bracelet'&&(
-              <label className="block text-sm">
-                {t('Độ to của vòng (Tỉ lệ tổng thể)','Bracelet scale')}
-                <input aria-label="Scale slider" className="w-full h-11 accent-slate-200" type="range" min="0.65" max="1.6" step="0.05" value={scale} onChange={e=>setScale(Number(e.target.value))}/>
-              </label>
-            )}
             {isHand&&<label className="block text-sm">{t('Vị trí cao / thấp','Vertical placement')}<input aria-label="Vertical placement" className="w-full h-11 accent-slate-200" type="range" min="-0.3" max="0.3" step="0.01" value={offset} onChange={e=>setOffset(Number(e.target.value))}/></label>}
 
             {/* Size Guide Button */}

@@ -38,7 +38,7 @@ export function smoothPose(previous,next,dt) {
 }
 export function drawNecklace(ctx,pose,image,{length=45,scale=1,offset=0,pendantScale=.18,chainOnly=false}={}) {
   if(!pose)return;
-  const span=pose.span,drop=span*({40:.02,45:.08,50:.14}[length]??.08),size=span*pendantScale*clamp(scale,.65,1.6);
+  const span=pose.span,lengthNum=Number(length)||45,drop=span*(0.08+(lengthNum-45)*0.012),size=span*pendantScale*clamp(scale,.65,1.6);
   ctx.save();ctx.translate(pose.x,pose.y+span*clamp(offset,-.3,.3));ctx.rotate(pose.angle);
   const metal=ctx.createLinearGradient(-span*.16,0,span*.16,drop);
   metal.addColorStop(0,'#8b95a0');metal.addColorStop(.45,'#f8fafc');metal.addColorStop(1,'#a7b2bf');
