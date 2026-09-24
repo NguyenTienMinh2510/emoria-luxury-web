@@ -52,6 +52,31 @@ assert.ok(drawCalls.some(c=>c[0]==='ellipse'||c[0]==='arc'));
 drawBracelet(ctx,bPose,null,{braceletScale:0.35,size:16});
 assert.ok(drawCalls.some(c=>c[0]==='ellipse'));
 
+// Physical units, motion response, bounded prediction and full hand rotation.
+import {landmarkPixelsPerMm,predictTrackingPose} from '../src/services/arTracking.js';
+import {previewSizeForVariant} from '../src/services/jewelrySizing.js';
+assert.equal(previewSizeForVariant('Dây 45cm','necklace'),45);
+assert.equal(previewSizeForVariant('17,5 mm','ring'),17.5);
+for(const label of ['Ni 17','16-19mm','45cm + 5cm','17mm / 19mm','Tiêu chuẩn'])assert.equal(previewSizeForVariant(label,'ring'),null);
+assert.equal(previewSizeForVariant('45cm + 5','necklace'),null);
+const moving=smoothHandPose(rPose,{...rPose,x:rPose.x+15},33);
+assert.ok(moving.x-rPose.x>14,'Motion should follow at least 93% of a step within one 30fps sample');
+assert.deepEqual(smoothHandPose(rPose,{...rPose,x:rPose.x+10},200),{...rPose,x:rPose.x+10},'Reacquisition must snap to current detection');
+const predicted=predictTrackingPose({x:100,y:100,time:0},{x:110,y:100,span:100,time:33},66);
+assert.equal(predicted.x,120);assert.equal(predicted.y,100);
+assert.ok(predictTrackingPose({x:0,y:0,time:0},{x:100,y:100,span:100,time:33},500).x<109,'Prediction must remain bounded');
+const metricHand=handPoints.map(p=>({x:p.x*640/2000,y:p.y*480/2000,z:p.z*640/2000}));
+assert.ok(Math.abs(landmarkPixelsPerMm(handPoints,metricHand,640,480,[[0,5],[5,17]])-2)<1e-8);
+assert.equal(landmarkPixelsPerMm(handPoints,null,640,480,[[0,5]]),null);
+const ringMetric=ringPose(handPoints,640,480,'ring',metricHand,'Right');
+assert.ok(Math.abs(ringMetric.pixelsPerMm-2)<1e-8);
+for(const yaw of [0,.8,1.7,2.5]){
+  const turn=handPoints.map(p=>{const x=(p.x-.5)*640;return {...p,x:.5+x*Math.cos(yaw)/640,z:x*Math.sin(yaw)/640};});
+  const tracked=ringPose(turn,640,480,'ring',null,'Right');
+  const normal=new THREE.Vector3(0,0,1).applyQuaternion(tracked.quaternion);
+  assert.ok(Math.abs(normal.z-Math.cos(yaw))<1e-6,'Ornament must rotate with hand rather than flip back to camera');
+}
+
 // Real GLB dimensions, masks, scale updates and late-load disposal.
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -67,7 +92,7 @@ for(const name of ['lumen','faith','sen','horizon','pulse','echo','halo','orbit'
  const scene=new AR3DScene(640,480);scene.activeModel=root;scene.setOptions({scale:1,size:c.defaultSize,pendantScale:c.pendantScale});
  scene.updatePose3D({x:320,y:240,span:200,angle:0},c.type);const first=root.scale.x;
  scene.updatePose3D({x:320,y:240,span:400,angle:0},c.type);assert.equal(root.scale.x,first*2);
- scene.setOptions({scale:1.5});scene.updatePose3D({x:320,y:240,span:400,angle:0},c.type);assert.equal(root.scale.x,first*(c.type==='necklace'?2:3));
+ scene.setOptions({scale:1.5});scene.updatePose3D({x:320,y:240,span:400,angle:0},c.type);assert.equal(root.scale.x,first*(c.type==='necklace'?2.4:3));
  if(c.type==='necklace'){
    assert.ok(gltf.scene.getObjectByName('ChainAnchor'),name+' needs an authored bail anchor');
    assert.ok(Math.abs(root.userData.chainAnchor.y-({lumen:16.9,faith:16.5,sen:20}[name]))<.001);
@@ -82,6 +107,23 @@ for(const name of ['lumen','faith','sen','horizon','pulse','echo','halo','orbit'
  }
  scene.dispose();
 }
+// Opening uses mm, band width stays constant, and pendant width follows catalog.
+const physicalScene=new AR3DScene(640,480);
+physicalScene.activeModel=new THREE.Group();physicalScene.activeModel.userData.widthMm=20;
+physicalScene.setOptions({size:17,modelSize:17});physicalScene.updatePose3D({...ringMetric,pixelsPerMm:2},'ring');
+assert.equal(physicalScene.activeModel.scale.x,2);assert.equal(physicalScene.activeModel.scale.y,2);
+physicalScene.setOptions({size:19});physicalScene.updatePose3D({...ringMetric,pixelsPerMm:2},'ring');
+assert.equal(physicalScene.activeModel.scale.x,2*19/17);assert.equal(physicalScene.activeModel.scale.y,2);
+physicalScene.dispose();
+const pendantScene=new AR3DScene(640,480);pendantScene.activeModel=new THREE.Group();
+pendantScene.activeModel.userData={widthMm:28,chainAnchor:new THREE.Vector3(0,16.9,0)};
+pendantScene.setOptions({pendantWidthMm:12,length:45});pendantScene.updateNecklace({...pose,pixelsPerMm:2});
+assert.ok(Math.abs(pendantScene.activeModel.scale.x*28-24)<1e-8);
+const pendantScale=pendantScene.activeModel.scale.x,linkScale=pendantScene.chain.scale.clone(),drop45=pendantScene.chain.userData.anchor.y;
+pendantScene.setOptions({length:50});pendantScene.updateNecklace({...pose,pixelsPerMm:2});
+assert.equal(pendantScene.activeModel.scale.x,pendantScale);assert.deepEqual(pendantScene.chain.scale,linkScale);
+assert.ok(pendantScene.chain.userData.anchor.y<drop45,'A longer chain hangs lower without enlarging links or pendant');
+pendantScene.dispose();
 let resolveModel,disposed=0;const pending=new AR3DScene();
 const lateMesh=new THREE.Mesh(new THREE.BoxGeometry(.02,.02,.02),new THREE.MeshStandardMaterial());lateMesh.geometry.addEventListener('dispose',()=>disposed++);
 pending.loader={loadAsync:()=>new Promise(r=>resolveModel=r)};
@@ -89,7 +131,7 @@ const loading=pending.setModel('x','ring',{modelUrl:'/models/jewelry/emoria-halo
 const chainScene=new AR3DScene();chainScene.setOptions({length:45});chainScene.updateChain(pose);
 const chainVersion=chainScene.chain.instanceMatrix.version;chainScene.updateChain({...pose,x:400});
 assert.equal(chainScene.chain.instanceMatrix.version,chainVersion,'Body movement must not rebuild chain geometry');
-chainScene.setOptions({length:50,scale:1.6,offset:.3});chainScene.updateChain(pose);assert.equal(chainScene.chain.instanceMatrix.version,chainVersion,'Fixed necklace geometry ignores former customer controls');chainScene.dispose();
+chainScene.setOptions({length:50,scale:1.6,offset:.3});chainScene.updateChain(pose);assert.equal(chainScene.chain.userData.length,50);assert.ok(Math.abs(chainScene.chain.userData.visibleLengthMm+Math.PI*66-500)<.01,'Chain centreline plus the back of the neck must match chosen length');chainScene.dispose();
 await assert.rejects(new AR3DScene().setModel('x','ring',{modelUrl:'https://untrusted.test/x.glb'}));
 assert.equal(tryOnConfig('emoria-lumen',{details:{ar:{enabled:false}}}),null);
 assert.equal(tryOnConfig('emoria-lumen',{details:{ar:{type:'necklace',modelUrl:'/models/custom.glb'}}}).modelUrl,'/models/custom.glb');
@@ -123,7 +165,7 @@ globalThis.fetch=async(url,options)=>{requests++;assert.equal(options.method,'GE
 async function get(id,method='GET') {let result;await handler({method,url:'/api/v1/products/'+id+'/try-on',headers:method==='GET'?{}:{'content-type':'application/json'},body:method==='GET'?undefined:{}},{setHeader(){},end(raw){result={status:this.statusCode,data:JSON.parse(raw)};}});return result;}
 try{
  const solaris=await get('emoria-solaris-keyring');assert.equal(solaris.status,404);
- const r=await get('emoria-lumen');assert.equal(r.status,200);assert.equal(r.data.fixedDimensions,true);assert.equal(r.data.previewLengths,undefined);assert.equal(r.data.productId,'emoria-lumen');
+ const r=await get('emoria-lumen');assert.equal(r.status,200);assert.equal(r.data.fixedDimensions,true);assert.deepEqual(r.data.previewLengths,[45,50]);assert.equal(r.data.productId,'emoria-lumen');
  assert.equal((await get('emoria-lumen','POST')).status,405);
  active=false;assert.equal((await get('emoria-lumen')).status,404);
 }finally{globalThis.fetch=actualFetch;}

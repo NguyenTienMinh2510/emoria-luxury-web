@@ -1,8 +1,8 @@
 {
   "product": "echo",
   "file": "emoria-echo.glb",
-  "triangles": 31118,
-  "bytes": 815164,
+  "triangles": 43406,
+  "bytes": 1060932,
   "reference": "/ar/echo.jpg",
   "dimensionsVerified": false
 }

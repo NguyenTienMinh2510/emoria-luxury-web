@@ -1,4 +1,5 @@
 import {Euler,Quaternion} from 'three';
+import {landmarkPixelsPerMm,smoothTrackingPose} from './arTracking.js';
 const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
 export function necklacePose(points,width,height,worldPoints=null) {
   const a=points?.[11],b=points?.[12];
@@ -26,16 +27,9 @@ export function necklacePose(points,width,height,worldPoints=null) {
   const quaternion=new Quaternion().setFromEuler(new Euler(pitch,yaw,-angle,'ZYX'));
   const scaleSpan=span/Math.max(.4,Math.cos(yaw));
   const z=((a.z||0)+(b.z||0))*width/2;
-  return {x:(a.x+b.x)*width/2,y:(a.y+b.y)*height/2,z,span,scaleSpan,angle,quaternion};
+  return {x:(a.x+b.x)*width/2,y:(a.y+b.y)*height/2,z,span,scaleSpan,angle,quaternion,pixelsPerMm:landmarkPixelsPerMm(points,worldPoints,width,height,[[11,12]])};
 }
-export function smoothPose(previous,next,dt) {
-  if(!next)return null;
-  if(!previous||Math.hypot(next.x-previous.x,next.y-previous.y)>next.span*.5)return {...next};
-  const alpha=1-Math.exp(-clamp(dt,0,200)/85);
-  const result=Object.fromEntries(['x','y','z','span','scaleSpan','angle'].map(k=>[k,(previous[k]||0)+((next[k]||0)-(previous[k]||0))*alpha]));
-  result.quaternion=next.quaternion?(previous.quaternion?.clone()||next.quaternion.clone()).slerp(next.quaternion,alpha):null;
-  return result;
-}
+export const smoothPose = smoothTrackingPose;
 export function drawNecklace(ctx,pose,image,{length=45,scale=1,offset=0,pendantScale=.18,chainOnly=false}={}) {
   if(!pose)return;
   const span=pose.span,lengthNum=Number(length)||45,drop=span*(0.08+(lengthNum-45)*0.012),size=span*pendantScale*clamp(scale,.65,1.6);

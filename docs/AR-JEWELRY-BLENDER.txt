@@ -1,6 +1,51 @@
 EMORIA — AR models from Whisk reference images
 Updated 2026-09-24
 
+REVISION: SIMPLE SIZING / RESPONSIVE TRACKING (2026-09-24)
+This section supersedes the historical revision notes below.
+- Removed card/ID calibration and screen-ruler workflows from the shared size guide.
+  Ring: inside diameter of an existing well-fitting ring, using a real ruler;
+  wrist: soft tape; necklace: a cord cut to the desired chain length.
+  Circumference = pi * inside diameter. No inferred national ring-size mapping.
+- AR v4 uses world-landmark estimates in metres to estimate pixels/mm. Median
+  hand-bone ratios reduce local landmark noise. Without world data the old
+  anatomical scale is retained as an approximation, including 360 mm shoulders.
+  A customer correction of 80–120% is available under Fine-tune the fit.
+- Ring inner diameter follows selected mm; band width is 3.8 mm from catalog
+  instead of the source mesh's 5.3 mm. Only the radial plane resizes with size.
+  Bracelet base centreline ellipse (29 by 19 mm radii) is approximately 15.25 cm.
+- Catalog necklace widths: Lumen/Faith 12 mm, Sen 13 mm. Renderer corrects the
+  larger source GLBs without losing the authored chain/bail connection.
+  Confirm these against manufactured pieces before claiming physical accuracy.
+- Necklace 45/50 cm choices change front-curve arc length; each link and pendant
+  retain their dimensions. The unrendered back is an approximate 66 mm radius
+  semicircle. Neck shape, clothing occlusion and realistic drape remain estimates.
+- Explicit purchase labels like 17 mm or 45 cm update the preview. Numbered sizes,
+  ranges and duo labels are not guessed; preview choice never silently changes cart.
+- Workers return capture timestamps, world landmarks and hand handedness.
+  Request interval reduced from 48 to 30 ms; camera target 30 fps. Rendering
+  follows display refresh without the old additional 33 ms gate.
+  Motion-responsive smoothing replaces 85 ms smoothing. Translation prediction
+  is capped at 45 ms / 12% of tracked span. Results older than 180 ms are hidden.
+  The supported necklace turn range still requires both shoulders visible.
+- Halo/Echo bevels now have 24 profile vertices rather than 8, with unchanged
+  inner diameter; GLBs and Blender roundtrip renders rebuilt. 33,758 / 43,406 tris.
+  Lower AR exposure retains more visible metal/enamel surface detail.
+- Automated tests: world-to-pixel conversion, fast motion response, prediction
+  cap, rear-facing hand orientation, physical size changes, chain arc length,
+  fixed link/pendant dimensions, GLB lifecycle, existing API/security checks.
+- Browser QA in this revision: desktop and 390 px layout; diameter 17 mm ->
+  circumference 53.4 mm; Escape restores the parent AR dialog. Real pose worker
+  detected shoulders in the existing public-photo synthetic camera fixture;
+  45 -> 50 cm selection worked, capture produced a local blob, and camera tracks
+  ended on close. No horizontal overflow at 390 px. Physical phone latency,
+  physical fit and production deployment are not verified.
+- Measurement references:
+  https://www.gia.edu/quality-assurance-benchmark/accurate-determination-finger-ring-size
+  https://www.tiffany.ae/en-ae/size-guide
+  https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker/web_js
+
+HISTORICAL REVISION (superseded where noted above):
 REVISION: FIXED NECKLACES, 3D SIDE VIEWS, ORBIT
 Current assets: 8 GLBs including emoria-orbit.glb (blue/gold bracelet, duo previews one).
 Orbit reference: public/ar/orbit.jpg. Chain reference: public/ar/chain.jpg.

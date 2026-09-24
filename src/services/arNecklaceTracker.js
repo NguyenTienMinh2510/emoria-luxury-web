@@ -1,15 +1,16 @@
+import {predictTrackingPose,computeDistanceMetrics} from './arTracking.js';
 import {necklacePose,smoothPose,drawNecklace} from './arGeometry.js';
 import {AR3DScene,isWebGLAvailable} from './ar3DRenderer.js';
 
 
 export class NecklaceTracker {
-  constructor(video,canvas,config,onState){
-    Object.assign(this,{video,canvas,config,onState,closed:false,manual:false,options:{length:45,scale:1,offset:0},lastFrame:-1,lastRequest:0,lastSeen:0,scene3d:null});
+  constructor(video,canvas,config,onState,onMetrics){
+    Object.assign(this,{video,canvas,config,onState,onMetrics,closed:false,manual:false,options:{length:config.defaultLength||45,scale:1,pendantScale:config.pendantScale||1,offset:0},lastFrame:-1,lastRequest:0,lastSeen:0,lastMetricsTime:0,scene3d:null});
   }
   state(value){if(!this.closed&&value!==this.lastState){this.lastState=value;this.onState(value);}}
   async start(){
     if(!globalThis.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw Object.assign(Error('Camera requires HTTPS'),{name:'UnsupportedError'});
-    const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:720},height:{ideal:960},frameRate:{ideal:24,max:30}}});
+    const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:720},height:{ideal:960},frameRate:{ideal:30,max:30}}});
     if(this.closed){stream.getTracks().forEach(t=>t.stop());return;}
     this.stream=stream;this.video.srcObject=stream;
     try{
@@ -26,9 +27,10 @@ export class NecklaceTracker {
         try{
           this.scene3d=new AR3DScene(this.canvas.width,this.canvas.height);
           await this.scene3d.setModel(this.config.productId,'necklace',{
-            modelUrl:this.config.modelUrl,
+            ...this.config,modelUrl:this.config.modelUrl,
             length:this.options.length,
             scale:this.options.scale,
+            pendantScale:this.options.pendantScale,
             shoulderReferenceMm:this.config.shoulderReferenceMm
           });
         }catch(error){this.scene3d?.dispose();this.scene3d=null;throw Object.assign(error,{name:"ModelLoadError"});}
@@ -38,11 +40,10 @@ export class NecklaceTracker {
       this.render=()=>{
         if(this.closed)return;
         const now=performance.now(),{width,height}=this.canvas;
-        if(now-(this.lastRender||0)<33){this.frame=requestAnimationFrame(this.render);return;}this.lastRender=now;
         this.ctx.save();this.ctx.translate(width,0);this.ctx.scale(-1,1);this.ctx.drawImage(this.video,0,0,width,height);
-        const pose=this.manual?{x:width/2,y:height*.57,z:0,span:Math.min(width*.7,height*.52),angle:0}:now-this.lastSeen<650?this.pose:null;
+        const pose=this.manual?{x:width/2,y:height*.57,z:0,span:Math.min(width*.7,height*.52),angle:0}:now-this.lastSeen<400&&this.pose?predictTrackingPose(this.previousPose,this.pose,now):null;
         if(pose){
-          const pScale=this.config.pendantScale||.18;
+          const pScale=(this.options.pendantScale||1)*(this.config.pendantScale||.18);
           if(!this.scene3d)drawNecklace(this.ctx,pose,this.image,{...this.options,pendantScale:pScale,chainOnly:!!(this.scene3d&&this.scene3d.renderer)});
           if(this.scene3d&&this.scene3d.renderer){
             this.scene3d.updateNecklace(pose);
@@ -53,7 +54,11 @@ export class NecklaceTracker {
         this.ctx.restore();
         if(!this.manual&&this.workerReady){
           this.state(pose?'tracking':'searching');
-          if(!this.busy&&this.video.currentTime!==this.lastFrame&&now-this.lastRequest>=48){
+          if(this.onMetrics&&now-this.lastMetricsTime>=100){
+            this.lastMetricsTime=now;
+            this.onMetrics(computeDistanceMetrics('necklace',pose,width));
+          }
+          if(!this.busy&&this.video.currentTime!==this.lastFrame&&now-this.lastRequest>=30){
             this.lastRequest=now;this.lastFrame=this.video.currentTime;this.busy=true;
             const ratio=Math.min(1,512/Math.max(width,height));
             createImageBitmap(this.video,{resizeWidth:Math.round(width*ratio),resizeHeight:Math.round(height*ratio)}).then(bitmap=>{
@@ -77,8 +82,15 @@ export class NecklaceTracker {
         if(this.closed)return;
         if(data.type==='ready'){clearTimeout(this.modelTimer);this.workerReady=true;this.state('searching');}
         else if(data.type==='pose'){
-          this.busy=false;const now=performance.now(),pose=necklacePose(data.points,this.canvas.width,this.canvas.height,data.worldPoints);
-          this.pose=smoothPose(this.pose,pose,now-(this.lastSeen||now-100));if(pose)this.lastSeen=now;
+          this.busy=false;const now=performance.now(),rawPose=necklacePose(data.points,this.canvas.width,this.canvas.height,data.worldPoints);
+          if(now-data.time>450)return;
+          if(rawPose){
+            this.previousPose=this.pose;
+            this.pose=smoothPose(this.pose,rawPose,data.time-(this.pose?.time??data.time-33));
+            if(this.pose){this.pose.time=data.time;this.lastSeen=now;}
+          }else if(now-this.lastSeen>400){
+            this.pose=null;this.previousPose=null;
+          }
         }else if(data.type==='error')this.fallback();
       };
       this.modelTimer=setTimeout(()=>this.fallback(),30000);this.worker.postMessage({type:'init'});

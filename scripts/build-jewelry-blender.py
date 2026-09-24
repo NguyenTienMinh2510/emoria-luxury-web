@@ -227,10 +227,17 @@ def pulse():
 
 def ring_surface(name,outer,inner,width,mat):
     # Ring hole axis Y, ornament faces +Z. Rounded rectangular radial profile.
-    profile=[(inner,-width/2+.25),(inner+.12,-width/2),(outer-.18,-width/2),(outer,-width/2+.2),(outer,width/2-.2),(outer-.18,width/2),(inner+.12,width/2),(inner,width/2-.25)]
+    # Resolve the comfort-fit bevel with real curved surfaces for close AR views.
+    bevel=min(.22,(outer-inner)*.45)
+    profile=[]
+    for r,y,start in [(inner+bevel,-width/2+bevel,180),(outer-bevel,-width/2+bevel,270),(outer-bevel,width/2-bevel,0),(inner+bevel,width/2-bevel,90)]:
+        for j in range(6):
+            angle=math.radians(start+j*18)
+            profile.append((r+bevel*math.cos(angle),y+bevel*math.sin(angle)))
+    count=len(profile)
     verts=[(r*math.sin(i*TAU/192),y,r*math.cos(i*TAU/192)) for i in range(192) for r,y in profile];faces=[]
     for i in range(192):
-        for j in range(8):faces.append((i*8+j,((i+1)%192)*8+j,((i+1)%192)*8+(j+1)%8,i*8+(j+1)%8))
+        for j in range(count):faces.append((i*count+j,((i+1)%192)*count+j,((i+1)%192)*count+(j+1)%count,i*count+(j+1)%count))
     return mesh(name,verts,faces,mat)
 
 def ring(kind):

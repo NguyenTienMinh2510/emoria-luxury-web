@@ -15,9 +15,11 @@ export function disposeModel(root){
 }
 
 // GLBs use meters, +Y up, +Z ornament face. Hand assets wrap the Y axis.
-export function prepareModel(asset,type){
+export function prepareModel(asset,type,options={}){
   const root=new THREE.Group();root.name=type+' / GLB';
   asset.scale.setScalar(1000);asset.updateMatrixWorld(true);
+  // The catalog band is 3.8 mm; shipped ring meshes were authored at 5.3 mm.
+  if(type==='ring'&&options.bandWidthMm){asset.scale.y*=options.bandWidthMm/5.3;asset.updateMatrixWorld(true);}
   const bounds=new THREE.Box3().setFromObject(asset),size=bounds.getSize(new THREE.Vector3());
   if(!Number.isFinite(size.length())||size.length()<1||size.length()>2000)throw Error('Invalid model dimensions');
   asset.traverse(o=>{
@@ -62,7 +64,7 @@ export class AR3DScene{
     if(typeof document!=='undefined'){
       this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'default'});
       this.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio||1,1.5));this.renderer.setSize(width,height);this.domElement=this.renderer.domElement;
-      this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;
+      this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.05;
       const pmrem=new THREE.PMREMGenerator(this.renderer),room=new RoomEnvironment();
       this.environment=pmrem.fromScene(room,.04);this.scene.environment=this.environment.texture;
       room.dispose();pmrem.dispose();
@@ -83,22 +85,30 @@ export class AR3DScene{
     const gltf=await this.loader.loadAsync(url);
     if(this.closed||ticket!==this.ticket){disposeModel(gltf.scene);return;}
     let model;
-    try{model=prepareModel(gltf.scene,type);}catch(error){disposeModel(gltf.scene);throw error;}
+    try{model=prepareModel(gltf.scene,type,this.options);}catch(error){disposeModel(gltf.scene);throw error;}
     if(this.activeModel)this.scene.remove(this.activeModel);disposeModel(this.activeModel);
     this.activeModel=model;this.currentType=type;this.scene.add(model);
   }
   setOptions(options){Object.assign(this.options,options);}
   updateChain(pose){
-    if(!this.chain){
+    const length=clamp(Number(this.options.length)||45,35,60);
+    if(!this.chain||this.chain.userData.length!==length){
+      if(this.chain){this.scene.remove(this.chain);disposeModel(this.chain);}
       // Millimetres: oval cable links with a round wire cross-section, not stretched tori.
       const points=Array.from({length:49},(_,i)=>new THREE.Vector3(1.05*Math.cos(i*Math.PI/24),1.7*Math.sin(i*Math.PI/24),0));
       const path=new THREE.CatmullRomCurve3(points.slice(0,-1),true);
       const geometry=new THREE.TubeGeometry(path,48,.44,10,true);
-      const curve=new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-66,65,-5),new THREE.Vector3(-55,12,-2),
-        new THREE.Vector3(-29,-39,0),new THREE.Vector3(0,-56,0),
-        new THREE.Vector3(29,-39,0),new THREE.Vector3(55,12,-2),new THREE.Vector3(66,65,-5)
+      // ponytail: approximate neck as a 66 mm radius semicircle; a measured
+      // neck scan would be needed for physically exact drape on each person.
+      const makeCurve=drop=>new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-66,65,-5),new THREE.Vector3(-55,65-(65+drop)*.44,-2),
+        new THREE.Vector3(-29,-drop+(65+drop)*.14,0),new THREE.Vector3(0,-drop,0),
+        new THREE.Vector3(29,-drop+(65+drop)*.14,0),new THREE.Vector3(55,65-(65+drop)*.44,-2),new THREE.Vector3(66,65,-5)
       ]);
+      const visibleLength=Math.max(140,length*10-Math.PI*66);
+      let low=-50,high=300;
+      for(let i=0;i<18;i++){const mid=(low+high)/2;if(makeCurve(mid).getLength()<visibleLength)low=mid;else high=mid;}
+      const curve=makeCurve((low+high)/2);
       // Odd count places exactly one link at the bail; neighbours alternate planes.
       const count=Math.ceil(curve.getLength()/2.35/2)*2+1;
       this.chain=new THREE.InstancedMesh(geometry,new THREE.MeshStandardMaterial({color:0xdde4ed,metalness:1,roughness:.19,envMapIntensity:1.6}),count);
@@ -112,12 +122,12 @@ export class AR3DScene{
       }
       this.chain.instanceMatrix.needsUpdate=true;
       this.chain.userData.anchor=curve.getPointAt(.5);
+      this.chain.userData.length=length;
+      this.chain.userData.visibleLengthMm=curve.getLength();
     }
-    const pixelsPerMm=(pose.scaleSpan||pose.span)/(this.options.shoulderReferenceMm||360);
-    const lengthFactor=(this.options.length||45)/45;
-    this.chain.scale.set(pixelsPerMm,pixelsPerMm*lengthFactor,pixelsPerMm);
-    const topShiftY=65*(lengthFactor-1)*pixelsPerMm;
-    this.chain.position.set(pose.x-this.width/2,this.height/2-pose.y-topShiftY,0);
+    const pixelsPerMm=(pose.pixelsPerMm||(pose.scaleSpan||pose.span)/(this.options.shoulderReferenceMm||360))*clamp(this.options.scale??1,.8,1.2);
+    this.chain.scale.setScalar(pixelsPerMm);
+    this.chain.position.set(pose.x-this.width/2,this.height/2-pose.y,0);
     if(pose.quaternion)this.chain.quaternion.copy(pose.quaternion);
     else this.chain.rotation.set(0,0,-pose.angle);
   }
@@ -125,7 +135,8 @@ export class AR3DScene{
     const model=this.activeModel;if(!model)return;
     model.visible=!!pose;if(this.chain)this.chain.visible=!!pose;if(!pose)return;
     this.updateChain(pose);
-    const scale=this.chain.scale.x;
+    const pScale=clamp(Number(this.options.pendantScale)||1,.5,3);
+    const scale=this.chain.scale.x*(this.options.pendantWidthMm?this.options.pendantWidthMm/model.userData.widthMm:1)*pScale;
     model.scale.setScalar(scale);model.quaternion.copy(this.chain.quaternion);
     // Same transform for chain and pendant. The chain passes through the GLB bail.
     const localAnchor=this.chain.userData.anchor;
@@ -138,8 +149,10 @@ export class AR3DScene{
     if(type==='necklace'){this.updateNecklace(pose);return;}
     const model=this.activeModel;if(!model)return;model.visible=!!pose;if(!pose)return;
     const o=this.options,adjust=clamp(o.scale??1,.65,1.6);
-    const width=type==='ring'?pose.span*.60*((o.size||17)/17)*((o.ringScale||.28)/.28):pose.span*((o.size||16)/16)*((o.braceletScale||.40)/.40);
-    model.scale.setScalar(width/model.userData.widthMm*adjust);
+    const pixelsPerMm=pose.pixelsPerMm||(type==='ring'?pose.span*.60/20:pose.span/58);
+    const sizeRatio=(Number(o.size)||(type==='ring'?17:16))/(o.modelSize||(type==='ring'?17:15.25));
+    // Resize the opening in its radial plane; preserve the band width along Y.
+    model.scale.set(pixelsPerMm*sizeRatio*adjust,pixelsPerMm*adjust,pixelsPerMm*sizeRatio*adjust);
     model.position.set(pose.x-this.width/2,this.height/2-pose.y-(type==='necklace'?0:pose.span*clamp(o.offset||0,-.3,.3)),0);
     if(pose.quaternion)model.quaternion.copy(pose.quaternion);
     else model.rotation.set(0,0,type==='ring'?-(pose.angle+Math.PI/2):-(pose.angle||0));

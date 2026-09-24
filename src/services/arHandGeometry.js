@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import {landmarkPixelsPerMm,smoothTrackingPose} from './arTracking.js';
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
-export function ringPose(points, width, height, finger = 'ring') {
+export function ringPose(points, width, height, finger = 'ring', worldPoints = null, handedness = null) {
   if (!points || !Array.isArray(points) || points.length < 21) return null;
   
   // Finger joint indices: [mcp, pip]
@@ -46,7 +47,7 @@ export function ringPose(points, width, height, finger = 'ring') {
       const kz = -((pinkyBase.z || 0) - (indexBase.z || 0)) * width;
       const vKnuckle = new THREE.Vector3(kx, ky, kz).normalize();
       const vNorm = new THREE.Vector3().crossVectors(vKnuckle, vBone).normalize();
-      if(vNorm.z<0)vNorm.negate(); // Keep ornament visible on either hand in the frontal try-on range.
+      if(handedness==='Left'||(!handedness&&vNorm.z<0))vNorm.negate();
       if (vNorm.lengthSq() > 0.1) {
         const vTan = new THREE.Vector3().crossVectors(vBone, vNorm).normalize();
         const m = new THREE.Matrix4().makeBasis(vTan, vBone, vNorm);
@@ -60,13 +61,14 @@ export function ringPose(points, width, height, finger = 'ring') {
     y: ringY,
     z: ringZ,
     span: boneLen,
+    pixelsPerMm: landmarkPixelsPerMm(points,worldPoints,width,height,[[0,5],[0,9],[0,17],[5,17],[mcpIdx,pipIdx]]),
     angle,
     quaternion,
     type: 'ring'
   };
 }
 
-export function braceletPose(points, width, height) {
+export function braceletPose(points, width, height, worldPoints = null, handedness = null) {
   if (!points || !Array.isArray(points) || points.length < 21) return null;
 
   const wrist = points[0];
@@ -107,7 +109,7 @@ export function braceletPose(points, width, height) {
     const vArm = new THREE.Vector3(-armDx, armDy, armDz).normalize();
     const vKnuckle = new THREE.Vector3(palmDx, -palmDy, -palmDz).normalize();
     const vNorm = new THREE.Vector3().crossVectors(vKnuckle, vArm).normalize();
-    if(vNorm.z<0)vNorm.negate();
+    if(handedness==='Left'||(!handedness&&vNorm.z<0))vNorm.negate();
     if (vNorm.lengthSq() > 0.1) {
       const vTan = new THREE.Vector3().crossVectors(vArm, vNorm).normalize();
       const m = new THREE.Matrix4().makeBasis(vTan, vArm, vNorm);
@@ -120,32 +122,14 @@ export function braceletPose(points, width, height) {
     y: braceletY,
     z: braceletZ,
     span: palmWidth * 1.05,
+    pixelsPerMm: landmarkPixelsPerMm(points,worldPoints,width,height,[[0,5],[0,9],[0,17],[5,17]]),
     angle: armAngle + Math.PI / 2, // Perpendicular to arm
     quaternion,
     type: 'bracelet'
   };
 }
 
-export function smoothHandPose(previous, next, dt) {
-  if (!next) return null;
-  if (!previous || Math.hypot(next.x - previous.x, next.y - previous.y) > next.span * 0.8) {
-    return { ...next };
-  }
-  const alpha = 1 - Math.exp(-clamp(dt, 0, 200) / 85);
-  let quaternion = next.quaternion;
-  if (previous.quaternion && next.quaternion) {
-    quaternion = previous.quaternion.clone().slerp(next.quaternion, alpha);
-  }
-  return {
-    x: previous.x + (next.x - previous.x) * alpha,
-    y: previous.y + (next.y - previous.y) * alpha,
-    z: (previous.z || 0) + ((next.z || 0) - (previous.z || 0)) * alpha,
-    span: previous.span + (next.span - previous.span) * alpha,
-    angle: previous.angle + Math.atan2(Math.sin(next.angle-previous.angle),Math.cos(next.angle-previous.angle))*alpha,
-    quaternion,
-    type: next.type
-  };
-}
+export const smoothHandPose = smoothTrackingPose;
 
 export function drawRing(ctx, pose, image, { size = 17, scale = 1, offset = 0, ringScale = 0.22 } = {}) {
   if (!pose) return;

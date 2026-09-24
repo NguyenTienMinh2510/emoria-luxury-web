@@ -1,13 +1,15 @@
+import {predictTrackingPose,computeDistanceMetrics} from './arTracking.js';
 import {ringPose,braceletPose,smoothHandPose,drawRing,drawBracelet} from './arHandGeometry.js';
 import {AR3DScene,isWebGLAvailable} from './ar3DRenderer.js';
 
 export class HandTracker {
-  constructor(video, canvas, config, onState) {
+  constructor(video, canvas, config, onState, onMetrics) {
     Object.assign(this, {
       video,
       canvas,
       config,
       onState,
+      onMetrics,
       closed: false,
       manual: false,
       options: {
@@ -19,6 +21,7 @@ export class HandTracker {
       lastFrame: -1,
       lastRequest: 0,
       lastSeen: 0,
+      lastMetricsTime: 0,
       pose: null,
       scene3d: null
     });
@@ -42,7 +45,7 @@ export class HandTracker {
         facingMode: 'user',
         width: { ideal: 720 },
         height: { ideal: 960 },
-        frameRate: { ideal: 24, max: 30 }
+        frameRate: { ideal: 30, max: 30 }
       }
     });
 
@@ -74,6 +77,7 @@ export class HandTracker {
         try {
           this.scene3d = new AR3DScene(this.canvas.width, this.canvas.height);
           await this.scene3d.setModel(this.config.productId, this.config.type, {
+            ...this.config,
             modelUrl: this.config.modelUrl,
             size: this.options.size,
             offset: this.options.offset,
@@ -91,7 +95,6 @@ export class HandTracker {
       this.render = () => {
         if (this.closed) return;
         const now = performance.now();
-        if(now-(this.lastRender||0)<33){this.frame=requestAnimationFrame(this.render);return;}this.lastRender=now;
         const { width, height } = this.canvas;
 
         this.ctx.save();
@@ -108,8 +111,8 @@ export class HandTracker {
               angle: this.config.type==='ring'?-Math.PI/2:0,
               type: this.config.type
             }
-          : now - this.lastSeen < 650
-          ? this.pose
+          : now - this.lastSeen < 400 && this.pose
+          ? predictTrackingPose(this.previousPose,this.pose,now)
           : null;
 
         if (pose && this.scene3d && this.scene3d.renderer) {
@@ -134,7 +137,11 @@ export class HandTracker {
 
         if (!this.manual && this.workerReady) {
           this.state(pose ? 'tracking' : 'searching');
-          if (!this.busy && this.video.currentTime !== this.lastFrame && now - this.lastRequest >= 48) {
+          if (this.onMetrics && now - this.lastMetricsTime >= 100) {
+            this.lastMetricsTime = now;
+            this.onMetrics(computeDistanceMetrics(this.config.type || 'ring', pose, width));
+          }
+          if (!this.busy && this.video.currentTime !== this.lastFrame && now - this.lastRequest >= 30) {
             this.lastRequest = now;
             this.lastFrame = this.video.currentTime;
             this.busy = true;
@@ -185,11 +192,21 @@ export class HandTracker {
           const now = performance.now();
           const rawPose =
             this.config.type === 'ring'
-              ? ringPose(data.points, this.canvas.width, this.canvas.height, this.options.finger)
-              : braceletPose(data.points, this.canvas.width, this.canvas.height);
+              ? ringPose(data.points, this.canvas.width, this.canvas.height, this.options.finger,data.worldPoints,data.handedness)
+              : braceletPose(data.points, this.canvas.width, this.canvas.height,data.worldPoints,data.handedness);
 
-          this.pose = smoothHandPose(this.pose, rawPose, now - (this.lastSeen || now - 100));
-          if (rawPose) this.lastSeen = now;
+          if (now - data.time > 450) return;
+          if (rawPose) {
+            this.previousPose = this.pose;
+            this.pose = smoothHandPose(this.pose, rawPose, data.time - (this.pose?.time ?? data.time - 33));
+            if (this.pose) {
+              this.pose.time = data.time;
+              this.lastSeen = now;
+            }
+          } else if (now - this.lastSeen > 400) {
+            this.pose = null;
+            this.previousPose = null;
+          }
         } else if (data.type === 'error') {
           this.fallback();
         }
@@ -213,6 +230,7 @@ export class HandTracker {
   }
 
   setOptions(options){
+    if(options.finger&&options.finger!==this.options.finger){this.pose=null;this.previousPose=null;}
     Object.assign(this.options,options);
     this.scene3d?.setOptions({...this.options,pendantScale:this.config.pendantScale});
   }

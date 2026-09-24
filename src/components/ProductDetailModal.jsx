@@ -299,6 +299,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
           <VirtualTryOnModal
             key={product.id}
             product={product}
+            initialSize={selectedSize}
             settings={settings}
             onAddToCart={onAddToCart}
             onClose={() => setTryOn(false)}
