@@ -114,7 +114,8 @@ export class AR3DScene{
       this.chain.userData.anchor=curve.getPointAt(.5);
     }
     const pixelsPerMm=(pose.scaleSpan||pose.span)/(this.options.shoulderReferenceMm||360);
-    this.chain.scale.setScalar(pixelsPerMm);
+    const lengthFactor=(this.options.length||45)/45;
+    this.chain.scale.set(pixelsPerMm,pixelsPerMm*lengthFactor,pixelsPerMm);
     this.chain.position.set(pose.x-this.width/2,this.height/2-pose.y,0);
     if(pose.quaternion)this.chain.quaternion.copy(pose.quaternion);
     else this.chain.rotation.set(0,0,-pose.angle);
@@ -126,8 +127,10 @@ export class AR3DScene{
     const scale=this.chain.scale.x;
     model.scale.setScalar(scale);model.quaternion.copy(this.chain.quaternion);
     // Same transform for chain and pendant. The chain passes through the GLB bail.
-    const offset=this.chain.userData.anchor.clone().sub(model.userData.chainAnchor);
-    model.position.copy(offset.multiplyScalar(scale).applyQuaternion(model.quaternion).add(this.chain.position));
+    const localAnchor=this.chain.userData.anchor;
+    const scaledAnchor=new THREE.Vector3(localAnchor.x*this.chain.scale.x,localAnchor.y*this.chain.scale.y,localAnchor.z*this.chain.scale.z);
+    const offset=scaledAnchor.sub(model.userData.chainAnchor.clone().multiplyScalar(scale));
+    model.position.copy(offset.applyQuaternion(model.quaternion).add(this.chain.position));
   }
 
   updatePose3D(pose,type){

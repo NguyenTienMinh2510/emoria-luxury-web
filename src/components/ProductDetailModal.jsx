@@ -1,8 +1,9 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Star, ShoppingBag, SmartphoneNfc, Shield, Check, Plus, Minus, Gift } from 'lucide-react';
+import { X, Star, ShoppingBag, SmartphoneNfc, Shield, Check, Plus, Minus, Gift, Ruler } from 'lucide-react';
 import { useStore } from '../components/StoreProvider';
 import { useLanguage } from '../i18n/LanguageProvider';
+import JewelrySizeGuideModal from './JewelrySizeGuideModal.jsx';
 const VirtualTryOnModal=lazy(()=>import('./VirtualTryOnModal'));
 
 export default function ProductDetailModal({ productId, onClose, onAddToCart, onOpenNfcDemo }) {
@@ -17,6 +18,7 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
   const [isGift, setIsGift] = useState(false);
   const [added, setAdded] = useState(false);
   const [tryOn,setTryOn]=useState(false);
+  const [showSizeGuide,setShowSizeGuide]=useState(false);
 
   const selectedVariant = product?.variants?.find(v => v.size === selectedSize);
   const canBuy = settings?.sales_enabled && product?.active && selectedVariant?.stock >= quantity;
@@ -40,7 +42,6 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
 
   return (
     <AnimatePresence>
-      {tryOn&&<Suspense fallback={<div role="status" className="fixed inset-0 z-[100] grid place-items-center bg-black/90 text-white">{t('Đang mở gương AR…','Opening AR mirror…')}</div>}><VirtualTryOnModal product={product} settings={settings} initialSize={selectedSize} onClose={()=>setTryOn(false)} onAddToCart={onAddToCart}/></Suspense>}
       <div 
         inert={tryOn||undefined}
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/85 backdrop-blur-xl"
@@ -110,6 +111,72 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
               {product.benefits?.length > 0 && <div className="text-sm text-slate-300"><h4 className="font-semibold text-white mb-2">Đi kèm sản phẩm</h4><ul className="list-disc pl-5 space-y-1">{product.benefits.map(text => <li key={text}>{text}</li>)}</ul></div>}
               {product.specifications?.length > 0 && <details className="text-sm border border-white/10 rounded-xl p-3"><summary className="cursor-pointer min-h-[44px] flex items-center">Thông số sản phẩm</summary><dl className="space-y-3 pt-2">{product.specifications.map(([label,value]) => <div key={label} className="grid sm:grid-cols-2 gap-1"><dt className="text-slate-400">{label}</dt><dd className="break-words">{value}</dd></div>)}</dl></details>}
 
+              {/* Measurement Badge & Size Guide Button */}
+              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-amber-200 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Ruler size={14} className="text-amber-300" />
+                    {t('Thông số đo lường chuẩn', 'Standard Sizing & Measurements')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowSizeGuide(true)}
+                    className="text-[11px] font-semibold text-amber-300 hover:text-amber-100 underline flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span>{t('Bảng đo & Hướng dẫn chọn size', 'Size & Measurement Guide')}</span>
+                  </button>
+                </div>
+                
+                <div className="text-xs text-slate-300 space-y-1">
+                  {product.category === 'Nhẫn' ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">{t('Đường kính lòng trong:', 'Inner diameter:')}</span>
+                        <span className="font-medium text-white">16.0 - 19.0 mm ({t('Chuẩn Ni 10 - Ni 19', 'Standard Ni 10 - Ni 19')})</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">{t('Chu vi ngón tay:', 'Finger circumference:')}</span>
+                        <span className="font-medium text-amber-200">50.3 - 59.7 mm</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 pt-1 border-t border-white/5">
+                        {t('Bản nhẫn 3.8mm · Đai nhẫn 1.8mm · Lòng nhẫn công thái học bo tròn êm ái', '3.8mm band width · 1.8mm thickness · Ergonomic comfort-fit interior')}
+                      </p>
+                    </>
+                  ) : product.category === 'Dây chuyền' ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">{t('Chiều dài dây tiêu chuẩn:', 'Standard chain length:')}</span>
+                        <span className="font-medium text-white">45 cm (+ 5 cm xích tăng đơ tùy chỉnh)</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">{t('Mặt charm NFC:', 'NFC Charm dimensions:')}</span>
+                        <span className="font-medium text-amber-200">Ø 12 mm x Dày 3.5 mm (Trọng lượng ~4.8g)</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 pt-1 border-t border-white/5">
+                        {t('Rủ ngang hõm ngực trên (xương quai xanh +4cm) · Dễ dàng cài nới lỏng đến 50cm', 'Mid-chest drop (+4cm below collarbone) · Extends up to 50cm with included extension')}
+                      </p>
+                    </>
+                  ) : product.category === 'Vòng tay' ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">{t('Chu vi cổ tay phù hợp:', 'Wrist circumference fit:')}</span>
+                        <span className="font-medium text-white">14.5 - 18.0 cm (Có xích phụ 3 nấc)</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">{t('Mặt charm NFC:', 'NFC Charm dimensions:')}</span>
+                        <span className="font-medium text-amber-200">Ø 12 mm x Dày 3.5 mm</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 pt-1 border-t border-white/5">
+                        {t('Khóa càng cua chắc chắn · Xích phụ 3cm giúp điều chỉnh ôm vừa hoặc đeo lỏng thoải mái', 'Secure lobster clasp · 3cm extension links for snug or relaxed fit')}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-slate-400">
+                      {t('Kích thước chuẩn hóa theo định lượng trang sức bạc S925 cao cấp.', 'Standardized dimensions for premium S925 sterling silver jewelry.')}
+                    </p>
+                  )}
+                </div>
+              </div>
 
               {/* Size selection */}
               {product.tryOnAvailable && (
@@ -238,6 +305,11 @@ export default function ProductDetailModal({ productId, onClose, onAddToCart, on
           />
         </Suspense>
       )}
+      <JewelrySizeGuideModal
+        isOpen={showSizeGuide}
+        onClose={() => setShowSizeGuide(false)}
+        initialCategory={product.category}
+      />
     </AnimatePresence>
   );
 }

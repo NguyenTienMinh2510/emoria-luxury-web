@@ -1,12 +1,15 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
-import {X,Camera,ShoppingBag,RotateCcw,ShieldCheck,Download,Check} from 'lucide-react';
+import {X,Camera,ShoppingBag,RotateCcw,ShieldCheck,Download,Check,Ruler} from 'lucide-react';
 import {useLanguage} from '../i18n/LanguageProvider';
 import {apiRequest} from '../services/apiClient.js';
 import {NecklaceTracker} from '../services/arNecklaceTracker.js';
 import {HandTracker} from '../services/arHandTracker.js';
 import {tryOnConfig} from '../services/tryOnConfig.js';
 import ARFramingGuide from './ARFramingGuide.jsx';
+import JewelrySizeGuideModal from './JewelrySizeGuideModal.jsx';
+
+const ringNiMap = { 16: 'Ni 10', 17: 'Ni 13', 18: 'Ni 16', 19: 'Ni 19' };
 
 export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,initialSize}){
   const {t}=useLanguage(),video=useRef(),canvas=useRef(),engine=useRef(),dialog=useRef(),alive=useRef(true),close=useRef(onClose);
@@ -15,6 +18,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
   const [length,setLength]=useState(45),[scale,setScale]=useState(1),[offset,setOffset]=useState(0),[manual,setManual]=useState(false),[added,setAdded]=useState(false),[photo,setPhoto]=useState(null);
   const [trySize,setTrySize]=useState(17),[selectedFinger,setSelectedFinger]=useState('ring');
   const [showGuide,setShowGuide]=useState(true);
+  const [showSizeGuide,setShowSizeGuide]=useState(false);
   const [size,setSize]=useState(initialSize||product.variants?.find(v=>v.stock>0)?.size||'');
   const variant=product.variants?.find(v=>v.size===size),canBuy=!!onAddToCart&&settings?.sales_enabled&&product.active&&variant?.stock>0;
   const active=['tracking','searching','loading-model','manual','manual-fallback'].includes(status);
@@ -169,40 +173,149 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
           {error&&<p role="alert" className="text-sm text-amber-200">{error}</p>}
           {!active&&<button disabled={!config||status==='starting'} onClick={start} className="w-full min-h-12 rounded-xl bg-white text-black font-semibold disabled:opacity-40 flex items-center justify-center gap-2 shadow-silver-glow"><Camera size={18}/>{status==='starting'?t('Đang mở…','Starting…'):t('Bật camera để trải nghiệm','Start camera')}</button>}
           {active&&<>
-            {config?.type==='necklace'&&<p className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-300">{t('Kích thước mẫu cố định · tự căn theo camera. Xoay vai chậm sang hai bên để xem góc nghiêng. Tỉ lệ đeo là ước lượng, không thay thế đo kích thước thực tế.','Fixed model dimensions · automatically fitted to camera. Slowly turn your shoulders to see side views. Fit is approximate, not a physical measurement.')}</p>}
+            {/* Necklace controls */}
+            {config?.type==='necklace'&&<div className="space-y-3">
+              <fieldset>
+                <legend className="text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
+                  <span>{t('Chiều dài dây chuyền (Độ rủ AR)','Necklace length (AR drop)')}</span>
+                  <span className="text-xs font-normal text-amber-200">{length} cm</span>
+                </legend>
+                <div className="flex gap-2">
+                  {[
+                    {l:40,label:'40 cm',sub:t('Sát cổ','Choker')},
+                    {l:45,label:'45 cm',sub:t('Tiêu chuẩn','Standard')},
+                    {l:50,label:'50 cm',sub:t('Dáng dài','Plunge')}
+                  ].map(({l,label,sub})=>(
+                    <button
+                      key={l}
+                      type="button"
+                      aria-pressed={length===l}
+                      onClick={()=>setLength(l)}
+                      className={`flex-1 min-h-11 rounded-xl border text-xs flex flex-col items-center justify-center p-1 transition-all ${length===l?'bg-white text-black font-bold shadow-sm':'border-white/20 text-slate-300 hover:bg-white/5'}`}
+                    >
+                      <span>{label}</span>
+                      <span className={`text-[10px] ${length===l?'text-black/70':'text-slate-400'}`}>{sub}</span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3 text-xs text-slate-300 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">{t('Độ rủ dây:','Hang drop:')}</span>
+                  <span className="font-semibold text-amber-200">
+                    {length===40?t('Chạm xương quai xanh (Sát cổ)','On collarbone (Choker)'):length===45?t('Ngang ngực trên (Tiêu chuẩn)','Mid-chest (Standard)'):t('Dáng dài thanh thoát (Matinee)','Plunge drop (Matinee)')}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px] text-slate-400 pt-1 border-t border-white/5">
+                  <span>{t('Mặt charm NFC: Ø12mm x 3.5mm','NFC Charm: Ø12mm x 3.5mm')}</span>
+                  <span>{t('+5cm xích phụ tăng đơ','+5cm extension included')}</span>
+                </div>
+              </div>
+            </div>}
 
             {/* Ring controls */}
-            {config?.type==='ring'&&<>
+            {config?.type==='ring'&&<div className="space-y-3">
               <fieldset>
-                <legend className="text-sm mb-2">{t('Kích thước nhẫn theo sản phẩm','Ring size from product specs')}</legend>
-                <div className="flex gap-2">{config.previewSizes?.map(s=><button key={s} aria-pressed={trySize===s} onClick={()=>setTrySize(s)} className={`flex-1 min-h-11 rounded-xl border text-xs ${trySize===s?'bg-white text-black font-bold':'border-white/20'}`}>{s} mm</button>)}</div>
+                <legend className="text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
+                  <span>{t('Kích thước nhẫn theo sản phẩm','Ring size from product specs')}</span>
+                  <span className="text-xs font-normal text-amber-200">{trySize} mm · {ringNiMap[trySize]||`Ni ${trySize}`}</span>
+                </legend>
+                <div className="flex gap-2">
+                  {config.previewSizes?.map(s=>(
+                    <button
+                      key={s}
+                      type="button"
+                      aria-pressed={trySize===s}
+                      onClick={()=>setTrySize(s)}
+                      className={`flex-1 min-h-11 rounded-xl border text-xs flex flex-col items-center justify-center p-1 transition-all ${trySize===s?'bg-white text-black font-bold shadow-sm':'border-white/20 text-slate-300 hover:bg-white/5'}`}
+                    >
+                      <span>{s} mm</span>
+                      <span className={`text-[10px] ${trySize===s?'text-black/70':'text-slate-400'}`}>{ringNiMap[s]||`Ni ${s}`}</span>
+                    </button>
+                  ))}
+                </div>
               </fieldset>
               <fieldset>
                 <legend className="text-xs text-slate-400 mb-1">{t('Ngón tay đeo nhẫn','Target finger')}</legend>
                 <div className="flex gap-1.5">
-                  {[['index',t('Ngón trỏ','Index')],['middle',t('Ngón giữa','Middle')],['ring',t('Ngón áp út','Ring')]].map(([fKey,fLabel])=><button key={fKey} onClick={()=>setSelectedFinger(fKey)} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs ${selectedFinger===fKey?'bg-amber-200/20 border-amber-300 text-amber-200':'border-white/10 text-slate-300'}`}>{fLabel}</button>)}
+                  {[['index',t('Ngón trỏ','Index')],['middle',t('Ngón giữa','Middle')],['ring',t('Ngón áp út','Ring')]].map(([fKey,fLabel])=><button key={fKey} onClick={()=>setSelectedFinger(fKey)} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs ${selectedFinger===fKey?'bg-amber-200/20 border-amber-300 text-amber-200 font-semibold':'border-white/10 text-slate-300 hover:bg-white/5'}`}>{fLabel}</button>)}
                 </div>
               </fieldset>
-            </>}
+              <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3 text-xs text-slate-300 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">{t('Đường kính lòng trong:','Inner diameter:')}</span>
+                  <span className="font-semibold text-amber-200">{trySize}.0 mm</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">{t('Chu vi ngón tương ứng:','Finger circumference:')}</span>
+                  <span className="font-semibold text-white">{(trySize*Math.PI).toFixed(1)} mm</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-white/5">
+                  <span>{t('Bản nhẫn: 3.8mm · Dày 1.8mm','Band: 3.8mm · Thick: 1.8mm')}</span>
+                  <span className="text-amber-300">{ringNiMap[trySize]||`Ni ${trySize}`}</span>
+                </div>
+              </div>
+            </div>}
 
             {/* Bracelet controls */}
-            {config?.type==='bracelet'&&config?.previewSizes&&<fieldset>
-              <legend className="text-sm mb-2">{t('Size vòng tay','Wrist size')}</legend>
-              <div className="flex gap-2">{config.previewSizes.map(s=><button key={s} aria-pressed={trySize===s} onClick={()=>setTrySize(s)} className={`flex-1 min-h-11 rounded-xl border ${trySize===s?'bg-white text-black font-bold':'border-white/20'}`}>{s} cm</button>)}</div>
-            </fieldset>}
-
-            {config?.type==='ring'?(
-              <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3 text-xs text-slate-300 flex items-center justify-between">
-                <span className="text-slate-400">{t('Độ to chuẩn theo kích thước:','Size locked to product:')}</span>
-                <span className="font-semibold text-amber-200">{trySize} mm {t('(Đường kính lòng trong)','(Inner diameter)')}</span>
+            {config?.type==='bracelet'&&config?.previewSizes&&<div className="space-y-3">
+              <fieldset>
+                <legend className="text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
+                  <span>{t('Size vòng tay (Chu vi)','Wrist size (Circumference)')}</span>
+                  <span className="text-xs font-normal text-amber-200">{trySize} cm</span>
+                </legend>
+                <div className="flex gap-2">
+                  {config.previewSizes.map(s=>{
+                    const wristNotes={15:t('Mảnh','Slim'),16:t('Chuẩn nữ','Std'),17:t('Vừa vặn','Med'),18:t('Chuẩn nam','Large')};
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        aria-pressed={trySize===s}
+                        onClick={()=>setTrySize(s)}
+                        className={`flex-1 min-h-11 rounded-xl border text-xs flex flex-col items-center justify-center p-1 transition-all ${trySize===s?'bg-white text-black font-bold shadow-sm':'border-white/20 text-slate-300 hover:bg-white/5'}`}
+                      >
+                        <span>{s} cm</span>
+                        <span className={`text-[10px] ${trySize===s?'text-black/70':'text-slate-400'}`}>{wristNotes[s]||''}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+              <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3 text-xs text-slate-300 space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">{t('Chu vi cổ tay phù hợp:','Best for wrist:')}</span>
+                  <span className="font-semibold text-amber-200">{trySize - 1.0} - {trySize} cm</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">{t('Đường kính xấp xỉ:','Approx. diameter:')}</span>
+                  <span className="font-semibold text-white">{((trySize*10)/Math.PI).toFixed(1)} mm</span>
+                </div>
+                <div className="flex justify-between text-[11px] text-slate-400 pt-1 border-t border-white/5">
+                  <span>{t('Mặt charm NFC: Ø12mm x 3.5mm','NFC Charm: Ø12mm x 3.5mm')}</span>
+                  <span>{t('+3cm xích phụ tăng đơ','+3cm extension')}</span>
+                </div>
               </div>
-            ):config?.type==='bracelet'?(
+            </div>}
+
+            {config?.type==='bracelet'&&(
               <label className="block text-sm">
                 {t('Độ to của vòng','Bracelet scale')}
                 <input aria-label="Scale slider" className="w-full h-11 accent-slate-200" type="range" min="0.65" max="1.6" step="0.05" value={scale} onChange={e=>setScale(Number(e.target.value))}/>
               </label>
-            ):null}
+            )}
             {isHand&&<label className="block text-sm">{t('Vị trí cao / thấp','Vertical placement')}<input aria-label="Vertical placement" className="w-full h-11 accent-slate-200" type="range" min="-0.3" max="0.3" step="0.01" value={offset} onChange={e=>setOffset(Number(e.target.value))}/></label>}
+
+            {/* Size Guide Button */}
+            <button
+              type="button"
+              onClick={()=>setShowSizeGuide(true)}
+              className="w-full py-2.5 px-3 rounded-xl border border-amber-400/30 bg-amber-400/5 hover:bg-amber-400/10 text-amber-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+            >
+              <Ruler size={15} className="text-amber-300" />
+              <span>{t('Tra cứu bảng số đo & cách đo size chuẩn','View Detailed Size & Measurement Guide')}</span>
+            </button>
+
             <div className="flex items-center justify-between gap-2">
               <label className="text-xs flex items-center gap-2 min-h-11 cursor-pointer"><input type="checkbox" checked={manual} disabled={!engine.current?.workerReady} onChange={e=>{setManual(e.target.checked);engine.current.setManual(e.target.checked);}}/>{t('Đặt mẫu giữa khung hình','Center the model')}</label>
               {isHand&&<button aria-label={t('Đặt lại vị trí','Reset placement')} className="min-h-11 min-w-11 grid place-items-center rounded-lg hover:bg-white/10" onClick={()=>{setTrySize(config?.defaultSize||17);setScale(1);setOffset(0);}}><RotateCcw size={17}/></button>}
@@ -224,6 +337,11 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
         </div>
       </div>
       {photo&&<div className="mx-5 mb-5 p-3 rounded-xl border border-white/15 flex gap-4 items-center bg-black/60"><img src={photo} alt={t('Ảnh thử vừa chụp','Your captured try-on')} className="w-20 max-h-28 object-contain rounded-lg"/><div className="flex-1"><p className="text-xs text-slate-400">{t('Ảnh chỉ lưu khi bạn bấm tải xuống.','The photo is saved only when you download it.')}</p><a href={photo} download={`EMORIA-${product.id}-try-on.jpg`} className="inline-flex items-center gap-2 min-h-11 underline text-amber-200"><Download size={16}/>{t('Tải ảnh','Download photo')}</a></div><button className="min-h-11 min-w-11 grid place-items-center" aria-label={t('Bỏ ảnh vừa chụp','Discard photo')} onClick={()=>setPhoto(null)}><X size={17}/></button></div>}
+      <JewelrySizeGuideModal
+        isOpen={showSizeGuide}
+        onClose={()=>setShowSizeGuide(false)}
+        initialCategory={config?.type==='necklace'?'Dây chuyền':config?.type==='bracelet'?'Vòng tay':'Nhẫn'}
+      />
     </section>
   </div>,document.body);
 }

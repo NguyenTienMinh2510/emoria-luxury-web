@@ -32,8 +32,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 12mm x Độ dày 3.5mm"
+        "Kích thước & Số đo dây chuyền",
+        "Dây dài 45cm (+5cm tăng đơ linh hoạt) · Mặt charm Ø12mm x 3.5mm"
       ],
       [
         "Độ tương thích",
@@ -45,7 +45,18 @@
     "priceNote": "Giá dự kiến theo bộ sưu tập",
     "sizes": [
       "Tiêu chuẩn"
-    ]
+    ],
+    "measurements": {
+      "type": "necklace",
+      "standardLengthCm": 45,
+      "extensionChainCm": 5,
+      "totalLengthCm": 50,
+      "chainThicknessMm": 1.2,
+      "charmDiameterMm": 12,
+      "charmThicknessMm": 3.5,
+      "weightGrams": 4.8,
+      "guide": "Dây dài 45cm rủ ngang xương quai xanh thanh lịch, có sẵn đoạn nối dài 5cm để bạn nới lỏng tùy trang phục."
+    }
   },
   {
     "id": "emoria-lumen-duo",
@@ -80,8 +91,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 12mm x Độ dày 3.5mm"
+        "Kích thước & Số đo bộ đôi",
+        "Gồm 2 dây chuyền 45cm (+5cm tăng đơ) · Mặt charm Ø12mm x 3.5mm"
       ],
       [
         "Độ tương thích",
@@ -95,7 +106,18 @@
       "Bộ 2 chiếc"
     ],
     "tag": "Combo cặp đôi",
-    "parentId": "emoria-lumen"
+    "parentId": "emoria-lumen",
+    "measurements": {
+      "type": "necklace",
+      "standardLengthCm": 45,
+      "extensionChainCm": 5,
+      "totalLengthCm": 50,
+      "chainThicknessMm": 1.2,
+      "charmDiameterMm": 12,
+      "charmThicknessMm": 3.5,
+      "units": 2,
+      "guide": "Bộ đôi gồm 2 dây chuyền Lumen với chip NFC riêng biệt, chuẩn 45cm kèm xích tăng đơ 5cm."
+    }
   },
   {
     "id": "emoria-halo",
@@ -130,8 +152,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 12mm x Độ dày 3.5mm"
+        "Kích thước & Số đo nhẫn chuẩn",
+        "Đường kính trong 16-19mm (Ni 10-19) · Chu vi 50.3-59.7mm · Bản nhẫn 3.8mm"
       ],
       [
         "Độ tương thích",
@@ -143,7 +165,19 @@
     "priceNote": "Giá dự kiến theo bộ sưu tập",
     "sizes": [
       "Tiêu chuẩn"
-    ]
+    ],
+    "measurements": {
+      "type": "ring",
+      "innerDiameterMmRange": "16 - 19 mm",
+      "circumferenceMmRange": "50.3 - 59.7 mm",
+      "vietnamNiRange": "Ni 10 - Ni 19",
+      "bandWidthMm": 3.8,
+      "bandThicknessMm": 1.8,
+      "charmDiameterMm": 12,
+      "charmThicknessMm": 3.5,
+      "weightGrams": 5.2,
+      "guide": "Lòng nhẫn công thái học bo tròn êm ái, phù hợp ngón áp út (Ni 11-13) hoặc ngón trỏ (Ni 14-16)."
+    }
   },
   {
     "id": "emoria-halo-duo",
@@ -178,8 +212,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 12mm x Độ dày 3.5mm"
+        "Kích thước & Số đo nhẫn đôi",
+        "Bộ gồm 2 nhẫn · Nam (Ni 16-19 / 18-19mm) & Nữ (Ni 10-13 / 16-17mm)"
       ],
       [
         "Độ tương thích",
@@ -193,7 +227,17 @@
       "Bộ 2 chiếc"
     ],
     "tag": "Combo cặp đôi",
-    "parentId": "emoria-halo"
+    "parentId": "emoria-halo",
+    "measurements": {
+      "type": "ring",
+      "innerDiameterMmRange": "16 - 19 mm",
+      "circumferenceMmRange": "50.3 - 59.7 mm",
+      "vietnamNiRange": "Ni 10 - Ni 19",
+      "bandWidthMm": 3.8,
+      "bandThicknessMm": 1.8,
+      "units": 2,
+      "guide": "Bộ đôi nhẫn Halo với 2 chip NFC độc lập, tùy chọn size linh hoạt theo ni ngón tay của hai bạn."
+    }
   },
   {
     "id": "emoria-horizon",
@@ -228,8 +272,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 12mm x Độ dày 3.5mm"
+        "Kích thước & Số đo vòng tay",
+        "Chu vi cổ tay 15-18cm (Xích phụ 3cm linh hoạt) · Mặt charm Ø12mm x 3.5mm"
       ],
       [
         "Độ tương thích",
@@ -241,7 +285,18 @@
     "priceNote": "Giá dự kiến theo bộ sưu tập",
     "sizes": [
       "Tiêu chuẩn"
-    ]
+    ],
+    "measurements": {
+      "type": "bracelet",
+      "wristCircumferenceRange": "14.5 - 18.0 cm",
+      "standardLengthCm": 16.5,
+      "extensionChainCm": 3,
+      "chainThicknessMm": 1.8,
+      "charmDiameterMm": 12,
+      "charmThicknessMm": 3.5,
+      "weightGrams": 6.5,
+      "guide": "Khóa càng cua chắc chắn đi kèm 3 nấc xích chờ 3cm giúp vừa vặn ôm cổ tay từ 15cm đến 18cm."
+    }
   },
   {
     "id": "emoria-pulse",
@@ -276,8 +331,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 12mm x Độ dày 3.5mm"
+        "Kích thước & Số đo vòng tay",
+        "Chu vi cổ tay 15-18cm (Xích phụ 3cm linh hoạt) · Mặt charm Ø12mm x 3.5mm"
       ],
       [
         "Độ tương thích",
@@ -289,7 +344,18 @@
     "priceNote": "Giá dự kiến theo bộ sưu tập",
     "sizes": [
       "Tiêu chuẩn"
-    ]
+    ],
+    "measurements": {
+      "type": "bracelet",
+      "wristCircumferenceRange": "14.5 - 18.0 cm",
+      "standardLengthCm": 16.5,
+      "extensionChainCm": 3,
+      "chainThicknessMm": 1.8,
+      "charmDiameterMm": 12,
+      "charmThicknessMm": 3.5,
+      "weightGrams": 6.8,
+      "guide": "Vòng tay Pulse ôm vừa vặn cổ tay 15-18cm nhờ xích nối 3 nấc, tích hợp tráng men đỏ ruby."
+    }
   },
   {
     "id": "emoria-pulse-duo",
@@ -324,8 +390,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 12mm x Độ dày 3.5mm"
+        "Kích thước & Số đo bộ đôi",
+        "Bộ gồm 2 vòng tay · Nam (17-18cm) & Nữ (15-16.5cm) kèm xích phụ 3cm"
       ],
       [
         "Độ tương thích",
@@ -339,7 +405,15 @@
       "Bộ 2 chiếc"
     ],
     "tag": "Combo cặp đôi",
-    "parentId": "emoria-pulse"
+    "parentId": "emoria-pulse",
+    "measurements": {
+      "type": "bracelet",
+      "wristCircumferenceRange": "14.5 - 18.0 cm",
+      "standardLengthCm": 16.5,
+      "extensionChainCm": 3,
+      "units": 2,
+      "guide": "Bộ đôi vòng tay Pulse kèm 2 chip NFC riêng biệt, chỉnh được kích thước cho cả cổ tay nam và nữ."
+    }
   },
   {
     "id": "emoria-faith",
@@ -374,8 +448,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 11mm x Độ dày 3mm"
+        "Kích thước & Số đo dây chuyền",
+        "Dây dài 45cm (+5cm tăng đơ linh hoạt) · Mặt charm Ø12mm x 3.5mm"
       ],
       [
         "Độ tương thích",
@@ -387,7 +461,18 @@
     "priceNote": "Giá dự kiến theo bộ sưu tập",
     "sizes": [
       "Tiêu chuẩn"
-    ]
+    ],
+    "measurements": {
+      "type": "necklace",
+      "standardLengthCm": 45,
+      "extensionChainCm": 5,
+      "totalLengthCm": 50,
+      "chainThicknessMm": 1.2,
+      "charmDiameterMm": 12,
+      "charmThicknessMm": 3.5,
+      "weightGrams": 4.6,
+      "guide": "Dây chuyền Faith dài 45cm kèm xích tăng đơ 5cm, mặt tráng men xanh lam tinh tế."
+    }
   },
   {
     "id": "emoria-echo",
@@ -422,8 +507,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 13mm x Độ dày 3.5mm"
+        "Kích thước & Số đo nhẫn chuẩn",
+        "Đường kính trong 16-19mm (Ni 10-19) · Chu vi 50.3-59.7mm · Bản nhẫn 3.8mm"
       ],
       [
         "Độ tương thích",
@@ -435,7 +520,19 @@
     "priceNote": "Giá dự kiến theo bộ sưu tập",
     "sizes": [
       "Tiêu chuẩn"
-    ]
+    ],
+    "measurements": {
+      "type": "ring",
+      "innerDiameterMmRange": "16 - 19 mm",
+      "circumferenceMmRange": "50.3 - 59.7 mm",
+      "vietnamNiRange": "Ni 10 - Ni 19",
+      "bandWidthMm": 3.8,
+      "bandThicknessMm": 1.8,
+      "charmDiameterMm": 12,
+      "charmThicknessMm": 3.5,
+      "weightGrams": 5.1,
+      "guide": "Lòng nhẫn Echo công thái học bo tròn êm ái, chu vi 50.3 - 59.7mm phù hợp đa dạng kích cỡ ngón."
+    }
   },
   {
     "id": "emoria-orbit",
@@ -470,8 +567,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 13mm x Độ dày 3mm"
+        "Kích thước & Số đo vòng tay",
+        "Chu vi cổ tay 15-18cm (Xích phụ 3cm linh hoạt) · Mặt charm Ø13mm x 3mm"
       ],
       [
         "Độ tương thích",
@@ -483,7 +580,18 @@
     "priceNote": "Giá dự kiến theo bộ sưu tập",
     "sizes": [
       "Tiêu chuẩn"
-    ]
+    ],
+    "measurements": {
+      "type": "bracelet",
+      "wristCircumferenceRange": "14.5 - 18.0 cm",
+      "standardLengthCm": 16.5,
+      "extensionChainCm": 3,
+      "chainThicknessMm": 1.8,
+      "charmDiameterMm": 13,
+      "charmThicknessMm": 3,
+      "weightGrams": 6.2,
+      "guide": "Vòng tay Orbit thiết kế quỹ đạo sao, vừa vặn cổ tay từ 15cm đến 18cm với xích phụ tăng đơ."
+    }
   },
   {
     "id": "emoria-orbit-duo",
@@ -518,8 +626,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 13mm x Độ dày 3mm"
+        "Kích thước & Số đo bộ đôi",
+        "Bộ gồm 2 vòng tay · Nam (17-18cm) & Nữ (15-16.5cm) kèm xích phụ 3cm"
       ],
       [
         "Độ tương thích",
@@ -533,7 +641,15 @@
       "Bộ 2 chiếc"
     ],
     "tag": "Combo cặp đôi",
-    "parentId": "emoria-orbit"
+    "parentId": "emoria-orbit",
+    "measurements": {
+      "type": "bracelet",
+      "wristCircumferenceRange": "14.5 - 18.0 cm",
+      "standardLengthCm": 16.5,
+      "extensionChainCm": 3,
+      "units": 2,
+      "guide": "Bộ đôi vòng tay Orbit với 2 không gian kỷ niệm NFC riêng, có thể chỉnh độ vừa cho cả nam và nữ."
+    }
   },
   {
     "id": "emoria-sen",
@@ -568,8 +684,8 @@
         "Lá chắn cách từ Ferrite chống nhiễu sóng do kim loại"
       ],
       [
-        "Kích thước mặt Charm",
-        "Đường kính 13mm x Độ dày 3mm"
+        "Kích thước & Số đo dây chuyền",
+        "Dây dài 45cm (+5cm tăng đơ linh hoạt) · Mặt charm Ø13mm x 3mm"
       ],
       [
         "Độ tương thích",
@@ -581,6 +697,17 @@
     "priceNote": "Giá dự kiến theo bộ sưu tập",
     "sizes": [
       "Tiêu chuẩn"
-    ]
+    ],
+    "measurements": {
+      "type": "necklace",
+      "standardLengthCm": 45,
+      "extensionChainCm": 5,
+      "totalLengthCm": 50,
+      "chainThicknessMm": 1.2,
+      "charmDiameterMm": 13,
+      "charmThicknessMm": 3,
+      "weightGrams": 4.5,
+      "guide": "Dây chuyền Hoa Sen dài 45cm kèm đoạn nối 5cm, mặt chạm khắc hoa sen thanh khiết."
+    }
   }
 ]
