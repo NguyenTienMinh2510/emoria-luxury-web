@@ -11,6 +11,20 @@ import JewelrySizeGuideModal from './JewelrySizeGuideModal.jsx';
 
 const ringNiMap = { 16: 'Ni 10', 17: 'Ni 13', 18: 'Ni 16', 19: 'Ni 19' };
 
+function getNiLabel(d) {
+  const num = Number(d);
+  if (num < 15.3) return 'Ni 7-8';
+  if (num < 15.8) return 'Ni 9';
+  if (num < 16.3) return 'Ni 10';
+  if (num < 16.8) return 'Ni 11-12';
+  if (num < 17.3) return 'Ni 13';
+  if (num < 17.8) return 'Ni 14-15';
+  if (num < 18.3) return 'Ni 16';
+  if (num < 18.8) return 'Ni 17-18';
+  if (num < 19.3) return 'Ni 19';
+  return 'Ni 20+';
+}
+
 export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,initialSize}){
   const {t}=useLanguage(),video=useRef(),canvas=useRef(),engine=useRef(),dialog=useRef(),alive=useRef(true),close=useRef(onClose);
   close.current=onClose;
@@ -19,6 +33,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
   const [trySize,setTrySize]=useState(17),[selectedFinger,setSelectedFinger]=useState('ring');
   const [showGuide,setShowGuide]=useState(true);
   const [showSizeGuide,setShowSizeGuide]=useState(false);
+  const [showCaliperHUD,setShowCaliperHUD]=useState(true);
   const [size,setSize]=useState(initialSize||product.variants?.find(v=>v.stock>0)?.size||'');
   const variant=product.variants?.find(v=>v.size===size),canBuy=!!onAddToCart&&settings?.sales_enabled&&product.active&&variant?.stock>0;
   const active=['tracking','searching','loading-model','manual','manual-fallback'].includes(status);
@@ -151,6 +166,32 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
                 t={t}
               />
             )}
+            {active && showCaliperHUD && (
+              <div className="absolute top-3 left-3 z-20 pointer-events-none flex flex-col gap-1 max-w-[90%] sm:max-w-none">
+                <div className="px-3 py-1.5 rounded-xl bg-black/85 border border-amber-400/40 backdrop-blur-md shadow-2xl flex items-center gap-2 text-amber-200">
+                  <Ruler size={14} className="text-amber-300 animate-pulse shrink-0" />
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span className="font-mono text-xs font-bold tracking-wider text-amber-200">
+                      {config?.type === 'ring'
+                        ? `Ø ${Number(trySize).toFixed(1)} mm`
+                        : config?.type === 'necklace'
+                        ? `${length} cm (+5cm)`
+                        : `CV ${Number(trySize).toFixed(1)} cm`}
+                    </span>
+                    <span className="text-[11px] text-slate-300">
+                      {config?.type === 'ring'
+                        ? `· CV: ${(trySize * Math.PI).toFixed(1)} mm · ${getNiLabel(trySize)}`
+                        : config?.type === 'necklace'
+                        ? `· Rủ: ${length === 40 ? t('Sát cổ', 'Choker') : length === 45 ? t('Ngang ngực trên', 'Standard') : t('Dáng dài', 'Plunge')}`
+                        : `· ĐK: ~${((trySize * 10) / Math.PI).toFixed(1)} mm`}
+                    </span>
+                  </div>
+                </div>
+                <div className="px-2 py-0.5 rounded-md bg-black/60 border border-white/10 text-[10px] text-slate-400 w-fit">
+                  {t('Thước đo AR trực tiếp · Dùng bộ tinh chỉnh để chỉnh số đo', 'Live AR caliper · Use fine-tune controls to adjust')}
+                </div>
+              </div>
+            )}
           </div>
           {!active&&<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-gradient-to-b from-[#131720] via-[#0b0d13] to-black text-center z-10">
             <div className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-2xl bg-white/[0.04] border border-white/15 p-3 shadow-[0_12px_35px_rgba(0,0,0,0.8)] flex items-center justify-center backdrop-blur-md overflow-hidden group">
@@ -176,11 +217,13 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
             {/* Necklace controls */}
             {config?.type==='necklace'&&<div className="space-y-3">
               <fieldset>
-                <legend className="text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
-                  <span>{t('Chiều dài dây chuyền (Độ rủ AR)','Necklace length (AR drop)')}</span>
-                  <span className="text-xs font-normal text-amber-200">{length} cm</span>
-                </legend>
-                <div className="flex gap-2">
+                <div className="flex items-center justify-between mb-2">
+                  <legend className="text-sm font-semibold text-slate-200">
+                    {t('Chiều dài dây chuyền (Độ rủ AR)','Necklace length (AR drop)')}
+                  </legend>
+                  <span className="text-xs font-bold text-amber-200">{length} cm</span>
+                </div>
+                <div className="flex gap-2 mb-2.5">
                   {[
                     {l:40,label:'40 cm',sub:t('Sát cổ','Choker')},
                     {l:45,label:'45 cm',sub:t('Tiêu chuẩn','Standard')},
@@ -198,12 +241,58 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
                     </button>
                   ))}
                 </div>
+
+                {/* Micro-Adjustment Stepper & Slider */}
+                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <Ruler size={13} className="text-amber-300" />
+                      {t('Thước tinh chỉnh độ rủ (±1 cm):', 'Fine-tune hang drop (±1 cm):')}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={()=>setLength(l=>Math.max(36,l-1))}
+                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center transition-colors"
+                        title={t('Thu ngắn 1 cm','Shorten 1 cm')}
+                      >
+                        -
+                      </button>
+                      <span className="font-mono font-bold text-amber-200 text-xs px-1">
+                        {length} cm
+                      </span>
+                      <button
+                        type="button"
+                        onClick={()=>setLength(l=>Math.min(54,l+1))}
+                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center transition-colors"
+                        title={t('Kéo dài 1 cm','Extend 1 cm')}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="36"
+                    max="54"
+                    step="1"
+                    value={length}
+                    onChange={e=>setLength(Number(e.target.value))}
+                    className="w-full h-1.5 rounded-lg bg-slate-800 accent-amber-300 cursor-pointer"
+                    aria-label="Necklace length fine tuning slider"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>36 cm (Choker ngắn)</span>
+                    <span>45 cm (Tiêu chuẩn)</span>
+                    <span>54 cm (Dáng dài)</span>
+                  </div>
+                </div>
               </fieldset>
               <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3 text-xs text-slate-300 space-y-1">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400">{t('Độ rủ dây:','Hang drop:')}</span>
                   <span className="font-semibold text-amber-200">
-                    {length===40?t('Chạm xương quai xanh (Sát cổ)','On collarbone (Choker)'):length===45?t('Ngang ngực trên (Tiêu chuẩn)','Mid-chest (Standard)'):t('Dáng dài thanh thoát (Matinee)','Plunge drop (Matinee)')}
+                    {length<=42?t('Chạm xương quai xanh (Sát cổ)','On collarbone (Choker)'):length<=47?t('Ngang ngực trên (Tiêu chuẩn)','Mid-chest (Standard)'):t('Dáng dài thanh thoát (Matinee)','Plunge drop (Matinee)')}
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px] text-slate-400 pt-1 border-t border-white/5">
@@ -216,23 +305,72 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
             {/* Ring controls */}
             {config?.type==='ring'&&<div className="space-y-3">
               <fieldset>
-                <legend className="text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
-                  <span>{t('Kích thước nhẫn theo sản phẩm','Ring size from product specs')}</span>
-                  <span className="text-xs font-normal text-amber-200">{trySize} mm · {ringNiMap[trySize]||`Ni ${trySize}`}</span>
-                </legend>
-                <div className="flex gap-2">
+                <div className="flex items-center justify-between mb-2">
+                  <legend className="text-sm font-semibold text-slate-200">
+                    {t('Kích thước nhẫn theo sản phẩm','Ring size from product specs')}
+                  </legend>
+                  <span className="text-xs font-bold text-amber-200">{Number(trySize).toFixed(1)} mm · {getNiLabel(trySize)}</span>
+                </div>
+                <div className="flex gap-2 mb-2.5">
                   {config.previewSizes?.map(s=>(
                     <button
                       key={s}
                       type="button"
-                      aria-pressed={trySize===s}
+                      aria-pressed={Math.abs(trySize-s)<0.1}
                       onClick={()=>setTrySize(s)}
-                      className={`flex-1 min-h-11 rounded-xl border text-xs flex flex-col items-center justify-center p-1 transition-all ${trySize===s?'bg-white text-black font-bold shadow-sm':'border-white/20 text-slate-300 hover:bg-white/5'}`}
+                      className={`flex-1 min-h-11 rounded-xl border text-xs flex flex-col items-center justify-center p-1 transition-all ${Math.abs(trySize-s)<0.1?'bg-white text-black font-bold shadow-sm':'border-white/20 text-slate-300 hover:bg-white/5'}`}
                     >
                       <span>{s} mm</span>
-                      <span className={`text-[10px] ${trySize===s?'text-black/70':'text-slate-400'}`}>{ringNiMap[s]||`Ni ${s}`}</span>
+                      <span className={`text-[10px] ${Math.abs(trySize-s)<0.1?'text-black/70':'text-slate-400'}`}>{ringNiMap[s]||`Ni ${s}`}</span>
                     </button>
                   ))}
+                </div>
+
+                {/* Micro-Adjustment Stepper & Slider */}
+                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <Ruler size={13} className="text-amber-300" />
+                      {t('Thước tinh chỉnh vi mô (±0.2 mm):', 'Micro-tune diameter (±0.2 mm):')}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={()=>setTrySize(s=>Math.max(14.5,Number((s-0.2).toFixed(1))))}
+                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center transition-colors"
+                        title={t('Giảm 0.2 mm','Decrease 0.2 mm')}
+                      >
+                        -
+                      </button>
+                      <span className="font-mono font-bold text-amber-200 text-xs px-1">
+                        {Number(trySize).toFixed(1)} mm
+                      </span>
+                      <button
+                        type="button"
+                        onClick={()=>setTrySize(s=>Math.min(21.0,Number((s+0.2).toFixed(1))))}
+                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center transition-colors"
+                        title={t('Tăng 0.2 mm','Increase 0.2 mm')}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="14.5"
+                    max="21.0"
+                    step="0.1"
+                    value={trySize}
+                    onChange={e=>setTrySize(Number(e.target.value))}
+                    className="w-full h-1.5 rounded-lg bg-slate-800 accent-amber-300 cursor-pointer"
+                    aria-label="Ring diameter fine tuning slider"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>14.5 mm (Ni 7)</span>
+                    <span>17.0 mm (Chuẩn nữ)</span>
+                    <span>18.0 mm (Chuẩn nam)</span>
+                    <span>21.0 mm (Ni 22)</span>
+                  </div>
                 </div>
               </fieldset>
               <fieldset>
@@ -244,7 +382,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
               <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3 text-xs text-slate-300 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">{t('Đường kính lòng trong:','Inner diameter:')}</span>
-                  <span className="font-semibold text-amber-200">{trySize}.0 mm</span>
+                  <span className="font-semibold text-amber-200">{Number(trySize).toFixed(1)} mm</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">{t('Chu vi ngón tương ứng:','Finger circumference:')}</span>
@@ -252,7 +390,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-white/5">
                   <span>{t('Bản nhẫn: 3.8mm · Dày 1.8mm','Band: 3.8mm · Thick: 1.8mm')}</span>
-                  <span className="text-amber-300">{ringNiMap[trySize]||`Ni ${trySize}`}</span>
+                  <span className="text-amber-300 font-semibold">{getNiLabel(trySize)}</span>
                 </div>
               </div>
             </div>}
@@ -260,32 +398,81 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
             {/* Bracelet controls */}
             {config?.type==='bracelet'&&config?.previewSizes&&<div className="space-y-3">
               <fieldset>
-                <legend className="text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
-                  <span>{t('Size vòng tay (Chu vi)','Wrist size (Circumference)')}</span>
-                  <span className="text-xs font-normal text-amber-200">{trySize} cm</span>
-                </legend>
-                <div className="flex gap-2">
+                <div className="flex items-center justify-between mb-2">
+                  <legend className="text-sm font-semibold text-slate-200">
+                    {t('Size vòng tay (Chu vi)','Wrist size (Circumference)')}
+                  </legend>
+                  <span className="text-xs font-bold text-amber-200">{Number(trySize).toFixed(1)} cm</span>
+                </div>
+                <div className="flex gap-2 mb-2.5">
                   {config.previewSizes.map(s=>{
                     const wristNotes={15:t('Mảnh','Slim'),16:t('Chuẩn nữ','Std'),17:t('Vừa vặn','Med'),18:t('Chuẩn nam','Large')};
                     return (
                       <button
                         key={s}
                         type="button"
-                        aria-pressed={trySize===s}
+                        aria-pressed={Math.abs(trySize-s)<0.1}
                         onClick={()=>setTrySize(s)}
-                        className={`flex-1 min-h-11 rounded-xl border text-xs flex flex-col items-center justify-center p-1 transition-all ${trySize===s?'bg-white text-black font-bold shadow-sm':'border-white/20 text-slate-300 hover:bg-white/5'}`}
+                        className={`flex-1 min-h-11 rounded-xl border text-xs flex flex-col items-center justify-center p-1 transition-all ${Math.abs(trySize-s)<0.1?'bg-white text-black font-bold shadow-sm':'border-white/20 text-slate-300 hover:bg-white/5'}`}
                       >
                         <span>{s} cm</span>
-                        <span className={`text-[10px] ${trySize===s?'text-black/70':'text-slate-400'}`}>{wristNotes[s]||''}</span>
+                        <span className={`text-[10px] ${Math.abs(trySize-s)<0.1?'text-black/70':'text-slate-400'}`}>{wristNotes[s]||''}</span>
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Micro-Adjustment Stepper & Slider */}
+                <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <Ruler size={13} className="text-amber-300" />
+                      {t('Thước tinh chỉnh chu vi (±0.2 cm):', 'Fine-tune wrist (±0.2 cm):')}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={()=>setTrySize(s=>Math.max(14.0,Number((s-0.2).toFixed(1))))}
+                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center transition-colors"
+                        title={t('Giảm 0.2 cm','Decrease 0.2 cm')}
+                      >
+                        -
+                      </button>
+                      <span className="font-mono font-bold text-amber-200 text-xs px-1">
+                        {Number(trySize).toFixed(1)} cm
+                      </span>
+                      <button
+                        type="button"
+                        onClick={()=>setTrySize(s=>Math.min(19.0,Number((s+0.2).toFixed(1))))}
+                        className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center transition-colors"
+                        title={t('Tăng 0.2 cm','Increase 0.2 cm')}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="14.0"
+                    max="19.0"
+                    step="0.1"
+                    value={trySize}
+                    onChange={e=>setTrySize(Number(e.target.value))}
+                    className="w-full h-1.5 rounded-lg bg-slate-800 accent-amber-300 cursor-pointer"
+                    aria-label="Wrist circumference fine tuning slider"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>14.0 cm (Mảnh)</span>
+                    <span>16.0 cm (Chuẩn nữ)</span>
+                    <span>18.0 cm (Chuẩn nam)</span>
+                    <span>19.0 cm (Rộng)</span>
+                  </div>
                 </div>
               </fieldset>
               <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3 text-xs text-slate-300 space-y-1">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400">{t('Chu vi cổ tay phù hợp:','Best for wrist:')}</span>
-                  <span className="font-semibold text-amber-200">{trySize - 1.0} - {trySize} cm</span>
+                  <span className="font-semibold text-amber-200">{(trySize - 1.0).toFixed(1)} - {Number(trySize).toFixed(1)} cm</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-400">{t('Đường kính xấp xỉ:','Approx. diameter:')}</span>
@@ -300,7 +487,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
 
             {config?.type==='bracelet'&&(
               <label className="block text-sm">
-                {t('Độ to của vòng','Bracelet scale')}
+                {t('Độ to của vòng (Tỉ lệ tổng thể)','Bracelet scale')}
                 <input aria-label="Scale slider" className="w-full h-11 accent-slate-200" type="range" min="0.65" max="1.6" step="0.05" value={scale} onChange={e=>setScale(Number(e.target.value))}/>
               </label>
             )}
@@ -313,14 +500,18 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
               className="w-full py-2.5 px-3 rounded-xl border border-amber-400/30 bg-amber-400/5 hover:bg-amber-400/10 text-amber-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors min-h-[44px]"
             >
               <Ruler size={15} className="text-amber-300" />
-              <span>{t('Tra cứu bảng số đo & cách đo size chuẩn','View Detailed Size & Measurement Guide')}</span>
+              <span>{t('Tra cứu bảng số đo & Thước đo màn hình 1:1','View Detailed Sizing & 1:1 Screen Caliper')}</span>
             </button>
 
             <div className="flex items-center justify-between gap-2">
               <label className="text-xs flex items-center gap-2 min-h-11 cursor-pointer"><input type="checkbox" checked={manual} disabled={!engine.current?.workerReady} onChange={e=>{setManual(e.target.checked);engine.current.setManual(e.target.checked);}}/>{t('Đặt mẫu giữa khung hình','Center the model')}</label>
               {isHand&&<button aria-label={t('Đặt lại vị trí','Reset placement')} className="min-h-11 min-w-11 grid place-items-center rounded-lg hover:bg-white/10" onClick={()=>{setTrySize(config?.defaultSize||17);setScale(1);setOffset(0);}}><RotateCcw size={17}/></button>}
             </div>
-            <div className="flex items-center justify-between pt-1 border-t border-white/5">
+            <div className="flex flex-col gap-2 pt-1 border-t border-white/5">
+              <label className="text-xs flex items-center gap-2 cursor-pointer text-slate-300">
+                <input type="checkbox" checked={showCaliperHUD} onChange={e=>setShowCaliperHUD(e.target.checked)} className="rounded accent-amber-300"/>
+                {t('Hiện thước kẹp đo kỹ thuật số AR (Digital Caliper HUD)','Show Digital Caliper HUD')}
+              </label>
               <label className="text-xs flex items-center gap-2 cursor-pointer text-slate-300">
                 <input type="checkbox" checked={showGuide} onChange={e=>setShowGuide(e.target.checked)} className="rounded accent-amber-300"/>
                 {t('Hiện khung gợi ý căn chỉnh AR','Show AR framing guide')}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Ruler, Sparkles, Check, Info, Heart, ShieldCheck, ChevronRight } from 'lucide-react';
+import { X, Ruler, Sparkles, Check, Info, Heart, ShieldCheck, ChevronRight, Sliders, CreditCard, RotateCcw } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageProvider';
 
 export default function JewelrySizeGuideModal({ isOpen, onClose, initialCategory = 'Nhẫn' }) {
@@ -14,6 +14,26 @@ export default function JewelrySizeGuideModal({ isOpen, onClose, initialCategory
 
   // Interactive Ring Size Calculator
   const [userCircumference, setUserCircumference] = useState(53.4);
+
+  // 1:1 Screen Caliper & Physical Ring Sizer (Standard ISO 7810 card = 85.60mm x 53.98mm)
+  const [cardWidthPx, setCardWidthPx] = useState(324); // ~3.785 px/mm (Standard 96 DPI screen)
+  const [calibratedDiameterMm, setCalibratedDiameterMm] = useState(17.0);
+  const [caliperJawMm, setCaliperJawMm] = useState(12.0);
+  const pxPerMm = cardWidthPx / 85.60;
+
+  const getNiFromDiameter = (d) => {
+    const num = Number(d);
+    if (num < 15.3) return 'Ni 7-8';
+    if (num < 15.8) return 'Ni 9';
+    if (num < 16.3) return 'Ni 10';
+    if (num < 16.8) return 'Ni 11-12';
+    if (num < 17.3) return 'Ni 13 (Chuẩn nữ)';
+    if (num < 17.8) return 'Ni 14-15';
+    if (num < 18.3) return 'Ni 16 (Chuẩn nam)';
+    if (num < 18.8) return 'Ni 17-18';
+    if (num < 19.3) return 'Ni 19';
+    return 'Ni 20+';
+  };
 
   useEffect(() => {
     if (initialCategory === 'Vòng tay') setActiveTab('bracelet');
@@ -97,6 +117,7 @@ export default function JewelrySizeGuideModal({ isOpen, onClose, initialCategory
             { id: 'necklace', label: t('✨ Dây Chuyền (Độ rủ & Chiều dài)', '✨ Necklaces (Length & Drop)') },
             { id: 'bracelet', label: t('💫 Vòng Tay (Cổ tay & Xích phụ)', '💫 Bracelets (Wrist & Extension)') },
             { id: 'gift', label: t('🎁 Bí Quyết Chọn Size Tặng Quà', '🎁 Gift Sizing Secrets') },
+            { id: 'caliper', label: t('📐 Thước Đo Màn Hình 1:1 Chuẩn (Caliper)', '📐 1:1 Screen Caliper Tool') },
           ].map(tab => (
             <button
               key={tab.id}
@@ -407,6 +428,333 @@ export default function JewelrySizeGuideModal({ isOpen, onClose, initialCategory
                 <p className="text-xs text-slate-400 leading-relaxed">
                   {t('Emoria hỗ trợ đổi size miễn phí trong vòng 7 ngày nếu không vừa ngón hoặc cổ tay, giữ nguyên không gian kỷ niệm NFC đã thiết lập.', 'Emoria provides free size exchanges within 7 days while preserving your initialized NFC memory space.')}
                 </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 5: 1:1 Screen Caliper & Physical Ring Sizer */}
+        {activeTab === 'caliper' && (
+          <div className="space-y-8 animate-fadeIn">
+            {/* Step 1: Calibration using ATM/CCCD card */}
+            <div className="p-6 rounded-3xl bg-white/[0.03] border border-amber-400/20 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-amber-400/20 text-amber-300 font-bold text-xs flex items-center justify-center border border-amber-400/30">1</span>
+                    <h3 className="font-semibold text-lg text-white">
+                      {t('Chuẩn Hóa Tỷ Lệ Màn Hình 1:1 Bằng Thẻ ATM / CCCD', 'Calibrate 1:1 Screen Scale with ATM / ID Card')}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1 max-w-xl">
+                    {t(
+                      'Tất cả thẻ ATM ngân hàng và CCCD đều theo chuẩn quốc tế ISO/IEC 7810 ID-1 (chiều dài chính xác 85.60 mm). Đặt thẻ thật của bạn lên khung bên dưới và kéo thanh trượt để mép khung vừa khít thẻ thật.',
+                      'All standard bank and ID cards follow ISO/IEC 7810 ID-1 (width exactly 85.60 mm). Place your physical card on the outline below and adjust the slider until it fits perfectly.'
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setCardWidthPx(324)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-slate-300 hover:text-white transition-colors self-start sm:self-auto border border-white/10"
+                >
+                  <RotateCcw size={13} />
+                  <span>{t('Đặt lại mặc định (96 DPI)', 'Reset (96 DPI)')}</span>
+                </button>
+              </div>
+
+              {/* Slider for card width */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400 flex items-center gap-1.5">
+                    <Sliders size={13} className="text-amber-300" />
+                    {t('Kéo để căn chỉnh chiều rộng khung:', 'Drag to align frame width:')}
+                  </span>
+                  <span className="font-mono text-amber-300 font-bold">
+                    {cardWidthPx} px · {(pxPerMm).toFixed(2)} px/mm
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="240"
+                  max="440"
+                  step="1"
+                  value={cardWidthPx}
+                  onChange={(e) => setCardWidthPx(Number(e.target.value))}
+                  className="w-full accent-amber-400 cursor-pointer"
+                  aria-label={t('Thanh trượt căn chỉnh kích thước thẻ', 'Card width calibration slider')}
+                />
+              </div>
+
+              {/* Physical Card Silhouette */}
+              <div className="flex flex-col items-center justify-center p-4 bg-dark-900/60 rounded-2xl border border-white/5 overflow-x-auto">
+                <p className="text-[11px] text-amber-200/80 mb-3 text-center flex items-center gap-1.5 font-medium">
+                  <CreditCard size={14} />
+                  {t('Đặt thẻ ATM / CCCD vật lý của bạn đè lên khung viền vàng này:', 'Place your physical bank/ID card over this golden outline:')}
+                </p>
+                <div
+                  style={{
+                    width: `${cardWidthPx}px`,
+                    height: `${(cardWidthPx * 53.98) / 85.60}px`,
+                    maxWidth: '100%',
+                  }}
+                  className="relative rounded-[12px] border-2 border-dashed border-amber-400/80 bg-gradient-to-br from-amber-500/10 via-white/5 to-transparent flex flex-col items-center justify-center p-4 text-center select-none shadow-lg shadow-amber-500/5 transition-[width,height] duration-75"
+                >
+                  <div className="absolute top-3 left-4 w-8 h-6 rounded bg-amber-400/30 border border-amber-300/40" />
+                  <span className="font-mono font-bold text-xs tracking-wider text-amber-200">
+                    ISO/IEC 7810 (85.60 mm × 53.98 mm)
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1">
+                    {t('Mép thẻ thật trùng khít 4 cạnh viền nét đứt này', 'Align real card edges with this dotted border')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 2: Physical Ring Sizer On Screen */}
+            <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 space-y-6">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-cyan-400/20 text-cyan-300 font-bold text-xs flex items-center justify-center border border-cyan-400/30">2</span>
+                <h3 className="font-semibold text-lg text-white">
+                  {t('Ướm Nhẫn Thật Lên Màn Hình (Thước Tròn 1:1)', 'Place Real Ring On Screen (1:1 Circle Sizer)')}
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400">
+                {t(
+                  'Đặt chiếc nhẫn bạn hoặc người ấy đang đeo vừa ngón lên vòng tròn bên dưới. Tinh chỉnh đường kính sao cho vòng tròn màu bạc vừa khít LÒNG TRONG (đường kính trong) của nhẫn.',
+                  'Place your existing ring onto the circle below. Adjust the slider until the silver circle fits exactly inside the inner rim of your ring.'
+                )}
+              </p>
+
+              <div className="grid md:grid-cols-2 gap-6 items-center">
+                {/* Visual Ring Circle */}
+                <div className="flex flex-col items-center justify-center p-8 bg-dark-900/60 rounded-2xl border border-white/5 min-h-[220px]">
+                  <div
+                    style={{
+                      width: `${calibratedDiameterMm * pxPerMm}px`,
+                      height: `${calibratedDiameterMm * pxPerMm}px`,
+                    }}
+                    className="rounded-full border-2 border-white bg-radial from-amber-400/20 via-white/10 to-transparent shadow-silver-glow flex flex-col items-center justify-center transition-all duration-75 relative"
+                  >
+                    <div className="absolute inset-x-0 top-1/2 h-[1px] bg-amber-400/40" />
+                    <div className="absolute inset-y-0 left-1/2 w-[1px] bg-amber-400/40" />
+                    <span className="font-mono text-xs font-bold text-white bg-dark-950/80 px-2 py-0.5 rounded-full z-10 border border-white/10 shadow">
+                      Ø {calibratedDiameterMm.toFixed(1)} mm
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-4 text-center">
+                    {t('Đặt lòng trong nhẫn thật trùng khít đường viền trắng', 'Match ring inner edge to the white rim')}
+                  </p>
+                </div>
+
+                {/* Ring Controls & Readout */}
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400">{t('Đường kính lòng trong (Ø):', 'Inner Diameter (Ø):')}</span>
+                      <span className="font-mono text-lg font-bold text-amber-300">
+                        {calibratedDiameterMm.toFixed(1)} mm
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400">{t('Chu vi lòng trong (C = π × d):', 'Circumference (C = π × d):')}</span>
+                      <span className="font-mono text-sm font-semibold text-slate-200">
+                        {(calibratedDiameterMm * Math.PI).toFixed(1)} mm
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                      <span className="text-xs font-medium text-amber-200">{t('Size chuẩn Việt Nam:', 'Vietnam Ni Standard:')}</span>
+                      <span className="font-bold text-base text-amber-300 bg-amber-400/10 px-3 py-1 rounded-lg border border-amber-400/30">
+                        {getNiFromDiameter(calibratedDiameterMm)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>{t('Tinh chỉnh đường kính (14.5 – 21.5 mm):', 'Fine-tune diameter (14.5 – 21.5 mm):')}</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setCalibratedDiameterMm((prev) => Math.max(14.5, +(prev - 0.1).toFixed(1)))}
+                          className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center transition-colors"
+                          title="-0.1 mm"
+                        >
+                          -
+                        </button>
+                        <button
+                          onClick={() => setCalibratedDiameterMm((prev) => Math.min(21.5, +(prev + 0.1).toFixed(1)))}
+                          className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center transition-colors"
+                          title="+0.1 mm"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="14.5"
+                      max="21.5"
+                      step="0.1"
+                      value={calibratedDiameterMm}
+                      onChange={(e) => setCalibratedDiameterMm(Number(e.target.value))}
+                      className="w-full accent-amber-400 cursor-pointer"
+                      aria-label={t('Thanh trượt đường kính nhẫn', 'Ring diameter slider')}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 3: Interactive Vernier Caliper Gauge for Emoria Specs */}
+            <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 space-y-6">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-emerald-400/20 text-emerald-300 font-bold text-xs flex items-center justify-center border border-emerald-400/30">3</span>
+                <h3 className="font-semibold text-lg text-white">
+                  {t('Thước Kẹp Điện Tử 1:1 Kiểm Tra Độ Dày & Chi Tiết Kim Hoàn', 'Digital Vernier Caliper 1:1 for Jewelry Specifications')}
+                </h3>
+              </div>
+              <p className="text-xs text-slate-400">
+                {t(
+                  'Chọn nhanh một bộ phận bất kỳ của trang sức Emoria bên dưới để xem độ mở ngàm thước kẹp thực tế trên màn hình (tỷ lệ 1:1 chuẩn mm sau khi đã căn chỉnh thẻ ở Bước 1).',
+                  'Select any Emoria component below to view its physical caliper opening at 1:1 scale on your screen.'
+                )}
+              </p>
+
+              {/* Presets for Emoria jewelry components */}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: t('Đai nhẫn dày 1.8mm (Comfort Fit)', 'Ring band 1.8mm thick'), mm: 1.8 },
+                  { label: t('Bản đai nhẫn 3.8mm', 'Ring band width 3.8mm'), mm: 3.8 },
+                  { label: t('Mắt dây chuyền 1.2mm', 'Chain link 1.2mm'), mm: 1.2 },
+                  { label: t('Đường kính Charm NFC 12.0mm', 'NFC Charm 12.0mm Ø'), mm: 12.0 },
+                  { label: t('Độ dày Charm 4 lớp 3.5mm', '4-Layer Charm 3.5mm thick'), mm: 3.5 },
+                ].map((spec) => (
+                  <button
+                    key={spec.mm + spec.label}
+                    onClick={() => setCaliperJawMm(spec.mm)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${
+                      Math.abs(caliperJawMm - spec.mm) < 0.05
+                        ? 'bg-amber-400/20 text-amber-200 border-amber-400/50 shadow'
+                        : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {spec.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Digital Caliper Visual Gauge */}
+              <div className="p-5 bg-dark-900/60 rounded-2xl border border-white/5 space-y-4">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400">{t('Khoảng cách ngàm kẹp thực tế:', 'Physical Jaw Gap:')}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xl font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-3 py-0.5 rounded-lg shadow-inner">
+                      {caliperJawMm.toFixed(1)} mm
+                    </span>
+                  </div>
+                </div>
+
+                {/* Visual Caliper Jaws */}
+                <div className="relative h-20 bg-dark-950/90 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden px-4">
+                  {/* Left Jaw */}
+                  <div className="h-14 w-4 bg-gradient-to-r from-slate-400 to-slate-200 rounded-l flex items-center justify-end pr-0.5 shadow-md">
+                    <div className="w-1 h-10 bg-slate-600 rounded-sm" />
+                  </div>
+
+                  {/* Measuring Gap (Exact 1:1 Scale in mm) */}
+                  <div
+                    style={{ width: `${Math.max(2, caliperJawMm * pxPerMm)}px` }}
+                    className="h-10 bg-emerald-500/20 border-y border-emerald-400/50 flex items-center justify-center relative transition-all duration-75 min-w-[2px]"
+                  >
+                    <div className="absolute inset-x-0 h-[1px] bg-emerald-400/80" />
+                    {caliperJawMm * pxPerMm > 35 && (
+                      <span className="font-mono text-[10px] text-emerald-300 font-bold bg-dark-950/90 px-1 rounded z-10">
+                        {caliperJawMm.toFixed(1)}mm
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Right Jaw */}
+                  <div className="h-14 w-4 bg-gradient-to-l from-slate-400 to-slate-200 rounded-r flex items-center justify-start pl-0.5 shadow-md">
+                    <div className="w-1 h-10 bg-slate-600 rounded-sm" />
+                  </div>
+                </div>
+
+                {/* Caliper Jaw Slider */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>{t('Kéo điều chỉnh ngàm thước tự do (0.5 – 30.0 mm):', 'Freely adjust caliper jaw (0.5 – 30.0 mm):')}</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setCaliperJawMm((prev) => Math.max(0.5, +(prev - 0.2).toFixed(1)))}
+                        className="w-6 h-6 rounded bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center text-xs"
+                      >
+                        -
+                      </button>
+                      <button
+                        onClick={() => setCaliperJawMm((prev) => Math.min(30.0, +(prev + 0.2).toFixed(1)))}
+                        className="w-6 h-6 rounded bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center text-xs"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="30.0"
+                    step="0.1"
+                    value={caliperJawMm}
+                    onChange={(e) => setCaliperJawMm(Number(e.target.value))}
+                    className="w-full accent-emerald-400 cursor-pointer"
+                    aria-label={t('Thanh trượt ngàm kẹp thước đo', 'Caliper jaw slider')}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Step 4: Metallurgy & Ergonomics Technical Reference */}
+            <div className="p-6 rounded-3xl bg-gradient-to-br from-white/[0.04] to-amber-500/[0.03] border border-amber-400/20 space-y-4">
+              <h4 className="text-sm font-semibold text-amber-200 flex items-center gap-2">
+                <ShieldCheck size={18} className="text-amber-300" />
+                {t('Tiêu Chuẩn Cơ Khí & Vật Lý Kim Hoàn Tại Emoria', 'Emoria Metallurgy & Physics Engineering Standards')}
+              </h4>
+              <div className="grid sm:grid-cols-2 gap-3 text-xs text-slate-300 leading-relaxed">
+                <div className="p-3.5 rounded-xl bg-black/20 border border-white/5 space-y-1.5">
+                  <p className="font-semibold text-white">💎 {t('Chuẩn Đai Nhẫn Comfort Fit (1.8mm)', 'Comfort Fit Ring Band (1.8mm)')}</p>
+                  <p className="text-slate-400 text-[11px]">
+                    {t(
+                      'Đai nhẫn được vát cong lòng trong (domed inner surface) 1.8mm giúp giảm ma sát khi đeo qua khớp ngón tay và hoàn toàn không gây cấn khi gập bàn tay làm việc.',
+                      'A domed 1.8mm inner profile glides smoothly over knuckles with zero friction or finger pinching.'
+                    )}
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-xl bg-black/20 border border-white/5 space-y-1.5">
+                  <p className="font-semibold text-white">📡 {t('Cấu Trúc Charm 4 Lớp Chống Nhiễu (3.5mm)', '4-Layer Shielded NFC Charm (3.5mm)')}</p>
+                  <p className="text-slate-400 text-[11px]">
+                    {t(
+                      'Gồm đá CZ/Men bảo vệ (1.1mm) + Chip NTAG215 (0.4mm) + Tấm chắn từ Ferrite 0.3mm (chống nhiễu kim loại bạc) + Khung đế Bạc S925 đúc nguyên khối chống nước IP68 (1.2mm).',
+                      'Enamel/CZ top (1.1mm) + NTAG215 (0.4mm) + Ferrite RF shield (0.3mm) + IP68 S925 silver base (1.2mm).'
+                    )}
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-xl bg-black/20 border border-white/5 space-y-1.5">
+                  <p className="font-semibold text-white">✨ {t('Dây Chuyền 45cm + 5cm Chờ Tự Do', '45cm + 5cm Adaptable Chain')}</p>
+                  <p className="text-slate-400 text-[11px]">
+                    {t(
+                      'Độ rủ tiêu chuẩn chạm xương quai xanh (clavicle). 5cm xích chờ cho phép bạn tùy chỉnh độ rủ xuống ngực trên tùy theo cổ áo sơ mi, váy hay áo len.',
+                      'Hangs naturally at the clavicle. The 5cm extender allows tailoring the drop to any neckline style.'
+                    )}
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-xl bg-black/20 border border-white/5 space-y-1.5">
+                  <p className="font-semibold text-white">💫 {t('Quy Tắc Độ Cử Động Vòng Tay (+1.2cm)', 'Bracelet Ease of Movement (+1.2cm)')}</p>
+                  <p className="text-slate-400 text-[11px]">
+                    {t(
+                      'Chu vi cổ tay thực tế luôn cần cộng thêm +1.2cm đến +1.5cm để khi gập cổ tay hoặc di chuột máy tính hạt charm không tì cấn vào mạch máu.',
+                      'Wrist circumference is intentionally sized with +1.2cm to +1.5cm ease to prevent any pressure when typing.'
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
