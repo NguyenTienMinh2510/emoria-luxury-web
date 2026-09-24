@@ -88,7 +88,12 @@ def pave(points,r=.38,prongs=True):
 def bail(y,double=False):
     ellipse('Connector',1,1.4,.15,.3,silver,cy=y)
     for x in ([-.85,.85] if double else [0]):
-        tube('Sculpted bail',[(x+1.18*math.cos(t),y+2.9+2.65*math.sin(t),.3+.6*math.sin(t)) for t in [i*TAU/64 for i in range(64)]],.48,silver,True,12)
+        tube('Sculpted bail',[(x+.45*math.sin(t),y+2.9+2.65*math.sin(t),1.18*math.cos(t)) for t in [i*TAU/96 for i in range(96)]],.48,silver,True,16)
+
+def chain_anchor(y):
+    o=bpy.data.objects.new('ChainAnchor',None);bpy.context.collection.objects.link(o)
+    o.location=(0,y,0);o.empty_display_size=.5
+    return o
 
 def leaf(angle,start,length,width,z,mat,name='Sculpted petal'):
     # Curved raised surface, tapered point, real thickness and smooth highlight ridge.
@@ -116,6 +121,10 @@ def lumen():
     ellipse('Gold bezel',3.08,3.08,1.82,.30,gold,cy=.7)
     ellipse('Gold bezel inner lip',2.74,2.74,2.1,.10,gold,cy=.7)
     stone((0,.7,2.02),2.7)
+    for i in range(8):
+        a=i*TAU/8
+        tube('Centre stone claw',[(2.95*math.cos(a),.7+2.95*math.sin(a),1.75),(2.58*math.cos(a),.7+2.58*math.sin(a),2.55)],.115,gold,sides=10)
+        ball('Rounded claw tip',(2.58*math.cos(a),.7+2.58*math.sin(a),2.55),.13,gold)
     for cx,cy,r in [(0,-13.5,5.6),(0,-13.5,4.15),(0,-13.5,2.7),(-8.1,-11.7,3.9),(8.1,-11.7,3.9)]:
         pts=[(cx+r*math.cos(i*math.pi/160),cy+r*math.sin(i*math.pi/160),1.48) for i in range(161)]
         pts=[p for p in pts if p[0]**2+p[1]**2<11.93**2]
@@ -160,8 +169,8 @@ def sen():
     ball('Central pearl',(0,0,2.5),1.75,pearl,scale=(1,1,.85))
     bail(14)
     # Clasp silhouette retained above the lotus.
-    ellipse('Lobster clasp',1.6,2.4,0,.53,silver,cy=20)
-    ball('Clasp release',(1.6,19.4,0),.6,silver,scale=(.7,1.5,.7))
+    tube('Lobster clasp',[(.4*math.sin(t),20+2.4*math.sin(t),1.6*math.cos(t)) for t in [i*TAU/96 for i in range(96)]],.53,silver,True,12)
+    ball('Clasp release',(.4,19.4,1.6),.6,silver,scale=(.7,1.5,.7))
 
 def horizon():
     disk(17,11.5,silver);disk(15.35,9.9,blue,.95,.5)
@@ -178,6 +187,25 @@ def horizon():
             if (x/15.3)**2+(y/9.85)**2<1:pts.append((x,y,1.5))
         if len(pts)>2:tube('Raised silver wave',pts,.20,silver)
     for x in [-18.8,18.8]:ellipse('Side connector',1.7,1.7,.3,.4,silver,cx=x)
+
+def orbit():
+    disk(10.2,10.7,silver,0,1.5);disk(9.65,10.15,blue,.9,.5)
+    ellipse('Orbit polished rim',10.05,10.55,1,.26,silver)
+    ellipse('Orbit inner lip',9.6,10.1,1.2,.12,silver)
+    for angle,paved in [(-.6,False),(.4,True)]:
+        points=[]
+        for i in range(160):
+            t=i*TAU/160;x=11.9*math.cos(t);y=3.7*math.sin(t)
+            points.append((x*math.cos(angle)-y*math.sin(angle),x*math.sin(angle)+y*math.cos(angle),1.6+1.35*math.sin(t)))
+        tube('Pave orbital band' if paved else 'Polished orbital band',points,.38 if paved else .3,silver,True,12)
+        if paved:pave([(x,y,z+.28) for x,y,z in points[::3]],.28)
+    # Front intersection of the two rotated ellipses: the gold hub joins both bands.
+    theta=math.pi/2-.1
+    radius=1/math.sqrt((math.cos(theta+.6)/11.9)**2+(math.sin(theta+.6)/3.7)**2)
+    hx,hy=radius*math.cos(theta),radius*math.sin(theta)
+    ball('Gold orbital centre',(hx,hy,3.15),1.62,gold,scale=(1,1,.8))
+    ellipse('Gold centre bezel',1.68,1.68,2.9,.16,gold,cx=hx,cy=hy)
+    for x in [-11.95,11.95]:ellipse('Side connector',1.5,1.45,.2,.35,silver,cx=x)
 
 def heart(t):return (16*math.sin(t)**3/1.45,(13*math.cos(t)-5*math.cos(2*t)-2*math.cos(3*t)-math.cos(4*t))/1.45+1.7)
 
@@ -229,13 +257,19 @@ def ring(kind):
 def wrist_chain(kind):
     # Separate linked cable wrapping the inferred wrist. Front ornaments remain rigid.
     # ponytail: inferred ellipse, not cloth simulation; calibrate from measured bracelet later.
-    start=1.31 if kind=='pulse' else .79
+    start=1.31 if kind=='pulse' else .49 if kind=='orbit' else .79
     for i in range(98):
         a=start+i*(TAU-2*start)/97
         center=Vector((29*math.sin(a),0,19*(math.cos(a)-1)))
         tangent=Vector((29*math.cos(a),0,-19*math.sin(a))).normalized()
         u=Vector((0,1,0)) if i%2==0 else Vector((math.sin(a),0,math.cos(a)))
         tube('Wrist cable link',[center+tangent*(.83*math.cos(t))+u*(.48*math.sin(t)) for t in [j*TAU/16 for j in range(16)]],.16,silver,True,6)
+        if kind=='orbit' and i%9==4:ball('Orbit chain bead',center,.62,silver)
+
+    if kind=='orbit':
+        for side in [-1,1]:
+            for i in range(3):
+                ellipse('Orbit connector link',.65,.95,-.2-i*.85,.2,silver,cx=side*(13.2+i*.25),n=32)
 
     if kind=='horizon':
         for side in [-1,1]:
@@ -256,7 +290,7 @@ def combine():
 
 def aim(o,p):o.rotation_euler=(Vector(p)-o.location).to_track_quat('-Z','Y').to_euler()
 
-names=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else ['lumen','faith','sen','horizon','pulse','echo','halo']
+names=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else ['lumen','faith','sen','horizon','pulse','echo','halo','orbit']
 reports=[]
 for name in names:
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -273,8 +307,10 @@ for name in names:
     crystal=material('Brilliant crystal',(.63,.72,.84),.85,.09)
     if name in ['echo','halo']:ring(name)
     else:globals()[name]()
-    if name in ['horizon','pulse']:wrist_chain(name)
+    if name in ['horizon','pulse','orbit']:wrist_chain(name)
     items=combine()
+    if name in ['lumen','faith','sen']:items.append(chain_anchor({'lumen':16.9,'faith':16.5,'sen':20}[name]))
+    bpy.context.view_layer.update()
     transform=Matrix.Rotation(math.pi/2,4,'X') @ Matrix.Diagonal((.001,.001,.001,1))
     for o in items:o.matrix_world=transform @ o.matrix_world
     bpy.ops.object.select_all(action='SELECT')
@@ -282,7 +318,8 @@ for name in names:
     path=OUT/f'emoria-{name}.glb'
     bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=True,export_yup=True,export_apply=True)
     triangles=0
-    for o in items:o.data.calc_loop_triangles();triangles+=len(o.data.loop_triangles)
+    for o in items:
+        if o.type=='MESH':o.data.calc_loop_triangles();triangles+=len(o.data.loop_triangles)
     assert 1000<triangles<140000,(name,triangles)
     scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=32;scene.cycles.use_denoising=True
     scene.render.resolution_x=900;scene.render.resolution_y=900;scene.render.resolution_percentage=100
@@ -290,7 +327,7 @@ for name in names:
     scene.view_settings.view_transform='AgX'
     for loc,power,size in [((.03,-.045,.06),.35,.045),((-.04,-.025,.015),.24,.025),((.005,.015,.04),.4,.035)]:
         bpy.ops.object.light_add(type='AREA',location=loc);o=bpy.context.object;o.data.energy=power;o.data.shape='DISK';o.data.size=size;aim(o,(0,0,0))
-    ring_mode=name in ['echo','halo'];bracelet=name in ['horizon','pulse']
+    ring_mode=name in ['echo','halo'];bracelet=name in ['horizon','pulse','orbit']
     bpy.ops.object.camera_add(location=(.03,-.065,.043) if ring_mode else (.012,-.095,.032))
     cam=bpy.context.object;aim(cam,(0,0,0 if ring_mode else .003));cam.data.type='ORTHO';cam.data.ortho_scale=.036 if ring_mode else (.076 if bracelet else .047);cam.data.clip_start=.001;scene.camera=cam
     scene.render.image_settings.file_format='PNG';scene.render.filepath=str(ART/f'{name}.png')

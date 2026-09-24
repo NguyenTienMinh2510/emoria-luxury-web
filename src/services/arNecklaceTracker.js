@@ -1,7 +1,6 @@
 import {necklacePose,smoothPose,drawNecklace} from './arGeometry.js';
 import {AR3DScene,isWebGLAvailable} from './ar3DRenderer.js';
 
-const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
 
 export class NecklaceTracker {
   constructor(video,canvas,config,onState){
@@ -30,7 +29,7 @@ export class NecklaceTracker {
             modelUrl:this.config.modelUrl,
             length:this.options.length,
             scale:this.options.scale,
-            pendantScale:this.config.pendantScale||0.09
+            shoulderReferenceMm:this.config.shoulderReferenceMm
           });
         }catch(error){this.scene3d?.dispose();this.scene3d=null;throw Object.assign(error,{name:"ModelLoadError"});}
       }
@@ -46,16 +45,7 @@ export class NecklaceTracker {
           const pScale=this.config.pendantScale||.18;
           if(!this.scene3d)drawNecklace(this.ctx,pose,this.image,{...this.options,pendantScale:pScale,chainOnly:!!(this.scene3d&&this.scene3d.renderer)});
           if(this.scene3d&&this.scene3d.renderer){
-            const drop=pose.span*(.02+(clamp(this.options.length,30,60)-40)*.012);
-            const pendantPose={
-              x:pose.x-Math.sin(pose.angle)*drop,
-              y:pose.y+Math.cos(pose.angle)*(drop+pose.span*pScale*.35)+pose.span*clamp(this.options.offset,-.3,.3),
-              span:pose.span,
-              z:pose.z||0,
-              angle:pose.angle
-            };
-            this.scene3d.updatePose3D(pendantPose,'necklace');
-            this.scene3d.updateChain(pose);
+            this.scene3d.updateNecklace(pose);
             this.scene3d.render();
             this.ctx.drawImage(this.scene3d.domElement,0,0,width,height);
           }
@@ -87,7 +77,7 @@ export class NecklaceTracker {
         if(this.closed)return;
         if(data.type==='ready'){clearTimeout(this.modelTimer);this.workerReady=true;this.state('searching');}
         else if(data.type==='pose'){
-          this.busy=false;const now=performance.now(),pose=necklacePose(data.points,this.canvas.width,this.canvas.height);
+          this.busy=false;const now=performance.now(),pose=necklacePose(data.points,this.canvas.width,this.canvas.height,data.worldPoints);
           this.pose=smoothPose(this.pose,pose,now-(this.lastSeen||now-100));if(pose)this.lastSeen=now;
         }else if(data.type==='error')this.fallback();
       };
@@ -97,7 +87,7 @@ export class NecklaceTracker {
   fallback(){if(this.closed)return;clearTimeout(this.modelTimer);this.worker?.terminate();this.worker=null;this.workerReady=false;this.busy=false;this.manual=true;this.state('manual-fallback');}
   setOptions(options){
     Object.assign(this.options,options);
-    this.scene3d?.setOptions({...this.options,pendantScale:this.config.pendantScale});
+    this.scene3d?.setOptions({shoulderReferenceMm:this.config.shoulderReferenceMm});
   }
   setManual(manual){this.manual=manual||!this.workerReady;this.pose=null;this.lastSeen=0;this.state(this.manual?'manual':'searching');}
   snapshot(){

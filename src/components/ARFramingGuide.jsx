@@ -3,8 +3,7 @@ import { Scan, Check, Sparkles, Lightbulb } from 'lucide-react';
 
 /**
  * ARFramingGuide Component
- * Provides a calibrated luxury HUD reticle & body/hand silhouette to guarantee
- * instant AI tracking lock for necklaces, rings, and bracelets.
+ * Framing hints and current tracking status for necklaces, rings and bracelets.
  * 
  * Sized to match real-world camera framing without shrinking or causing jewelry offset.
  */
@@ -56,9 +55,9 @@ export default function ARFramingGuide({
     : 'bg-black/80 border-amber-300/50 text-amber-200 shadow-[0_0_15px_rgba(251,191,36,0.25)] animate-pulse';
 
   const hintText = isTracking
-    ? t('✦ Đã khóa vị trí hoàn hảo · AR đang hiển thị', '✦ Target locked · AR Active')
+    ? t('Đã nhận diện vị trí · AR đang hiển thị', 'Position detected · AR active')
     : isManual
-    ? t('Căn chỉnh thủ công theo ý thích', 'Manual placement mode')
+    ? t('Mẫu đặt giữa khung hình', 'Model centered in frame')
     : isLoading
     ? t('Đang khởi động cảm biến AR...', 'Initializing AR tracking...')
     : type === 'ring'
@@ -72,7 +71,7 @@ export default function ARFramingGuide({
       ? t('Khoảng cách: 25 - 40 cm · Xòe nhẹ các ngón tay', 'Distance: 25 - 40 cm · Spread fingers slightly')
       : type === 'bracelet'
       ? t('Khoảng cách: 30 - 50 cm · Đưa cổ tay hướng camera', 'Distance: 30 - 50 cm · Face wrist to camera')
-      : t('Khoảng cách: 45 - 65 cm · Thấy rõ 2 vai & nhìn thẳng', 'Distance: 45 - 65 cm · Face forward with both shoulders')
+      : t('Thấy rõ hai vai · Xoay người chậm để xem góc nghiêng', 'Keep both shoulders visible · Turn slowly for side views')
   );
 
   return (

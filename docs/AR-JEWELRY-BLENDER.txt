@@ -1,5 +1,34 @@
 EMORIA — AR models from Whisk reference images
-Updated 2026-09-23
+Updated 2026-09-24
+
+REVISION: FIXED NECKLACES, 3D SIDE VIEWS, ORBIT
+Current assets: 8 GLBs including emoria-orbit.glb (blue/gold bracelet, duo previews one).
+Orbit reference: public/ar/orbit.jpg. Chain reference: public/ar/chain.jpg.
+Faith/Lumen/Sen GLBs now contain an authored ChainAnchor Empty in the bail opening.
+Renderer uses this anchor and the same 3D transform for both chain and pendant.
+Chain: instanced oval cable links, approximately 2.98 mm outer width / 0.88 mm wire diameter.
+Lumen: extra stone claws; all necklace bails have denser rounded geometry and a true depth opening.
+PBR enamel/pearl/gemstone properties are preserved, never indiscriminately converted to metallic silver.
+Necklace length, pendant scale and vertical-position controls have been removed from the customer UI.
+Lumen face 28 mm; Faith cross approximately 18 x 29 mm; Sen approximately 26 mm across.
+These modeled dimensions are inferred from images, NOT verified against physical products.
+Only the visible front chain is rendered, styled as a 45 cm necklace.
+Pixel scale uses an assumed 360 mm shoulder span; camera alone cannot measure actual shoulder width.
+REST version 3 config is shared in src/services/tryOnConfig.js, re-exported by server/tryOn.js.
+Necklaces return fixedDimensions and shoulderReferenceMm. No database migration needed.
+Custom GLBs should include ChainAnchor; bounding-box fallback for old custom models needs visual review.
+
+Pose worker supplies world landmarks for shoulder yaw and (when hips are reliably visible) torso pitch.
+Quaternion smoothing and foreshortening compensation maintain consistent size during moderate turns.
+Estimated yaw up to ~66 degrees is supported while both shoulders remain detectable.
+When hips are out of frame, pitch stays neutral. This is not full 360-degree tracking.
+Hair/clothing/body occlusion and chain physics remain approximations.
+AR WebGL supersampling is capped at 1.5x; camera render target remains ~30 fps.
+Tests now cover all 8 GLBs, anchors over 3D rotations/distances, fixed scale, preserved enamel,
+side-view scale compensation, torso pitch and quaternion smoothing.
+Browser QA: .local/necklace-assembly.html (magnified assembly), .local/ar-ui-harness.html (synthetic camera).
+Faith front/50-degree side view and synthetic shoulder tracking checked in browser.
+Physical phone accuracy/performance and deployment were not verified in this revision.
 
 VIEW
 Run: npm run dev -- --port 3021
@@ -10,9 +39,9 @@ The server must stay running. Phone camera requires HTTPS (production), or local
 This update is local; it has not been committed or deployed.
 
 ASSETS
-public/models/jewelry/emoria-{lumen,faith,sen,horizon,pulse,echo,halo}.glb
+public/models/jewelry/emoria-{lumen,faith,sen,horizon,pulse,echo,halo,orbit}.glb
 Editable Blender source and roundtrip renders: docs/jewelry-blender/
-References: public/ar/*.jpg (7 supplied images; no Orbit image in this folder).
+References: public/ar/*.jpg (8 designs plus the supplied chain reference).
 Rebuild all with PowerShell:
 & 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe' --background --python-exit-code 1 --python scripts/build-jewelry-blender.py
 Rebuild only some: append -- lumen pulse
@@ -21,22 +50,22 @@ Old build-lumen-blender.py and emoria-lumen-pendant/necklace.glb are legacy prot
 
 REST / RUNTIME
 GET /api/v1/products/:id/try-on verifies the product is active, returns the matching GLB and calibration.
-server/tryOn.js: curated 7 designs, supported duo aliases, optional details.ar overrides.
+src/services/tryOnConfig.js: curated 8 designs, supported duo aliases, optional details.ar overrides.
 Model URLs must be same-origin .glb paths. enabled:false disables AR.
 Products without a matching 3D asset no longer display an unrelated generic design.
 Horizon is a bracelet; Halo/Echo are rings; Lumen/Faith/Sen use necklace placement.
 For Sen this is a charm suspended on a simulated chain, not a claim that a chain is included in the order.
 GLB meters; +Y up, +Z ornament front; ring hole axis Y. Dimensions are inferred, not measured.
-Necklace chain is a separate instanced 3D mesh, adjusted to shoulder span and simulated length.
+Necklace chain uses fixed link geometry, scaled with the same camera calibration as its pendant.
 Ring/wrist depth masks are geometric approximations. No hair/clothing segmentation.
 Hand orientation is optimized for a frontal view; the same model is displayed on either hand.
 
 PERFORMANCE
 Only the selected GLB is loaded when camera starts; Three.js remains in lazy AR chunks.
-~0.26–1.88 MB per new GLB, roughly 8,900–65,600 triangles.
-Meshes joined by material; necklace uses 160 links in one instanced draw, rebuilt only when length changes.
-Camera rendering capped around 30 fps; tracking requested at about 12 fps in a worker.
-Model scale responds to landmark span and size/placement controls.
+~0.29–1.88 MB per GLB, roughly 10,400–65,600 triangles.
+Meshes joined by material; necklace links use one instanced draw and are not rebuilt during tracking.
+Camera rendering capped around 30 fps; pose tracking runs in a worker, requested no faster than every 48 ms.
+Model scale responds to landmarks. Only ring/bracelet types retain size/placement controls.
 Camera tracks, workers, GPU buffers, environment maps and photo blob URLs released on close.
 Late model/camera results are discarded after close; missing GLB/WebGL produces a visible error.
 
@@ -54,11 +83,13 @@ late model disposal, camera permission race, hand worker result lifecycle, pose 
 Local browser checks additionally use .local/ar-ui-harness.html and .local/ar-worker-check.html (not deployed).
 No schema migration or third-party AI calls required by this feature.
 
-Verified in this run:
-- All seven GLBs loaded in the browser gallery.
-- Real Pose Lite inference tracked the shoulder fixture; synthetic video composited Lumen and chain.
-- Real Hand Landmarker processed three frames without erroneous fallback.
-- Manual Halo preview, capture, close (tracks ended), 390px layout with no horizontal overflow.
-- Local REST returned active Lumen necklace, Horizon bracelet and Halo ring configurations.
+Verified for this revision:
+- All 8 GLBs parse in automated tests; Orbit loads and renders in the browser gallery.
+- Faith synthetic camera preview detected shoulders; necklace sliders are absent.
+- Faith front and 50-degree side assembly views preserve the chain/bail connection.
+- Sen chain/clasp connection inspected in the assembly preview.
+- 390px iframe viewport: no horizontal overflow, no necklace sliders, active shoulder tracking.
+- Synthetic-camera capture produced a local photo; closing the mirror ended camera tracks.
+- Local REST returned HTTP 200, version 3, matching Faith/Orbit GLB URLs.
 - npm run test:ci PASS; npm run build PASS (existing large main chunk warning remains).
 Physical-camera tracking on iOS/Android and production deployment were not performed in this run.

@@ -1,20 +1,40 @@
+import {Euler,Quaternion} from 'three';
 const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
-export function necklacePose(points,width,height) {
+export function necklacePose(points,width,height,worldPoints=null) {
   const a=points?.[11],b=points?.[12];
-  if(!a||!b||![a.x,a.y,b.x,b.y,a.visibility,b.visibility].every(Number.isFinite)||Math.min(a.visibility,b.visibility)<0.48)return null;
+  if(!a||!b||![a.x,a.y,b.x,b.y,a.z??0,b.z??0,a.visibility,b.visibility].every(Number.isFinite)||Math.min(a.visibility,b.visibility)<0.48)return null;
   if([a,b].some(p=>p.x<0.01||p.x>0.99||p.y<0.04||p.y>0.96))return null;
   const [left,right]=a.x<b.x?[a,b]:[b,a];
   const dx=(right.x-left.x)*width,dy=(right.y-left.y)*height;
   const span=Math.hypot(dx,dy),angle=Math.atan2(dy,dx);
-  if(span<width*0.14||span>width*0.96||Math.abs(angle)>0.55||Math.abs((a.z||0)-(b.z||0))>0.38)return null;
+  const dz=((right.z||0)-(left.z||0))*width;
+  if(span<width*0.10||span>width*0.96||Math.abs(angle)>.8||Math.abs(dz)>width*.8)return null;
+  let yaw=Math.atan2(dz,span),pitch=0;
+  const wl=worldPoints?.[left===a?11:12],wr=worldPoints?.[left===a?12:11];
+  const finite=p=>p&&[p.x,p.y,p.z].every(Number.isFinite);
+  if(finite(wl)&&finite(wr)){
+    const across=Math.hypot(wr.x-wl.x,wr.y-wl.y);
+    if(across>.05)yaw=Math.atan2(wr.z-wl.z,across);
+    const ha=worldPoints[23],hb=worldPoints[24];
+    if(finite(ha)&&finite(hb)&&points[23]?.visibility>.6&&points[24]?.visibility>.6){
+      const up=(ha.y+hb.y-wl.y-wr.y)/2,forward=(ha.z+hb.z-wl.z-wr.z)/2;
+      if(up>.12)pitch=clamp(Math.atan2(forward,up),-.4,.4);
+    }
+  }
+  // Beyond ~66 degrees one shoulder is usually occluded: ask for reacquisition.
+  if(Math.abs(yaw)>1.15)return null;
+  const quaternion=new Quaternion().setFromEuler(new Euler(pitch,yaw,-angle,'ZYX'));
+  const scaleSpan=span/Math.max(.4,Math.cos(yaw));
   const z=((a.z||0)+(b.z||0))*width/2;
-  return {x:(a.x+b.x)*width/2,y:(a.y+b.y)*height/2,z,span,angle};
+  return {x:(a.x+b.x)*width/2,y:(a.y+b.y)*height/2,z,span,scaleSpan,angle,quaternion};
 }
 export function smoothPose(previous,next,dt) {
   if(!next)return null;
   if(!previous||Math.hypot(next.x-previous.x,next.y-previous.y)>next.span*.5)return {...next};
   const alpha=1-Math.exp(-clamp(dt,0,200)/85);
-  return Object.fromEntries(['x','y','z','span','angle'].map(k=>[k,(previous[k]||0)+((next[k]||0)-(previous[k]||0))*alpha]));
+  const result=Object.fromEntries(['x','y','z','span','scaleSpan','angle'].map(k=>[k,(previous[k]||0)+((next[k]||0)-(previous[k]||0))*alpha]));
+  result.quaternion=next.quaternion?(previous.quaternion?.clone()||next.quaternion.clone()).slerp(next.quaternion,alpha):null;
+  return result;
 }
 export function drawNecklace(ctx,pose,image,{length=45,scale=1,offset=0,pendantScale=.18,chainOnly=false}={}) {
   if(!pose)return;

@@ -26,17 +26,8 @@ export function prepareModel(asset,type){
       if(o.material){
         for(const m of [o.material].flat()){
           if(m&&(m.isMeshStandardMaterial||m.isMeshPhysicalMaterial)){
-            if(m.metalness>0.2||!m.map){
-              m.metalness=Math.max(m.metalness,0.96);
-              m.roughness=clamp(m.roughness,0.12,0.22);
-              m.envMapIntensity=1.85;
-            }else{
-              m.envMapIntensity=1.4;
-            }
-            if('clearcoat' in m&&m.clearcoat===0){
-              m.clearcoat=0.6;
-              m.clearcoatRoughness=0.1;
-            }
+            // Keep enamel, pearl and gemstone properties authored in Blender.
+            m.envMapIntensity=m.metalness>.8?1.6:1;
             m.needsUpdate=true;
           }
         }
@@ -45,6 +36,11 @@ export function prepareModel(asset,type){
   });
   if(type==='bracelet')asset.position.z=19;
   root.add(asset);
+  if(type==='necklace'){
+    root.updateMatrixWorld(true);
+    const anchor=asset.getObjectByName('ChainAnchor');
+    root.userData.chainAnchor=anchor?root.worldToLocal(anchor.getWorldPosition(new THREE.Vector3())):new THREE.Vector3(0,bounds.max.y-2,0);
+  }
   if(type==='ring'||type==='bracelet'){
     // Approximate depth mask only; does not infer clothing or real wrist dimensions.
     const radius=type==='ring'?8.35:27;
@@ -65,7 +61,7 @@ export class AR3DScene{
     this.camera.position.z=2000;
     if(typeof document!=='undefined'){
       this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'default'});
-      this.renderer.setPixelRatio(1);this.renderer.setSize(width,height);this.domElement=this.renderer.domElement;
+      this.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio||1,1.5));this.renderer.setSize(width,height);this.domElement=this.renderer.domElement;
       this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.2;
       const pmrem=new THREE.PMREMGenerator(this.renderer),room=new RoomEnvironment();
       this.environment=pmrem.fromScene(room,.04);this.scene.environment=this.environment.texture;
@@ -94,39 +90,51 @@ export class AR3DScene{
   setOptions(options){Object.assign(this.options,options);}
   updateChain(pose){
     if(!this.chain){
-      this.chain=new THREE.InstancedMesh(new THREE.TorusGeometry(1.0,.28,8,16),new THREE.MeshStandardMaterial({color:0xdde4ed,metalness:0.98,roughness:.12,envMapIntensity:2.2}),200);
-      this.chain.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.chain.frustumCulled=false;this.scene.add(this.chain);
-    }
-    // Link positions change only with chain length; body motion transforms one mesh.
-    const span=pose.span,length=this.options.length||45;
-    if(this.chainLength!==length){
-      this.chainLength=length;
-      const drop=.02+(clamp(length,30,60)-40)*.012;
-      const link=new THREE.Object3D(),step=1/200;
-      for(let side=0;side<2;side++){
-        const sign=side?1:-1;
-        const curve=new THREE.CubicBezierCurve3(
-          new THREE.Vector3(sign*.22,.24,0),
-          new THREE.Vector3(sign*.18,-drop*.2,0),
-          new THREE.Vector3(sign*.08,-drop,0),
-          new THREE.Vector3(0,-drop,0)
-        );
-        for(let i=0;i<100;i++){
-          link.position.copy(curve.getPointAt(i/99));
-          link.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),curve.getTangentAt(i/99));
-          link.rotateY(i%2?Math.PI/2.2:0);link.scale.set(step,step*1.45,step);link.updateMatrix();this.chain.setMatrixAt(side*100+i,link.matrix);
-        }
+      // Millimetres: oval cable links with a round wire cross-section, not stretched tori.
+      const points=Array.from({length:49},(_,i)=>new THREE.Vector3(1.05*Math.cos(i*Math.PI/24),1.7*Math.sin(i*Math.PI/24),0));
+      const path=new THREE.CatmullRomCurve3(points.slice(0,-1),true);
+      const geometry=new THREE.TubeGeometry(path,48,.44,10,true);
+      const curve=new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-66,65,-5),new THREE.Vector3(-55,12,-2),
+        new THREE.Vector3(-29,-39,0),new THREE.Vector3(0,-56,0),
+        new THREE.Vector3(29,-39,0),new THREE.Vector3(55,12,-2),new THREE.Vector3(66,65,-5)
+      ]);
+      // Odd count places exactly one link at the bail; neighbours alternate planes.
+      const count=Math.ceil(curve.getLength()/2.35/2)*2+1;
+      this.chain=new THREE.InstancedMesh(geometry,new THREE.MeshStandardMaterial({color:0xdde4ed,metalness:1,roughness:.19,envMapIntensity:1.6}),count);
+      this.chain.frustumCulled=false;this.scene.add(this.chain);
+      const link=new THREE.Object3D(),axis=new THREE.Vector3(0,1,0);
+      for(let i=0;i<count;i++){
+        const t=i/(count-1);link.position.copy(curve.getPointAt(t));
+        link.quaternion.setFromUnitVectors(axis,curve.getTangentAt(t));
+        link.rotateY((i-(count-1)/2)%2?Math.PI/2:0);
+        link.updateMatrix();this.chain.setMatrixAt(i,link.matrix);
       }
       this.chain.instanceMatrix.needsUpdate=true;
+      this.chain.userData.anchor=curve.getPointAt(.5);
     }
-    this.chain.position.set(pose.x-this.width/2,this.height/2-pose.y-span*clamp(this.options.offset||0,-.3,.3),0);
-    this.chain.scale.setScalar(span);this.chain.rotation.z=-pose.angle;
+    const pixelsPerMm=(pose.scaleSpan||pose.span)/(this.options.shoulderReferenceMm||360);
+    this.chain.scale.setScalar(pixelsPerMm);
+    this.chain.position.set(pose.x-this.width/2,this.height/2-pose.y,0);
+    if(pose.quaternion)this.chain.quaternion.copy(pose.quaternion);
+    else this.chain.rotation.set(0,0,-pose.angle);
+  }
+  updateNecklace(pose){
+    const model=this.activeModel;if(!model)return;
+    model.visible=!!pose;if(this.chain)this.chain.visible=!!pose;if(!pose)return;
+    this.updateChain(pose);
+    const scale=this.chain.scale.x;
+    model.scale.setScalar(scale);model.quaternion.copy(this.chain.quaternion);
+    // Same transform for chain and pendant. The chain passes through the GLB bail.
+    const offset=this.chain.userData.anchor.clone().sub(model.userData.chainAnchor);
+    model.position.copy(offset.multiplyScalar(scale).applyQuaternion(model.quaternion).add(this.chain.position));
   }
 
   updatePose3D(pose,type){
+    if(type==='necklace'){this.updateNecklace(pose);return;}
     const model=this.activeModel;if(!model)return;model.visible=!!pose;if(!pose)return;
     const o=this.options,adjust=clamp(o.scale??1,.65,1.6);
-    const width=type==='necklace'?pose.span*(o.pendantScale||.18):type==='ring'?pose.span*.60*((o.size||17)/17)*((o.ringScale||.28)/.28):pose.span*((o.size||16)/16)*((o.braceletScale||.40)/.40);
+    const width=type==='ring'?pose.span*.60*((o.size||17)/17)*((o.ringScale||.28)/.28):pose.span*((o.size||16)/16)*((o.braceletScale||.40)/.40);
     model.scale.setScalar(width/model.userData.widthMm*adjust);
     model.position.set(pose.x-this.width/2,this.height/2-pose.y-(type==='necklace'?0:pose.span*clamp(o.offset||0,-.3,.3)),0);
     if(pose.quaternion)model.quaternion.copy(pose.quaternion);

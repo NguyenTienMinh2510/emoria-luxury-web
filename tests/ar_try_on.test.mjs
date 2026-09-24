@@ -10,8 +10,17 @@ import {HandTracker} from '../src/services/arHandTracker.js';
 import handler from '../api/v1.js';
 
 const points=Array.from({length:33},()=>({x:.5,y:.3,z:0,visibility:1}));points[11]={x:.25,y:.5,z:0,visibility:1};points[12]={x:.75,y:.5,z:0,visibility:1};
-const pose=necklacePose(points,640,480);assert.deepEqual(pose,{x:320,y:240,z:0,span:320,angle:0});
+const pose=necklacePose(points,640,480);assert.equal(pose.x,320);assert.equal(pose.span,320);assert.equal(pose.scaleSpan,320);assert.ok(pose.quaternion.angleTo(new THREE.Quaternion())<1e-8);
+for(const yaw of [-.9,.9]){
+ const turned=structuredClone(points),span=.5*Math.cos(yaw),depth=.5*Math.sin(yaw);
+ turned[11]={x:.5-span/2,y:.5,z:-depth/2,visibility:1};turned[12]={x:.5+span/2,y:.5,z:depth/2,visibility:1};
+ const p=necklacePose(turned,640,480);assert.ok(p);assert.ok(Math.abs(p.scaleSpan-320)<1e-6,'Turning must not shrink physical jewelry scale');
+ assert.ok(Math.abs(p.quaternion.angleTo(new THREE.Quaternion())-Math.abs(yaw))<1e-6);
+}
 assert.equal(necklacePose(null,640,480),null);
+const world=points.map(p=>({...p}));world[11]={x:-.18,y:-.3,z:0};world[12]={x:.18,y:-.3,z:0};world[23]={x:-.13,y:.1,z:.1};world[24]={x:.13,y:.1,z:.1};
+const tilted=necklacePose(points,640,480,world);assert.ok(tilted.quaternion.x>0);
+const smoothedTilt=smoothPose(pose,tilted,30);assert.ok(smoothedTilt.quaternion.x>0&&smoothedTilt.quaternion.x<tilted.quaternion.x);
 for(const patch of [{visibility:.1},{x:NaN},{x:-.1},{z:1}]){const bad=structuredClone(points);Object.assign(bad[11],patch);assert.equal(necklacePose(bad,640,480),null);}
 const smoothed=smoothPose(pose,{...pose,x:330},40);assert.ok(smoothed.x>320&&smoothed.x<330);assert.equal(smoothPose(pose,null,50),null);
 const drawCalls=[];const ctx=new Proxy({createLinearGradient:()=>({addColorStop(){}}),createRadialGradient:()=>({addColorStop(){}})},{get:(o,k)=>k in o?o[k]:(...args)=>drawCalls.push([k,...args])});
@@ -47,7 +56,7 @@ assert.ok(drawCalls.some(c=>c[0]==='ellipse'));
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {AR3DScene,prepareModel,disposeModel} from '../src/services/ar3DRenderer.js';
-for(const name of ['lumen','faith','sen','horizon','pulse','echo','halo']){
+for(const name of ['lumen','faith','sen','horizon','pulse','echo','halo','orbit']){
  const c=tryOnConfig('emoria-'+name),bytes=fs.readFileSync('public'+c.modelUrl);
  assert.equal(bytes.toString('ascii',0,4),'glTF');
  const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
@@ -58,7 +67,19 @@ for(const name of ['lumen','faith','sen','horizon','pulse','echo','halo']){
  const scene=new AR3DScene(640,480);scene.activeModel=root;scene.setOptions({scale:1,size:c.defaultSize,pendantScale:c.pendantScale});
  scene.updatePose3D({x:320,y:240,span:200,angle:0},c.type);const first=root.scale.x;
  scene.updatePose3D({x:320,y:240,span:400,angle:0},c.type);assert.equal(root.scale.x,first*2);
- scene.setOptions({scale:1.5});scene.updatePose3D({x:320,y:240,span:400,angle:0},c.type);assert.equal(root.scale.x,first*3);
+ scene.setOptions({scale:1.5});scene.updatePose3D({x:320,y:240,span:400,angle:0},c.type);assert.equal(root.scale.x,first*(c.type==='necklace'?2:3));
+ if(c.type==='necklace'){
+   assert.ok(gltf.scene.getObjectByName('ChainAnchor'),name+' needs an authored bail anchor');
+   assert.ok(Math.abs(root.userData.chainAnchor.y-({lumen:16.9,faith:16.5,sen:20}[name]))<.001);
+   for(const angle of [-.4,0,.4])for(const span of [180,480]){
+     scene.updateNecklace({x:280,y:200,span,angle,quaternion:new THREE.Quaternion().setFromEuler(new THREE.Euler(.2,angle,-angle))});root.updateMatrixWorld(true);scene.chain.updateMatrixWorld(true);
+     const bail=root.localToWorld(root.userData.chainAnchor.clone());
+     const chain=scene.chain.localToWorld(scene.chain.userData.anchor.clone());
+     assert.ok(bail.distanceTo(chain)<1e-6,name+' must stay attached at every angle and distance');
+   }
+   let enamel;gltf.scene.traverse(o=>{if(o.material?.name?.includes('enamel'))enamel=o.material;});
+   if(enamel)assert.ok(enamel.metalness<.2,'Enamel must not become metallic');
+ }
  scene.dispose();
 }
 let resolveModel,disposed=0;const pending=new AR3DScene();
@@ -68,7 +89,7 @@ const loading=pending.setModel('x','ring',{modelUrl:'/models/jewelry/emoria-halo
 const chainScene=new AR3DScene();chainScene.setOptions({length:45});chainScene.updateChain(pose);
 const chainVersion=chainScene.chain.instanceMatrix.version;chainScene.updateChain({...pose,x:400});
 assert.equal(chainScene.chain.instanceMatrix.version,chainVersion,'Body movement must not rebuild chain geometry');
-chainScene.setOptions({length:50});chainScene.updateChain(pose);assert.ok(chainScene.chain.instanceMatrix.version>chainVersion);chainScene.dispose();
+chainScene.setOptions({length:50,scale:1.6,offset:.3});chainScene.updateChain(pose);assert.equal(chainScene.chain.instanceMatrix.version,chainVersion,'Fixed necklace geometry ignores former customer controls');chainScene.dispose();
 await assert.rejects(new AR3DScene().setModel('x','ring',{modelUrl:'https://untrusted.test/x.glb'}));
 assert.equal(tryOnConfig('emoria-lumen',{details:{ar:{enabled:false}}}),null);
 assert.equal(tryOnConfig('emoria-lumen',{details:{ar:{type:'necklace',modelUrl:'/models/custom.glb'}}}).modelUrl,'/models/custom.glb');
@@ -102,7 +123,7 @@ globalThis.fetch=async(url,options)=>{requests++;assert.equal(options.method,'GE
 async function get(id,method='GET') {let result;await handler({method,url:'/api/v1/products/'+id+'/try-on',headers:method==='GET'?{}:{'content-type':'application/json'},body:method==='GET'?undefined:{}},{setHeader(){},end(raw){result={status:this.statusCode,data:JSON.parse(raw)};}});return result;}
 try{
  const solaris=await get('emoria-solaris-keyring');assert.equal(solaris.status,404);
- const r=await get('emoria-lumen');assert.equal(r.status,200);assert.deepEqual(r.data.previewLengths,[40,45,50]);assert.equal(r.data.productId,'emoria-lumen');
+ const r=await get('emoria-lumen');assert.equal(r.status,200);assert.equal(r.data.fixedDimensions,true);assert.equal(r.data.previewLengths,undefined);assert.equal(r.data.productId,'emoria-lumen');
  assert.equal((await get('emoria-lumen','POST')).status,405);
  active=false;assert.equal((await get('emoria-lumen')).status,404);
 }finally{globalThis.fetch=actualFetch;}

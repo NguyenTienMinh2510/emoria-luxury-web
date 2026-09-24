@@ -112,7 +112,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
     starting: t('Đang mở camera…','Opening camera…'),
     'loading-model': t('Đang tải bộ nhận diện trên thiết bị…','Loading on-device tracking…'),
     tracking: isHand?(config?.type==='bracelet'?t('Đã nhận diện cổ tay','Wrist detected'):t('Đã nhận diện bàn tay','Hand detected')):t('Đã nhận diện vai & cổ','Shoulders & neck detected'),
-    searching: isHand?(config?.type==='bracelet'?t('Giơ cổ tay và bàn tay trước camera','Show your wrist and hand to the camera'):t('Giơ bàn tay trước camera, xòe nhẹ các ngón tay','Show your hand facing the camera, spread fingers slightly')):t('Lùi nhẹ để thấy cả hai vai, nhìn thẳng camera','Step back to show both shoulders and face the camera'),
+    searching: isHand?(config?.type==='bracelet'?t('Giơ cổ tay và bàn tay trước camera','Show your wrist and hand to the camera'):t('Giơ bàn tay trước camera, xòe nhẹ các ngón tay','Show your hand facing the camera, spread fingers slightly')):t('Lùi nhẹ để camera thấy cả hai vai','Step back until both shoulders are visible'),
     manual: t('Căn chỉnh thủ công','Manual placement'),
     'manual-fallback': t('Thiết bị chưa chạy được nhận diện tự động. Bạn vẫn có thể căn chỉnh thủ công.','Automatic tracking is unavailable here. You can still adjust placement manually.'),
     paused: t('Camera đã tắt khi rời trang','Camera stopped while the page was hidden'),
@@ -169,11 +169,7 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
           {error&&<p role="alert" className="text-sm text-amber-200">{error}</p>}
           {!active&&<button disabled={!config||status==='starting'} onClick={start} className="w-full min-h-12 rounded-xl bg-white text-black font-semibold disabled:opacity-40 flex items-center justify-center gap-2 shadow-silver-glow"><Camera size={18}/>{status==='starting'?t('Đang mở…','Starting…'):t('Bật camera để trải nghiệm','Start camera')}</button>}
           {active&&<>
-            {/* Necklace controls */}
-            {config?.type==='necklace'&&config?.previewLengths&&<fieldset>
-              <legend className="text-sm mb-2">{t('Độ rủ mô phỏng','Simulated chain drop')}</legend>
-              <div className="flex gap-2">{config.previewLengths.map(n=><button key={n} aria-pressed={length===n} onClick={()=>setLength(n)} className={`flex-1 min-h-11 rounded-xl border ${length===n?'bg-white text-black font-bold':'border-white/20'}`}>{n} cm</button>)}</div>
-            </fieldset>}
+            {config?.type==='necklace'&&<p className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-slate-300">{t('Kích thước mẫu cố định · tự căn theo camera. Xoay vai chậm sang hai bên để xem góc nghiêng. Tỉ lệ đeo là ước lượng, không thay thế đo kích thước thực tế.','Fixed model dimensions · automatically fitted to camera. Slowly turn your shoulders to see side views. Fit is approximate, not a physical measurement.')}</p>}
 
             {/* Ring controls */}
             {config?.type==='ring'&&<>
@@ -200,16 +196,16 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
                 <span className="text-slate-400">{t('Độ to chuẩn theo kích thước:','Size locked to product:')}</span>
                 <span className="font-semibold text-amber-200">{trySize} mm {t('(Đường kính lòng trong)','(Inner diameter)')}</span>
               </div>
-            ):(
+            ):config?.type==='bracelet'?(
               <label className="block text-sm">
-                {config?.type==='bracelet'?t('Độ to của vòng','Bracelet scale'):t('Kích thước mặt dây','Pendant scale')}
+                {t('Độ to của vòng','Bracelet scale')}
                 <input aria-label="Scale slider" className="w-full h-11 accent-slate-200" type="range" min="0.65" max="1.6" step="0.05" value={scale} onChange={e=>setScale(Number(e.target.value))}/>
               </label>
-            )}
-            <label className="block text-sm">{t('Vị trí cao / thấp','Vertical placement')}<input aria-label="Vertical placement" className="w-full h-11 accent-slate-200" type="range" min="-0.3" max="0.3" step="0.01" value={offset} onChange={e=>setOffset(Number(e.target.value))}/></label>
+            ):null}
+            {isHand&&<label className="block text-sm">{t('Vị trí cao / thấp','Vertical placement')}<input aria-label="Vertical placement" className="w-full h-11 accent-slate-200" type="range" min="-0.3" max="0.3" step="0.01" value={offset} onChange={e=>setOffset(Number(e.target.value))}/></label>}
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs flex items-center gap-2 min-h-11 cursor-pointer"><input type="checkbox" checked={manual} disabled={!engine.current?.workerReady} onChange={e=>{setManual(e.target.checked);engine.current.setManual(e.target.checked);}}/>{t('Căn chỉnh thủ công','Manual placement')}</label>
-              <button aria-label={t('Đặt lại vị trí','Reset placement')} className="min-h-11 min-w-11 grid place-items-center rounded-lg hover:bg-white/10" onClick={()=>{setLength(45);setTrySize(config?.defaultSize||17);setScale(1);setOffset(0);}}><RotateCcw size={17}/></button>
+              <label className="text-xs flex items-center gap-2 min-h-11 cursor-pointer"><input type="checkbox" checked={manual} disabled={!engine.current?.workerReady} onChange={e=>{setManual(e.target.checked);engine.current.setManual(e.target.checked);}}/>{t('Đặt mẫu giữa khung hình','Center the model')}</label>
+              {isHand&&<button aria-label={t('Đặt lại vị trí','Reset placement')} className="min-h-11 min-w-11 grid place-items-center rounded-lg hover:bg-white/10" onClick={()=>{setTrySize(config?.defaultSize||17);setScale(1);setOffset(0);}}><RotateCcw size={17}/></button>}
             </div>
             <div className="flex items-center justify-between pt-1 border-t border-white/5">
               <label className="text-xs flex items-center gap-2 cursor-pointer text-slate-300">
