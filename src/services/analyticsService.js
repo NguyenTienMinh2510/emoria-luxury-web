@@ -1,3 +1,5 @@
+import { track } from '@vercel/analytics';
+
 const consentKey='emoria_analytics_consent';
 let measurementId='', enabled=false;
 const analyticsEnv=import.meta.env||{};
@@ -21,6 +23,17 @@ export function configureAnalytics(settings,privateView=false){
  }
 }
 export function trackShopEvent(event,items=[],extra={}){
+ if(getAnalyticsConsent()==='granted'){
+  try{
+   const totalValue=items.reduce((n,i)=>n+(Number(i.price)||0)*(Number(i.quantity)||1),0);
+   track(event,{
+    page:extra.page||'EMORIA',
+    items_count:items.length,
+    ...(totalValue?{value:totalValue}:{}),
+    ...(items[0]?.name?{item:items[0].name}:{})
+   });
+  }catch{}
+ }
  if(!enabled || !window.gtag)return;
  if(!['view_item','add_to_cart','begin_checkout','order_created','page_view'].includes(event))return;
  const clean=items.map(i=>({item_id:i.id,item_name:i.name,price:Number(i.price),quantity:Number(i.quantity||1)}));
