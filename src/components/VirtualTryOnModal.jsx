@@ -7,6 +7,7 @@ import {NecklaceTracker} from '../services/arNecklaceTracker.js';
 import {HandTracker} from '../services/arHandTracker.js';
 import {tryOnConfig} from '../services/tryOnConfig.js';
 import ARFramingGuide from './ARFramingGuide.jsx';
+import ARVisualCaliper from './ARVisualCaliper.jsx';
 import JewelrySizeGuideModal from './JewelrySizeGuideModal.jsx';
 
 const ringNiMap = { 16: 'Ni 10', 17: 'Ni 13', 18: 'Ni 16', 19: 'Ni 19' };
@@ -153,6 +154,21 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
       </header>
       <div className="grid md:grid-cols-[minmax(0,1fr)_300px]">
         <div className="relative bg-[#0b0d12] min-h-[400px] md:min-h-[540px] flex items-center justify-center overflow-hidden rounded-2xl m-3 border border-white/10 shadow-2xl">
+          {/* Interactive AR Visual Digital Caliper & Metric Ruler Overlay */}
+          <ARVisualCaliper
+            type={config?.type || 'necklace'}
+            length={length}
+            setLength={setLength}
+            trySize={trySize}
+            setTrySize={setTrySize}
+            getNiLabel={getNiLabel}
+            showCaliper={showCaliperHUD}
+            onToggleCaliper={() => setShowCaliperHUD(prev => !prev)}
+            onOpenScreenCaliper={() => setShowSizeGuide(true)}
+            t={t}
+            isLive={active}
+          />
+
           <div className="relative w-full h-full flex items-center justify-center">
             <video ref={video} playsInline muted autoPlay aria-hidden="true" className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"/>
             <canvas ref={canvas} aria-label={t('Gương AR trực tiếp','Live AR mirror')} className={`max-w-full max-h-[65dvh] md:max-h-[75dvh] w-auto h-auto object-contain rounded-xl block ${active?'':'invisible'}`}/>
@@ -165,32 +181,6 @@ export default function VirtualTryOnModal({product,settings,onClose,onAddToCart,
                 onToggleGuide={() => setShowGuide(prev => !prev)}
                 t={t}
               />
-            )}
-            {active && showCaliperHUD && (
-              <div className="absolute top-3 left-3 z-20 pointer-events-none flex flex-col gap-1 max-w-[90%] sm:max-w-none">
-                <div className="px-3 py-1.5 rounded-xl bg-black/85 border border-amber-400/40 backdrop-blur-md shadow-2xl flex items-center gap-2 text-amber-200">
-                  <Ruler size={14} className="text-amber-300 animate-pulse shrink-0" />
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="font-mono text-xs font-bold tracking-wider text-amber-200">
-                      {config?.type === 'ring'
-                        ? `Ø ${Number(trySize).toFixed(1)} mm`
-                        : config?.type === 'necklace'
-                        ? `${length} cm (+5cm)`
-                        : `CV ${Number(trySize).toFixed(1)} cm`}
-                    </span>
-                    <span className="text-[11px] text-slate-300">
-                      {config?.type === 'ring'
-                        ? `· CV: ${(trySize * Math.PI).toFixed(1)} mm · ${getNiLabel(trySize)}`
-                        : config?.type === 'necklace'
-                        ? `· Rủ: ${length === 40 ? t('Sát cổ', 'Choker') : length === 45 ? t('Ngang ngực trên', 'Standard') : t('Dáng dài', 'Plunge')}`
-                        : `· ĐK: ~${((trySize * 10) / Math.PI).toFixed(1)} mm`}
-                    </span>
-                  </div>
-                </div>
-                <div className="px-2 py-0.5 rounded-md bg-black/60 border border-white/10 text-[10px] text-slate-400 w-fit">
-                  {t('Thước đo AR trực tiếp · Dùng bộ tinh chỉnh để chỉnh số đo', 'Live AR caliper · Use fine-tune controls to adjust')}
-                </div>
-              </div>
             )}
           </div>
           {!active&&<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-gradient-to-b from-[#131720] via-[#0b0d13] to-black text-center z-10">
