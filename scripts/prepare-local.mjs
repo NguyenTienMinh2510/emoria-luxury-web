@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 const target = 'local-stack/supabase';
 fs.mkdirSync(`${target}/migrations`, { recursive: true });
-const files = ['20260913_init_emoria_schema.sql','20260914_atomic_checkout.sql','20260914_articles_system.sql','202609140001_store_operations.sql','202609140002_editor_security.sql'];
+const files = ['20260913_init_emoria_schema.sql','20260914000000_atomic_checkout.sql','20260914_articles_system.sql','202609140001_store_operations.sql','202609140002_editor_security.sql'];
 files.forEach((file, i) => fs.copyFileSync(`supabase/migrations/${file}`, `${target}/migrations/20260914000${i+1}_${file.split('_').slice(1).join('_')}`));
 for(const file of fs.readdirSync('supabase/migrations').filter(f=>/^\d{14}_.+\.sql$/.test(f)))fs.copyFileSync(`supabase/migrations/${file}`,`${target}/migrations/${file}`);
 let config = fs.readFileSync(`${target}/config.toml`, 'utf8');

@@ -94,3 +94,12 @@ const melodiesHtml=render(CuratedMelodies,{isOpen:true,onClose:()=>{},onSelectMe
 assert.ok(melodiesHtml.includes('Kho Giai Điệu Chọn Lọc Emoria'));
 assert.ok(melodiesHtml.includes('Clair de Lune'));
 console.log('PASS luxury unboxing and AI muse render: wax seal, crystal chime chords, letter muse prompts, and curated melodies modal.');
+
+const {default:MemoryMatchStudio}=await compile('src/components/MemoryMatchStudio.jsx','memory-match-studio');
+const matchHtml=render(MemoryMatchStudio,{tagUid:'emo-heart',matchId:'fixture-match-id',currentUser:'user-owner-a'});
+assert.ok(matchHtml.includes('Couple Match'));
+
+const {default:MemoryHouseStudio}=await compile('src/components/MemoryHouseStudio.jsx','memory-house-studio');
+const houseHtml=render(MemoryHouseStudio,{tagUid:'emo-heart',currentUser:'user-owner-a'});
+assert.ok(houseHtml.includes('Ngôi Nhà Kỷ Niệm'));
+console.log('PASS event studios render: MemoryMatchStudio and MemoryHouseStudio static render without client crash.');

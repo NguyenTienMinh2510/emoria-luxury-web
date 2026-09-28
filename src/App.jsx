@@ -26,6 +26,8 @@ import AuthModal from './components/AuthModal';
 import CheckoutModal from './components/CheckoutModal';
 import AdminView from './views/AdminView';
 import PrivacyPolicyModal from './components/PrivacyPolicyModal';
+import MemoryMatchStudio from './components/MemoryMatchStudio';
+import MemoryHouseStudio from './components/MemoryHouseStudio';
 import { 
   SmartphoneNfc, Shield, User, Key, Lock, Unlock, 
   Sparkles, CheckCircle2, ChevronUp, ChevronDown, Power, ArrowRight
@@ -52,6 +54,9 @@ export default function App() {
   const [chipId,setChipId]=useState('');
   const [currentTag, setCurrentTag] = useState('emoria-lumen');
   const [selectedArticleSlug, setSelectedArticleSlug] = useState('nghe-thuat-che-tac-da-quy-emoria');
+  const [activeMatchId, setActiveMatchId] = useState(null);
+  const [matchInviteToken, setMatchInviteToken] = useState(null);
+  const [houseShareId, setHouseShareId] = useState(null);
   const [activeSection, setActiveSection] = useState('collection');
   const [searchQuery, setSearchQuery] = useState('');
   const [heroLayoutMode, setHeroLayoutMode] = useState('before-hero'); // 'before-hero' | 'hero'
@@ -154,7 +159,16 @@ export default function App() {
       if (policy === 'privacy' || privacy === 'true' || window.location.hash === '#privacy') {
         setIsPrivacyOpen(true);
       }
-      if (payment && orderId) {
+      if (q.get('view') === 'memory-match' || q.get('match') || q.get('invite')) {
+        if (q.get('match')) setActiveMatchId(q.get('match'));
+        if (q.get('invite')) setMatchInviteToken(q.get('invite'));
+        if (q.get('tag')) setCurrentTag(q.get('tag'));
+        setCurrentView('memory-match');
+      } else if (q.get('view') === 'memory-house' || q.get('share')) {
+        if (q.get('share')) setHouseShareId(q.get('share'));
+        if (q.get('tag')) setCurrentTag(q.get('tag'));
+        setCurrentView('memory-house');
+      } else if (payment && orderId) {
         if (payment === 'success') {
           setCartItems([]);
           try { localStorage.removeItem('emoria_cart_v1'); } catch {}
@@ -164,7 +178,10 @@ export default function App() {
       } else if(q.get('article')) { setSelectedArticleSlug(q.get('article'));setCurrentView('article-detail'); }
       else if(q.get('chip')) {setChipId(q.get('chip'));setCurrentView('nfc');}
       else if(q.get('tag') || q.get('memory')) {setCurrentTag(q.get('tag') || q.get('memory'));setCurrentView('memory');}
-      else {setCurrentView(['home','shop','memory','articles','about','admin'].includes(q.get('view')) ? q.get('view') : 'home');if(q.get('view')==='memory')setCurrentTag('');}
+      else {
+        setCurrentView(['home','shop','memory','articles','about','admin','memory-match','memory-house'].includes(q.get('view')) ? q.get('view') : 'home');
+        if(q.get('view')==='memory')setCurrentTag('');
+      }
       setRouteReady(true);
     };
     const handleHashChange = () => {
@@ -183,13 +200,24 @@ export default function App() {
   useEffect(()=>{
     if(!routeReady)return;
     const url=new URL(window.location.href);
-    ['chip','view','tag','memory','article','payment','orderId','token'].forEach(key=>url.searchParams.delete(key));
+    ['chip','view','tag','memory','article','payment','orderId','token','match','invite','share'].forEach(key=>url.searchParams.delete(key));
     if(currentView==='article-detail')url.searchParams.set('article',selectedArticleSlug);
     else if(currentView==='nfc')url.searchParams.set('chip',chipId);
     else if(currentView==='memory') {if(currentTag)url.searchParams.set('tag',currentTag);else url.searchParams.set('view','memory');}
+    else if(currentView==='memory-match') {
+      url.searchParams.set('view','memory-match');
+      if(activeMatchId) url.searchParams.set('match',activeMatchId);
+      if(matchInviteToken) url.searchParams.set('invite',matchInviteToken);
+      if(currentTag) url.searchParams.set('tag',currentTag);
+    }
+    else if(currentView==='memory-house') {
+      url.searchParams.set('view','memory-house');
+      if(houseShareId) url.searchParams.set('share',houseShareId);
+      if(currentTag) url.searchParams.set('tag',currentTag);
+    }
     else if(currentView!=='home')url.searchParams.set('view',currentView);
     if(url.href!==window.location.href)window.history.pushState({},'',url);
-  },[currentView,currentTag,chipId,selectedArticleSlug,routeReady]);
+  },[currentView,currentTag,chipId,selectedArticleSlug,activeMatchId,matchInviteToken,houseShareId,routeReady]);
 
   // Cart Handlers
   const handleAddToCart = (product, quantity = 1) => {
@@ -467,6 +495,16 @@ export default function App() {
               setCurrentView('shop');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
+            onOpenMatchStudio={(tag) => {
+              if (tag) setCurrentTag(tag);
+              setCurrentView('memory-match');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenHouseStudio={(tag) => {
+              if (tag) setCurrentTag(tag);
+              setCurrentView('memory-house');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 
@@ -530,6 +568,65 @@ export default function App() {
             onRefresh={() => {
               setSystemConfig(getSystemAvailability());
               store.refresh();
+            }}
+          />
+        )}
+
+        {/* VIEW 8: COUPLE MATCH STUDIO */}
+        {currentView === 'memory-match' && (
+          <MemoryMatchStudio
+            tagUid={currentTag || 'emoria-lumen'}
+            matchId={activeMatchId}
+            inviteToken={matchInviteToken}
+            currentUser={authSession.user?.id || null}
+            onBack={() => {
+              setCurrentView('memory');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateHome={() => {
+              setCurrentView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateShop={() => {
+              setCurrentView('shop');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateMemory={() => {
+              setCurrentView('memory');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onSwitchStudio={(target) => {
+              setCurrentView(target === 'house' ? 'memory-house' : 'memory-match');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
+        {/* VIEW 9: MEMORY HOUSE STUDIO */}
+        {currentView === 'memory-house' && (
+          <MemoryHouseStudio
+            tagUid={currentTag || 'emoria-lumen'}
+            shareId={houseShareId}
+            currentUser={authSession.user?.id || null}
+            onBack={() => {
+              setCurrentView('memory');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateHome={() => {
+              setCurrentView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateShop={() => {
+              setCurrentView('shop');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateMemory={() => {
+              setCurrentView('memory');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onSwitchStudio={(target) => {
+              setCurrentView(target === 'match' ? 'memory-match' : 'memory-house');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
         )}

@@ -16,7 +16,7 @@ try {
     'supabase/setup_test_auth_schema.sql',
     'supabase/migrations/20260913_init_emoria_schema.sql',
     'supabase/seeds/demo_memory_spaces.sql',
-    'supabase/migrations/20260914_atomic_checkout.sql',
+    'supabase/migrations/20260914000000_atomic_checkout.sql',
     'supabase/migrations/20260914_articles_system.sql',
     'tests/atomic_checkout.test.sql',
     'tests/articles_system.test.sql',

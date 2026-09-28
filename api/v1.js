@@ -46,9 +46,10 @@ export default async function handler(req,res) {
       const {data,error}=await query;
       if(error){
         console.error('[API Database Error]', error.code, error.message);
-        if(error.code==='42501')throw fail(403,'Không có quyền thực hiện thao tác.',error.code);
+        if(error.code==='42501')throw fail(403,error.message||'Không có quyền thực hiện thao tác.',error.code);
         if(error.code==='P0001')throw fail(409,error.message,error.code);
-        if(/^22|^23/.test(error.code||''))throw fail(422,'Dữ liệu không hợp lệ hoặc xung đột với dữ liệu hiện có.',error.code);
+        if(error.code==='P0002')throw fail(404,error.message||'Không tìm thấy tài nguyên.',error.code);
+        if(/^22|^23/.test(error.code||''))throw fail(422,error.message||'Dữ liệu không hợp lệ hoặc xung đột với dữ liệu hiện có.',error.code);
         throw fail(503,'Database chưa trả kết quả. Vui lòng thử lại.');
       }
       if(data?.success===false)throw fail(409,data.message||'Không thể thực hiện thao tác.');

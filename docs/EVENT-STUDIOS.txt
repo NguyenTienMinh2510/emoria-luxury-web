@@ -1,0 +1,419 @@
+EMORIA LUXURY — TÀI LIỆU KỸ THUẬT & CONTRACT API EVENT STUDIOS
+Phiên bản: 1.0 (Giai đoạn T1B - Chuẩn bị cho T2 UI)
+Ngày: 28/09/2026
+
+==============================================================================
+I. TỔNG QUAN & NGUYÊN TẮC THIẾT KẾ
+==============================================================================
+Hệ thống Event Studios cung cấp hai không gian lãng mạn dành riêng cho các cặp đôi:
+1. MemoryMatch Studio ("Mình hiểu nhau bao nhiêu?"): Trò chơi trắc nghiệm thấu hiểu 3–7 câu hỏi với cơ chế nộp bài độc lập, bảo mật câu trả lời hai phía trước khi cùng mở kết quả (Reveal).
+2. Memory House Studio ("Nhà của đôi mình"): Không gian 5 phòng cố định lưu giữ các khoảnh khắc ảnh Polaroid, ghi chú ngắn, hỗ trợ bản nháp riêng tư (Draft) và bản chụp đóng băng để chia sẻ công khai (Published Snapshot).
+
+Nguyên tắc an toàn dữ liệu:
+- Ranh giới giao dịch hoàn toàn nằm trong các hàm PostgreSQL RPC có kiểm soát bảo mật chặt chẽ (SECURITY DEFINER, search_path).
+- Quyền chủ sở hữu kiểm tra động theo owner_id hiện thời của memory_spaces; người nhận (recipients) hoặc người ngoài không có quyền ghi.
+- Không lộ invite_token, token_hash, đáp án của đối phương trước reveal, hay bất kỳ dữ liệu nhạy cảm NFC nào (PIN hash, thư tay bí mật letter, danh sách media NFC gốc).
+- Không lưu đáp án, invite token hoặc ảnh base64 trong localStorage/sessionStorage.
+
+==============================================================================
+II. ĐIỀU HƯỚNG BẰNG QUERY STRING (QUERY NAVIGATION SPECIFICATION)
+==============================================================================
+Hệ thống sử dụng query string trong URL để điều hướng (theo kiến trúc React 19 / Vite hiện có, không phụ thuộc router ngoài):
+
+1. MemoryMatch Studio:
+- ?view=memory-match
+  -> Mở màn hình tạo hoặc chọn lượt chơi dành cho Owner (yêu cầu đăng nhập).
+- ?view=memory-match&match=<match_id>
+  -> Owner tiếp tục chỉnh sửa câu hỏi nháp, xem trạng thái chờ hoặc xem kết quả.
+- ?view=memory-match&match=<match_id>&invite=<token>
+  -> Màn hình dành cho Partner tham gia trả lời bằng mã mời (không bắt buộc đăng nhập).
+
+2. Memory House Studio:
+- ?view=memory-house
+  -> Mở studio ngôi nhà kỷ niệm của Owner (yêu cầu đăng nhập).
+- ?view=memory-house&tag=<tag_uid>
+  -> Mở studio ngôi nhà gắn với chip kỷ vật cụ thể.
+- ?view=memory-house&share=<share_id>
+  -> Mở trang xem công khai ngôi nhà dành cho khách hoặc bạn bè qua liên kết chia sẻ (không yêu cầu đăng nhập).
+
+==============================================================================
+III. CONTRACT API CHI TIẾT (REST API ENDPOINTS)
+==============================================================================
+
+Tất cả các route đều nằm dưới prefix: /api/v1
+Format dữ liệu: application/json; charset=utf-8
+Header bảo mật: Cache-Control: no-store; X-Content-Type-Options: nosniff
+
+------------------------------------------------------------------------------
+1. COUPLE MATCH STUDIO API
+------------------------------------------------------------------------------
+
+1.1 Tạo lượt chơi mới (Draft Create)
+- Method: POST
+- Path: /api/v1/events/matches
+- Quyền: Authenticated (Owner của kỷ vật)
+- Request Body:
+  {
+    "tag_uid": "emo-heart",           // (Bắt buộc) Mã chip kỷ vật
+    "title": "Kỷ niệm chúng mình",    // (Tùy chọn, tối đa 80 ký tự, mặc định: "Couple Match")
+    "partner_name": "Lan",            // (Tùy chọn, tối đa 80 ký tự)
+    "owner_name": "Minh"              // (Tùy chọn, tối đa 80 ký tự)
+  }
+- Response Success (201 Created):
+  {
+    "success": true,
+    "match_id": "c1f7a2d3-...",
+    "status": "draft",
+    "title": "Kỷ niệm chúng mình",
+    "partner_name": "Lan",
+    "owner_name": "Minh"
+  }
+- Mã lỗi thường gặp:
+  + 400: Thiếu tag_uid hoặc sai định dạng.
+  + 401: Chưa đăng nhập.
+  + 403: Không phải chủ nhân hiện tại của kỷ vật này.
+  + 404: Không tìm thấy kỷ vật.
+
+1.2 Lưu bộ câu hỏi nháp (Draft Questions Save)
+- Method: PUT
+- Path: /api/v1/events/matches/:match_id/questions
+- Quyền: Authenticated (Owner của kỷ vật)
+- Request Body:
+  {
+    "questions": [
+      {
+        "id": 1,
+        "text": "Lần đầu gặp nhau ở đâu?",    // 1–300 ký tự
+        "options": ["Quán cà phê", "Thư viện", "Công viên"], // 2–4 lựa chọn, mỗi lựa chọn 1–200 ký tự
+        "image_path": "emo-heart/first.jpg"  // Tùy chọn, phải thuộc bucket emoria-event-media namespace tag
+      }
+      // Tối thiểu 3 câu, tối đa 7 câu
+    ],
+    "title": "Tiêu đề mới (tùy chọn)",
+    "partner_name": "Tên đối tác (tùy chọn)",
+    "owner_name": "Tên người tạo (tùy chọn)"
+  }
+- Response Success (200 OK):
+  {
+    "success": true,
+    "match_id": "c1f7a2d3-...",
+    "questions_count": 3
+  }
+- Mã lỗi thường gặp:
+  + 400: match_id không đúng định dạng UUID hoặc questions không phải mảng.
+  + 403: Không có quyền sửa (không phải owner).
+  + 422: Số câu hỏi ngoài khoảng 3–7; câu hỏi thiếu text; lựa chọn ngoài khoảng 2–4; ảnh ngoại lai không hợp lệ; hoặc lượt chơi đã bắt đầu (status <> 'draft').
+
+1.3 Tải bản nháp câu hỏi của Owner (Draft Load)
+- Method: GET
+- Path: /api/v1/events/matches/:match_id/draft
+- Quyền: Authenticated (Owner của kỷ vật)
+- Response Success (200 OK):
+  {
+    "success": true,
+    "match_id": "c1f7a2d3-...",
+    "tag_uid": "emo-heart",
+    "title": "Kỷ niệm chúng mình",
+    "partner_name": "Lan",
+    "owner_name": "Minh",
+    "status": "draft",
+    "questions": [...],
+    "created_at": "2026-09-28T...",
+    "started_at": null
+  }
+- Mã lỗi thường gặp:
+  + 401: Chưa đăng nhập.
+  + 403: Không phải chủ nhân của kỷ vật.
+  + 404: Lượt chơi không tồn tại.
+
+1.4 Bắt đầu lượt chơi & Sinh mã mời (Begin Match)
+- Method: POST
+- Path: /api/v1/events/matches/:match_id/begin
+- Quyền: Authenticated (Owner của kỷ vật)
+- Request Body: {}
+- Cơ chế: Đóng băng câu hỏi, chuyển status sang 'active', sinh raw invite token ngẫu nhiên 256-bit và lưu SHA-256 hash vào DB. Raw invite token chỉ trả về duy nhất trong response này cho Owner.
+- Response Success (200 OK):
+  {
+    "success": true,
+    "match_id": "c1f7a2d3-...",
+    "status": "active",
+    "invite_token": "a4f89d..."
+  }
+- Mã lỗi thường gặp:
+  + 403: Không phải chủ sở hữu.
+  + 422: Chưa đủ 3–7 câu hỏi hoặc lượt chơi đã bắt đầu trước đó.
+
+1.5 Lưu tiến độ trả lời nháp (Save Progress)
+- Method: POST
+- Path: /api/v1/events/matches/:match_id/progress
+- Quyền: Public (Hỗ trợ Owner có JWT hoặc Partner kèm invite_token)
+- Request Body:
+  {
+    "answers": [0, 2],            // Mảng chỉ số đáp án đã chọn (số nguyên hoặc null)
+    "invite_token": "a4f89d..."    // (Bắt buộc với Partner, tùy chọn với Owner)
+  }
+- Response Success (200 OK):
+  {
+    "success": true,
+    "role": "owner" | "partner",
+    "saved_count": 2
+  }
+- Mã lỗi thường gặp:
+  + 400: match_id sai UUID hoặc answers không phải mảng.
+  + 403: Mã mời không chính xác hoặc không có quyền truy cập.
+  + 422: Đã nộp bài chính thức (không thể sửa tiến độ), hoặc chỉ số lựa chọn vượt quá số option.
+
+1.6 Nộp bài chính thức (Submit Match)
+- Method: POST
+- Path: /api/v1/events/matches/:match_id/submit
+- Quyền: Public (Owner qua JWT hoặc Partner qua invite_token)
+- Request Body:
+  {
+    "answers": [0, 2, 1],         // Mảng đầy đủ tất cả các câu hỏi
+    "invite_token": "a4f89d..."    // (Bắt buộc với Partner, tùy chọn với Owner)
+  }
+- Cơ chế lũy đẳng (Idempotent): Nếu đã nộp trước đó, trả về { "already_submitted": true } mà không ghi đè đáp án cũ. Khi cả hai bên đều đã nộp bài, hệ thống tự động tính điểm số câu trùng khớp và cập nhật status = 'completed'.
+- Response Success (200 OK):
+  {
+    "success": true,
+    "submitted": true,
+    "both_submitted": false | true,
+    "score": null | 2,             // Chỉ trả về số nguyên khi both_submitted = true
+    "total_questions": 3
+  }
+- Mã lỗi thường gặp:
+  + 403: Token mời sai hoặc người gọi không có quyền.
+  + 422: Thiếu đáp án (chưa trả lời hết các câu) hoặc chỉ số lựa chọn không hợp lệ.
+
+1.7 Đọc trạng thái & Kết quả lượt chơi (Get View / Reveal)
+- Method: GET hoặc POST
+- Path:
+  + GET /api/v1/events/matches/:match_id/view?invite=<token>
+  + POST /api/v1/events/matches/:match_id/view  (Body: { "invite_token": "<token>" })
+- Quyền: Public (Owner qua JWT hoặc Partner qua invite token)
+- Response Success (200 OK):
+  {
+    "success": true,
+    "match_id": "c1f7a2d3-...",
+    "title": "Kỷ niệm chúng mình",
+    "partner_name": "Lan",
+    "owner_name": "Minh",
+    "status": "active" | "completed",
+    "questions": [...],
+    "my_role": "owner" | "partner",
+    "my_submitted": true,
+    "my_answers": [0, 2, 1],
+    "other_submitted": true,
+    "other_answers": [0, 1, 1],    // TUYỆT ĐỐI LÀ NULL KHI both_submitted = false
+    "both_submitted": true,
+    "score": 2,                    // TUYỆT ĐỐI LÀ NULL KHI both_submitted = false
+    "total_questions": 3
+  }
+- Mã lỗi thường gặp:
+  + 403: Không có quyền truy cập hoặc invite token không đúng.
+  + 404: Lượt chơi không tồn tại.
+
+1.8 Danh sách lượt chơi của kỷ vật (Owner Match History)
+- Method: GET
+- Path: /api/v1/memories/:tag_uid/matches
+- Quyền: Authenticated (Owner của kỷ vật)
+- Response Success (200 OK):
+  [
+    {
+      "id": "c1f7a2d3-...",
+      "title": "Kỷ niệm chúng mình",
+      "partner_name": "Lan",
+      "owner_name": "Minh",
+      "status": "completed",
+      "score": 2,
+      "total_questions": 3,
+      "owner_submitted": true,
+      "partner_submitted": true,
+      "created_at": "2026-09-28T...",
+      "completed_at": "2026-09-28T..."
+    }
+  ]
+
+------------------------------------------------------------------------------
+2. MEMORY HOUSE STUDIO API
+------------------------------------------------------------------------------
+
+2.1 Tải bản nháp ngôi nhà kỷ niệm (House Draft Load)
+- Method: GET
+- Path: /api/v1/memories/:tag_uid/house/draft
+- Quyền: Authenticated (Owner của kỷ vật)
+- Response Success (200 OK):
+  {
+    "success": true,
+    "exists": true,
+    "house_id": "...",
+    "title": "Our Memory House",
+    "theme": "rose_romance",
+    "rooms": [
+      {
+        "id": "beginning",
+        "name": "Ngày bắt đầu",
+        "memories": [
+          {
+            "id": "mem-1",
+            "photo_path": "emo-heart/photo1.jpg",
+            "title": "Buổi hẹn đầu",
+            "note": "Ánh mắt đầu tiên chạm nhau..."
+          }
+        ]
+      }
+    ],
+    "is_published": false,
+    "share_id": null
+  }
+
+2.2 Lưu bản nháp ngôi nhà kỷ niệm (House Draft Save)
+- Method: PUT
+- Path: /api/v1/memories/:tag_uid/house/draft
+- Quyền: Authenticated (Owner của kỷ vật)
+- Request Body:
+  {
+    "title": "Nhà của Minh & Lan",       // Tùy chọn, tối đa 120 ký tự
+    "theme": "rose_romance",             // Tùy chọn: 'classic' | 'warm_gold' | 'rose_romance' | 'midnight' | 'minimal_dark' | 'editorial_cream'
+    "rooms": [                           // Tối đa 5 phòng cố định
+      {
+        "id": "beginning",               // Bắt buộc thuộc: 'beginning', 'first', 'little-things', 'memories', 'next-chapter'
+        "name": "Ngày bắt đầu",         // Tùy chọn, tối đa 120 ký tự
+        "memories": [                    // Tối đa 10 ảnh/phòng
+          {
+            "id": "item-1",
+            "photo_path": "emo-heart/room1.jpg", // Bắt buộc nằm trong bucket emoria-event-media namespace tag
+            "title": "Tiêu đề ảnh",              // Tùy chọn, tối đa 120 ký tự
+            "note": "Ghi chú ngắn kỷ niệm"       // Tùy chọn, tối đa 1500 ký tự
+          }
+        ]
+      }
+    ]
+  }
+- Response Success (200 OK):
+  {
+    "success": true,
+    "house_id": "..."
+  }
+- Mã lỗi thường gặp:
+  + 403: Không phải chủ sở hữu kỷ vật.
+  + 422: ID phòng không hợp lệ; quá 10 ảnh/phòng; ghi chú quá 1500 ký tự; ảnh ngoại lai không thuộc namespace tag; theme không hợp lệ.
+
+2.3 Xuất bản ngôi nhà kỷ niệm (House Publish)
+- Method: POST
+- Path: /api/v1/memories/:tag_uid/house/publish
+- Quyền: Authenticated (Owner của kỷ vật)
+- Cơ chế: Đóng băng toàn bộ nội dung rooms_draft hiện thời vào published_snapshot, tạo hoặc giữ share_id, đặt is_published = true. Yêu cầu tối thiểu 1 kỷ niệm ảnh trên toàn bộ 5 phòng.
+- Response Success (200 OK):
+  {
+    "success": true,
+    "is_published": true,
+    "share_id": "a9b1c2d3e4f5...",
+    "published_at": "2026-09-28T..."
+  }
+- Mã lỗi thường gặp:
+  + 422: Chưa có kỷ niệm ảnh nào (cần ít nhất 1 ảnh để xuất bản).
+
+2.4 Hủy xuất bản ngôi nhà (House Unpublish)
+- Method: POST
+- Path: /api/v1/memories/:tag_uid/house/unpublish
+- Quyền: Authenticated (Owner của kỷ vật)
+- Cơ chế: Đặt is_published = false. Các truy cập từ link công khai sẽ bị chặn ngay lập tức (trả về 403).
+- Response Success (200 OK):
+  {
+    "success": true,
+    "is_published": false
+  }
+
+2.5 Thu hồi liên kết chia sẻ (House Revoke Share)
+- Method: POST
+- Path: /api/v1/memories/:tag_uid/house/revoke
+- Quyền: Authenticated (Owner của kỷ vật)
+- Cơ chế: Sinh share_id hoàn toàn mới, đồng thời hủy xuất bản (is_published = false). Liên kết cũ bị vô hiệu hóa vĩnh viễn (trả về 404).
+- Response Success (200 OK):
+  {
+    "success": true,
+    "is_published": false,
+    "revoked": true
+  }
+
+2.6 Xem công khai ngôi nhà qua Share ID (House Public View)
+- Method: GET
+- Path: /api/v1/events/houses/share/:share_id
+- Quyền: Public (Bất kỳ ai có liên kết chia sẻ)
+- Response Success (200 OK):
+  {
+    "success": true,
+    "title": "Nhà của Minh & Lan",
+    "theme": "rose_romance",
+    "rooms": [...],                     // Snapshot đã đóng băng tại thời điểm xuất bản
+    "published_at": "2026-09-28T..."
+  }
+- Mã lỗi thường gặp:
+  + 400: Mã liên kết không hợp lệ.
+  + 403: Không gian ngôi nhà đang ở chế độ riêng tư (đã unpublish), hoặc kỷ vật đang bị tạm ngưng (suspended / admin_suspended).
+  + 404: Không tìm thấy ngôi nhà kỷ niệm hoặc liên kết đã bị thu hồi vĩnh viễn (P0002).
+
+==============================================================================
+IV. MA TRẬN BẢO MẬT & DỮ LIỆU ĐƯỢC PHÉP TRẢ VỀ
+==============================================================================
+
+1. TRƯỜNG TUYỆT ĐỐI KHÔNG TRẢ VỀ (FORBIDDEN / SEALED FIELDS):
+- tag_uid: Không trả về trong API Public View của House (tránh lộ định danh chip NFC phần cứng).
+- PIN / pin_hash: Tuyệt đối không trả về trong bất kỳ endpoint nào của Event Studios.
+- letter (thư tay riêng tư): Hoàn toàn niêm phong, không bao giờ xuất hiện trong payload House hay Match.
+- media_gallery gốc của NFC: Không trả về trong snapshot của House (chỉ trả về các phòng và ảnh do người dùng chủ động đưa vào House).
+- partner_token_hash / raw invite token: Tuyệt đối không lưu hash ra client; raw token chỉ trả cho Owner 1 lần duy nhất khi gọi beginMatch.
+- partner_answers / owner_answers: Tuyệt đối trả về NULL trong getMatchView cho đến khi both_submitted = true.
+- score: Tuyệt đối trả về NULL trong Match trước khi cả hai hoàn thành.
+
+2. TRƯỜNG ĐƯỢC PHÉP TRẢ VỀ TRONG PUBLIC VIEW (ALLOWED PUBLIC FIELDS):
+- title: Tiêu đề ngôi nhà do Owner đặt.
+- theme: Bảng màu giao diện đã chọn.
+- rooms: Danh sách các phòng và kỷ niệm (id, photo_path, title, note).
+- published_at: Thời điểm xuất bản ngôi nhà.
+
+==============================================================================
+V. HƯỚNG DẪN TÍCH HỢP SERVICE FRONTEND (SRC/SERVICES/EVENTSERVICE.JS)
+==============================================================================
+
+Import các hàm và hằng số từ src/services/eventService.js:
+
+```javascript
+import {
+  createMatch,
+  saveMatchQuestions,
+  beginMatch,
+  saveMatchProgress,
+  submitMatch,
+  getMatchView,
+  listMatches,
+  getHouseDraft,
+  saveHouseDraft,
+  publishHouse,
+  unpublishHouse,
+  revokeHouseShare,
+  getPublicHouse,
+  DEFAULT_MATCH_QUESTIONS,
+  HOUSE_ROOMS_SPEC,
+  HOUSE_THEMES
+} from '../services/eventService.js';
+```
+
+Ví dụ luồng chơi Couple Match:
+1. Owner tạo match:
+   const res = await createMatch({ tagUid: 'emo-pulse', title: 'Thấu hiểu' });
+   const matchId = res.match_id;
+
+2. Owner lưu câu hỏi:
+   await saveMatchQuestions(matchId, DEFAULT_MATCH_QUESTIONS.slice(0, 5));
+
+3. Owner bắt đầu & lấy link mời:
+   const beginRes = await beginMatch(matchId);
+   const inviteLink = `${window.location.origin}/?view=memory-match&match=${matchId}&invite=${beginRes.invite_token}`;
+
+4. Partner hoặc Owner xem trạng thái:
+   const view = await getMatchView(matchId, { inviteToken: currentInviteToken });
+
+5. Nộp bài:
+   await submitMatch(matchId, { answers: [0, 1, 2, 0, 1], inviteToken: currentInviteToken });

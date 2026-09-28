@@ -1,0 +1,65 @@
+EMORIA — Kế hoạch triển khai và nghiệm thu hai studio sự kiện
+Ngày: 28/09/2026
+
+Mục tiêu
+Hai trang riêng, dễ làm quen trên điện thoại: MemoryMatch để cùng khám phá nhau và Memory House để kể câu chuyện tình yêu bằng ảnh. Tài liệu [DIGIMAR] Web 10_10.docx là tham khảo nghiệp vụ; ưu tiên yêu cầu trực tiếp của chủ dự án về thao tác tối giản và hình ảnh lãng mạn.
+
+Cơ sở đã đọc
+- React 19 / Vite / Tailwind; điều hướng query string trong src/App.jsx, chưa có router dependency.
+- MemorySpaceView chứa studio NFC hiện tại. Event không nhồi vào modal này.
+- /me/memories và memory_spaces.owner_id đã phân biệt owner/recipient.
+- api/v1.js và server/routes.js truyền JWT người gọi tới Supabase; RPC là ranh giới giao dịch.
+- Media NFC là nội dung riêng có kiểm tra grant/moderation; không dùng liên kết social để mở quyền cho kho này.
+- Baseline npm.cmd run test:ci: PASS trước triển khai. Đây gồm service/API mock/render; không chứng minh cloud DB hay mobile browser.
+
+Thiết kế sản phẩm
+1. MemoryMatch — Mình hiểu nhau bao nhiêu?
+   Route riêng ?view=memory-match; vào từ menu Sự kiện hoặc thẻ trong kỷ vật của owner.
+   Mở studio -> tự chọn kỷ vật duy nhất nếu có -> tên hai người và bộ 7 câu gợi ý.
+   Sửa một câu mỗi lần; chọn 3–7 câu, 2–4 lựa chọn, ảnh tùy chọn có preview/thay/xóa.
+   Xem trước -> tạo lời mời -> mỗi người trả lời độc lập từng câu -> cùng mở kết quả.
+   Không yêu cầu partner đăng ký chỉ để chơi. Link mời khó đoán chỉ cấp vai trò partner.
+   Chờ đối phương có trạng thái rõ và tải lại; không lộ câu trả lời qua response/DB.
+   Kết quả dùng giọng vui và dịu dàng: khác nhau là điều để tìm hiểu, không chấm chất lượng tình yêu.
+
+2. Memory House — Nhà của đôi mình
+   Route riêng ?view=memory-house; không phụ thuộc hoàn thành MemoryMatch.
+   Ngôi nhà có mái, cửa sổ, ánh đèn ấm, khung ảnh Polaroid; 5 góc chạm được.
+   Năm góc: Ngày bắt đầu / Lần đầu của đôi mình / Điều nhỏ xíu / Miền ký ức / Chương tiếp theo.
+   Chạm góc -> ảnh và vài dòng -> lưu; ảnh preview và ghi chú gợi ý ngắn.
+   Có thể bắt đầu bằng một kỷ niệm; các góc trống vẫn đẹp, không khiến người dùng cảm thấy chưa hoàn thành.
+   Chọn một số bảng màu nhẹ (hồng phấn/kem hoặc đêm xanh/ánh vàng) nếu không tăng thao tác bắt buộc.
+   Xem nhà hoàn chỉnh trước khi bật chia sẻ. Copy link/Web Share có fallback và phản hồi thành công/thất bại.
+   Nút thu hồi chia sẻ dễ tìm. Không tự đăng mạng xã hội, không hứa thắng giải, không tự bịa thể lệ.
+
+Định hướng hình ảnh
+- Cảm hứng ngôi nhà sáng đèn trong tài liệu BA; ưu tiên khả năng tương tác thật bằng CSS/SVG thay vì thêm engine 3D.
+- Giữ nhận diện EMORIA, kết hợp nền đêm sâu, màu kem, hồng dịu, ánh vàng và serif cho tiêu đề.
+- Một CTA chính mỗi trạng thái, ít chữ, input >=16px trên mobile, vùng chạm >=44px.
+- Ảnh không méo; placeholder/empty state có chủ ý. Không trang trí che nội dung.
+- Motion nhẹ, tôn trọng prefers-reduced-motion; keyboard focus, label và aria-live cho trạng thái.
+
+Giao việc tuần tự qua Antigravity MCP
+T1 — Dữ liệu, quyền, service
+Phạm vi: migration event mới, server/routes.js và event backend, service/constants, test event và tài liệu API.
+Đầu ra: CRUD lưu thật, Match invite/submit/reveal, House private/publish/revoke, ảnh an toàn, contract cho frontend.
+Nghiệm thu: owner-only; recipient/anonymous/foreign owner bị chặn; answer secrecy cả RPC/direct table; submit atomic/idempotent; input/foreign image validation; publish revocation.
+Không sửa UI trong T1. Không ghi cloud; không reset DB; báo blocker nếu local DB thiếu.
+
+T2 — Hai studio, điều hướng và trải nghiệm
+Phạm vi: App.jsx, Navbar.jsx, entry nhỏ trong MemorySpaceView.jsx, event views/components/styles, UI tests.
+Tái dùng contract T1, không tạo store giả hoặc báo lưu thành công khi request lỗi.
+Nghiệm thu: routes mở trực tiếp/refresh/back-forward đúng; tạo và reload draft; ảnh thật; luồng hai browser; House room CRUD; publish/copy/revoke; owner login/no-NFC/recipient/error/loading states.
+Test desktop và 390px mobile, không horizontal overflow, bàn phím không che CTA, không mất nhập khi API lỗi. Cảnh báo rời trang khi còn dữ liệu chưa lưu.
+
+T3 — Sửa theo nghiệm thu
+Codex đọc actual diff, tự chạy tests phù hợp và kiểm tra giao diện. Mỗi lỗi trả Antigravity phải có file/vị trí, cách tái hiện, expected/actual, phạm vi sửa và check cần chạy lại.
+Không đồng thời sửa file Antigravity đang xử lý. Không chấp nhận chỉ dựa vào status completed của CLI.
+
+Cổng hoàn thành
+- Diff không chạm ngoài phạm vi vô cớ, không lộ secret, không thay quyền NFC hiện hữu.
+- npm.cmd run test:ci + npm.cmd run build đạt sau thay đổi.
+- Behavior tests event đạt; integration DB nếu chưa chạy phải ghi rõ chưa nghiệm thu backend thực tế.
+- Kiểm tra render thật mobile/desktop và hai phiên độc lập trước khi kết luận end-to-end.
+- Bàn giao URL local, files, migration cần triển khai, kết quả test và giới hạn còn lại.
+- Không commit/push/deploy khi chưa có yêu cầu.
