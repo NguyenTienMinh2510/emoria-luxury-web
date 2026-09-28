@@ -142,7 +142,8 @@ export async function saveMatchQuestions(matchId, payload) {
 export async function beginMatch(matchId) {
   if (!matchId) throw new Error('Vui lòng cung cấp mã lượt chơi.');
   return apiRequest(`/events/matches/${encodeURIComponent(matchId)}/begin`, {
-    method: 'POST'
+    method: 'POST',
+    body: {}
   });
 }
 
@@ -235,7 +236,8 @@ export async function saveHouseDraft(tagUid, { title, theme, rooms } = {}) {
 export async function publishHouse(tagUid) {
   if (!tagUid) throw new Error('Vui lòng cung cấp mã kỷ vật.');
   return apiRequest(`/memories/${encodeURIComponent(tagUid)}/house/publish`, {
-    method: 'POST'
+    method: 'POST',
+    body: {}
   });
 }
 
@@ -245,7 +247,8 @@ export async function publishHouse(tagUid) {
 export async function unpublishHouse(tagUid) {
   if (!tagUid) throw new Error('Vui lòng cung cấp mã kỷ vật.');
   return apiRequest(`/memories/${encodeURIComponent(tagUid)}/house/unpublish`, {
-    method: 'POST'
+    method: 'POST',
+    body: {}
   });
 }
 
@@ -255,7 +258,8 @@ export async function unpublishHouse(tagUid) {
 export async function revokeHouseShare(tagUid) {
   if (!tagUid) throw new Error('Vui lòng cung cấp mã kỷ vật.');
   return apiRequest(`/memories/${encodeURIComponent(tagUid)}/house/revoke`, {
-    method: 'POST'
+    method: 'POST',
+    body: {}
   });
 }
 

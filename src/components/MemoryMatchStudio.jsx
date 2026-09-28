@@ -32,7 +32,7 @@ export default function MemoryMatchStudio({
   const [matchId, setMatchId] = useState(initialMatchId || null);
   const [inviteToken, setInviteToken] = useState(initialInviteToken || '');
   const [viewData, setViewData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -423,72 +423,99 @@ export default function MemoryMatchStudio({
   const totalQuestions = activeQuestions.length;
   const progressPercent = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
 
+  const handleGoHome = () => {
+    if (onNavigateHome) {
+      onNavigateHome();
+    } else if (typeof window !== 'undefined') {
+      window.location.href = '/?view=home';
+    }
+  };
+
+  const handleBackToMemory = () => {
+    if (onNavigateMemory) {
+      onNavigateMemory(tagUid);
+    } else if (onBack) {
+      onBack();
+    } else if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+    } else if (onNavigateHome) {
+      onNavigateHome();
+    }
+  };
+
+  const handleSwitchToHouse = () => {
+    if (onSwitchStudio) {
+      onSwitchStudio('house');
+    } else if (typeof window !== 'undefined') {
+      window.location.href = `/?view=memory-house${tagUid ? `&tag=${encodeURIComponent(tagUid)}` : ''}`;
+    }
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-6 sm:py-10 text-slate-100">
       {/* Top Header Bar with Multi-Page Navigation */}
-      <header className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-white/10">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-white/10">
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={onBack || onNavigateMemory}
+            onClick={handleGoHome}
             type="button"
-            aria-label="Quay lại không gian kỷ niệm"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
+            title="Về Trang Chủ Emoria"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Quay lại</span>
+            <Home className="w-3.5 h-3.5" />
+            <span>Trang chủ</span>
           </button>
 
-          {onNavigateHome && (
-            <button
-              onClick={onNavigateHome}
-              type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
-              title="Về Trang Chủ Emoria"
-            >
-              <Home className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Trang chủ</span>
-            </button>
-          )}
+          <button
+            onClick={handleBackToMemory}
+            type="button"
+            aria-label="Quay lại kỷ vật"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
+            title="Quay lại không gian kỷ niệm"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Quay lại kỷ vật</span>
+          </button>
+
+          <button
+            onClick={handleSwitchToHouse}
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-medium transition-colors cursor-pointer shrink-0"
+            title="Chuyển sang Memory House Studio"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Chuyển sang House Studio</span>
+          </button>
 
           {onNavigateShop && (
             <button
               onClick={onNavigateShop}
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
               title="Xem Cửa Hàng & Bộ Sưu Tập"
             >
               <ShoppingBag className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Cửa hàng</span>
+              <span>Cửa hàng</span>
             </button>
           )}
+        </div>
 
-          {onSwitchStudio && (
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-full shrink-0">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Couple Match Studio</span>
+          </div>
+
+          {viewData?.status === 'draft' && currentUser && (
             <button
-              onClick={() => onSwitchStudio('house')}
+              onClick={() => setStudioMode(studioMode === 'editor' ? 'player' : 'editor')}
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 text-xs font-medium transition-colors cursor-pointer"
-              title="Chuyển sang Memory House Studio"
+              className="text-xs text-slate-400 hover:text-white underline cursor-pointer shrink-0"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">House Studio</span>
+              {studioMode === 'editor' ? 'Xem trước khi chơi' : 'Sửa câu hỏi'}
             </button>
           )}
         </div>
-
-        <div className="flex items-center gap-2 text-xs font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-full">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Couple Match Studio</span>
-        </div>
-
-        {viewData?.status === 'draft' && currentUser && (
-          <button
-            onClick={() => setStudioMode(studioMode === 'editor' ? 'player' : 'editor')}
-            type="button"
-            className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
-          >
-            {studioMode === 'editor' ? 'Xem trước khi chơi' : 'Sửa câu hỏi'}
-          </button>
-        )}
       </header>
 
       {/* Notifications / Error Banner */}

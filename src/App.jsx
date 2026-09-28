@@ -580,23 +580,43 @@ export default function App() {
             inviteToken={matchInviteToken}
             currentUser={authSession.user?.id || null}
             onBack={() => {
+              setActiveMatchId(null);
+              setMatchInviteToken(null);
+              setHouseShareId(null);
               setCurrentView('memory');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateHome={() => {
+              setActiveMatchId(null);
+              setMatchInviteToken(null);
+              setHouseShareId(null);
               setCurrentView('home');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateShop={() => {
+              setActiveMatchId(null);
+              setMatchInviteToken(null);
+              setHouseShareId(null);
               setCurrentView('shop');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            onNavigateMemory={() => {
+            onNavigateMemory={(tag) => {
+              setActiveMatchId(null);
+              setMatchInviteToken(null);
+              setHouseShareId(null);
+              if (tag) setCurrentTag(tag);
               setCurrentView('memory');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onSwitchStudio={(target) => {
-              setCurrentView(target === 'house' ? 'memory-house' : 'memory-match');
+              if (target === 'house') {
+                setActiveMatchId(null);
+                setMatchInviteToken(null);
+                setCurrentView('memory-house');
+              } else {
+                setHouseShareId(null);
+                setCurrentView('memory-match');
+              }
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
@@ -609,23 +629,43 @@ export default function App() {
             shareId={houseShareId}
             currentUser={authSession.user?.id || null}
             onBack={() => {
+              setActiveMatchId(null);
+              setMatchInviteToken(null);
+              setHouseShareId(null);
               setCurrentView('memory');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateHome={() => {
+              setActiveMatchId(null);
+              setMatchInviteToken(null);
+              setHouseShareId(null);
               setCurrentView('home');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateShop={() => {
+              setActiveMatchId(null);
+              setMatchInviteToken(null);
+              setHouseShareId(null);
               setCurrentView('shop');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            onNavigateMemory={() => {
+            onNavigateMemory={(tag) => {
+              setActiveMatchId(null);
+              setMatchInviteToken(null);
+              setHouseShareId(null);
+              if (tag) setCurrentTag(tag);
               setCurrentView('memory');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onSwitchStudio={(target) => {
-              setCurrentView(target === 'match' ? 'memory-match' : 'memory-house');
+              if (target === 'match') {
+                setHouseShareId(null);
+                setCurrentView('memory-match');
+              } else {
+                setActiveMatchId(null);
+                setMatchInviteToken(null);
+                setCurrentView('memory-house');
+              }
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />

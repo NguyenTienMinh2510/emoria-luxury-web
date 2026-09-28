@@ -13,6 +13,7 @@ import {
   unpublishHouse,
   revokeHouseShare,
   getPublicHouse,
+  getPublicHouseByTag,
   uploadEventPhoto,
   HOUSE_ROOMS_SPEC,
   HOUSE_THEMES
@@ -74,10 +75,10 @@ export default function MemoryHouseStudio({
   onSwitchStudio,
   currentUser
 }) {
-  const isPublicVisitor = Boolean(initialShareId);
+  const isPublicVisitor = Boolean(initialShareId) || !currentUser;
 
   // States
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [activeTab, setActiveTab] = useState(isPublicVisitor ? 'preview' : 'edit'); // 'edit' | 'preview'
@@ -105,7 +106,7 @@ export default function MemoryHouseStudio({
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
   const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
 
-  // Load House Data (either draft for owner or public snapshot)
+  // Load House Data (either draft for owner or public snapshot for guest/share)
   const loadHouse = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -116,7 +117,6 @@ export default function MemoryHouseStudio({
         if (publicData.title) setHouseTitle(publicData.title);
         if (publicData.theme) setSelectedTheme(publicData.theme);
         if (Array.isArray(publicData.rooms)) {
-          // Merge with SPEC names if missing
           const enriched = publicData.rooms.map((r) => {
             const spec = HOUSE_ROOMS_SPEC.find((s) => s.id === r.id);
             return {
@@ -131,25 +131,66 @@ export default function MemoryHouseStudio({
         setActiveTab('preview');
       } else if (tagUid && currentUser) {
         // Owner draft mode
-        const draft = await getHouseDraft(tagUid);
-        if (draft.title) setHouseTitle(draft.title);
-        if (draft.theme) setSelectedTheme(draft.theme);
-        setIsPublished(Boolean(draft.is_published));
-        if (draft.share_id) setCurrentShareId(draft.share_id);
+        try {
+          const draft = await getHouseDraft(tagUid);
+          if (draft.title) setHouseTitle(draft.title);
+          if (draft.theme) setSelectedTheme(draft.theme);
+          setIsPublished(Boolean(draft.is_published));
+          if (draft.share_id) setCurrentShareId(draft.share_id);
 
-        if (Array.isArray(draft.rooms) && draft.rooms.length > 0) {
-          // Ensure all 5 standard rooms are present
-          const fullRooms = HOUSE_ROOMS_SPEC.map((spec) => {
-            const existing = draft.rooms.find((r) => r.id === spec.id);
+          if (Array.isArray(draft.rooms) && draft.rooms.length > 0) {
+            const fullRooms = HOUSE_ROOMS_SPEC.map((spec) => {
+              const existing = draft.rooms.find((r) => r.id === spec.id);
+              return {
+                id: spec.id,
+                name: existing?.name || spec.name,
+                note: existing?.note || '',
+                memories: existing?.memories || []
+              };
+            });
+            setRooms(fullRooms);
+          }
+        } catch (draftErr) {
+          // Fallback to public published view if not owner of draft
+          try {
+            const publicData = await getPublicHouseByTag(tagUid);
+            if (publicData.title) setHouseTitle(publicData.title);
+            if (publicData.theme) setSelectedTheme(publicData.theme);
+            if (Array.isArray(publicData.rooms)) {
+              const enriched = publicData.rooms.map((r) => {
+                const spec = HOUSE_ROOMS_SPEC.find((s) => s.id === r.id);
+                return {
+                  ...r,
+                  name: r.name || spec?.name || r.id,
+                  memories: r.memories || []
+                };
+              });
+              setRooms(enriched);
+            }
+            setIsPublished(true);
+            setActiveTab('preview');
+          } catch {
+            throw draftErr;
+          }
+        }
+      } else if (tagUid) {
+        // Guest mode (unauthenticated) - only read published snapshot, NEVER query draft
+        const publicData = await getPublicHouseByTag(tagUid);
+        if (publicData.title) setHouseTitle(publicData.title);
+        if (publicData.theme) setSelectedTheme(publicData.theme);
+        if (Array.isArray(publicData.rooms)) {
+          const enriched = publicData.rooms.map((r) => {
+            const spec = HOUSE_ROOMS_SPEC.find((s) => s.id === r.id);
             return {
-              id: spec.id,
-              name: existing?.name || spec.name,
-              note: existing?.note || '',
-              memories: existing?.memories || []
+              ...r,
+              name: r.name || spec?.name || r.id,
+              memories: r.memories || []
             };
           });
-          setRooms(fullRooms);
+          setRooms(enriched);
         }
+        setIsPublished(true);
+        setActiveTab('preview');
       }
     } catch (err) {
       setError(err?.message || 'Không thể tải ngôi nhà kỷ niệm.');
@@ -323,6 +364,34 @@ export default function MemoryHouseStudio({
   const themeStyle = THEME_STYLES[selectedTheme] || THEME_STYLES.warm_gold;
   const currentRoom = rooms[activeRoomIndex] || rooms[0];
 
+  const handleGoHome = () => {
+    if (onNavigateHome) {
+      onNavigateHome();
+    } else if (typeof window !== 'undefined') {
+      window.location.href = '/?view=home';
+    }
+  };
+
+  const handleBackToMemory = () => {
+    if (onNavigateMemory) {
+      onNavigateMemory(tagUid);
+    } else if (onBack) {
+      onBack();
+    } else if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+    } else if (onNavigateHome) {
+      onNavigateHome();
+    }
+  };
+
+  const handleSwitchToMatch = () => {
+    if (onSwitchStudio) {
+      onSwitchStudio('match');
+    } else if (typeof window !== 'undefined') {
+      window.location.href = `/?view=memory-match${tagUid ? `&tag=${encodeURIComponent(tagUid)}` : ''}`;
+    }
+  };
+
   // Loading State
   if (loading) {
     return (
@@ -344,95 +413,92 @@ export default function MemoryHouseStudio({
     <div className={`w-full min-h-screen bg-gradient-to-b ${themeStyle.bg} text-slate-100 px-4 py-6 sm:py-10 transition-colors duration-500`}>
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Top Navigation Bar with Multi-Page Navigation */}
-        <header className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/10">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={onBack || onNavigateMemory}
+              onClick={handleGoHome}
               type="button"
-              aria-label="Quay lại"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
+              title="Về Trang Chủ Emoria"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Quay lại</span>
+              <Home className="w-3.5 h-3.5" />
+              <span>Trang chủ</span>
             </button>
 
-            {onNavigateHome && (
-              <button
-                onClick={onNavigateHome}
-                type="button"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
-                title="Về Trang Chủ Emoria"
-              >
-                <Home className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Trang chủ</span>
-              </button>
-            )}
+            <button
+              onClick={handleBackToMemory}
+              type="button"
+              aria-label="Quay lại kỷ vật"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
+              title="Quay lại không gian kỷ niệm"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Quay lại kỷ vật</span>
+            </button>
+
+            <button
+              onClick={handleSwitchToMatch}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-medium transition-colors cursor-pointer shrink-0"
+              title="Chuyển sang Couple Match Studio"
+            >
+              <Heart className="w-3.5 h-3.5 fill-rose-300/30" />
+              <span>Chuyển sang Match Studio</span>
+            </button>
 
             {onNavigateShop && (
               <button
                 onClick={onNavigateShop}
                 type="button"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
                 title="Xem Cửa Hàng & Bộ Sưu Tập"
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Cửa hàng</span>
-              </button>
-            )}
-
-            {onSwitchStudio && (
-              <button
-                onClick={() => onSwitchStudio('match')}
-                type="button"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-xs font-medium transition-colors cursor-pointer"
-                title="Chuyển sang Couple Match Studio"
-              >
-                <Heart className="w-3.5 h-3.5 fill-rose-300/30" />
-                <span className="hidden sm:inline">Match Studio</span>
+                <span>Cửa hàng</span>
               </button>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white/10 border border-white/10 text-amber-300 flex items-center gap-1.5">
+            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white/10 border border-white/10 text-amber-300 flex items-center gap-1.5 shrink-0">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Memory House Studio</span>
             </span>
 
             {isPublished && (
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0">
                 <Globe className="w-3 h-3" />
-                <span className="hidden sm:inline">Công khai</span>
+                <span>Công khai</span>
               </span>
             )}
-          </div>
 
-          {!isPublicVisitor && (
-            <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-full border border-white/10">
-              <button
-                type="button"
-                onClick={() => setActiveTab('edit')}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'edit'
-                    ? 'bg-white text-dark-950 shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Chỉnh sửa
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('preview')}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'preview'
-                    ? 'bg-white text-dark-950 shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Dạo xem
-              </button>
-            </div>
-          )}
+            {!isPublicVisitor && (
+              <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-full border border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('edit')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'edit'
+                      ? 'bg-white text-dark-950 shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Chỉnh sửa
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('preview')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'preview'
+                      ? 'bg-white text-dark-950 shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Dạo xem
+                </button>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* Notifications & Alerts */}
@@ -549,305 +615,333 @@ export default function MemoryHouseStudio({
         {/* TAB 1: EDIT MODE (Chủ sở hữu chỉnh sửa nội dung và tải ảnh)             */}
         {/* ===================================================================== */}
         {activeTab === 'edit' && !isPublicVisitor && (
-          <section id={`room-panel-${currentRoom.id}`} role="tabpanel" aria-labelledby={`room-tab-${currentRoom.id}`} className="space-y-6">
-            
-            {/* LIVE PREVIEW FRAME: KHUNG MÔ HÌNH NGÔI NHÀ CẬP NHẬT TRỰC TIẾP */}
-            <div className={`p-5 sm:p-7 rounded-3xl border ${themeStyle.card} bg-gradient-to-br from-black/80 via-black/60 to-black/90 backdrop-blur-2xl shadow-2xl relative overflow-hidden space-y-5 transition-all duration-300`}>
-              <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
-              <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
+          <section id={`room-panel-${currentRoom.id}`} role="tabpanel" aria-labelledby={`room-tab-${currentRoom.id}`}>
+            {/* Desktop 2-column layout: Trái là Live Preview khung ngôi nhà, Phải là form chỉnh sửa. Mobile: Live Preview nằm trên. */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-              {/* Live Preview Header: Luxury Villa Plaque */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10 relative z-10">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-[10px] sm:text-xs uppercase tracking-[0.2em] font-bold text-amber-300 font-mono">
-                      LIVE PREVIEW · MÔ HÌNH NGÔI NHÀ TRỰC TIẾP
-                    </span>
-                  </div>
-                  <h3 className="font-serif text-xl sm:text-2xl font-bold text-white tracking-wide transition-all">
-                    {houseTitle.trim() || 'Ngôi Nhà Kỷ Niệm Của Đôi Mình'}
-                  </h3>
-                  <p className="text-xs text-slate-400 font-light flex items-center gap-2">
-                    <span>Tông màu: <strong className={themeStyle.accent}>{themeStyle.name}</strong></span>
-                    <span>·</span>
-                    <span>Tiến độ: <strong className="text-white font-medium">{rooms.filter(r => (r.memories?.length || 0) > 0).length}/5 phòng</strong> đã có ảnh</span>
-                  </p>
-                </div>
+              {/* CỘT TRÁI: KHUNG NGÔI NHÀ LIVE PREVIEW (Desktop: lg:col-span-5 sticky, Mobile: trên) */}
+              <div className="lg:col-span-5 lg:sticky lg:top-6 space-y-4">
+                <div className={`p-5 sm:p-6 rounded-3xl border ${themeStyle.card} bg-gradient-to-br from-black/85 via-black/70 to-black/90 backdrop-blur-2xl shadow-2xl relative overflow-hidden space-y-4 transition-all duration-300`}>
+                  <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('preview')}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-xs font-bold transition-all cursor-pointer shadow-sm group"
-                  >
-                    <Eye className="w-3.5 h-3.5 text-amber-300 group-hover:text-dark-950 transition-colors" />
-                    <span>Dạo Xem Thử Toàn Cảnh</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Live Architecture Grid: 5 Căn Phòng Cập Nhật Tức Thì */}
-              <div className="space-y-2 relative z-10">
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Sơ đồ 5 căn phòng (Nhấp vào phòng để nhảy nhanh tới vị trí chỉnh sửa):</span>
-                  <span className="hidden sm:inline text-amber-300/80 italic font-serif">Mỗi thay đổi được cập nhật tức thì ✦</span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                  {rooms.map((room, idx) => {
-                    const isSelected = activeRoomIndex === idx;
-                    const photoCount = room.memories?.length || 0;
-                    const firstPhoto = photoCount > 0 ? room.memories[0].photo_url : null;
-                    const hasNote = Boolean(room.note?.trim());
-
-                    return (
-                      <div
-                        key={room.id}
-                        onClick={() => setActiveRoomIndex(idx)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setActiveRoomIndex(idx); e.preventDefault(); } }}
-                        className={`group relative rounded-2xl p-3 border transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden text-left ${
-                          isSelected
-                            ? 'bg-white/[0.09] border-amber-400 ring-2 ring-amber-400/30 shadow-lg scale-[1.02]'
-                            : 'bg-black/40 border-white/10 hover:border-white/30 hover:bg-white/[0.04]'
-                        }`}
+                  {/* Header / Plaque Khung Ngôi Nhà */}
+                  <div className="relative z-10 flex flex-col border-b border-white/10 pb-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-amber-300 font-mono">
+                          LIVE PREVIEW
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('preview')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-[11px] font-bold transition-all cursor-pointer shadow-sm group"
                       >
-                        {/* Status Pin / Badge */}
-                        <div className="flex items-center justify-between gap-1 mb-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            isSelected
-                              ? 'bg-amber-400 text-dark-950'
-                              : 'bg-white/10 text-slate-300'
-                          }`}>
-                            Phòng {idx + 1}
-                          </span>
-                          {photoCount > 0 ? (
-                            <span className="text-[10px] text-emerald-300 font-medium flex items-center gap-0.5">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>{photoCount} ảnh</span>
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-500 italic">Trống</span>
-                          )}
-                        </div>
+                        <Eye className="w-3 h-3 text-amber-300 group-hover:text-dark-950 transition-colors" />
+                        <span>Dạo xem</span>
+                      </button>
+                    </div>
 
-                        {/* Room Miniature Visual (Thumbnail or Outline) */}
-                        <div className="relative aspect-4/3 w-full rounded-xl overflow-hidden bg-white/5 border border-white/10 mb-2 flex items-center justify-center">
-                          {firstPhoto ? (
-                            <>
-                              <img
-                                src={firstPhoto}
-                                alt={room.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                              />
-                              {photoCount > 1 && (
-                                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-white border border-white/20">
-                                  +{photoCount - 1}
+                    {/* Architectural Frame Header */}
+                    <div className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10">
+                      <div className="flex items-center gap-2 text-xs text-amber-300 font-serif">
+                        <Home className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span className="font-bold">Khung Ngôi Nhà (5 Phòng)</span>
+                      </div>
+                      <span className="text-[11px] text-slate-300 font-medium">
+                        {rooms.filter(r => (r.memories?.length || 0) > 0).length}/5 có ảnh
+                      </span>
+                    </div>
+
+                    {/* Tên ngôi nhà & Theme */}
+                    <div className="space-y-1 text-left pt-1">
+                      <h3 className="font-serif text-lg sm:text-xl font-bold text-white tracking-wide transition-all line-clamp-1">
+                        {houseTitle.trim() || 'Ngôi Nhà Kỷ Niệm Của Đôi Mình'}
+                      </h3>
+                      <p className="text-xs text-slate-400 font-light flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span>Tông màu: <strong className={themeStyle.accent}>{themeStyle.name}</strong></span>
+                        <span>·</span>
+                        <span>Đã có ảnh: <strong className="text-white font-medium">{rooms.filter(r => (r.memories?.length || 0) > 0).length}/5 phòng</strong></span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 5 Rooms Architecture Grid (beginning, first, little-things, memories, next-chapter) */}
+                  <div className="space-y-2 relative z-10">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span>5 căn phòng (Nhấp phòng để sửa):</span>
+                      <span className="text-amber-300/80 italic font-serif text-[10px]">Cập nhật tức thì ✦</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-2.5">
+                      {rooms.map((room, idx) => {
+                        const isSelected = activeRoomIndex === idx;
+                        const photoCount = room.memories?.length || 0;
+                        const firstPhoto = photoCount > 0 ? room.memories[0].photo_url : null;
+
+                        return (
+                          <div
+                            key={room.id}
+                            onClick={() => setActiveRoomIndex(idx)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setActiveRoomIndex(idx); e.preventDefault(); } }}
+                            className={`group relative rounded-2xl p-2.5 border transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden text-left ${
+                              isSelected
+                                ? 'bg-white/[0.09] border-amber-400 ring-2 ring-amber-400/30 shadow-lg scale-[1.01]'
+                                : 'bg-black/40 border-white/10 hover:border-white/30 hover:bg-white/[0.04]'
+                            }`}
+                          >
+                            {/* Room Header Badge */}
+                            <div className="flex items-center justify-between gap-1 mb-1.5">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                isSelected
+                                  ? 'bg-amber-400 text-dark-950'
+                                  : 'bg-white/10 text-slate-300'
+                              }`}>
+                                Phòng {idx + 1}
+                              </span>
+                              {photoCount > 0 ? (
+                                <span className="text-[10px] text-emerald-300 font-medium flex items-center gap-0.5">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>{photoCount} ảnh</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-500 italic">Trống</span>
+                              )}
+                            </div>
+
+                            {/* Thumbnail or Clean Empty State (NO fake placeholders) */}
+                            <div className="relative aspect-4/3 w-full rounded-xl overflow-hidden bg-white/5 border border-white/10 mb-1.5 flex items-center justify-center">
+                              {firstPhoto ? (
+                                <>
+                                  <img
+                                    src={firstPhoto}
+                                    alt={room.name}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                  />
+                                  {photoCount > 1 && (
+                                    <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-white border border-white/20">
+                                      +{photoCount - 1}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="text-center p-2">
+                                  <ImageIcon className="w-5 h-5 text-slate-600 mx-auto mb-1 group-hover:text-amber-300/60 transition-colors" />
+                                  <span className="text-[9px] text-slate-500 block leading-tight">Chưa có ảnh</span>
                                 </div>
                               )}
-                            </>
-                          ) : (
-                            <div className="text-center p-2">
-                              <ImageIcon className="w-5 h-5 text-slate-600 mx-auto mb-1 group-hover:text-amber-300/60 transition-colors" />
-                              <span className="text-[9px] text-slate-500 block leading-tight">Chờ ảnh</span>
                             </div>
-                          )}
-                        </div>
 
-                        {/* Room Name & Live Note Quote */}
-                        <div className="space-y-1 mt-auto">
-                          <p className={`text-xs font-bold truncate ${isSelected ? 'text-amber-300' : 'text-slate-200'}`}>
-                            {room.name}
-                          </p>
-                          <p className="text-[10px] text-slate-400 line-clamp-2 italic leading-snug min-h-[1.75rem]">
-                            {hasNote ? `“${room.note}”` : '“Chưa có lời tựa...”'}
-                          </p>
-                        </div>
+                            {/* Room Name */}
+                            <p className={`text-xs font-bold truncate ${isSelected ? 'text-amber-300' : 'text-slate-200'}`}>
+                              {room.name}
+                            </p>
 
-                        {/* Selected Indicator Arrow */}
-                        {isSelected && (
-                          <div className="mt-2 pt-1 border-t border-amber-400/30 flex items-center justify-between text-[10px] text-amber-300 font-semibold">
-                            <span>✦ Đang sửa</span>
-                            <Edit3 className="w-3 h-3" />
+                            {/* Selected Indicator */}
+                            {isSelected && (
+                              <div className="mt-1 pt-1 border-t border-amber-400/30 flex items-center justify-between text-[10px] text-amber-300 font-semibold">
+                                <span>✦ Đang sửa</span>
+                                <Edit3 className="w-2.5 h-2.5" />
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-            {/* House Title & Theme Settings */}
-            <div className="bg-black/40 border border-white/10 rounded-3xl p-6 backdrop-blur-xl space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Tên ngôi nhà của bạn</label>
-                  <input
-                    type="text"
-                    value={houseTitle}
-                    onChange={(e) => setHouseTitle(e.target.value)}
-                    placeholder="Ví dụ: Tổ Ấm Của Minh & Thảo"
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Tông màu chủ đạo (Theme)</label>
-                  <select
-                    value={selectedTheme}
-                    onChange={(e) => setSelectedTheme(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-dark-900 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors cursor-pointer"
-                  >
-                    {HOUSE_THEMES.map((themeKey) => (
-                      <option key={themeKey} value={themeKey} className="bg-dark-950 text-white">
-                        {THEME_STYLES[themeKey]?.name || themeKey}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Current Room Editor Card */}
-            <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
-                <div>
-                  <span className="text-xs uppercase tracking-widest text-amber-400 font-bold">Phòng {activeRoomIndex + 1} / 5</span>
-                  <h2 className="text-2xl font-serif font-bold text-white mt-0.5">{currentRoom.name}</h2>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {HOUSE_ROOMS_SPEC.find((s) => s.id === currentRoom.id)?.description}
-                  </p>
-                </div>
-
-                {/* Upload Button */}
-                {(currentRoom.memories?.length || 0) < 10 && (
-                  <label className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-dark-950 font-bold text-xs shadow-lg transition-all cursor-pointer">
-                    <Upload className="w-4 h-4" />
-                    <span>{uploadingRoomId === currentRoom.id ? 'Đang tải...' : 'Thêm ảnh kỷ niệm'}</span>
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="sr-only"
-                      disabled={uploadingRoomId === currentRoom.id}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handlePhotoUpload(currentRoom.id, file);
-                      }}
-                    />
-                  </label>
-                )}
-              </div>
-
-              {/* Room Note / Intro */}
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Ghi chú / Lời tựa cho căn phòng này ({currentRoom.note?.length || 0}/1500)
-                </label>
-                <textarea
-                  rows={3}
-                  value={currentRoom.note || ''}
-                  onChange={(e) => handleUpdateRoomNote(currentRoom.id, e.target.value)}
-                  placeholder="Viết vài dòng tâm sự dịu dàng cho căn phòng này..."
-                  className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors resize-none"
-                />
-              </div>
-
-              {/* Polaroid Photo Cards Grid */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
-                  <span>Khoảnh khắc trong phòng ({currentRoom.memories?.length || 0}/10 ảnh)</span>
-                </div>
-
-                {(!currentRoom.memories || currentRoom.memories.length === 0) ? (
-                  <div className="py-12 border border-dashed border-white/15 rounded-3xl text-center flex flex-col items-center justify-center">
-                    <ImageIcon className="w-10 h-10 text-slate-600 mb-3" />
-                    <p className="text-sm font-medium text-slate-400">Chưa có bức ảnh nào trong căn phòng này</p>
-                    <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                      Hãy chọn một bức ảnh kỷ niệm gắn liền với giai đoạn này để lấp đầy căn phòng nhé.
+                  {/* Ghi chú phòng hiện tại */}
+                  <div className="p-3.5 rounded-2xl bg-black/50 border border-white/10 text-xs space-y-1 relative z-10">
+                    <div className="flex items-center justify-between text-[11px] text-amber-300 font-semibold">
+                      <span className="flex items-center gap-1.5">
+                        <Edit3 className="w-3 h-3 text-amber-400" />
+                        <span>Ghi chú: {currentRoom.name}</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">Phòng {activeRoomIndex + 1}/5</span>
+                    </div>
+                    <p className="text-slate-300 italic line-clamp-3 text-[11px] leading-relaxed">
+                      {currentRoom.note?.trim() ? `“${currentRoom.note}”` : 'Chưa có ghi chú cho căn phòng này.'}
                     </p>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {currentRoom.memories.map((mem, memIdx) => (
-                      <div
-                        key={mem.id || memIdx}
-                        className={`${themeStyle.polaroidBg} rounded-2xl p-4 shadow-xl space-y-3 transition-transform hover:-translate-y-1 duration-300 relative group`}
-                      >
-                        <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-200">
-                          <img
-                            src={mem.photo_url}
-                            alt={mem.caption || `Kỷ niệm ${memIdx + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setLightboxPhoto(mem.photo_url)}
-                            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Phóng to ảnh"
-                          >
-                            <Maximize2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {/* Caption input */}
-                        <div className="space-y-1">
-                          <input
-                            type="text"
-                            value={mem.caption || ''}
-                            onChange={(e) => handleUpdateCaption(currentRoom.id, memIdx, e.target.value)}
-                            placeholder="Ghi chú ngọt ngào..."
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-black/5 border border-black/10 text-xs font-serif focus:border-amber-600 focus:outline-none"
-                          />
-                          <div className="flex items-center justify-between text-[10px] opacity-60 px-1">
-                            <span>{mem.date || 'Khoảnh khắc'}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemovePhoto(currentRoom.id, memIdx)}
-                              className="text-red-600 hover:text-red-800 font-semibold cursor-pointer"
-                            >
-                              Xóa ảnh
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
 
-            {/* Bottom Actions Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => handleSaveDraft()}
-                disabled={isSaving}
-                className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm border border-white/15 transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isSaving ? 'Đang lưu...' : 'Lưu bản nháp'}
-              </button>
+              {/* CỘT PHẢI: FORM CHỈNH SỬA (Settings + Room Editor + Bottom Actions) */}
+              <div className="lg:col-span-7 space-y-6">
+                {/* House Title & Theme Settings */}
+                <div className="bg-black/40 border border-white/10 rounded-3xl p-6 backdrop-blur-xl space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1.5">Tên ngôi nhà của bạn</label>
+                      <input
+                        type="text"
+                        value={houseTitle}
+                        onChange={(e) => setHouseTitle(e.target.value)}
+                        placeholder="Ví dụ: Tổ Ấm Của Minh & Thảo"
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1.5">Tông màu chủ đạo (Theme)</label>
+                      <select
+                        value={selectedTheme}
+                        onChange={(e) => setSelectedTheme(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-dark-900 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors cursor-pointer"
+                      >
+                        {HOUSE_THEMES.map((themeKey) => (
+                          <option key={themeKey} value={themeKey} className="bg-dark-950 text-white">
+                            {THEME_STYLES[themeKey]?.name || themeKey}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
 
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('preview')}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-semibold text-sm border border-white/10 transition-all cursor-pointer"
-                >
-                  <Eye className="w-4 h-4" />
-                  <span>Xem thử</span>
-                </button>
+                {/* Current Room Editor Card */}
+                <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+                    <div>
+                      <span className="text-xs uppercase tracking-widest text-amber-400 font-bold">Phòng {activeRoomIndex + 1} / 5</span>
+                      <h2 className="text-2xl font-serif font-bold text-white mt-0.5">{currentRoom.name}</h2>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {HOUSE_ROOMS_SPEC.find((s) => s.id === currentRoom.id)?.description}
+                      </p>
+                    </div>
 
-                <button
-                  type="button"
-                  onClick={handlePublish}
-                  disabled={isPublishing}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-dark-950 font-bold text-sm shadow-xl shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <Globe className="w-4 h-4" />
-                  <span>{isPublishing ? 'Đang xuất bản...' : isPublished ? 'Cập Nhật Xuất Bản' : 'Xuất Bản Ngôi Nhà'}</span>
-                </button>
+                    {/* Upload Button */}
+                    {(currentRoom.memories?.length || 0) < 10 && (
+                      <label className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-dark-950 font-bold text-xs shadow-lg transition-all cursor-pointer">
+                        <Upload className="w-4 h-4" />
+                        <span>{uploadingRoomId === currentRoom.id ? 'Đang tải...' : 'Thêm ảnh kỷ niệm'}</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="sr-only"
+                          disabled={uploadingRoomId === currentRoom.id}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handlePhotoUpload(currentRoom.id, file);
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Room Note / Intro */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      Ghi chú / Lời tựa cho căn phòng này ({currentRoom.note?.length || 0}/1500)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={currentRoom.note || ''}
+                      onChange={(e) => handleUpdateRoomNote(currentRoom.id, e.target.value)}
+                      placeholder="Viết vài dòng tâm sự dịu dàng cho căn phòng này..."
+                      className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors resize-none"
+                    />
+                  </div>
+
+                  {/* Polaroid Photo Cards Grid */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+                      <span>Khoảnh khắc trong phòng ({currentRoom.memories?.length || 0}/10 ảnh)</span>
+                    </div>
+
+                    {(!currentRoom.memories || currentRoom.memories.length === 0) ? (
+                      <div className="py-12 border border-dashed border-white/15 rounded-3xl text-center flex flex-col items-center justify-center">
+                        <ImageIcon className="w-10 h-10 text-slate-600 mb-3" />
+                        <p className="text-sm font-medium text-slate-400">Chưa có bức ảnh nào trong căn phòng này</p>
+                        <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                          Hãy chọn một bức ảnh kỷ niệm gắn liền với giai đoạn này để lấp đầy căn phòng nhé.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {currentRoom.memories.map((mem, memIdx) => (
+                          <div
+                            key={mem.id || memIdx}
+                            className={`${themeStyle.polaroidBg} rounded-2xl p-4 shadow-xl space-y-3 transition-transform hover:-translate-y-1 duration-300 relative group`}
+                          >
+                            <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-200">
+                              <img
+                                src={mem.photo_url}
+                                alt={mem.caption || `Kỷ niệm ${memIdx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setLightboxPhoto(mem.photo_url)}
+                                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Phóng to ảnh"
+                              >
+                                <Maximize2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {/* Caption input */}
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                value={mem.caption || ''}
+                                onChange={(e) => handleUpdateCaption(currentRoom.id, memIdx, e.target.value)}
+                                placeholder="Ghi chú ngọt ngào..."
+                                className="w-full px-2.5 py-1.5 rounded-lg bg-black/5 border border-black/10 text-xs font-serif focus:border-amber-600 focus:outline-none"
+                              />
+                              <div className="flex items-center justify-between text-[10px] opacity-60 px-1">
+                                <span>{mem.date || 'Khoảnh khắc'}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePhoto(currentRoom.id, memIdx)}
+                                  className="text-red-600 hover:text-red-800 font-semibold cursor-pointer"
+                                >
+                                  Xóa ảnh
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bottom Actions Bar */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveDraft()}
+                    disabled={isSaving}
+                    className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm border border-white/15 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSaving ? 'Đang lưu...' : 'Lưu bản nháp'}
+                  </button>
+
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('preview')}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-semibold text-sm border border-white/10 transition-all cursor-pointer"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>Xem thử</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handlePublish}
+                      disabled={isPublishing}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-dark-950 font-bold text-sm shadow-xl shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Globe className="w-4 h-4" />
+                      <span>{isPublishing ? 'Đang xuất bản...' : isPublished ? 'Cập Nhật Xuất Bản' : 'Xuất Bản Ngôi Nhà'}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </section>

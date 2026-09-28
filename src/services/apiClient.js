@@ -3,14 +3,26 @@ import {supabase} from '../lib/supabaseClient.js';
 export async function apiRequest(path,{method='GET',body,timeoutMs=20000}={}) {
   const {data,error}=await supabase.auth.getSession();
   if(error)throw error;
+  const isSendBody = method !== 'GET' && method !== 'HEAD';
+  const payload = isSendBody ? (body === undefined ? {} : body) : undefined;
   const response=await fetch(`/api/v1${path}`,{
     method,credentials:'omit',cache:'no-store',
-    headers:{Accept:'application/json',...(body===undefined?{}:{'Content-Type':'application/json'}),
-      ...(data.session?.access_token?{Authorization:`Bearer ${data.session.access_token}`}:{})},
-    ...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(timeoutMs),
+    headers:{
+      Accept:'application/json',
+      ...(isSendBody ? {'Content-Type':'application/json'} : {}),
+      ...(data.session?.access_token?{Authorization:`Bearer ${data.session.access_token}`}:{})
+    },
+    ...(payload !== undefined ? {body:JSON.stringify(payload)} : {}),
+    signal:AbortSignal.timeout(timeoutMs),
   });
   let result;
   try{result=await response.json();}catch{throw Object.assign(new Error('Máy chủ chưa trả dữ liệu hợp lệ.'),{status:502});}
-  if(!response.ok)throw Object.assign(new Error(result.error?.message||result.error||'Yêu cầu thất bại.'),{status:response.status,code:result.error?.code});
+  if(!response.ok){
+    let msg = result.error?.message || result.error || 'Yêu cầu thất bại.';
+    if(typeof msg === 'string' && (msg.includes('Yêu cầu phải là JSON') || msg.includes('JSON không hợp lệ'))){
+      msg = 'Dữ liệu yêu cầu không hợp lệ.';
+    }
+    throw Object.assign(new Error(msg),{status:response.status,code:result.error?.code});
+  }
   return result;
 }

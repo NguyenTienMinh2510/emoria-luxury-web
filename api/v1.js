@@ -9,8 +9,8 @@ async function readBody(req) {
   // Ten handwritten letters plus article content must fit; media is uploaded separately.
   if(body===undefined){let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>524288)throw fail(413,'Yêu cầu quá lớn.');}body=raw;}
   if(Buffer.byteLength(typeof body==='string'?body:JSON.stringify(body))>524288)throw fail(413,'Yêu cầu quá lớn.');
-  try{if(typeof body==='string')body=JSON.parse(body);}catch{throw fail(400,'JSON không hợp lệ.');}
-  if(!body||typeof body!=='object'||Array.isArray(body))throw fail(400,'Nội dung yêu cầu không hợp lệ.');
+  try{if(typeof body==='string')body=body.trim()===''?{}:JSON.parse(body);}catch{throw fail(400,'Dữ liệu yêu cầu không hợp lệ.');}
+  if(!body||typeof body!=='object'||Array.isArray(body))throw fail(400,'Dữ liệu yêu cầu không hợp lệ.');
   return body;
 }
 

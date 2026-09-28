@@ -259,6 +259,16 @@ export const routes=[
       p_rooms:c.body.rooms??null
     });
   }),
+  route('POST','/memories/([^/]+)/house/draft','user',c=>{
+    if(c.body.title!==undefined&&typeof c.body.title!=='string')throw Object.assign(new Error('Tiêu đề không hợp lệ.'),{status:400});
+    if(c.body.rooms!==undefined&&!Array.isArray(c.body.rooms))throw Object.assign(new Error('Danh sách phòng phải là một mảng.'),{status:400});
+    return rpc(c,'rpc_house_save_draft',{
+      p_tag_uid:c.params[0],
+      p_title:c.body.title??null,
+      p_theme:c.body.theme??null,
+      p_rooms:c.body.rooms??null
+    });
+  }),
   route('POST','/memories/([^/]+)/house/publish','user',c=>{
     return rpc(c,'rpc_house_publish',{p_tag_uid:c.params[0]});
   }),

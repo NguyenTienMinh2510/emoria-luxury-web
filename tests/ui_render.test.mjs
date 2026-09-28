@@ -98,8 +98,24 @@ console.log('PASS luxury unboxing and AI muse render: wax seal, crystal chime ch
 const {default:MemoryMatchStudio}=await compile('src/components/MemoryMatchStudio.jsx','memory-match-studio');
 const matchHtml=render(MemoryMatchStudio,{tagUid:'emo-heart',matchId:'fixture-match-id',currentUser:'user-owner-a'});
 assert.ok(matchHtml.includes('Couple Match'));
+assert.ok(matchHtml.includes('Trang chủ'), 'Match Studio header có nút Trang chủ');
+assert.ok(matchHtml.includes('Quay lại kỷ vật'), 'Match Studio header có nút Quay lại kỷ vật');
+assert.ok(matchHtml.includes('Chuyển sang House Studio'), 'Match Studio header có nút Chuyển sang House Studio');
 
 const {default:MemoryHouseStudio}=await compile('src/components/MemoryHouseStudio.jsx','memory-house-studio');
 const houseHtml=render(MemoryHouseStudio,{tagUid:'emo-heart',currentUser:'user-owner-a'});
 assert.ok(houseHtml.includes('Ngôi Nhà Kỷ Niệm'));
-console.log('PASS event studios render: MemoryMatchStudio and MemoryHouseStudio static render without client crash.');
+assert.ok(houseHtml.includes('Trang chủ'), 'House Studio header có nút Trang chủ');
+assert.ok(houseHtml.includes('Quay lại kỷ vật'), 'House Studio header có nút Quay lại kỷ vật');
+assert.ok(houseHtml.includes('Chuyển sang Match Studio'), 'House Studio header có nút Chuyển sang Match Studio');
+assert.ok(houseHtml.includes('LIVE PREVIEW'), 'House Studio luôn render Live Preview trong edit mode');
+assert.ok(houseHtml.includes('Khung Ngôi Nhà (5 Phòng)'), 'House Studio có khung ngôi nhà rõ ràng');
+assert.ok(houseHtml.includes('Ngày bắt đầu'), 'Preview có phòng beginning (Ngày bắt đầu)');
+assert.ok(houseHtml.includes('Lần đầu của đôi mình'), 'Preview có phòng first (Lần đầu của đôi mình)');
+assert.ok(houseHtml.includes('Điều nhỏ xíu'), 'Preview có phòng little-things (Điều nhỏ xíu)');
+assert.ok(houseHtml.includes('Miền ký ức'), 'Preview có phòng memories (Miền ký ức)');
+assert.ok(houseHtml.includes('Chương tiếp theo'), 'Preview có phòng next-chapter (Chương tiếp theo)');
+assert.ok(houseHtml.includes('Chưa có ảnh'), 'Phòng chưa có ảnh có empty state rõ ràng');
+assert.ok(!houseHtml.includes('via.placeholder.com'), 'Không dùng placeholder giả');
+assert.ok(houseHtml.includes('Ghi chú: Ngày bắt đầu'), 'Preview hiển thị ghi chú phòng hiện tại');
+console.log('PASS event studios render: MemoryMatchStudio and MemoryHouseStudio static render without client crash, complete with navigation and live preview.');

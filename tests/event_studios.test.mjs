@@ -12,23 +12,26 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'fixture-service-role-key';
 const originalFetch = globalThis.fetch;
 
 // Helper to make API requests to handler (simulating Vite / Vercel API routing)
-async function apiCall(method, path, body, token) {
-  const req = Readable.from(body === undefined ? [] : [JSON.stringify(body)]);
+async function apiCall(method, path, body, token, options = {}) {
+  const payloadStr = options.raw !== undefined ? options.raw : (body === undefined ? undefined : JSON.stringify(body));
+  const req = Readable.from(payloadStr === undefined ? [] : [payloadStr]);
+  const contentType = options.contentType !== undefined ? options.contentType : (payloadStr === undefined ? undefined : 'application/json');
   Object.assign(req, {
     method,
     url: path,
     headers: {
-      ...(body === undefined ? {} : {'content-type': 'application/json'}),
-      ...(token ? {authorization: `Bearer ${token}`} : {})
+      ...(contentType ? {'content-type': contentType} : {}),
+      ...(token ? {authorization: `Bearer ${token}`} : {}),
+      ...(options.headers || {})
     },
-    ...(body === undefined ? {} : {body})
+    ...(body !== undefined && options.raw === undefined ? {body} : {})
   });
   const headers = {};
   let result;
   const res = {
     setHeader(k, v) { headers[k] = v; },
     end(raw) {
-      result = { status: this.statusCode, body: JSON.parse(raw), headers };
+      result = { status: this.statusCode, body: raw ? JSON.parse(raw) : null, headers };
     }
   };
   await handler(req, res);
@@ -1021,8 +1024,92 @@ async function runTests() {
     assert.ok(houseStudioCode.includes('role="tab"'), 'MemoryHouseStudio có ARIA tab');
     console.log('  [PASS] Test 19: UI Components sạch, không lưu storage riêng tư, tuân thủ accessibility.');
 
+    // --------------------------------------------------------------------------
+    // Test 20: Kiểm tra JSON không hợp lệ trả lỗi 400 rõ ràng
+    // --------------------------------------------------------------------------
+    console.log('--- Test 20: Kiểm tra JSON không hợp lệ trả lỗi 400 rõ ràng ---');
+    const badJsonEndpoints = [
+      { method: 'POST', path: '/api/v1/events/matches', token: 'token-owner-a' },
+      { method: 'PUT', path: `/api/v1/events/matches/${createRes.body.match_id}/questions`, token: 'token-owner-a' },
+      { method: 'POST', path: `/api/v1/events/matches/${createRes.body.match_id}/begin`, token: 'token-owner-a' },
+      { method: 'POST', path: '/api/v1/memories/emo-heart/house/draft', token: 'token-owner-a' },
+      { method: 'PUT', path: '/api/v1/memories/emo-heart/house/draft', token: 'token-owner-a' },
+      { method: 'POST', path: '/api/v1/memories/emo-heart/house/publish', token: 'token-owner-a' }
+    ];
+
+    for (const ep of badJsonEndpoints) {
+      // 1. Gửi chuỗi JSON hỏng (malformed syntax)
+      const resBadSyntax = await apiCall(ep.method, ep.path, undefined, ep.token, {
+        raw: '{invalid json...',
+        contentType: 'application/json'
+      });
+      assert.equal(resBadSyntax.status, 400, `${ep.method} ${ep.path} phải trả về 400 khi JSON sai cú pháp`);
+      assert.equal(resBadSyntax.body?.error?.message, 'Dữ liệu yêu cầu không hợp lệ.', 'Thông báo lỗi phải là: Dữ liệu yêu cầu không hợp lệ.');
+
+      // 2. Gửi mảng JSON thay vì object
+      const resArray = await apiCall(ep.method, ep.path, undefined, ep.token, {
+        raw: '[1, 2, 3]',
+        contentType: 'application/json'
+      });
+      assert.equal(resArray.status, 400, `${ep.method} ${ep.path} phải trả về 400 khi body là array`);
+      assert.equal(resArray.body?.error?.message, 'Dữ liệu yêu cầu không hợp lệ.');
+    }
+    console.log('  [PASS] Test 20: Toàn bộ route event trả 400 "Dữ liệu yêu cầu không hợp lệ." khi JSON sai cú pháp.');
+
+    // --------------------------------------------------------------------------
+    // Test 21: Kiểm tra luồng Guest & NFC public House ---
+    // --------------------------------------------------------------------------
+    console.log('--- Test 21: Kiểm tra luồng Guest & NFC public House ---');
+    // Guest truy vấn draft bằng tag_uid bị chặn 401
+    const guestDraftRes = await apiCall('GET', '/api/v1/memories/emo-heart/house/draft', undefined, null);
+    assert.equal(guestDraftRes.status, 401, 'Guest không được phép gọi endpoint draft');
+
+    // Lưu đầy đủ 5 phòng và xuất bản bởi chủ hiện tại (user-owner-b)
+    const all5Rooms = [
+      { id: 'beginning', name: 'Ngày bắt đầu', memories: [{ id: 'm1', photo_path: 'emo-heart/room1.jpg', note: 'Khởi đầu' }] },
+      { id: 'first', name: 'Lần đầu của đôi mình', memories: [] },
+      { id: 'little-things', name: 'Điều nhỏ xíu', memories: [] },
+      { id: 'memories', name: 'Miền ký ức', memories: [] },
+      { id: 'next-chapter', name: 'Chương tiếp theo', memories: [] }
+    ];
+    await apiCall('PUT', '/api/v1/memories/emo-heart/house/draft', {
+      title: 'Nhà Đầy Đủ 5 Phòng',
+      theme: 'warm_gold',
+      rooms: all5Rooms
+    }, 'token-owner-b');
+    const pubBRes = await apiCall('POST', '/api/v1/memories/emo-heart/house/publish', {}, 'token-owner-b');
+    assert.equal(pubBRes.status, 200, 'Owner B xuất bản thành công');
+
+    const guestPublishedRes = await apiCall('GET', '/api/v1/events/houses/tag/emo-heart', undefined, null);
+    assert.equal(guestPublishedRes.status, 200, 'Guest đọc được published snapshot khi đã xuất bản');
+    assert.ok(Array.isArray(guestPublishedRes.body.rooms), 'Có danh sách rooms trong snapshot');
+    assert.equal(guestPublishedRes.body.rooms.length, 5, 'Snapshot chứa đủ 5 phòng');
+    assert.equal(guestPublishedRes.body.draft, undefined, 'Không lộ draft riêng tư');
+    assert.equal(guestPublishedRes.body.pin_hash, undefined, 'Không lộ pin_hash');
+    assert.equal(guestPublishedRes.body.letter, undefined, 'Không lộ thư tay riêng tư');
+    console.log('  [PASS] Test 21: Guest chỉ được xem snapshot đã publish qua tag_uid, không lộ draft hay thông tin NFC.');
+
+    // --------------------------------------------------------------------------
+    // Test 22: Kiểm tra Navigation & Live Preview UI Code Structure
+    // --------------------------------------------------------------------------
+    console.log('--- Test 22: Navigation & Live Preview UI Code Structure ---');
+    assert.ok(matchStudioCode.includes('Trang chủ'), 'Match Studio có nút Trang chủ');
+    assert.ok(matchStudioCode.includes('Quay lại kỷ vật'), 'Match Studio có nút Quay lại kỷ vật');
+    assert.ok(matchStudioCode.includes('Chuyển sang House Studio'), 'Match Studio có nút Chuyển sang House Studio');
+
+    assert.ok(houseStudioCode.includes('Trang chủ'), 'House Studio có nút Trang chủ');
+    assert.ok(houseStudioCode.includes('Quay lại kỷ vật'), 'House Studio có nút Quay lại kỷ vật');
+    assert.ok(houseStudioCode.includes('Chuyển sang Match Studio'), 'House Studio có nút Chuyển sang Match Studio');
+
+    assert.ok(houseStudioCode.includes('LIVE PREVIEW'), 'House Studio có LIVE PREVIEW');
+    assert.ok(houseStudioCode.includes('Khung Ngôi Nhà'), 'House Studio có Khung Ngôi Nhà');
+    assert.ok(houseStudioCode.includes('Chưa có ảnh'), 'House Studio có empty state Chưa có ảnh rõ ràng');
+    assert.ok(!houseStudioCode.includes('via.placeholder.com'), 'Không dùng ảnh placeholder giả');
+    assert.ok(!houseStudioCode.includes('placeholder.png'), 'Không dùng ảnh placeholder giả');
+    console.log('  [PASS] Test 22: Navigation và Live Preview 5 phòng đầy đủ, rõ ràng và không dùng placeholder giả.');
+
     console.log('\n================================================================');
-    console.log('  TẤT CẢ 19/19 BEHAVIOR, SECURITY & UI ASSERTIONS ĐẠT KẾT QUẢ PASS');
+    console.log('  TẤT CẢ 22/22 BEHAVIOR, SECURITY & UI ASSERTIONS ĐẠT KẾT QUẢ PASS');
     console.log('================================================================');
 
   } finally {
