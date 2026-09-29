@@ -1,40 +1,42 @@
 import MemoryAccountsAdmin from './MemoryAccountsAdmin';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, Shield, Package, Truck, SmartphoneNfc, Power, 
-  CheckCircle2, Clock, AlertTriangle, Key, RefreshCw, 
+import {
+  X, Shield, ShieldAlert, Package, Truck, SmartphoneNfc, Power,
+  CheckCircle2, Clock, AlertTriangle, Key, RefreshCw,
   Settings, UserCheck, Eye, Edit3, Lock, Unlock, Database,
   BookOpen, MessageSquare, Plus, Trash2, Check, EyeOff, FileText, Send
 } from 'lucide-react';
 import CommentModeration from './CommentModeration';
 import MarketingPanel from './MarketingPanel';
 import VideoModerationAdmin from './VideoModerationAdmin';
+import EventModerationAdmin from './EventModerationAdmin';
 import NfcOperations,{OrderGiftSetup} from './NfcOperations';
 import ShipmentEditor from './ShipmentEditor';
 import StoreAdminPanel from './StoreAdminPanel';
 import MarkdownContent from './MarkdownContent';
 import { callStore } from '../services/catalogService';
 import { listOrdersForAdmin, updateOrderStatus } from '../services/orderBackendService';
-import { 
-  getSystemAvailability, 
-  updateSystemAvailability 
+import {
+  getSystemAvailability,
+  updateSystemAvailability
 } from '../services/authRoleService';
-import { 
-  getAllShowcaseMemories, 
-  updateMemoryAvailability 
+import {
+  getAllShowcaseMemories,
+  updateMemoryAvailability
 } from '../services/memoryService';
-import { 
-  getArticleAdminData, 
-  saveArticleAdmin, 
-  moderateArticleComment, 
-  DEMO_ARTICLES, 
-  DEMO_COMMENTS 
+import {
+  getArticleAdminData,
+  saveArticleAdmin,
+  deleteArticleAdmin,
+  moderateArticleComment,
+  DEMO_ARTICLES,
+  DEMO_COMMENTS
 } from '../services/articleService';
 
 export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
   const [activeTab, setActiveTab] = useState('marketing'); // 'orders' | 'articles' | 'moderation' | 'system' | 'nfc' | 'infrastructure'
-  
+
   // Orders State
   const [orders, setOrders] = useState([]);
   const [orderPage,setOrderPage]=useState(0);
@@ -155,6 +157,21 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
     }
   };
 
+  const handleDeleteArticle = async (art) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn bài viết "${art.title}" không? Hành động này không thể hoàn tác.`)) {
+      return;
+    }
+    const res = await deleteArticleAdmin(art.id);
+    if (res.success) {
+      setAdminArticles(prev => prev.filter(a => a.id !== art.id));
+      setSaveMessage(`Đã xóa vĩnh viễn bài viết "${art.title}".`);
+      setTimeout(() => setSaveMessage(''), 3000);
+      if (onRefresh) onRefresh();
+    } else {
+      alert(res.message || 'Lỗi khi xóa bài viết.');
+    }
+  };
+
   const handleToggleArticleStatus = async (art) => {
     const nextStatus = art.status === 'published' ? 'archived' : 'published';
     const res = await saveArticleAdmin({
@@ -235,7 +252,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
 
   return (
     <AnimatePresence>
-      <div 
+      <div
         className="admin-page min-h-screen px-3 sm:px-6 pt-32 pb-16 max-w-7xl mx-auto"
       >
         <motion.div
@@ -321,6 +338,18 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
             </button>
 
             <button
+              onClick={() => setActiveTab('events-moderation')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
+                activeTab === 'events-moderation'
+                  ? 'bg-white text-dark-950 shadow-silver-glow'
+                  : 'bg-white/5 text-slate-300 hover:bg-white/10'
+              }`}
+            >
+              <ShieldAlert className="w-4 h-4 text-rose-400" />
+              <span>Sự Kiện & Báo Cáo</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('nfc')}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
                 activeTab === 'nfc'
@@ -371,6 +400,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
           {activeTab==='contacts' && <StoreAdminPanel section="contacts" />}
           {activeTab==='orders' && <div className="flex flex-wrap gap-3 mb-4"><input aria-label="Tìm mã đơn" placeholder="Tìm mã đơn" className="store-input !w-64" value={orderSearch} onChange={e=>{setOrderSearch(e.target.value);setOrderPage(0);}}/><button disabled={!orderPage} onClick={()=>setOrderPage(p=>p-1)}>Trước</button><span>Trang {orderPage+1}</span><button disabled={orders.length<25} onClick={()=>setOrderPage(p=>p+1)}>Sau</button><button onClick={async()=>{try{const n=await callStore('rpc_expire_orders');await loadData();setSaveMessage(`Đã xử lý ${n} đơn hết hạn.`);}catch(e){setSaveMessage(e.message);}}}>Xử lý đơn hết hạn</button></div>}
           {activeTab === 'video-moderation' && <VideoModerationAdmin/>}
+          {activeTab === 'events-moderation' && <EventModerationAdmin/>}
           {activeTab === 'orders' && (
             <div className="space-y-4">
               {isLoadingOrders ? (
@@ -404,7 +434,7 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                     </div>
 
                     <div className="text-[11px] text-slate-400">
-                      <strong>Địa chỉ: </strong> {order.address}, {order.city} • 
+                      <strong>Địa chỉ: </strong> {order.address}, {order.city} •
                       <strong> Thanh toán: </strong> <span className="uppercase text-slate-200">{order.paymentMethod}</span>
                     </div>
 

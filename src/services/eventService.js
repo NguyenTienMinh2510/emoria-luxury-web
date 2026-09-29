@@ -1,5 +1,7 @@
 import {apiRequest} from './apiClient.js';
 import {supabase} from '../lib/supabaseClient.js';
+import {serializeHouseRooms} from './house3d.js';
+import {getAnalyticsConsent} from './analyticsService.js';
 
 /**
  * 7 câu hỏi gợi ý mặc định cho Couple Match Studio (thấu hiểu nhau)
@@ -118,13 +120,14 @@ export async function saveMatchQuestions(matchId, payload) {
   if (!matchId) throw new Error('Vui lòng cung cấp mã lượt chơi.');
   let body;
   if (Array.isArray(payload)) {
-    body = { questions: payload };
+    body = { questions: payload, expected_revision: 0 };
   } else if (payload && typeof payload === 'object') {
     body = {
       questions: payload.questions,
+      expected_revision: payload.expected_revision ?? 0,
       title: payload.title,
-      partner_name: payload.partnerName || payload.partner_name,
-      owner_name: payload.ownerName || payload.owner_name
+      partner_name: payload.partnerName ?? payload.partner_name,
+      owner_name: payload.ownerName ?? payload.owner_name
     };
   } else {
     throw new Error('Dữ liệu câu hỏi không hợp lệ.');
@@ -150,13 +153,14 @@ export async function beginMatch(matchId) {
 /**
  * Lưu tiến độ trả lời (Owner hoặc Partner có inviteToken)
  */
-export async function saveMatchProgress(matchId, { answers, inviteToken, invite_token } = {}) {
+export async function saveMatchProgress(matchId, { answers, inviteToken, invite_token, expected_revision } = {}) {
   if (!matchId) throw new Error('Vui lòng cung cấp mã lượt chơi.');
   if (!Array.isArray(answers)) throw new Error('Dữ liệu tiến độ phải là một mảng.');
   return apiRequest(`/events/matches/${encodeURIComponent(matchId)}/progress`, {
     method: 'POST',
     body: {
       answers,
+      expected_revision: expected_revision ?? 0,
       invite_token: inviteToken || invite_token || null
     }
   });
@@ -218,14 +222,15 @@ export async function getHouseDraft(tagUid) {
 /**
  * Lưu bản nháp Memory House (5 phòng cố định, tối đa 10 ảnh/phòng)
  */
-export async function saveHouseDraft(tagUid, { title, theme, rooms } = {}) {
+export async function saveHouseDraft(tagUid, { title, theme, rooms, expected_revision } = {}) {
   if (!tagUid) throw new Error('Vui lòng cung cấp mã kỷ vật.');
   return apiRequest(`/memories/${encodeURIComponent(tagUid)}/house/draft`, {
     method: 'PUT',
     body: {
       title,
       theme,
-      rooms
+      rooms: serializeHouseRooms(rooms),
+      expected_revision: expected_revision ?? 0
     }
   });
 }
@@ -294,8 +299,8 @@ export async function uploadEventPhoto(tagUid, file) {
   if (!allowed.includes(file.type)) {
     throw new Error('Chỉ hỗ trợ tệp ảnh JPEG, PNG hoặc WebP.');
   }
-  if (file.size > 10 * 1024 * 1024) {
-    throw new Error('Dung lượng ảnh tối đa là 10 MB.');
+  if (file.size > 8 * 1024 * 1024) {
+    throw new Error('Dung lượng ảnh tối đa là 8 MB.');
   }
   const extMap = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
   const ext = extMap[file.type] || 'jpg';
@@ -336,3 +341,90 @@ export async function signEventMedia(paths) {
   return res?.signed || {};
 }
 
+/**
+ * Gửi tracking sự kiện (deduplicated & rate-limited)
+ * Fire-and-forget: không chặn luồng giao diện người dùng nếu tracking gặp lỗi
+ */
+let eventSession;
+export async function trackEventAction(eventName, resourceType, resourceId, dedupeKey = null, metadata = {}, inviteToken = null) {
+  if(getAnalyticsConsent() !== 'granted')return;
+  eventSession ||= crypto.randomUUID();
+  if (!eventName || !resourceType || !resourceId) return;
+  try {
+    return await apiRequest('/events/analytics/track', {
+      method: 'POST',
+      body: {
+        event_name: eventName,
+        resource_type: resourceType,
+        resource_id: String(resourceId),
+        session_id: eventSession,
+        event_id: /opened/.test(eventName)?undefined:crypto.randomUUID(),
+        invite_token: inviteToken
+      }
+    });
+  } catch (err) {
+    // Non-blocking for client
+    console.debug('[Event Tracking]', eventName, err?.message);
+    return null;
+  }
+}
+
+/**
+ * Báo cáo nội dung vi phạm (cho khách hoặc người dùng)
+ */
+export async function submitContentReport(resourceType, resourceId, reason, details = '', inviteToken = null) {
+  if (!resourceType || !resourceId || !reason) {
+    throw new Error('Vui lòng chọn loại nội dung và lý do báo cáo.');
+  }
+  return apiRequest('/events/reports', {
+    method: 'POST',
+    body: {
+      resource_type: resourceType,
+      resource_id: String(resourceId),
+      reason,
+      details: details || null,
+      invite_token: inviteToken
+    }
+  });
+}
+
+/**
+ * Quản trị viên: Lấy danh sách báo cáo nội dung
+ */
+export async function adminListReports(status = null, limit = 50, offset = 0) {
+  const query = new URLSearchParams();
+  if (status) query.set('status', status);
+  query.set('limit', String(limit));
+  query.set('offset', String(offset));
+  return apiRequest(`/admin/events/reports?${query.toString()}`, {
+    method: 'GET'
+  });
+}
+
+/**
+ * Quản trị viên: Xử lý báo cáo (ẩn, khôi phục, bỏ qua)
+ */
+export async function adminModerateContent(reportId, action, reason = '') {
+  if (!reportId || !action) throw new Error('Vui lòng cung cấp mã báo cáo và hành động.');
+  return apiRequest('/admin/events/moderate', {
+    method: 'POST',
+    body: {
+      report_id: reportId,
+      action,
+      reason: reason || null
+    }
+  });
+}
+
+/**
+ * Quản trị viên: Thống kê và phễu chuyển đổi sự kiện
+ */
+export async function adminGetAnalyticsSummary(days = 30) {
+  return apiRequest(`/admin/events/analytics/summary?days=${encodeURIComponent(days)}`, {
+    method: 'GET'
+  });
+}
+
+
+export const sendHouseReply=body=>apiRequest("/events/houses/replies",{method:"POST",body});
+export const getHouseReplies=tag=>apiRequest(`/memories/${encodeURIComponent(tag)}/house/replies`);

@@ -1,0 +1,1385 @@
+import React, { useRef, useState, useEffect } from 'react';
+import {
+  DECORATIONS,
+  roomDecorations,
+  placeDecoration,
+  setDecorationPhoto,
+  addDecorationInstance,
+  updateDecorationInstance,
+  removeDecorationInstance,
+  cloneDecorationInstance,
+  getSupportingObjects,
+  getDefaultPosition,
+  ROOM_BOUNDS,
+  DECOR_SLOTS
+} from '../services/house3d.js';
+import { createMusicBoxPlayer } from '../services/musicBoxPlayer.js';
+import MemoryHouse2D from './MemoryHouse2D.jsx';
+
+// Style Packages (Gói phong cách một chạm)
+export const STYLE_PACKAGES = [
+  {
+    id: 'first_date',
+    name: 'Buổi hẹn đầu',
+    desc: 'Bình tulip, cốc đôi & lịch hẹn hò',
+    lighting: 'sunset',
+    slots: { left: 'vase', table: 'mugs', right: 'calendar' }
+  },
+  {
+    id: 'cozy_home',
+    name: 'Tổ ấm bình yên',
+    desc: 'Mèo ngủ ngoan, cây xanh & đèn ấm áp',
+    lighting: 'day',
+    slots: { left: 'cat', table: 'plant', right: 'lamp' }
+  },
+  {
+    id: 'cherished_love',
+    name: 'Kỷ vật tình yêu',
+    desc: 'Dây ảnh, khung ảnh & album kỷ niệm',
+    lighting: 'sunset',
+    slots: { left: 'bunting', table: 'frame', right: 'album' }
+  },
+  {
+    id: 'travel_memories',
+    name: 'Kỷ niệm chuyến đi',
+    desc: 'Dây ảnh (Máy ảnh & Postcard đang chờ tạo asset 3D)',
+    lighting: 'day',
+    slots: { left: 'bunting' },
+    isPendingAsset: true
+  }
+];
+
+export default function MemoryHouse3D({
+  rooms,
+  title,
+  theme,
+  activeRoomId,
+  onSelectRoom,
+  onRoomsChange,
+  onPhoto,
+  onSave,
+  onUploadPhoto,
+  uploading = false,
+  saving,
+  readOnly = false,
+  onRegisterCapture
+}) {
+  const host = useRef(null), engine = useRef(null), latest = useRef({});
+  const fileInput = useRef(null), uploadTarget = useRef(null), tourTimer = useRef(null);
+  const musicBox = useRef(null);
+
+  const [view, setView] = useState('3d'), [status, setStatus] = useState('loading'), [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
+  const [touring, setTouring] = useState(false), [tourPaused, setTourPaused] = useState(false);
+
+  // Freeform Decor States
+  const [selectedInstanceId, setSelectedInstanceId] = useState(null);
+  const [activeTool, setActiveTool] = useState('idle'); // 'idle' | 'place' | 'move'
+  const [placingItem, setPlacingItem] = useState(null);
+  const [pendingPlacement, setPendingPlacement] = useState(null);
+  const [enableSnapping, setEnableSnapping] = useState(true);
+  const [editingContent, setEditingContent] = useState(false);
+  const [history, setHistory] = useState({ past: [], future: [] });
+
+  // Music Box, Gyroscope, Decor Inspection, Welcome Door
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.55);
+  const [isGyroEnabled, setIsGyroEnabled] = useState(false);
+  const [inspectingDecor, setInspectingDecor] = useState(null);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  const [arrangeNotice, setArrangeNotice] = useState('');
+  const [deleteDialog, setDeleteDialog] = useState(null); // { targetId, children, availableSupports, chosenSupportId }
+
+  latest.current = { rooms, title, theme, activeRoomId, onSelectRoom, onPhoto, readOnly };
+  const room = rooms.find(r => r.id === activeRoomId) || rooms[0];
+  const decorationsList = roomDecorations(room);
+  const selectedInstance = decorationsList.find(d => (d.id && d.id === selectedInstanceId) || (d.slot && d.slot === selectedInstanceId));
+  const selectedAsset = selectedInstance ? DECORATIONS.find(d => d.id === selectedInstance.item) : null;
+  const placingAsset = placingItem ? DECORATIONS.find(d => d.id === placingItem) : null;
+
+  // Initialize Music Box Player (Web Audio API)
+  useEffect(() => {
+    musicBox.current = createMusicBoxPlayer();
+    return () => {
+      musicBox.current?.dispose();
+      musicBox.current = null;
+    };
+  }, []);
+
+  function toggleMusic() {
+    if (!musicBox.current) return;
+    const playing = musicBox.current.toggle();
+    setIsMusicPlaying(playing);
+  }
+
+  function handleVolumeChange(v) {
+    setMusicVolume(v);
+    musicBox.current?.setVolume(v);
+  }
+
+  async function toggleGyro() {
+    const next = !isGyroEnabled;
+    const ok = await engine.current?.enableGyroscope(next);
+    setIsGyroEnabled(Boolean(ok && next));
+  }
+
+  function chooseUpload(target) {
+    if (readOnly || uploading || !room) return;
+    uploadTarget.current = { roomId: room.id, target };
+    fileInput.current?.click();
+  }
+
+  // Soft Snapping Helper
+  function snapCoord(pos, otherDecorations, threshold = 0.2) {
+    if (!Array.isArray(pos) || !enableSnapping) return pos;
+    let [x, y, z] = pos;
+    for (const d of otherDecorations) {
+      if (!Array.isArray(d.position)) continue;
+      if (Math.abs(x - d.position[0]) < threshold) x = d.position[0];
+      if (Math.abs(z - d.position[2]) < threshold) z = d.position[2];
+    }
+    if (Math.abs(x) < 0.1) x = 0;
+    if (Math.abs(z) < 0.1) z = 0;
+    return [Number(x.toFixed(3)), Number(y.toFixed(3)), Number(z.toFixed(3))];
+  }
+
+  // History State Handlers (Undo / Redo)
+  function commitChange(nextRoom, recordHistory = true) {
+    if (readOnly || !room) return;
+    if (recordHistory) {
+      setHistory(h => ({
+        past: [
+          ...h.past.slice(-25),
+          { roomId: room.id, decorations: roomDecorations(room), lighting: room.lighting || 'day' }
+        ],
+        future: []
+      }));
+    }
+    onRoomsChange?.(rooms.map(r => r.id === room.id ? nextRoom : r));
+  }
+
+  function handleUndo() {
+    if (readOnly || history.past.length === 0) return;
+    const prev = history.past[history.past.length - 1];
+    const newPast = history.past.slice(0, -1);
+    const target = rooms.find(r => r.id === prev.roomId);
+    const currentSnap = { roomId: target.id, decorations: roomDecorations(target), lighting: target.lighting || 'day' };
+    setHistory({
+      past: newPast,
+      future: [currentSnap, ...history.future.slice(0, 25)]
+    });
+    onRoomsChange?.(rooms.map(r => r.id === prev.roomId ? { ...r, decorations: prev.decorations, lighting: prev.lighting } : r));
+    setSelectedInstanceId(null);
+    engine.current?.setSelectionHighlight(null);
+    engine.current?.hideGhost();
+    setActiveTool('idle');
+  }
+
+  function handleRedo() {
+    if (readOnly || history.future.length === 0) return;
+    const next = history.future[0];
+    const newFuture = history.future.slice(1);
+    const target = rooms.find(r => r.id === next.roomId);
+    const currentSnap = { roomId: target.id, decorations: roomDecorations(target), lighting: target.lighting || 'day' };
+    setHistory({
+      past: [...history.past, currentSnap],
+      future: newFuture
+    });
+    onRoomsChange?.(rooms.map(r => r.id === next.roomId ? { ...r, decorations: next.decorations, lighting: next.lighting } : r));
+    setSelectedInstanceId(null);
+    engine.current?.setSelectionHighlight(null);
+    engine.current?.hideGhost();
+    setActiveTool('idle');
+  }
+
+  // 3D Engine Setup
+  latest.current.placement = placingItem || activeTool === 'move' ? {
+    item: placingItem || selectedInstance?.item,
+    scale: placingItem ? 1 : selectedInstance?.scale,
+    rotation: placingItem ? 0 : selectedInstance?.rotation,
+    excludeId: placingItem ? null : selectedInstanceId
+  } : null;
+  latest.current.onSurfaceTap = surfaceHit => {
+    if (readOnly) return;
+    if (placingItem) {
+      setPendingPlacement(surfaceHit);
+      engine.current?.showGhost(placingItem, surfaceHit.position, surfaceHit.isValid);
+    } else if (activeTool === 'move' && selectedInstanceId) {
+      if (!surfaceHit.isValid) { setArrangeNotice(surfaceHit.reason); return; }
+      commitChange(updateDecorationInstance(room, selectedInstanceId, {
+        position: surfaceHit.position, surface: surfaceHit.surface, parent_id: surfaceHit.parentId
+      }));
+      engine.current?.setSelectionHighlight(selectedInstanceId);
+      setActiveTool('idle');
+      engine.current?.setInteracting(false);
+    }
+  };
+  useEffect(() => {
+    if (view !== '3d' || !host.current) return;
+    let cancelled = false; setStatus('loading'); setError('');
+    import('../services/house3dRenderer.js').then(({ createHouseRenderer }) => {
+      if (cancelled) return;
+      try {
+        engine.current = createHouseRenderer(host.current, {
+          getPlacement: () => latest.current.placement,
+          onRoom: id => {
+            latest.current.onSelectRoom?.(id);
+            engine.current?.focus(id, true);
+          },
+          onPhoto: (url, memory) => {
+            latest.current.onPhoto?.(url, memory);
+          },
+          onDecorItem: (item, decorData) => {
+            if (latest.current.readOnly) {
+              const asset = DECORATIONS.find(d => d.id === item);
+              if (asset) {
+                setInspectingDecor({ ...asset, ...decorData, id: asset.id });
+                if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
+              }
+            } else {
+              if (decorData.roomId) latest.current.onSelectRoom?.(decorData.roomId);
+              const instId = decorData.id || decorData.instanceId;
+              setSelectedInstanceId(instId);
+              engine.current?.setSelectionHighlight(instId);
+              if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
+            }
+          },
+          onSurfaceTap: hit => latest.current.onSurfaceTap?.(hit),
+          onReady: () => { if (!cancelled) setStatus('ready'); },
+          onError: message => { if (!cancelled) { setError(message); setStatus('error'); } }
+        });
+        engine.current.update(latest.current);
+        if (onRegisterCapture) {
+          onRegisterCapture(() => engine.current?.capture());
+        }
+      } catch {
+        setError('Thiết bị chưa mở được 3D. Khung 2D bên dưới vẫn dùng bình thường.');
+        setStatus('error');
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setStatus('error');
+        setError('Chưa tải được chế độ 3D. Hãy thử lại khi kết nối ổn định.');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      if (onRegisterCapture) onRegisterCapture(null);
+      engine.current?.dispose();
+      engine.current = null;
+    };
+  }, [view, retry]);
+
+  useEffect(() => {
+    engine.current?.update({ rooms, title, theme, activeRoomId });
+  }, [rooms, title, theme, activeRoomId]);
+
+  // Guided Tour timer (steps through rooms smoothly every 6.5s)
+  useEffect(() => {
+    if (!touring || tourPaused) {
+      if (tourTimer.current) clearInterval(tourTimer.current);
+      return;
+    }
+    tourTimer.current = setInterval(() => {
+      const currentIdx = rooms.findIndex(r => r.id === activeRoomId);
+      const nextIdx = (currentIdx + 1) % rooms.length;
+      const nextId = rooms[nextIdx].id;
+      onSelectRoom?.(nextId);
+      engine.current?.focus(nextId, true);
+    }, 6500);
+    return () => { if (tourTimer.current) clearInterval(tourTimer.current); };
+  }, [touring, tourPaused, rooms, activeRoomId, onSelectRoom]);
+
+  // Freeform Placement Flow
+  function startPlacement(itemId) {
+    if (readOnly || !room) return;
+    const currentDecor = roomDecorations(room);
+    if (currentDecor.length > 35) {
+      setArrangeNotice('Phòng đang có nhiều đồ vật. Bạn vẫn có thể tiếp tục đặt thêm thoải mái.');
+      setTimeout(() => setArrangeNotice(''), 3000);
+    }
+    const asset = DECORATIONS.find(d => d.id === itemId);
+    if (!asset) return;
+    setSelectedInstanceId(null);
+    engine.current?.setSelectionHighlight(null);
+    setPlacingItem(itemId);
+    setActiveTool('place');
+
+    const defPos = getDefaultPosition(room.id, asset.defaultSurface);
+    const initialPlacement = {
+      isValid: true,
+      surface: asset.defaultSurface,
+      position: defPos,
+      parentId: null
+    };
+    setPendingPlacement(initialPlacement);
+    engine.current?.showGhost(itemId, defPos, true);
+    engine.current?.focus(room.id, true);
+  }
+
+  function confirmPlacement() {
+    if (readOnly || !placingItem || !pendingPlacement?.isValid || !room) return;
+    const nextRoom = addDecorationInstance(room, placingItem, {
+      position: pendingPlacement.position,
+      surface: pendingPlacement.surface,
+      parent_id: pendingPlacement.parentId
+    });
+    commitChange(nextRoom, true);
+    engine.current?.hideGhost();
+    const newItems = roomDecorations(nextRoom);
+    const newest = newItems[newItems.length - 1];
+    setPlacingItem(null);
+    setPendingPlacement(null);
+    setActiveTool('idle');
+    if (newest?.id) {
+      setSelectedInstanceId(newest.id);
+      setTimeout(() => engine.current?.setSelectionHighlight(newest.id), 50);
+    }
+  }
+
+  function cancelPlacement() {
+    engine.current?.hideGhost();
+    setPlacingItem(null);
+    setPendingPlacement(null);
+    setActiveTool('idle');
+  }
+
+  // Selected Instance Actions
+  function toggleMoveMode() {
+    if (activeTool === 'move') {
+      setActiveTool('idle');
+      engine.current?.setInteracting(false);
+    } else {
+      setActiveTool('move');
+      engine.current?.setInteracting(true); // Lock camera orbit during move
+    }
+  }
+
+  function rotateSelected(deltaDegrees) {
+    if (!selectedInstanceId || !room) return;
+    const target = roomDecorations(room).find(d => (d.id && d.id === selectedInstanceId) || (d.slot && d.slot === selectedInstanceId));
+    if (!target) return;
+    const currentRot = Array.isArray(target.rotation) ? target.rotation[1] : (Number(target.rotation) || 0);
+    const newRot = (currentRot + deltaDegrees + 360) % 360;
+    const updated = updateDecorationInstance(room, selectedInstanceId, { rotation: newRot });
+    commitChange(updated, true);
+    engine.current?.setSelectionHighlight(selectedInstanceId);
+  }
+
+  function scaleSelected(newScale) {
+    if (!selectedInstanceId || !room) return;
+    const updated = updateDecorationInstance(room, selectedInstanceId, { scale: newScale });
+    commitChange(updated, true);
+    engine.current?.setSelectionHighlight(selectedInstanceId);
+  }
+
+  function cloneSelected() {
+    if (!selectedInstanceId || !room) return;
+    const updated = cloneDecorationInstance(room, selectedInstanceId);
+    commitChange(updated, true);
+    const newItems = roomDecorations(updated);
+    const cloned = newItems[newItems.length - 1];
+    if (cloned?.id) {
+      setSelectedInstanceId(cloned.id);
+      setTimeout(() => engine.current?.setSelectionHighlight(cloned.id), 50);
+    }
+  }
+
+  function requestDelete(instId) {
+    if (!instId || !room) return;
+    const currentDecor = roomDecorations(room);
+    const children = currentDecor.filter(d => d.parent_id === instId);
+    if (children.length > 0) {
+      const availableSupports = getSupportingObjects(room, instId);
+      setDeleteDialog({
+        targetId: instId,
+        children,
+        availableSupports,
+        chosenSupportId: availableSupports[0]?.id || ''
+      });
+      return;
+    }
+    executeDelete(instId, { action: 'drop_or_cancel' });
+  }
+
+  function executeDelete(targetId, options) {
+    const updated = removeDecorationInstance(room, targetId, options);
+    if (updated.cancelled) {
+      alert('Không thể xóa vì một số món đồ bên trên không thể đặt trên sàn và phòng không còn mặt bàn nào khác. Vui lòng chuyển đồ sang nơi khác trước.');
+      setDeleteDialog(null);
+      return;
+    }
+    commitChange(updated, true);
+    if (selectedInstanceId === targetId) {
+      setSelectedInstanceId(null);
+      engine.current?.setSelectionHighlight(null);
+    }
+    setDeleteDialog(null);
+  }
+
+  function deleteSelected() {
+    if (!selectedInstanceId) return;
+    requestDelete(selectedInstanceId);
+  }
+
+  // Apply one-touch style package
+  function applyStylePackage(pkg) {
+    if (readOnly || !room) return;
+    const existingDecor = roomDecorations(room);
+    const nextDecor = [...existingDecor];
+    for (const [sId, itemId] of Object.entries(pkg.slots)) {
+      if (!itemId) continue;
+      const asset = DECORATIONS.find(d => d.id === itemId);
+      if (!asset) continue;
+      const defPos = getDefaultPosition(room.id, asset.defaultSurface, sId);
+      nextDecor.push({
+        id: `${room.id}_${sId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        item: itemId,
+        surface: asset.defaultSurface,
+        position: defPos,
+        rotation: 0,
+        scale: 1.0,
+        photos: [],
+        text: ''
+      });
+    }
+    const updatedRoom = {
+      ...room,
+      lighting: pkg.lighting || room.lighting || 'day',
+      decorations: nextDecor
+    };
+    commitChange(updatedRoom, true);
+    engine.current?.focus(room.id, true);
+  }
+
+  // Helper: Classify photo aspect ratio
+  function classifyMemoryAspectRatio(mem) {
+    if (!mem) return 'square';
+    if (typeof mem.aspect_ratio === 'number') {
+      if (mem.aspect_ratio < 0.92) return 'portrait';
+      if (mem.aspect_ratio > 1.08) return 'landscape';
+      return 'square';
+    }
+    if (typeof mem.aspectRatio === 'number') {
+      if (mem.aspectRatio < 0.92) return 'portrait';
+      if (mem.aspectRatio > 1.08) return 'landscape';
+      return 'square';
+    }
+    return 'square';
+  }
+
+  // "✦ Dọn nhà giúp mình" (Auto-arrange available photos into empty slots/instances)
+  function autoArrangePhotos() {
+    if (readOnly || !room || !room.memories || room.memories.length === 0) return;
+    const existingDecor = roomDecorations(room);
+
+    let targetDecor = existingDecor.map(d => ({ ...d, photos: Array.isArray(d.photos) ? [...d.photos] : [] }));
+    const totalSlots = targetDecor.reduce((sum, d) => {
+      const asset = DECORATIONS.find(a => a.id === d.item);
+      return sum + (asset?.photoCount || 0);
+    }, 0);
+
+    // If room currently has no photo-holding decor items, place standard set
+    if (totalSlots === 0) {
+      targetDecor = [
+        { id: `${room.id}_frame_${Date.now()}`, surface: 'table', item: 'frame', position: getDefaultPosition(room.id, 'table', 'table'), rotation: 0, photos: [null] },
+        { id: `${room.id}_album_${Date.now()}`, surface: 'table', item: 'album', position: getDefaultPosition(room.id, 'table', 'right'), rotation: 0, photos: [null, null] },
+        { id: `${room.id}_bunting_${Date.now()}`, surface: 'wall', item: 'bunting', position: getDefaultPosition(room.id, 'wall', 'left'), rotation: 0, photos: [null, null, null] }
+      ];
+    }
+
+    const usedIds = new Set(targetDecor.flatMap(d => d.photos || []).filter(Boolean));
+    const availableMemories = room.memories.filter(m => (m.photo_url || m.photo_path) && !usedIds.has(m.id));
+
+    if (availableMemories.length === 0) {
+      setArrangeNotice('Tất cả ảnh trong phòng đã được sắp xếp vào các vị trí!');
+      setTimeout(() => setArrangeNotice(''), 3500);
+      return;
+    }
+
+    const portraits = [], landscapes = [], squares = [];
+    for (const m of availableMemories) {
+      const cat = classifyMemoryAspectRatio(m);
+      if (cat === 'portrait') portraits.push(m);
+      else if (cat === 'landscape') landscapes.push(m);
+      else squares.push(m);
+    }
+
+    const openSlots = [];
+    targetDecor.forEach((d, dIdx) => {
+      const asset = DECORATIONS.find(a => a.id === d.item);
+      if (!asset || !asset.photoCount) return;
+      const count = asset.photoCount;
+      while (d.photos.length < count) d.photos.push(null);
+      for (let i = 0; i < count; i++) {
+        if (!d.photos[i]) {
+          let pref = 'square';
+          if (d.item === 'frame') pref = 'portrait';
+          else if (d.item === 'album') pref = 'landscape';
+          openSlots.push({ dIdx, pIdx: i, pref, item: d.item });
+        }
+      }
+    });
+
+    if (openSlots.length === 0) {
+      setArrangeNotice('Các khung ảnh và vật phẩm trong phòng đã đầy!');
+      setTimeout(() => setArrangeNotice(''), 3500);
+      return;
+    }
+
+    let placedCount = 0;
+    for (const slotInfo of openSlots) {
+      let match = null;
+      if (slotInfo.pref === 'portrait' && portraits.length > 0) match = portraits.shift();
+      else if (slotInfo.pref === 'landscape' && landscapes.length > 0) match = landscapes.shift();
+      else if (slotInfo.pref === 'square' && squares.length > 0) match = squares.shift();
+      if (match) {
+        targetDecor[slotInfo.dIdx].photos[slotInfo.pIdx] = match.id;
+        slotInfo.filled = true;
+        placedCount++;
+      }
+    }
+
+    const leftover = [...portraits, ...landscapes, ...squares];
+    for (const slotInfo of openSlots) {
+      if (!slotInfo.filled && leftover.length > 0) {
+        const next = leftover.shift();
+        targetDecor[slotInfo.dIdx].photos[slotInfo.pIdx] = next.id;
+        slotInfo.filled = true;
+        placedCount++;
+      }
+    }
+
+    const updatedRoom = { ...room, decorations: targetDecor };
+    commitChange(updatedRoom, true);
+    engine.current?.focus(room.id, true);
+    setArrangeNotice(`✦ Đã tự động sắp xếp ${placedCount} ảnh vào vị trí tối ưu theo tỷ lệ khung hình.`);
+    setTimeout(() => setArrangeNotice(''), 4500);
+  }
+
+  const button = 'px-3 py-1.5 rounded-xl border border-white/15 bg-white/10 text-xs text-white hover:bg-white/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+
+  return (
+    <section aria-label="Ngôi nhà kỷ niệm 3D" className="rounded-3xl border border-white/15 bg-gradient-to-b from-stone-900/90 to-stone-950/90 shadow-2xl backdrop-blur-xl overflow-hidden relative">
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        onChange={async e => {
+          const file = e.target.files?.[0], t = uploadTarget.current;
+          e.target.value = ''; uploadTarget.current = null;
+          if (file && t) {
+            await onUploadPhoto?.(t.roomId, file, t.target);
+          }
+        }}
+      />
+
+      {/* Top Bar: Title, Controls, Music Box, Gyroscope */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-white/10">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] uppercase tracking-wider text-amber-200/90 font-bold">Mô hình 3D thực tế</p>
+          </div>
+          <h2 className="font-serif text-lg text-white font-bold">{title || 'Ngôi nhà kỷ niệm'}</h2>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Interactive Music Box Toggle */}
+          <button
+            type="button"
+            onClick={toggleMusic}
+            className={`${button} flex items-center gap-1.5 ${isMusicPlaying ? 'bg-amber-400 text-stone-950 font-bold border-amber-300 shadow-md' : 'bg-white/5'}`}
+            title="Chạm để bật/tắt giai điệu hộp nhạc du dương"
+          >
+            <span className={`inline-block transition-transform duration-700 ${isMusicPlaying ? 'animate-spin' : ''}`}>
+              🎵
+            </span>
+            <span>{isMusicPlaying ? 'Hộp nhạc: Bật' : 'Hộp nhạc'}</span>
+          </button>
+
+          {isMusicPlaying && (
+            <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-xl border border-white/10">
+              <span className="text-[10px] text-stone-300">Âm lượng</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={musicVolume}
+                onChange={e => handleVolumeChange(parseFloat(e.target.value))}
+                className="w-14 accent-amber-300 h-1 cursor-pointer"
+                aria-label="Âm lượng hộp nhạc"
+              />
+            </div>
+          )}
+
+          {/* Gyroscope Tilt Toggle */}
+          {typeof window !== 'undefined' && (
+            <button
+              type="button"
+              onClick={toggleGyro}
+              className={`${button} ${isGyroEnabled ? 'bg-indigo-500/20 text-indigo-300 border-indigo-400/40' : 'bg-white/5'}`}
+              title="Nghiêng điện thoại để đổi góc nhìn nhẹ nhàng"
+            >
+              📱 {isGyroEnabled ? 'Cảm biến: Bật' : 'Nghiêng máy'}
+            </button>
+          )}
+
+          {/* Undo / Redo Buttons */}
+          {!readOnly && (
+            <div className="flex items-center gap-1 bg-black/30 p-1 rounded-xl border border-white/10">
+              <button
+                type="button"
+                className={`${button} px-2 py-1`}
+                disabled={history.past.length === 0}
+                onClick={handleUndo}
+                title="Hoàn tác (Undo)"
+              >
+                ↶
+              </button>
+              <button
+                type="button"
+                className={`${button} px-2 py-1`}
+                disabled={history.future.length === 0}
+                onClick={handleRedo}
+                title="Làm lại (Redo)"
+              >
+                ↷
+              </button>
+            </div>
+          )}
+
+          <div className="flex rounded-xl bg-black/30 p-1 border border-white/10" role="group" aria-label="Chế độ hiển thị">
+            <button type="button" className={`${button} ${view === '3d' ? 'bg-white/20 font-bold' : ''}`} onClick={() => setView('3d')}>Khung 3D</button>
+            <button type="button" className={`${button} ${view === '2d' ? 'bg-white/20 font-bold' : ''}`} onClick={() => { cancelPlacement(); setView('2d'); }}>Ngôi nhà 2D</button>
+          </div>
+        </div>
+      </div>
+
+      {/* 3D Canvas Container */}
+      {view === '3d' ? (
+        <>
+          <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full min-h-[340px] max-h-[580px] bg-stone-950 overflow-hidden">
+            <div ref={host} className="w-full h-full" />
+
+            {/* Soft Welcome Door Entrance */}
+            {!welcomeDismissed && readOnly && (
+              <div className="absolute inset-0 z-20 bg-black/75 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
+                <div className="max-w-md space-y-4">
+                  <span className="text-4xl animate-bounce">🚪✨</span>
+                  <h3 className="text-2xl font-serif font-bold text-white">Chào mừng bạn ghé thăm</h3>
+                  <p className="text-xs text-stone-300 leading-relaxed">
+                    Ngôi nhà kỷ niệm lưu giữ những khoảnh khắc ngọt ngào nhất của đôi mình. Mời bạn dạo bước qua 5 căn phòng ấm áp.
+                  </p>
+                  <div className="pt-2 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWelcomeDismissed(true);
+                        engine.current?.focus(rooms[0]?.id || 'beginning', true);
+                      }}
+                      className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 font-bold text-xs shadow-lg hover:from-amber-300 hover:to-amber-400 transition-all cursor-pointer"
+                    >
+                      Bắt đầu dạo bước
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWelcomeDismissed(true)}
+                      className="px-4 py-2.5 rounded-2xl bg-white/10 text-stone-300 hover:text-white text-xs font-semibold cursor-pointer"
+                    >
+                      Bỏ qua
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {status === 'loading' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-stone-950/80 text-white text-xs">
+                <div className="w-8 h-8 rounded-full border-2 border-amber-300 border-t-transparent animate-spin" />
+                <span>Đang bài trí ngôi nhà 3D...</span>
+              </div>
+            )}
+            {status === 'error' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-stone-950/90 text-stone-200 text-xs p-4 text-center">
+                <p>{error}</p>
+                <button type="button" className={button} onClick={() => setRetry(r => r + 1)}>Tải lại mô hình</button>
+                <button type="button" className={button} onClick={() => setView('2d')}>Mở ngôi nhà 2D</button>
+              </div>
+            )}
+
+            {/* Floating Placement Confirmation Banner */}
+            {!readOnly && placingItem && placingAsset && (
+              <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between gap-3 p-3 rounded-2xl bg-stone-900/95 border border-amber-400/40 backdrop-blur-xl shadow-2xl animate-scaleUp">
+                <div className="flex items-center gap-2.5">
+                  <img src={placingAsset.image} alt="" className="w-9 h-9 rounded-xl object-cover border border-amber-300/30" />
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Đang đặt: {placingAsset.name}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300">
+                        {pendingPlacement?.surface === 'table' ? 'Mặt bàn' : pendingPlacement?.surface === 'wall' ? 'Tường' : 'Sàn phòng'}
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-stone-300">
+                      {pendingPlacement?.isValid
+                        ? '✓ Vị trí hợp lệ. Chạm để đổi chỗ hoặc nhấn xác nhận.'
+                        : `⚠ ${pendingPlacement?.reason || 'Vị trí không phù hợp'}`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={confirmPlacement}
+                    disabled={!pendingPlacement?.isValid}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-40"
+                  >
+                    ✓ Xác nhận đặt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelPlacement}
+                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Floating Concise Action Toolbar for Selected Instance */}
+            {!readOnly && selectedInstance && selectedAsset && !placingItem && (
+              <div className="absolute top-3 left-3 right-3 z-30 flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-stone-900/95 border border-amber-400/40 backdrop-blur-xl shadow-2xl animate-scaleUp">
+                <div className="flex items-center gap-2.5">
+                  <img src={selectedAsset.image} alt="" className="w-9 h-9 rounded-xl object-cover border border-amber-300/30" />
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>{selectedAsset.name}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300">
+                        {selectedInstance.surface === 'table' ? 'Mặt bàn' : selectedInstance.surface === 'wall' ? 'Tường' : 'Sàn phòng'}
+                      </span>
+                    </h4>
+                    <p className="text-[10px] text-stone-400">
+                      {activeTool === 'move' ? 'Chạm vị trí mới trên sàn hoặc bàn để di chuyển' : 'Đang chọn món này'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick Action Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={toggleMoveMode}
+                    className={`${button} ${activeTool === 'move' ? 'bg-amber-400 text-stone-950 font-bold border-amber-300 shadow' : ''}`}
+                    title="Chạm vị trí mới để di chuyển đồ vật"
+                  >
+                    {activeTool === 'move' ? '✓ Đang di chuyển' : 'Di chuyển'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => rotateSelected(45)}
+                    className={button}
+                    title="Xoay đồ vật 45 độ"
+                  >
+                    Xoay 45°
+                  </button>
+
+                  {/* Quick Scale Toggle (0.8x -> 1.0x -> 1.3x) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Number(selectedInstance.scale) || 1.0;
+                      const next = cur < 0.9 ? 1.0 : cur < 1.15 ? 1.3 : 0.8;
+                      scaleSelected(next);
+                    }}
+                    className={button}
+                    title="Đổi kích thước đồ vật"
+                  >
+                    {(Number(selectedInstance.scale) || 1.0) > 1.1 ? 'Lớn (1.3x)' : (Number(selectedInstance.scale) || 1.0) < 0.9 ? 'Nhỏ (0.8x)' : 'Vừa (1.0x)'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={cloneSelected}
+                    className={button}
+                    title="Tạo thêm một bản sao của món này"
+                  >
+                    Nhân bản
+                  </button>
+
+                  {(selectedAsset.photoCount > 0 || selectedAsset.textLabel) && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingContent(!editingContent)}
+                      className={`${button} ${editingContent ? 'bg-amber-400/20 text-amber-300 border-amber-400/40' : ''}`}
+                      title="Gắn ảnh hoặc thay đổi nội dung chữ"
+                    >
+                      Nội dung
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={deleteSelected}
+                    className="px-2.5 py-1.5 rounded-xl border border-rose-500/30 bg-rose-500/20 text-rose-200 hover:bg-rose-500/30 text-xs font-semibold cursor-pointer transition-all"
+                    title="Xóa món này khỏi phòng"
+                  >
+                    Xóa
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedInstanceId(null);
+                      engine.current?.setSelectionHighlight(null);
+                      setActiveTool('idle');
+                      engine.current?.setInteracting(false);
+                    }}
+                    className="text-stone-400 hover:text-white px-2 py-1 text-xs cursor-pointer"
+                    title="Bỏ chọn"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Floating View Controls */}
+            <div className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={`${button} bg-black/60 backdrop-blur-md hover:bg-black/80`}
+                disabled={status !== 'ready'}
+                onClick={() => { setTouring(false); setTourPaused(false); engine.current?.overview(true); }}
+                title="Đưa góc nhìn về toàn cảnh ngôi nhà"
+              >
+                Toàn cảnh
+              </button>
+              <button
+                type="button"
+                className={`${button} bg-black/60 backdrop-blur-md hover:bg-black/80`}
+                disabled={status !== 'ready'}
+                onClick={() => engine.current?.focus(room?.id, true)}
+                title="Tập trung góc nhìn vào phòng đang chọn"
+              >
+                Ghé phòng này
+              </button>
+              <button
+                type="button"
+                className={`${button} ${touring ? 'bg-amber-300 text-stone-950 font-bold' : 'bg-black/60 backdrop-blur-md text-amber-200 border-amber-300/30'}`}
+                disabled={status !== 'ready'}
+                onClick={() => {
+                  if (touring) {
+                    setTouring(false);
+                    setTourPaused(false);
+                  } else {
+                    setTouring(true);
+                    setTourPaused(false);
+                    engine.current?.focus(room?.id, true);
+                  }
+                }}
+                title="Dạo bước tự động qua từng căn phòng"
+              >
+                {touring ? 'Đang dạo bước' : 'Dạo bước'}
+              </button>
+            </div>
+
+            {/* Visitor Decor Inspection Modal */}
+            {inspectingDecor && (
+              <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+                <div className="w-full max-w-sm bg-stone-900 border border-white/20 rounded-3xl p-5 shadow-2xl space-y-4 animate-scaleUp">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                    <div className="flex items-center gap-2.5">
+                      <img src={inspectingDecor.image} alt="" className="w-10 h-10 rounded-xl object-cover border border-white/15" />
+                      <div>
+                        <h4 className="font-serif font-bold text-white text-sm">{inspectingDecor.name}</h4>
+                        <span className="text-[10px] text-amber-300">Đồ vật tương tác 3D</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInspectingDecor(null)}
+                      className="text-stone-400 hover:text-white text-sm font-bold p-1 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {inspectingDecor.id === 'calendar' && (
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 space-y-1">
+                      <p className="font-bold">📅 Ngày kỷ niệm của đôi mình</p>
+                      <p className="italic text-stone-200 leading-relaxed">
+                        {inspectingDecor.text || '28.09.2026 — Ngày chúng mình có nhau'}
+                      </p>
+                    </div>
+                  )}
+
+                  {inspectingDecor.id === 'cat' && (
+                    <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-200 space-y-1">
+                      <p className="font-bold">🐾 Bé Miu cưng</p>
+                      <p className="italic text-stone-200 leading-relaxed">
+                        "Meow meow! Bé mèo ngủ ngoan chứng kiến từng câu chuyện hạnh phúc trong căn nhà."
+                      </p>
+                    </div>
+                  )}
+
+                  {inspectingDecor.id === 'plant' && (
+                    <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-200 space-y-1">
+                      <p className="font-bold">🌱 Cây tình yêu</p>
+                      <p className="italic text-stone-200 leading-relaxed">
+                        "Mỗi ngày một chút quan tâm, tình yêu chúng mình sẽ lớn lên xanh tươi."
+                      </p>
+                    </div>
+                  )}
+
+                  {inspectingDecor.id === 'mugs' && (
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 space-y-1">
+                      <p className="font-bold">☕ Cốc đôi buổi sáng</p>
+                      <p className="italic text-stone-200 leading-relaxed">
+                        "Cùng nhau thưởng thức tách cà phê sớm, ấm áp từng khoảnh khắc bắt đầu ngày mới."
+                      </p>
+                    </div>
+                  )}
+
+                  {inspectingDecor.id === 'lamp' && (
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 space-y-1">
+                      <p className="font-bold">💡 Đèn ấm áp</p>
+                      <p className="italic text-stone-200 leading-relaxed">
+                        "Ánh đèn dịu dàng cho những buổi tối ngồi bên nhau sẻ chia mọi điều."
+                      </p>
+                    </div>
+                  )}
+
+                  {inspectingDecor.id === 'vase' && (
+                    <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-200 space-y-1">
+                      <p className="font-bold">🌷 Bình tulip</p>
+                      <p className="italic text-stone-200 leading-relaxed">
+                        "Gợi nhớ những đóa hoa thơm ngát của buổi hẹn hò đầu tiên."
+                      </p>
+                    </div>
+                  )}
+
+                  {['album', 'bunting', 'frame'].includes(inspectingDecor.id) && (
+                    <div className="p-3.5 rounded-2xl bg-stone-800/80 border border-white/10 text-xs text-stone-200 space-y-2">
+                      <p className="font-bold text-amber-300">🖼️ Kỷ niệm gắn trên đồ vật</p>
+                      <p className="text-[11px] text-stone-300">
+                        Bấm vào ảnh trên tường hoặc danh sách bên dưới để phóng to xem trọn vẹn.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="pt-1 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setInspectingDecor(null)}
+                      className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-colors cursor-pointer"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        /* 2D Fallback View: Accessible List of Placed Decorations */
+        <div className="p-5 space-y-4">
+          <MemoryHouse2D rooms={rooms} title={title} theme={theme} activeRoomId={activeRoomId} onSelectRoom={onSelectRoom} onPhoto={onPhoto}/>
+          {!readOnly && placingItem && <div className="flex items-center gap-3 text-sm"><span>Đặt {placingAsset?.name} tại vị trí gợi ý trong {room?.name}</span><button type="button" className={button} onClick={confirmPlacement}>Xác nhận đặt</button><button type="button" className={button} onClick={cancelPlacement}>Hủy</button></div>}
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-serif font-bold text-white">Danh sách đồ trang trí trong phòng · {room?.name}</h3>
+            <span className="text-xs text-amber-300 font-mono">{decorationsList.length} món</span>
+          </div>
+
+          {decorationsList.length === 0 ? (
+            <p className="text-xs text-stone-400 italic">Chưa có đồ trang trí nào trong phòng này.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {decorationsList.map((d, idx) => {
+                const asset = DECORATIONS.find(a => a.id === d.item);
+                const instId = d.id || d.slot || idx;
+                return (
+                  <div key={instId} className="p-3 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <img src={asset?.image} alt="" className="w-10 h-10 rounded-xl object-cover border border-white/15" />
+                      <div>
+                        <h4 className="text-xs font-bold text-white">{asset?.name || d.item}</h4>
+                        <span className="text-[10px] text-amber-200/80">
+                          {d.surface === 'table' ? 'Mặt bàn' : d.surface === 'wall' ? 'Tường' : 'Sàn phòng'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {!readOnly && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedInstanceId(instId);
+                            setEditingContent(true);
+                          }}
+                          className={`${button} text-[10px] px-2 py-1`}
+                        >
+                          Sửa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => requestDelete(instId)}
+                          className="text-rose-400 hover:text-rose-300 text-xs p-1 cursor-pointer"
+                          title="Xóa"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Rooms selector pills */}
+      <div className="px-4 py-3 flex flex-wrap gap-2 border-t border-white/5" role="group" aria-label="Chọn phòng trong nhà 3D">
+        {rooms.map(r => (
+          <button
+            key={r.id}
+            type="button"
+            className={`${button} ${r.id === room?.id ? 'bg-amber-200 text-stone-950 font-bold shadow-md' : 'text-stone-300'}`}
+            aria-pressed={r.id === room?.id}
+            onClick={() => {
+              onSelectRoom?.(r.id);
+              engine.current?.focus(r.id, true);
+            }}
+          >
+            {r.name}
+          </button>
+        ))}
+      </div>
+
+      {room?.note && <p className="px-5 pb-4 text-sm italic text-amber-100/80">“{room.note}”</p>}
+
+      {!readOnly && room && (
+        <div className="border-t border-white/10 p-4 sm:p-5 space-y-6">
+          {/* Gói phong cách một chạm (Style Packages) & Dọn nhà giúp mình */}
+          <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="font-serif text-sm font-bold text-amber-300 flex items-center gap-1.5">
+                  <span>Gói phong cách một chạm · {room.name}</span>
+                </h3>
+                <p className="text-[11px] text-stone-400">
+                  Áp dụng bộ trang trí có sẵn để bắt đầu nhanh, sau đó bạn có thể tự do di chuyển, xoay, thêm món tùy ý.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {(room.memories?.length || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={autoArrangePhotos}
+                    className="px-3 py-1.5 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/30 text-xs font-semibold cursor-pointer"
+                    title="Tự động gắn ảnh trong phòng vào các khung, album và dây ảnh còn trống"
+                  >
+                    ✦ Dọn nhà giúp mình
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={button}
+                  disabled={history.past.length === 0}
+                  onClick={handleUndo}
+                  title="Khôi phục trạng thái trang trí trước đó"
+                >
+                  Hoàn tác
+                </button>
+              </div>
+            </div>
+
+            {arrangeNotice && (
+              <div className="p-3 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-200 text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 font-bold">✦</span>
+                  <span>{arrangeNotice}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setArrangeNotice('')}
+                  className="text-stone-400 hover:text-white text-xs px-2 py-0.5 rounded cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+              {STYLE_PACKAGES.map(pkg => (
+                <button
+                  key={pkg.id}
+                  type="button"
+                  onClick={() => { if (!pkg.isPendingAsset) applyStylePackage(pkg); }}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    pkg.isPendingAsset
+                      ? 'border-white/10 bg-white/[0.01] opacity-60'
+                      : 'border-white/15 bg-white/5 hover:border-amber-300/50 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">{pkg.name}</span>
+                    {pkg.isPendingAsset && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Chờ asset 3D</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-stone-400 mt-1 line-clamp-2 leading-relaxed">{pkg.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Freeform Decoration Library & Placement */}
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-3 justify-between items-center">
+              <div>
+                <h3 className="font-serif text-base font-bold text-white flex items-center gap-2">
+                  <span>Trang trí tự do · {room.name}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-mono">
+                    {decorationsList.length} món
+                  </span>
+                </h3>
+                <p className="text-xs text-stone-400">
+                  Chạm một món đồ bên dưới để xem trước và đặt tự do vào sàn, tường hoặc mặt bàn.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEnableSnapping(!enableSnapping)}
+                  className={`${button} ${enableSnapping ? 'bg-amber-400/20 text-amber-200 border-amber-400/40' : 'text-stone-400'}`}
+                  title="Tự động căn theo đường thẳng và các đồ vật lân cận"
+                >
+                  {enableSnapping ? '🧲 Căn chỉnh: Bật' : 'Tự do hoàn toàn'}
+                </button>
+
+                <label className="text-xs text-stone-300 flex items-center gap-1.5 ml-2">
+                  <span>Mood ánh sáng:</span>
+                  <select
+                    className="bg-stone-900 rounded-lg p-2 border border-white/20 text-white cursor-pointer"
+                    value={room.lighting || 'day'}
+                    onChange={e => commitChange({ ...room, lighting: e.target.value }, true)}
+                  >
+                    <option value="day">Bình minh trong trẻo</option>
+                    <option value="sunset">Hoàng hôn mật ngọt</option>
+                    <option value="night">Đêm hẹn hò</option>
+                  </select>
+                </label>
+
+                {onSave && (
+                  <button
+                    type="button"
+                    className={`${button} bg-amber-200 text-stone-950 font-bold`}
+                    disabled={saving}
+                    onClick={() => onSave()}
+                  >
+                    {saving ? 'Đang lưu…' : 'Lưu trang trí'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Library Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
+              {DECORATIONS.map(d => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => startPlacement(d.id)}
+                  className={`text-left rounded-2xl border p-2 transition-all cursor-pointer relative group ${
+                    placingItem === d.id
+                      ? 'border-amber-400 bg-amber-400/15 ring-2 ring-amber-400/30'
+                      : 'border-white/10 hover:border-amber-300/40 bg-white/[0.02] hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <img
+                    loading="lazy"
+                    src={d.image}
+                    alt=""
+                    className="w-full aspect-[4/3] object-cover rounded-xl"
+                  />
+                  <div className="pt-2 px-1">
+                    <span className="block text-xs font-medium text-white truncate">{d.name}</span>
+                    <div className="flex items-center justify-between mt-1 text-[10px]">
+                      <span className="text-stone-400">
+                        {d.defaultSurface === 'table' ? 'Mặt bàn' : d.defaultSurface === 'wall' ? 'Tường' : 'Sàn'}
+                      </span>
+                      {d.photoCount > 0 && (
+                        <span className="text-amber-300 font-semibold">{d.photoCount} ảnh</span>
+                      )}
+                      {d.textLabel && (
+                        <span className="text-indigo-300 font-semibold">Chữ</span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Personalized Content Editor for Selected Instance */}
+            {selectedInstance && selectedAsset && (selectedAsset.textLabel || selectedAsset.photoCount > 0) && (
+              <div className="rounded-2xl border border-amber-200/25 bg-amber-200/5 p-4 space-y-4 animate-scaleUp" aria-label="Cá nhân hóa đồ vật">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-amber-100 text-sm flex items-center gap-2">
+                    <span>Dấu ấn của đôi mình · {selectedAsset.name}</span>
+                    <span className="text-[10px] text-stone-400">#{selectedInstance.id || selectedInstance.slot}</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInstanceId(null)}
+                    className="text-stone-400 hover:text-white text-xs cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                {selectedAsset.textLabel && (
+                  <label className="block text-sm text-slate-300">
+                    {selectedAsset.textLabel}
+                    <textarea
+                      value={selectedInstance.text || ''}
+                      maxLength={80}
+                      rows={2}
+                      placeholder={selectedInstance.item === 'calendar' ? '28.09.2026\nNgày mình có nhau' : 'Minh & An\nNhà là nơi có nhau'}
+                      className="mt-2 block w-full rounded-xl border border-white/20 bg-stone-900 p-3 text-white text-xs"
+                      onChange={e => {
+                        const updated = updateDecorationInstance(room, selectedInstanceId, { text: e.target.value });
+                        commitChange(updated, true);
+                      }}
+                    />
+                    <span className="text-[11px] text-stone-400">
+                      {(selectedInstance.text || '').length}/80 ký tự · Cập nhật tức thì lên mô hình 3D
+                    </span>
+                  </label>
+                )}
+
+                {Array.from({ length: selectedAsset.photoCount }, (_, index) => {
+                  const photoId = selectedInstance.photos?.[index];
+                  const photo = room.memories?.find(m => m.id === photoId);
+                  return (
+                    <div key={index} className="flex flex-wrap items-center gap-3">
+                      {photo?.photo_url && (
+                        <img src={photo.photo_url} alt={`Ảnh ${index + 1} trên ${selectedAsset.name}`} className="h-16 w-16 rounded-xl object-cover border border-white/10" />
+                      )}
+                      <label className="flex-1 min-w-32 text-xs text-slate-300">
+                        Ảnh {index + 1} trên {selectedAsset.name}
+                        <select
+                          value={photo?.id || ''}
+                          className="mt-1 block w-full rounded-lg border border-white/20 bg-stone-900 p-2 text-white text-xs cursor-pointer"
+                          onChange={e => {
+                            const updated = setDecorationPhoto(room, selectedInstanceId, selectedInstance.item, index, e.target.value || null);
+                            commitChange(updated, true);
+                          }}
+                        >
+                          <option value="">Chưa chọn ảnh</option>
+                          {(room.memories || []).map((m, i) => (
+                            <option key={m.id} value={m.id}>
+                              {m.caption || `Kỷ niệm ${i + 1}`}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      {onUploadPhoto && (
+                        <button
+                          type="button"
+                          className={button}
+                          disabled={uploading || (room.memories?.length || 0) >= 10}
+                          onClick={() => chooseUpload({ slot: selectedInstanceId, item: selectedInstance.item, index })}
+                        >
+                          Tải ảnh {index + 1} lên đồ vật
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Supporting Object Deletion Choice Modal */}
+      {deleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title">
+          <div className="w-full max-w-md rounded-2xl border border-amber-200/30 bg-stone-900 p-6 shadow-2xl space-y-4">
+            <h3 id="delete-dialog-title" className="text-base font-semibold text-amber-200">
+              Vật phẩm này đang đỡ các món đồ bên trên
+            </h3>
+            <p className="text-xs text-stone-300 leading-relaxed">
+              Bạn đang xóa một vật đỡ có <strong className="text-white">{deleteDialog.children.length} món đồ</strong> đặt bên trên ({deleteDialog.children.map(c => DECORATIONS.find(d => d.id === c.item)?.name || c.item).join(', ')}).
+              Vui lòng chọn cách xử lý để không làm mất đồ hoặc để đồ lơ lửng:
+            </p>
+
+            {deleteDialog.availableSupports.length > 0 && (
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
+                <label className="block text-xs font-medium text-amber-100">
+                  Chuyển sang vật đỡ khác trong phòng:
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={deleteDialog.chosenSupportId}
+                    onChange={e => setDeleteDialog(d => ({ ...d, chosenSupportId: e.target.value }))}
+                    className="flex-1 rounded-lg border border-white/20 bg-stone-800 p-2 text-xs text-white"
+                  >
+                    {deleteDialog.availableSupports.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {DECORATIONS.find(d => d.id === s.item)?.name || s.item} (#{s.id.slice(-6)})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => executeDelete(deleteDialog.targetId, { action: 'reparent', targetParentId: deleteDialog.chosenSupportId })}
+                    className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-semibold text-stone-950 hover:bg-amber-300 cursor-pointer"
+                  >
+                    Chuyển & Xóa
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => executeDelete(deleteDialog.targetId, { action: 'drop_or_cancel' })}
+                className="w-full rounded-xl border border-white/20 bg-stone-800 p-2.5 text-xs text-stone-200 hover:bg-stone-700 text-left transition cursor-pointer"
+              >
+                🏠 Hạ các món hỗ trợ sàn xuống sàn nhà
+              </button>
+
+              <button
+                type="button"
+                onClick={() => executeDelete(deleteDialog.targetId, { action: 'delete_children' })}
+                className="w-full rounded-xl border border-rose-500/30 bg-rose-500/10 p-2.5 text-xs text-rose-300 hover:bg-rose-500/20 text-left transition cursor-pointer"
+              >
+                🗑️ Xóa cả vật đỡ lẫn toàn bộ đồ bên trên
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeleteDialog(null)}
+                className="w-full rounded-xl border border-white/10 bg-transparent p-2.5 text-xs text-stone-400 hover:text-white text-center transition cursor-pointer"
+              >
+                ✕ Hủy thao tác (giữ nguyên tất cả)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}

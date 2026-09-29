@@ -1,0 +1,39 @@
+{
+  "assets": [
+    {
+      "file": "memory-house.glb",
+      "bytes": 1436520,
+      "triangles": 28911
+    },
+    {
+      "file": "decorations.glb",
+      "bytes": 761384,
+      "triangles": 16428
+    }
+  ],
+  "reference": "public/memoryhouse",
+  "method": "Procedural Blender reconstruction based on supplied images; hidden surfaces inferred",
+  "rooms": [
+    "beginning",
+    "first",
+    "little-things",
+    "memories",
+    "next-chapter"
+  ],
+  "decorations": [
+    "calendar",
+    "cat",
+    "nameplate",
+    "plant",
+    "mugs",
+    "lamp",
+    "vase",
+    "album",
+    "bunting",
+    "frame",
+    "birdcage",
+    "candles"
+  ],
+  "up": "+Y",
+  "front": "+Z"
+}

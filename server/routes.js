@@ -1,12 +1,13 @@
 // Explicit resource routes. SQL functions remain the transaction boundary.
 import {createClient} from '@supabase/supabase-js';
+import {eventRpc,isEventRpc,streamMatch} from './eventGateway.js';
 import {normalizeCheckout} from '../src/services/checkoutPayload.js';
 import {analyzeVideo,readVideoLabels,readVideoUploads} from './videoLabels.js';
 import {craftLetter} from './geminiLetter.js';
 import {tryOnConfig} from './tryOn.js';
 import {signEventPaths,enrichMatchQuestionsWithSignedUrls,enrichHouseRoomsWithSignedUrls} from './eventMedia.js';
 const route=(method,path,access,run,status)=>({method,pattern:new RegExp(`^${path}$`),access,run,status});
-const rpc=(c,name,args={})=>c.db(c.client.rpc(name,args));
+const rpc=(c,name,args={})=>isEventRpc(name)?eventRpc(c,name,args):c.db(c.client.rpc(name,args));
 const integer=(value,fallback,max=10000)=>{const n=Number(value??fallback);if(!Number.isInteger(n)||n<0||n>max)throw Object.assign(new Error('Tham số phân trang không hợp lệ.'),{status:400});return n;};
 const pick=(body,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(body,k)).map(k=>[k,body[k]]));
 const settingKeys=['sandbox','sales_enabled','cod_enabled','transfer_enabled','shipping_fee','free_shipping_from','gift_fee','reservation_minutes','bank_bin','bank_account','bank_owner','contact_email','contact_phone','address','ga4_measurement_id','shipping_policy','return_policy','privacy_policy'];
@@ -109,6 +110,7 @@ export const routes=[
   route('GET','/admin/articles','admin',c=>rpc(c,'rpc_article_admin_data')),
   route('POST','/admin/articles','admin',c=>rpc(c,'rpc_save_article_admin',{p_article_id:null,p_payload:c.body}),201),
   route('PUT','/admin/articles/([^/]+)','admin',c=>rpc(c,'rpc_save_article_admin',{p_article_id:c.params[0],p_payload:c.body})),
+  route('DELETE','/admin/articles/([^/]+)','admin',c=>rpc(c,'rpc_delete_article_admin',{p_article_id:c.params[0]})),
   route('GET','/me/saved-articles','user',c=>rpc(c,'rpc_saved_articles')),
   route('POST','/memories/([^/]+)/access','public',c=>rpc(c,'rpc_get_memory_view',{p_tag_uid:c.params[0],p_grant_token:c.body.grant??null})),
   route('POST','/memories/([^/]+)/grants','public',c=>rpc(c,'rpc_verify_memory_pin',{p_tag_uid:c.params[0],p_pin:c.body.pin}),201),
@@ -123,7 +125,8 @@ export const routes=[
     return rpc(c,'rpc_update_my_profile',Object.fromEntries(['full_name','phone','birthday','gender','address','bio','avatar_url'].map(k=>[`p_${k}`,Object.hasOwn(c.body,k)?c.body[k]:previous[k]??null])));
   }),
   // Event Studios - Couple Match Studio
-  route('POST','/events/matches','user',c=>{
+  route('POST','/events/matches','user',async c=>{
+
     const tag=c.body.tag_uid||c.body.tagUid||c.body.tag;
     if(!tag||typeof tag!=='string')throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'),{status:400});
     return rpc(c,'rpc_match_create',{
@@ -135,7 +138,7 @@ export const routes=[
   },201),
   route('PUT','/events/matches/([^/]+)/questions','user',c=>{
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.params[0]))throw Object.assign(new Error('Mã lượt chơi không hợp lệ.'),{status:400});
-    if(!Array.isArray(c.body.questions)||c.body.questions.length<3||c.body.questions.length>7)throw Object.assign(new Error('Số câu hỏi phải từ 3 đến 7 câu.'),{status:400});
+    if(!Array.isArray(c.body.questions)||c.body.questions.length>10)throw Object.assign(new Error('Số câu hỏi trong bản nháp tối đa là 10 câu.'),{status:400});
     return rpc(c,'rpc_match_save_questions',{
       p_match_id:c.params[0],
       p_questions:c.body.questions,
@@ -153,15 +156,19 @@ export const routes=[
       if(paths.length>0){
         try{signedMap=await signEventPaths(paths);}catch{/* Bỏ ảnh nếu storage lỗi hoặc thiếu key */}
       }
-      draft.questions=enrichMatchQuestionsWithSignedUrls(draft.questions,signedMap);
+      draft.questions=enrichMatchQuestionsWithSignedUrls(draft.questions,signedMap,{ownerDraft:true});
     }
     return draft;
   }),
-  route('POST','/events/matches/([^/]+)/begin','user',c=>{
+  route('POST','/events/matches/([^/]+)/begin','user',async c=>{
+
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.params[0]))throw Object.assign(new Error('Mã lượt chơi không hợp lệ.'),{status:400});
-    return rpc(c,'rpc_match_begin',{p_match_id:c.params[0]});
+    const res=await rpc(c,'rpc_match_begin',{p_match_id:c.params[0]});
+
+    return res;
   }),
-  route('POST','/events/matches/([^/]+)/progress','public',c=>{
+  route('POST','/events/matches/([^/]+)/progress','public',async c=>{
+
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.params[0]))throw Object.assign(new Error('Mã lượt chơi không hợp lệ.'),{status:400});
     if(!Array.isArray(c.body.answers))throw Object.assign(new Error('Tiến độ câu trả lời phải là một mảng.'),{status:400});
     for(const a of c.body.answers){
@@ -176,7 +183,8 @@ export const routes=[
       p_invite_token:token
     });
   }),
-  route('POST','/events/matches/([^/]+)/submit','public',c=>{
+  route('POST','/events/matches/([^/]+)/submit','public',async c=>{
+
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.params[0]))throw Object.assign(new Error('Mã lượt chơi không hợp lệ.'),{status:400});
     if(!Array.isArray(c.body.answers))throw Object.assign(new Error('Đáp án nộp phải là một mảng.'),{status:400});
     for(const a of c.body.answers){
@@ -185,13 +193,35 @@ export const routes=[
       }
     }
     const token=c.body.invite_token||c.body.inviteToken||c.query.get('invite')||null;
-    return rpc(c,'rpc_match_submit',{
+    const res=await rpc(c,'rpc_match_submit',{
       p_match_id:c.params[0],
       p_answers:c.body.answers,
       p_invite_token:token
     });
+    try{
+      if(res?.both_submitted){
+        await c.client.rpc('rpc_track_event_action',{
+          p_event_name:'match_both_completed',
+          p_resource_type:'match',
+          p_resource_id:c.params[0],
+          p_dedupe_key:`dedupe:match:${c.params[0]}:both_completed`
+        });
+      }else if(res?.submitted){
+        const isPartner=Boolean(token);
+        const eventName=isPartner?'match_partner_completed':'match_owner_completed';
+        const roleKey=isPartner?'partner':'owner';
+        await c.client.rpc('rpc_track_event_action',{
+          p_event_name:eventName,
+          p_resource_type:'match',
+          p_resource_id:c.params[0],
+          p_dedupe_key:`dedupe:match:${c.params[0]}:${roleKey}_completed`
+        });
+      }
+    }catch{}
+    return res;
   }),
   route('GET','/events/matches/([^/]+)/view','public',async c=>{
+
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.params[0]))throw Object.assign(new Error('Mã lượt chơi không hợp lệ.'),{status:400});
     const token=c.query.get('invite')||c.query.get('invite_token')||null;
     const view=await rpc(c,'rpc_match_get_view',{
@@ -204,11 +234,12 @@ export const routes=[
       if(paths.length>0){
         try{signedMap=await signEventPaths(paths);}catch{/* Bỏ ảnh nếu storage lỗi hoặc chưa cấu hình key */}
       }
-      view.questions=enrichMatchQuestionsWithSignedUrls(view.questions,signedMap);
+      view.questions=enrichMatchQuestionsWithSignedUrls(view.questions,signedMap,{ownerDraft:view.role==='owner'&&view.status==='draft'});
     }
     return view;
   }),
   route('POST','/events/matches/([^/]+)/view','public',async c=>{
+
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.params[0]))throw Object.assign(new Error('Mã lượt chơi không hợp lệ.'),{status:400});
     const token=c.body.invite_token||c.body.inviteToken||c.body.invite||c.query.get('invite')||null;
     const view=await rpc(c,'rpc_match_get_view',{
@@ -221,7 +252,7 @@ export const routes=[
       if(paths.length>0){
         try{signedMap=await signEventPaths(paths);}catch{/* Bỏ ảnh nếu storage lỗi hoặc chưa cấu hình key */}
       }
-      view.questions=enrichMatchQuestionsWithSignedUrls(view.questions,signedMap);
+      view.questions=enrichMatchQuestionsWithSignedUrls(view.questions,signedMap,{ownerDraft:view.role==='owner'&&view.status==='draft'});
     }
     return view;
   }),
@@ -245,7 +276,7 @@ export const routes=[
       if(paths.length>0){
         try{signedMap=await signEventPaths(paths);}catch{/* Bỏ ảnh nếu storage lỗi hoặc chưa cấu hình key */}
       }
-      draft.rooms=enrichHouseRoomsWithSignedUrls(draft.rooms,signedMap);
+      draft.rooms=enrichHouseRoomsWithSignedUrls(draft.rooms,signedMap,{ownerDraft:true});
     }
     return draft;
   }),
@@ -269,8 +300,10 @@ export const routes=[
       p_rooms:c.body.rooms??null
     });
   }),
-  route('POST','/memories/([^/]+)/house/publish','user',c=>{
-    return rpc(c,'rpc_house_publish',{p_tag_uid:c.params[0]});
+  route('POST','/memories/([^/]+)/house/publish','user',async c=>{
+    const res=await rpc(c,'rpc_house_publish',{p_tag_uid:c.params[0]});
+
+    return res;
   }),
   route('POST','/memories/([^/]+)/house/unpublish','user',c=>{
     return rpc(c,'rpc_house_unpublish',{p_tag_uid:c.params[0]});
@@ -279,6 +312,7 @@ export const routes=[
     return rpc(c,'rpc_house_revoke_share',{p_tag_uid:c.params[0]});
   }),
   route('GET','/events/houses/share/([^/]+)','public',async c=>{
+
     if(!c.params[0]||c.params[0].length>64)throw Object.assign(new Error('Mã liên kết không hợp lệ.'),{status:400});
     const view=await rpc(c,'rpc_house_public_view',{p_share_id:c.params[0]});
     if(view&&Array.isArray(view.rooms)){
@@ -299,6 +333,7 @@ export const routes=[
     return view;
   }),
   route('GET','/events/houses/tag/([^/]+)','public',async c=>{
+
     if(!c.params[0]||c.params[0].length>64)throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'),{status:400});
     const view=await rpc(c,'rpc_house_tag_public_view',{p_tag_uid:c.params[0]});
     if(view&&Array.isArray(view.rooms)){
@@ -321,6 +356,7 @@ export const routes=[
 
   // Event Studios - Media Signing Endpoint (chỉ cho phép owner ký ảnh thuộc memory space của chính mình)
   route('POST','/events/media/sign','user',async c=>{
+
     const rawPaths=Array.isArray(c.body.paths)?c.body.paths:(c.body.path?[c.body.path]:[]);
     if(rawPaths.length===0)throw Object.assign(new Error('Danh sách đường dẫn không được rỗng.'),{status:400});
     if(rawPaths.length>50)throw Object.assign(new Error('Tối đa 50 đường dẫn mỗi lần yêu cầu.'),{status:400});
@@ -344,5 +380,73 @@ export const routes=[
     }
     const signedMap=await signEventPaths(rawPaths);
     return {signed:signedMap};
+  }),
+
+  route('POST','/events/matches/([^/]+)/stream','public',streamMatch),
+  route('POST','/events/houses/replies','public',c=>eventRpc(c,'house_reply',c.body),201),
+  route('GET','/memories/([^/]+)/house/replies','user',c=>eventRpc(c,'house_replies',{p_tag_uid:c.params[0]})),
+  // Event Studios - Content Reporting
+  route('POST','/events/reports','public',async c=>{
+
+    const {resource_type,resource_id,reason,details}=c.body;
+    if(!resource_type||!resource_id||!reason)throw Object.assign(new Error('Dữ liệu báo cáo không đầy đủ.'),{status:400});
+    return rpc(c,'rpc_submit_content_report',{
+      p_resource_type:resource_type,
+      p_resource_id:String(resource_id),
+      p_reason:reason,
+      p_details:details||null
+    });
+  },201),
+  // Event Studios - Analytics Tracking Ingestion
+  route('POST','/events/analytics/track','public',async c=>{
+
+    const {event_name,resource_type,resource_id,dedupe_key,metadata}=c.body;
+    if(!event_name||!resource_type||!resource_id)throw Object.assign(new Error('Dữ liệu sự kiện không hợp lệ.'),{status:400});
+    const clientAllowedEvents=[
+      'match_invite_opened','house_opened_share','house_share_click','house_copy_link',
+      'house_postcard_download','house_postcard_shared','house_viewed_public'
+    ];
+    if(!clientAllowedEvents.includes(event_name)){
+      throw Object.assign(new Error('Sự kiện mang tính thẩm quyền chỉ được ghi nhận từ hệ thống máy chủ.'),{status:403});
+    }
+    let cleanDedupeKey=dedupe_key||null;
+    if(event_name==='house_viewed_public'&&cleanDedupeKey){
+      const visitorHash=c.ip?c.ip.replace(/[^a-zA-Z0-9]/g,''):'visitor';
+      const dateStr=new Date().toISOString().slice(0,10);
+      cleanDedupeKey=`${cleanDedupeKey}:${visitorHash}:${dateStr}`;
+    }
+    return rpc(c,'rpc_track_event_action',{
+      p_event_name:event_name,
+      p_resource_type:resource_type,
+      p_resource_id:String(resource_id),
+      p_dedupe_key:cleanDedupeKey,
+      p_metadata:metadata||{}
+    });
+  }),
+  // Admin - Event Content Reports & Moderation
+  route('GET','/admin/events/reports','admin',c=>{
+    const status=c.query.get('status')||null;
+    const limit=Math.min(100,Math.max(1,parseInt(c.query.get('limit')||'50',10)));
+    const offset=Math.max(0,parseInt(c.query.get('offset')||'0',10));
+    return rpc(c,'rpc_admin_list_reports',{
+      p_status:status,
+      p_limit:limit,
+      p_offset:offset
+    });
+  }),
+  route('POST','/admin/events/moderate','admin',c=>{
+    const {report_id,action,reason}=c.body;
+    if(!report_id||!action)throw Object.assign(new Error('Dữ liệu kiểm duyệt không hợp lệ.'),{status:400});
+    return rpc(c,'rpc_admin_moderate_content',{
+      p_report_id:report_id,
+      p_action:action,
+      p_reason:reason||null
+    });
+  }),
+  route('GET','/admin/events/analytics/summary','admin',c=>{
+    const days=Math.min(180,Math.max(1,parseInt(c.query.get('days')||'30',10)));
+    return rpc(c,'rpc_get_event_analytics_summary',{
+      p_days:days
+    });
   }),
 ];

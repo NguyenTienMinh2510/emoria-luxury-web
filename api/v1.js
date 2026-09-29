@@ -55,7 +55,13 @@ export default async function handler(req,res) {
       if(data?.success===false)throw fail(409,data.message||'Không thể thực hiện thao tác.');
       return data;
     };
-    const result=await route.run({client,db,user,body,params,query:url.searchParams});
+    const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
+    const ip = String(Array.isArray(rawIp) ? rawIp[0] : rawIp).split(',')[0].trim() || '127.0.0.1';
+    const result=await route.run({client,db,user,body,params,query:url.searchParams,ip,req,res});
+    if(res.writableEnded)return;
     send(route.status||200,result??{success:true});
-  }catch(error){send(error.status||500,{error:{code:error.code||`HTTP_${error.status||500}`,message:error.status?error.message:'Không thể xử lý yêu cầu. Vui lòng thử lại.'}});}
+  }catch(error){
+    if(error.retryAfter)res.setHeader('Retry-After',String(error.retryAfter));
+    send(error.status||500,{error:{code:error.code||`HTTP_${error.status||500}`,message:error.status?error.message:'Không thể xử lý yêu cầu. Vui lòng thử lại.'}});
+  }
 }

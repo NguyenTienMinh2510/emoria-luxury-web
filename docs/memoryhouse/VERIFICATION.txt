@@ -1,0 +1,35 @@
+Memory House 3D verification — 2026-09-29 (local)
+
+PASS Blender 5.2.2 background export and render, source .blend saved.
+House: 1,436,024 bytes, 28,911 triangles.
+Decor library: 781,464 bytes, 16,958 triangles.
+Five room nodes, fifteen real UV photo planes, fifteen placement anchors,
+twelve prop roots and twelve rendered catalog thumbnails verified.
+
+PASS npm.cmd run test:ci, including the new test:house3d assertions and existing
+UI, event, REST, security and media suites. Some existing tests use mocks; this
+does not constitute production/cloud database verification.
+PASS npm.cmd run test:event-db against actual local PostgreSQL in
+supabase_db_emoria-sandbox, including old event regression and new migration.
+Validated draft save/reopen, published snapshot isolation, invalid asset IDs,
+rotation, duplicate slots, malformed payloads, extra transforms and lighting.
+PASS npm.cmd run build. Vite reports its existing >500kB chunk advisory;
+the 3D renderer and Three.js/GLTF dependencies are asynchronously loaded.
+PASS git diff --check.
+
+Browser check: full MemoryHouseStudio mounted in .local/house-qa.html with
+explicitly simulated API responses, real production components/GLBs/textures.
+- No WebGL/console errors on normal initial load.
+- Real memory-image texture appears on wall; clicking it opens the lightbox.
+- Place cat, rotate, save, reload -> selected decoration retained.
+- Remove -> empty state; undo -> decoration restored.
+- Edit caption after a decoration action, then undo -> caption preserved.
+- Publish -> guest UI shows snapshot and no decoration/save/edit controls.
+- 390px viewport: house fits, document has no horizontal overflow.
+- Force GLB HTTP 503 -> fallback message; choose 2D -> canvas disposed,
+  existing live preview and enabled save remain available.
+- Original header navigation, room gallery and live preview remain present.
+
+Not claimed: a physical-phone performance benchmark, real cloud-storage upload
+through the QA fixture, production migration or deployed-site verification.
+Production rollout instructions are in README.txt.

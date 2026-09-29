@@ -47,7 +47,8 @@ const state = {
   users: {
     'token-owner-a': { id: 'user-owner-a', email: 'owner@emoria.test' },
     'token-owner-b': { id: 'user-owner-b', email: 'other@emoria.test' },
-    'token-recipient': { id: 'user-recipient', email: 'recipient@emoria.test' }
+    'token-recipient': { id: 'user-recipient', email: 'recipient@emoria.test' },
+    'token-admin': { id: 'user-admin', email: 'admin@emoria.test', is_admin: true }
   },
   memories: {
     'emo-heart': {
@@ -76,19 +77,156 @@ const state = {
   houses: {},
   storageObjects: {
     'emoria-event-media': new Set(['emo-heart/img1.jpg', 'emo-heart/img2.jpg', 'emo-heart/room1.jpg', 'emo-foreign/pic1.jpg'])
-  }
-};
+  },
+    rateLimits: {},
+    reports: {},
+    analyticsEvents: [],
+    dedupeKeys: new Set(),
+    replies: []
+  };
 
-let currentMatchCounter = 1;
+  let currentMatchCounter = 1;
 
-// Simulated RPC runner reproducing exact PostgreSQL semantics from 20260928072518_event_studios.sql
-function runSimulatedRpc(name, args, callerUserId) {
-  if (name === 'rpc_match_create') {
-    const mem = state.memories[args.p_tag_uid?.toLowerCase()?.trim()];
-    if (!mem) return { error: { code: 'P0002', message: 'Không tìm thấy kỷ vật mang mã chip ' + args.p_tag_uid } };
-    if (!callerUserId || mem.owner_id !== callerUserId) {
-      return { error: { code: '42501', message: 'Từ chối quyền: Bạn không phải chủ nhân hiện tại của kỷ vật này' } };
+  // Simulated RPC runner reproducing exact PostgreSQL semantics from 20260928072518_event_studios.sql & 20260929060533_event_studios_completion.sql
+  function runSimulatedRpc(name, args, callerUserId) {
+    if (name === 'rpc_event_dispatch') {
+      const action = args.p_action;
+      const a = args.p_args || {};
+      const caller = args.p_caller || callerUserId || null;
+
+      if (action.startsWith('rpc_match_') && a.p_match_id) {
+        const match = state.matches[a.p_match_id];
+        const matchMemory = match && state.memories[match.tag_uid];
+        if (match && action === 'rpc_match_save_questions' && matchMemory && matchMemory.owner_id !== caller) {
+          return { error: { code: '42501', message: 'Từ chối quyền: Bạn không phải chủ nhân hiện tại của kỷ vật này' } };
+        }
+        if (match && action === 'rpc_match_save_questions' && match.status !== 'draft') {
+          return { error: { code: '22023', message: 'Không thể sửa đổi câu hỏi khi lượt chơi đã bắt đầu' } };
+        }
+        if (match && action === 'rpc_match_save_progress' && a.p_invite_token && match.partner_token_hash !== 'hash-' + a.p_invite_token) {
+          return { error: { code: '42501', message: 'Mã mời tham gia không chính xác hoặc đã hết hiệu lực' } };
+        }
+        let rev = match.draft_revision || 0;
+        if (action === 'rpc_match_save_progress' || action === 'rpc_match_submit') {
+          const isPartner = Boolean(a.p_invite_token);
+          rev = isPartner ? (match.partner_revision || 0) : (match.owner_revision || 0);
+        }
+        if (a.expected_revision !== undefined && a.expected_revision !== null) {
+          if (Number(a.expected_revision) !== Number(rev)) {
+            return { error: { code: 'P0001', message: 'DRAFT_CONFLICT: Bản này đã thay đổi ở nơi khác. Hãy tải lại trước khi lưu.' } };
+          }
+        } else if (rev > 0 && (action === 'rpc_match_save_questions' || action === 'rpc_match_save_progress')) {
+          return { error: { code: 'P0001', message: 'DRAFT_CONFLICT: Bản này đã thay đổi ở nơi khác. Hãy tải lại trước khi lưu.' } };
+        }
+      }
+
+      if (action === 'rpc_house_save_draft' && a.p_tag_uid) {
+        const mem = state.memories[a.p_tag_uid?.toLowerCase()?.trim()];
+        const house = mem ? state.houses[mem.id] : null;
+        const currentRev = house?.draft_revision || 0;
+        if (a.expected_revision !== undefined && a.expected_revision !== null) {
+          if (Number(a.expected_revision) !== Number(currentRev)) {
+            return { error: { code: 'P0001', message: 'DRAFT_CONFLICT: Ngôi nhà đã thay đổi ở nơi khác. Hãy tải lại trước khi lưu.' } };
+          }
+        } else if (currentRev > 0) {
+          return { error: { code: 'P0001', message: 'DRAFT_CONFLICT: Ngôi nhà đã thay đổi ở nơi khác. Hãy tải lại trước khi lưu.' } };
+        }
+      }
+
+      if (action === 'house_reply') {
+        const h = Object.values(state.houses).find(item => item.share_id === a.share_id) ||
+                  (a.tag_uid ? state.houses[state.memories[a.tag_uid?.toLowerCase()?.trim()]?.id] : null);
+        if (!h) return { error: { code: 'P0002', message: 'Không tìm thấy ngôi nhà' } };
+        const view = runSimulatedRpc('rpc_house_public_view', { p_share_id: h.share_id }, caller);
+        if (view.error) return view;
+        const beginningRoom = view.data?.rooms?.find(r => r.id === 'beginning');
+        const policy = beginningRoom?.reply_policy || 'visitors';
+        if (policy === 'off' || (policy === 'signed_in' && !caller)) {
+          return { error: { code: '42501', message: 'Chủ nhà chưa cho phép gửi lời nhắn này' } };
+        }
+        if (!a.name || a.name.trim().length === 0 || a.name.length > 80 || (a.message && a.message.length > 1000) || !['heart', 'message'].includes(a.kind)) {
+          return { error: { code: '22023', message: 'Lời nhắn không hợp lệ' } };
+        }
+        if (!state.replies) state.replies = [];
+        state.replies.push({
+          id: crypto.randomUUID(),
+          house_id: h.id,
+          name: a.name.trim(),
+          message: a.message || '',
+          kind: a.kind,
+          created_at: new Date().toISOString(),
+          read_at: null
+        });
+        return { data: { success: true } };
+      }
+
+      if (action === 'house_replies') {
+        const mem = state.memories[a.p_tag_uid?.toLowerCase()?.trim()];
+        if (!mem) return { error: { code: 'P0002', message: 'Không tìm thấy kỷ vật' } };
+        if (!caller || mem.owner_id !== caller) {
+          return { error: { code: '42501', message: 'Từ chối quyền: Bạn không phải chủ nhân kỷ vật này' } };
+        }
+        const h = state.houses[mem.id];
+        if (!h) return { data: [] };
+        const replies = (state.replies || []).filter(r => r.house_id === h.id);
+        replies.forEach(r => { if (!r.read_at) r.read_at = new Date().toISOString(); });
+        return { data: replies.map(({ id, name, message, kind, created_at, read_at }) => ({ id, name, message, kind, created_at, read_at })) };
+      }
+
+      const res = runSimulatedRpc(action, a, caller);
+      if (res.error) return res;
+
+      // Bump revisions on successful write mutations
+      if (action === 'rpc_match_save_questions' && a.p_match_id) {
+        const m = state.matches[a.p_match_id];
+        if (m) m.draft_revision = (m.draft_revision || 0) + 1;
+      } else if (action === 'rpc_match_save_progress' && a.p_match_id) {
+        const m = state.matches[a.p_match_id];
+        if (m) {
+          const isPartner = Boolean(a.p_invite_token);
+          if (isPartner) m.partner_revision = (m.partner_revision || 0) + 1;
+          else m.owner_revision = (m.owner_revision || 0) + 1;
+        }
+      } else if (action === 'rpc_house_save_draft' && a.p_tag_uid) {
+        const mem = state.memories[a.p_tag_uid?.toLowerCase()?.trim()];
+        const h = mem ? state.houses[mem.id] : null;
+        if (h) h.draft_revision = (h.draft_revision || 0) + 1;
+      }
+
+      // Attach revisions to return object
+      let outData = res.data;
+      if (typeof outData === 'object' && outData !== null && !Array.isArray(outData)) {
+        if (action.startsWith('rpc_match_') && a.p_match_id) {
+          const m = state.matches[a.p_match_id];
+          if (m) {
+            const isPartner = Boolean(a.p_invite_token);
+            outData = {
+              ...outData,
+              draft_revision: m.draft_revision || 0,
+              progress_revision: isPartner ? (m.partner_revision || 0) : (m.owner_revision || 0)
+            };
+          }
+        }
+        if (action.startsWith('rpc_house_') && a.p_tag_uid) {
+          const mem = state.memories[a.p_tag_uid?.toLowerCase()?.trim()];
+          const h = mem ? state.houses[mem.id] : null;
+          if (h) {
+            outData = {
+              ...outData,
+              draft_revision: h.draft_revision || 0
+            };
+          }
+        }
+      }
+      return { data: outData };
     }
+
+    if (name === 'rpc_match_create') {
+      const mem = state.memories[args.p_tag_uid?.toLowerCase()?.trim()];
+      if (!mem) return { error: { code: 'P0002', message: 'Không tìm thấy kỷ vật mang mã chip ' + args.p_tag_uid } };
+      if (!callerUserId || mem.owner_id !== callerUserId) {
+        return { error: { code: '42501', message: 'Từ chối quyền: Bạn không phải chủ nhân hiện tại của kỷ vật này' } };
+      }
     const matchId = crypto.randomUUID();
     state.matches[matchId] = {
       id: matchId,
@@ -120,8 +258,8 @@ function runSimulatedRpc(name, args, callerUserId) {
     if (match.status !== 'draft') {
       return { error: { code: '22023', message: 'Không thể sửa đổi câu hỏi khi lượt chơi đã bắt đầu' } };
     }
-    if (!Array.isArray(args.p_questions) || args.p_questions.length < 3 || args.p_questions.length > 7) {
-      return { error: { code: '22023', message: 'Số lượng câu hỏi phải từ 3 đến 7 câu' } };
+    if (!Array.isArray(args.p_questions) || args.p_questions.length > 10) {
+      return { error: { code: '22023', message: 'Số lượng câu hỏi trong bản nháp tối đa là 10 câu' } };
     }
     // Validate image paths
     for (let i = 0; i < args.p_questions.length; i++) {
@@ -256,6 +394,7 @@ function runSimulatedRpc(name, args, callerUserId) {
   if (name === 'rpc_match_get_view') {
     const match = state.matches[args.p_match_id];
     if (!match) return { error: { code: 'P0002', message: 'Lượt chơi không tồn tại' } };
+    if (match.is_hidden) return { error: { code: '42501', message: 'Lượt chơi này đã bị tạm ẩn do vi phạm tiêu chuẩn cộng đồng' } };
     const mem = Object.values(state.memories).find(m => m.id === match.memory_id);
     let role = null;
     if (args.p_invite_token) {
@@ -331,6 +470,88 @@ function runSimulatedRpc(name, args, callerUserId) {
           const prefix = m.photo_path?.split('/')[0]?.toLowerCase();
           if (prefix !== mem.tag_uid || !state.storageObjects['emoria-event-media'].has(m.photo_path)) {
             return { error: { code: '22023', message: `Ảnh ${m.photo_path} không hợp lệ hoặc không tồn tại trong bucket emoria-event-media` } };
+          }
+        }
+        if (r.decorations) {
+          if (!Array.isArray(r.decorations)) {
+            return { error: { code: '22023', message: 'Đồ trang trí phải là danh sách' } };
+          }
+          if (Buffer.byteLength(JSON.stringify(r.decorations)) > 131072) {
+            return { error: { code: '22023', message: 'Dung lượng đồ trang trí vượt quá giới hạn 128KB' } };
+          }
+          const boundsMap = {
+            'beginning':     { minX: -4.20, maxX: -1.40, minY: 0.10, maxY: 2.60, minZ: -1.35, maxZ: 1.35 },
+            'first':         { minX: -1.40, maxX: 1.40,  minY: 0.10, maxY: 2.60, minZ: -1.35, maxZ: 1.35 },
+            'little-things': { minX: 1.40,  maxX: 4.20,  minY: 0.10, maxY: 2.60, minZ: -1.35, maxZ: 1.35 },
+            'memories':      { minX: -3.60, maxX: 0.00,  minY: 2.20, maxY: 4.70, minZ: -1.35, maxZ: 1.35 },
+            'next-chapter':  { minX: 0.00,  maxX: 3.60,  minY: 2.20, maxY: 4.70, minZ: -1.35, maxZ: 1.35 }
+          };
+          const b = boundsMap[r.id] || { minX: -4.5, maxX: 4.5, minY: 0.1, maxY: 4.8, minZ: -1.4, maxZ: 1.4 };
+          const margin = 0.06;
+
+          const supportedSurfacesMap = {
+            calendar: ['table', 'wall'],
+            cat: ['floor', 'table'],
+            nameplate: ['table', 'shelf', 'floor'],
+            plant: ['floor', 'table', 'shelf'],
+            mugs: ['table', 'shelf'],
+            lamp: ['table', 'shelf', 'floor'],
+            vase: ['table', 'shelf'],
+            album: ['table', 'shelf'],
+            bunting: ['wall', 'ceiling'],
+            frame: ['wall', 'table'],
+            birdcage: ['table', 'floor', 'shelf'],
+            candles: ['table', 'shelf']
+          };
+
+          for (const d of r.decorations) {
+            if (!d || typeof d !== 'object') {
+              return { error: { code: '22023', message: 'Đồ trang trí không hợp lệ' } };
+            }
+            if (!supportedSurfacesMap[d.item]) {
+              return { error: { code: '22023', message: 'Món đồ trang trí không hợp lệ' } };
+            }
+            if (d.surface && !supportedSurfacesMap[d.item].includes(d.surface)) {
+              return { error: { code: '22023', message: `Món ${d.item} không thể đặt trên ${d.surface}` } };
+            }
+            if (d.position) {
+              if (!Array.isArray(d.position) || d.position.length !== 3 || !d.position.every(n => typeof n === 'number' && Number.isFinite(n))) {
+                return { error: { code: '22023', message: 'Tọa độ vị trí phải là số hữu hạn' } };
+              }
+              const [px, py, pz] = d.position;
+              if (px < b.minX + margin || px > b.maxX - margin || py < b.minY - 0.05 || py > b.maxY - margin || pz < b.minZ + margin || pz > b.maxZ - margin) {
+                return { error: { code: '22023', message: 'Vị trí đồ trang trí vượt quá giới hạn căn phòng' } };
+              }
+            }
+            if (d.scale !== undefined) {
+              const sc = typeof d.scale === 'number' ? [d.scale] : (Array.isArray(d.scale) ? d.scale : null);
+              if (!sc || sc.some(n => typeof n !== 'number' || !Number.isFinite(n) || n < 0.3 || n > 3.0)) {
+                return { error: { code: '22023', message: 'Tỷ lệ thu phóng phải nằm trong khoảng 0.3 đến 3.0' } };
+              }
+            }
+            if (d.parent_id) {
+              if (d.id && d.id === d.parent_id) {
+                return { error: { code: '22023', message: 'Đồ trang trí không thể làm vật đỡ cho chính nó' } };
+              }
+              const parentObj = r.decorations.find(p => (p.id && p.id === d.parent_id) || (p.slot && p.slot === d.parent_id));
+              if (!parentObj) {
+                return { error: { code: '22023', message: `Vật đỡ ${d.parent_id} không tồn tại trong cùng phòng` } };
+              }
+              if (!['table', 'desk', 'shelf', 'carpet', 'album', 'nameplate'].includes(parentObj.item)) {
+                return { error: { code: '22023', message: `Món đồ ${parentObj.item} không thể làm vật đỡ cho món đồ khác` } };
+              }
+              const visited = new Set([d.id, d.parent_id]);
+              let curr = parentObj.parent_id;
+              while (curr) {
+                if (visited.has(curr)) {
+                  return { error: { code: '22023', message: 'Phát hiện chu trình tham chiếu vật đỡ' } };
+                }
+                visited.add(curr);
+                const nextP = r.decorations.find(p => p.id === curr);
+                if (!nextP) break;
+                curr = nextP.parent_id;
+              }
+            }
           }
         }
       }
@@ -418,6 +639,7 @@ function runSimulatedRpc(name, args, callerUserId) {
     const h = Object.values(state.houses).find(item => item.share_id === shareId);
     if (!h) return { error: { code: 'P0002', message: 'Không tìm thấy ngôi nhà kỷ niệm hoặc liên kết đã bị thu hồi' } };
     if (!h.is_published) return { error: { code: '42501', message: 'Không gian ngôi nhà này hiện đang ở chế độ riêng tư' } };
+    if (h.is_hidden) return { error: { code: '42501', message: 'Không gian ngôi nhà này đã bị tạm ẩn do vi phạm tiêu chuẩn cộng đồng' } };
     const mem = Object.values(state.memories).find(m => m.id === h.memory_id);
     if (mem.availability_status === 'suspended' || mem.admin_suspended) {
       return { error: { code: '42501', message: 'Kỷ niệm này hiện đang tạm ngưng truy cập' } };
@@ -441,6 +663,7 @@ function runSimulatedRpc(name, args, callerUserId) {
     const h = state.houses[mem.id];
     if (!h) return { error: { code: 'P0002', message: 'Không tìm thấy ngôi nhà kỷ niệm cho kỷ vật này' } };
     if (!h.is_published) return { error: { code: '42501', message: 'Không gian ngôi nhà này hiện đang ở chế độ riêng tư' } };
+    if (h.is_hidden) return { error: { code: '42501', message: 'Không gian ngôi nhà này đã bị tạm ẩn do vi phạm tiêu chuẩn cộng đồng' } };
     if (mem.availability_status === 'suspended' || mem.admin_suspended) {
       return { error: { code: '42501', message: 'Kỷ niệm này hiện đang tạm ngưng truy cập' } };
     }
@@ -468,6 +691,173 @@ function runSimulatedRpc(name, args, callerUserId) {
         admin_suspended: m.admin_suspended || false
       }));
     return { data: list };
+  }
+
+  if (name === 'is_admin') {
+    return { data: callerUserId === 'user-admin' };
+  }
+
+  if (name === 'rpc_check_rate_limit') {
+    const key = args.p_key;
+    const maxBurst = args.p_max_burst || 10;
+    const windowSeconds = args.p_window_seconds || 60;
+    if (!state.rateLimits) state.rateLimits = {};
+    const now = Date.now();
+    const entry = state.rateLimits[key] || { count: 0, resetAt: now + windowSeconds * 1000 };
+    if (now > entry.resetAt) {
+      entry.count = 1;
+      entry.resetAt = now + windowSeconds * 1000;
+    } else {
+      entry.count++;
+    }
+    state.rateLimits[key] = entry;
+    const allowed = entry.count <= maxBurst;
+    const retryAfter = allowed ? 0 : Math.max(1, Math.ceil((entry.resetAt - now) / 1000));
+    return {
+      data: {
+        allowed,
+        current_count: entry.count,
+        max_burst: maxBurst,
+        retry_after: retryAfter
+      }
+    };
+  }
+
+  if (name === 'rpc_track_event_action') {
+    if (!state.analyticsEvents) state.analyticsEvents = [];
+    if (!state.dedupeKeys) state.dedupeKeys = new Set();
+    const dedupe = args.p_dedupe_key;
+    if (dedupe) {
+      if (state.dedupeKeys.has(dedupe)) {
+        return { data: { success: true, deduped: true } };
+      }
+      state.dedupeKeys.add(dedupe);
+    }
+    state.analyticsEvents.push({
+      id: crypto.randomUUID(),
+      event_name: args.p_event_name,
+      resource_type: args.p_resource_type,
+      resource_id: args.p_resource_id,
+      dedupe_key: dedupe || null,
+      metadata: args.p_metadata || {},
+      created_at: new Date().toISOString()
+    });
+    return { data: { success: true, tracked: true } };
+  }
+
+  if (name === 'rpc_get_event_analytics_summary') {
+    if (callerUserId !== 'user-admin') {
+      return { error: { code: '42501', message: 'Chỉ quản trị viên mới có quyền xem báo cáo thống kê' } };
+    }
+    const events = state.analyticsEvents || [];
+    const counts = {};
+    for (const ev of events) {
+      counts[ev.event_name] = (counts[ev.event_name] || 0) + 1;
+    }
+    return {
+      data: {
+        success: true,
+        days: args.p_days || 30,
+        total_events: events.length,
+        events_by_type: counts,
+        funnel_match: {
+          invite_opened: counts['match_invite_opened'] || 0,
+          started: counts['match_started'] || 0,
+          owner_completed: counts['match_owner_completed'] || 0,
+          partner_completed: counts['match_partner_completed'] || 0,
+          both_completed: counts['match_both_completed'] || 0
+        },
+        funnel_house: {
+          published: counts['house_published'] || 0,
+          opened_share: counts['house_opened_share'] || 0,
+          share_clicked: counts['house_share_click'] || 0,
+          copy_link: counts['house_copy_link'] || 0,
+          postcard_download: counts['house_postcard_download'] || 0,
+          postcard_shared: counts['house_postcard_shared'] || 0
+        },
+        daily_trends: [
+          { date: new Date().toISOString().slice(0, 10), count: events.length }
+        ],
+        updated_at: new Date().toISOString()
+      }
+    };
+  }
+
+  if (name === 'rpc_submit_content_report') {
+    if (!['house', 'match', 'guestbook'].includes(args.p_resource_type)) {
+      return { error: { code: '22023', message: 'Loại tài nguyên báo cáo không hợp lệ' } };
+    }
+    if (!['inappropriate_content', 'harassment', 'copyright', 'spam', 'other'].includes(args.p_reason)) {
+      return { error: { code: '22023', message: 'Lý do báo cáo không hợp lệ' } };
+    }
+    if (!state.reports) state.reports = {};
+    const reportId = crypto.randomUUID();
+    state.reports[reportId] = {
+      id: reportId,
+      resource_type: args.p_resource_type,
+      resource_id: args.p_resource_id,
+      reason: args.p_reason,
+      details: args.p_details || null,
+      status: 'pending',
+      admin_notes: null,
+      created_at: new Date().toISOString(),
+      reviewed_at: null
+    };
+    return { data: { success: true, report_id: reportId, status: 'pending' } };
+  }
+
+  if (name === 'rpc_admin_list_reports') {
+    if (callerUserId !== 'user-admin') {
+      return { error: { code: '42501', message: 'Chỉ quản trị viên mới có quyền xem danh sách báo cáo' } };
+    }
+    let list = Object.values(state.reports || {});
+    if (args.p_status) {
+      list = list.filter(r => r.status === args.p_status);
+    }
+    return { data: { success: true, reports: list } };
+  }
+
+  if (name === 'rpc_admin_moderate_content') {
+    if (callerUserId !== 'user-admin') {
+      return { error: { code: '42501', message: 'Chỉ quản trị viên mới có quyền kiểm duyệt nội dung' } };
+    }
+    if (!['hide', 'restore', 'dismiss'].includes(args.p_action)) {
+      return { error: { code: '22023', message: 'Hành động kiểm duyệt không hợp lệ' } };
+    }
+    const report = state.reports?.[args.p_report_id];
+    if (!report) {
+      return { error: { code: 'P0002', message: 'Báo cáo vi phạm không tồn tại' } };
+    }
+    if (args.p_action === 'hide') {
+      report.status = 'hidden';
+      report.admin_notes = args.p_reason || 'Vi phạm tiêu chuẩn';
+      report.reviewed_at = new Date().toISOString();
+      if (report.resource_type === 'house') {
+        const h = Object.values(state.houses).find(item => item.share_id === report.resource_id) ||
+                  state.houses[state.memories[report.resource_id]?.id];
+        if (h) h.is_hidden = true;
+      } else if (report.resource_type === 'match') {
+        const m = state.matches[report.resource_id];
+        if (m) m.is_hidden = true;
+      }
+    } else if (args.p_action === 'restore') {
+      report.status = 'restored';
+      report.admin_notes = args.p_reason || 'Đã khôi phục';
+      report.reviewed_at = new Date().toISOString();
+      if (report.resource_type === 'house') {
+        const h = Object.values(state.houses).find(item => item.share_id === report.resource_id) ||
+                  state.houses[state.memories[report.resource_id]?.id];
+        if (h) h.is_hidden = false;
+      } else if (report.resource_type === 'match') {
+        const m = state.matches[report.resource_id];
+        if (m) m.is_hidden = false;
+      }
+    } else if (args.p_action === 'dismiss') {
+      report.status = 'dismissed';
+      report.admin_notes = args.p_reason || 'Bác bỏ';
+      report.reviewed_at = new Date().toISOString();
+    }
+    return { data: { success: true, action: args.p_action } };
   }
 
   return { error: { code: '42883', message: 'Function not found: ' + name } };
@@ -835,8 +1225,10 @@ async function runTests() {
         memories: [{ id: 'bad-1', photo_path: 'other-chip/private.jpg', note: 'Hack' }]
       }
     ];
+    const houseRev = (await apiCall('GET', '/api/v1/memories/emo-heart/house/draft', undefined, 'token-owner-a')).body.draft_revision || 0;
     const foreignPhotoRes = await apiCall('PUT', '/api/v1/memories/emo-heart/house/draft', {
-      rooms: badRooms
+      rooms: badRooms,
+      expected_revision: houseRev
     }, 'token-owner-a');
     assert.equal(foreignPhotoRes.status, 422, 'Đường dẫn ảnh thuộc namespace chip khác bị từ chối (422)');
 
@@ -942,8 +1334,16 @@ async function runTests() {
     const draftImg = await apiCall('GET', `/api/v1/events/matches/${mImg.body.match_id}/draft`, undefined, 'token-owner-b');
     assert.equal(draftImg.status, 200);
     assert.ok(draftImg.body.questions[0].image_url, 'image_url phải có giá trị signed');
-    assert.equal(draftImg.body.questions[0].image_path, undefined, 'raw image_path phải được xóa sạch');
+    assert.equal(draftImg.body.questions[0].image_path, 'emo-heart/img1.jpg', 'owner draft phải giữ raw image_path để sửa và autosave không mất ảnh');
     assert.ok(draftImg.body.questions[0].image_url.includes('token=verified-mock-signer-token'), 'image_url phải đến từ signer thật');
+
+    // Begin match và kiểm tra view của partner: raw image_path PHẢI được xóa sạch khỏi public/partner
+    const beginImg = await apiCall('POST', `/api/v1/events/matches/${mImg.body.match_id}/begin`, {}, 'token-owner-b');
+    assert.equal(beginImg.status, 200);
+    const viewPartner = await apiCall('GET', `/api/v1/events/matches/${mImg.body.match_id}/view?invite=${beginImg.body.invite_token}`);
+    assert.equal(viewPartner.status, 200);
+    assert.equal(viewPartner.body.questions[0].image_path, undefined, 'raw image_path phải được xóa sạch khỏi view partner/public');
+    assert.ok(viewPartner.body.questions[0].image_url, 'partner view nhận signed image_url');
 
     // Publish house to test public photo signed URL
     const rePub = await apiCall('POST', '/api/v1/memories/emo-heart/house/publish', {}, 'token-owner-b');
@@ -962,7 +1362,7 @@ async function runTests() {
       const draftNoKey = await apiCall('GET', `/api/v1/events/matches/${mImg.body.match_id}/draft`, undefined, 'token-owner-b');
       assert.equal(draftNoKey.status, 200);
       assert.equal(draftNoKey.body.questions[0].image_url, null, 'Khi thiếu key, image_url phải là null, không trả token giả');
-      assert.equal(draftNoKey.body.questions[0].image_path, undefined, 'Raw image_path vẫn phải được bảo vệ xóa sạch');
+      assert.equal(draftNoKey.body.questions[0].image_path, 'emo-heart/img1.jpg', 'Raw image_path trong draft chủ nhà vẫn giữ nguyên để không mất liên kết');
 
       const signNoKey = await apiCall('POST', '/api/v1/events/media/sign', {
         paths: ['emo-heart/img1.jpg']
@@ -1072,10 +1472,12 @@ async function runTests() {
       { id: 'memories', name: 'Miền ký ức', memories: [] },
       { id: 'next-chapter', name: 'Chương tiếp theo', memories: [] }
     ];
+    const curHouseDraft = await apiCall('GET', '/api/v1/memories/emo-heart/house/draft', undefined, 'token-owner-b');
     await apiCall('PUT', '/api/v1/memories/emo-heart/house/draft', {
       title: 'Nhà Đầy Đủ 5 Phòng',
       theme: 'warm_gold',
-      rooms: all5Rooms
+      rooms: all5Rooms,
+      expected_revision: curHouseDraft.body?.draft_revision
     }, 'token-owner-b');
     const pubBRes = await apiCall('POST', '/api/v1/memories/emo-heart/house/publish', {}, 'token-owner-b');
     assert.equal(pubBRes.status, 200, 'Owner B xuất bản thành công');
@@ -1108,8 +1510,385 @@ async function runTests() {
     assert.ok(!houseStudioCode.includes('placeholder.png'), 'Không dùng ảnh placeholder giả');
     console.log('  [PASS] Test 22: Navigation và Live Preview 5 phòng đầy đủ, rõ ràng và không dùng placeholder giả.');
 
+    // --------------------------------------------------------------------------
+    // Test 23: Chặng A - Autosave, Draft Questions vs Begin Match, Reordering ---
+    // --------------------------------------------------------------------------
+    console.log('--- Test 23: Chặng A - Autosave, Draft Questions vs Begin Match, Reordering ---');
+    // UI Code checks
+    assert.ok(matchStudioCode.includes('autosaveState'), 'Match Studio có state autosaveState');
+    assert.ok(matchStudioCode.includes('handleMoveQuestion'), 'Match Studio có handleMoveQuestion');
+    assert.ok(matchStudioCode.includes('GripVertical'), 'Match Studio có icon kéo thả GripVertical');
+    assert.ok(matchStudioCode.includes('ChevronUp'), 'Match Studio có nút di chuyển ChevronUp');
+    assert.ok(matchStudioCode.includes('ChevronDown'), 'Match Studio có nút di chuyển ChevronDown');
+
+    assert.ok(houseStudioCode.includes('autosaveState'), 'House Studio có state autosaveState');
+    assert.ok(houseStudioCode.includes('mapOrderedRooms'), 'House Studio có hàm giữ thứ tự mapOrderedRooms');
+    assert.ok(houseStudioCode.includes('handleMoveRoom'), 'House Studio có hàm đổi thứ tự phòng handleMoveRoom');
+    assert.ok(houseStudioCode.includes('handleMovePhoto'), 'House Studio có hàm đổi thứ tự ảnh handleMovePhoto');
+    assert.ok(houseStudioCode.includes('GripVertical'), 'House Studio có icon kéo thả GripVertical');
+
+    // Create match for testing draft questions
+    const draftMatchRes = await apiCall('POST', '/api/v1/events/matches', {
+      tag_uid: 'emo-heart',
+      title: 'Thử thách draft test'
+    }, 'token-owner-b');
+    assert.equal(draftMatchRes.status, 201, 'Tạo match draft thành công');
+    const dMatchId = draftMatchRes.body.match_id || draftMatchRes.body.id;
+
+    // Lưu draft với 1 câu hỏi (chưa đủ 3 câu) -> Bắt buộc phải THÀNH CÔNG (200) để không chặn autosave khi đang gõ
+    const save1QuestionRes = await apiCall('PUT', `/api/v1/events/matches/${dMatchId}/questions`, {
+      questions: [
+        { id: 1, text: 'Câu 1 duy nhất', options: ['A', 'B'] }
+      ]
+    }, 'token-owner-b');
+    assert.equal(save1QuestionRes.status, 200, 'Lưu bản nháp với 1 câu hỏi phải được chấp nhận để autosave hoạt động');
+
+    // Thử bắt đầu lượt chơi (begin) khi chỉ có 1 câu hỏi -> Phải BỊ TỪ CHỐI (422)
+    const beginInvalidRes = await apiCall('POST', `/api/v1/events/matches/${dMatchId}/begin`, {}, 'token-owner-b');
+    assert.equal(beginInvalidRes.status, 422, 'Bắt đầu match khi chỉ có 1 câu hỏi phải bị từ chối');
+    assert.ok(beginInvalidRes.body?.error?.message?.includes('3 đến 7'), 'Báo lỗi rõ ràng phải có từ 3 đến 7 câu hỏi');
+
+    // Lưu đầy đủ 3 câu hỏi hợp lệ
+    const save3QuestionsRes = await apiCall('PUT', `/api/v1/events/matches/${dMatchId}/questions`, {
+      expected_revision: save1QuestionRes.body?.draft_revision,
+      questions: [
+        { id: 1, text: 'Câu hỏi 1?', options: ['A', 'B'] },
+        { id: 2, text: 'Câu hỏi 2?', options: ['A', 'B', 'C'] },
+        { id: 3, text: 'Câu hỏi 3?', options: ['X', 'Y'] }
+      ]
+    }, 'token-owner-b');
+    assert.equal(save3QuestionsRes.status, 200, 'Lưu 3 câu hỏi thành công');
+
+    // Kích hoạt lượt chơi khi đã có 3 câu hỏi hợp lệ -> Phải THÀNH CÔNG (200)
+    const beginValidRes = await apiCall('POST', `/api/v1/events/matches/${dMatchId}/begin`, {}, 'token-owner-b');
+    assert.equal(beginValidRes.status, 200, 'Bắt đầu match thành công với 3 câu hỏi');
+    assert.ok(beginValidRes.body?.invite_token, 'Trả về mã invite_token sau khi kích hoạt');
+    console.log('  [PASS] Test 23: Chặng A đã kiểm chứng hoàn hảo autosave, phân tách draft/begin validation và reordering.');
+
+    // --------------------------------------------------------------------------
+    // Test 24: Chặng E & F - Rate Limiting Enforcement (HTTP 429 & Retry-After)
+    // --------------------------------------------------------------------------
+    console.log('--- Test 24: Chặng E & F - Rate Limiting Enforcement ---');
+    // POST /events/reports có rate limit burst: 5 reqs / 60s per IP
+    const reportPayload = {
+      resource_type: 'match',
+      resource_id: dMatchId,
+      reason: 'spam',
+      details: 'Spam report test'
+    };
+
+    // Gửi 5 requests liên tiếp -> Cả 5 phải thành công (201)
+    for (let i = 1; i <= 5; i++) {
+      const repRes = await apiCall('POST', '/api/v1/events/reports', reportPayload, null);
+      assert.equal(repRes.status, 201, `Gửi báo cáo lần ${i} nằm trong giới hạn cho phép (201)`);
+    }
+
+    // Gửi request thứ 6 từ cùng IP -> Bắt buộc phải bị chặn với mã 429 và Retry-After header
+    const repResBurst = await apiCall('POST', '/api/v1/events/reports', reportPayload, null);
+    assert.equal(repResBurst.status, 429, 'Vượt quá burst limit phải trả về HTTP 429');
+    assert.equal(repResBurst.body?.error?.code, 'RATE_LIMIT_EXCEEDED', 'Mã lỗi là RATE_LIMIT_EXCEEDED');
+    assert.ok(repResBurst.headers['Retry-After'] || repResBurst.headers['retry-after'], 'Phải có header Retry-After');
+    console.log('  [PASS] Test 24: Rate limiting enforcement chặn chính xác và trả về HTTP 429 kèm Retry-After.');
+
+    // --------------------------------------------------------------------------
+    // Test 25: Chặng E & F - Content Reporting & Admin Moderation Lifecycle
+    // --------------------------------------------------------------------------
+    console.log('--- Test 25: Content Reporting & Admin Moderation Lifecycle ---');
+    // Xuất bản một ngôi nhà để test kiểm duyệt
+    const housePubRes = await apiCall('POST', '/api/v1/memories/emo-heart/house/publish', {}, 'token-owner-b');
+    assert.equal(housePubRes.status, 200, 'Xuất bản ngôi nhà thành công');
+    const houseShareId = housePubRes.body.share_id;
+    assert.ok(houseShareId, 'Nhận được share_id');
+
+    // Khách xem nhà bình thường (200 OK)
+    const pubViewBefore = await apiCall('GET', `/api/v1/events/houses/share/${houseShareId}`, undefined, null);
+    assert.equal(pubViewBefore.status, 200, 'Khách xem được ngôi nhà trước khi kiểm duyệt');
+
+    // Khách gửi báo cáo vi phạm nội dung
+    // Dùng IP khác để không bị vướng rate limit của Test 24
+    const reportHouseRes = await apiCall('POST', '/api/v1/events/reports', {
+      resource_type: 'house',
+      resource_id: houseShareId,
+      reason: 'inappropriate_content',
+      details: 'Chứa hình ảnh chưa phù hợp'
+    }, null, { headers: { 'x-forwarded-for': '192.168.1.50' } });
+    assert.equal(reportHouseRes.status, 201, 'Gửi báo cáo thành công với status 201');
+    const repId = reportHouseRes.body.report_id;
+    assert.ok(repId, 'Nhận được report_id');
+
+    // User thường (non-admin) cố tình truy cập hàng đợi báo cáo -> 403 Forbidden
+    const nonAdminGetReports = await apiCall('GET', '/api/v1/admin/events/reports', undefined, 'token-owner-a');
+    assert.equal(nonAdminGetReports.status, 403, 'Người dùng không phải admin bị từ chối xem báo cáo');
+
+    // Admin truy cập hàng đợi báo cáo -> 200 OK
+    const adminGetReports = await apiCall('GET', '/api/v1/admin/events/reports', undefined, 'token-admin');
+    assert.equal(adminGetReports.status, 200, 'Admin lấy danh sách báo cáo thành công');
+    assert.ok(Array.isArray(adminGetReports.body.reports), 'Trả về mảng danh sách báo cáo');
+    const targetedReport = adminGetReports.body.reports.find(r => r.id === repId);
+    assert.ok(targetedReport, 'Tìm thấy báo cáo vừa tạo trong danh sách của Admin');
+    assert.equal(targetedReport.status, 'pending', 'Trạng thái ban đầu là pending');
+
+    // Admin kiểm duyệt: Ẩn nội dung vi phạm (action: hide)
+    const moderateHideRes = await apiCall('POST', '/api/v1/admin/events/moderate', {
+      report_id: repId,
+      action: 'hide',
+      reason: 'Tạm ẩn theo phản ánh người dùng'
+    }, 'token-admin');
+    assert.equal(moderateHideRes.status, 200, 'Admin ẩn nội dung thành công');
+    assert.equal(moderateHideRes.body.action, 'hide');
+
+    // Khách truy cập lại ngôi nhà đã bị ẩn -> Bị từ chối với mã 403 / thông báo tạm ẩn
+    const pubViewAfterHide = await apiCall('GET', `/api/v1/events/houses/share/${houseShareId}`, undefined, null);
+    assert.equal(pubViewAfterHide.status, 403, 'Ngôi nhà đã bị tạm ẩn phải trả về 403');
+    assert.ok(pubViewAfterHide.body?.error?.message?.includes('tạm ẩn'), 'Thông báo rõ ràng nội dung đã bị tạm ẩn');
+
+    // Admin kiểm tra lại và khôi phục nội dung (action: restore)
+    const moderateRestoreRes = await apiCall('POST', '/api/v1/admin/events/moderate', {
+      report_id: repId,
+      action: 'restore',
+      reason: 'Đã xác minh nội dung hợp lệ'
+    }, 'token-admin');
+    assert.equal(moderateRestoreRes.status, 200, 'Admin khôi phục nội dung thành công');
+
+    // Khách truy cập lại -> Xem được bình thường (200 OK)
+    const pubViewAfterRestore = await apiCall('GET', `/api/v1/events/houses/share/${houseShareId}`, undefined, null);
+    assert.equal(pubViewAfterRestore.status, 200, 'Ngôi nhà được khôi phục xem lại bình thường');
+    console.log('  [PASS] Test 25: Chu trình Báo cáo vi phạm & Kiểm duyệt Admin (Report -> List -> Hide -> Block -> Restore) hoạt động chuẩn xác.');
+
+    // --------------------------------------------------------------------------
+    // Test 26: Chặng E & F - Event Analytics Tracking Ingestion & Funnel Aggregation
+    // --------------------------------------------------------------------------
+    console.log('--- Test 26: Event Analytics Tracking & Funnel Aggregation ---');
+    // Gửi tracking events hợp lệ
+    const track1 = await apiCall('POST', '/api/v1/events/analytics/track', {
+      event_name: 'match_invite_opened',
+      resource_type: 'match',
+      resource_id: dMatchId,
+      dedupe_key: `dedupe:match:${dMatchId}:open:test-client-1`,
+      metadata: { referrer: 'zalo' }
+    }, null, { headers: { 'x-forwarded-for': '192.168.1.80' } });
+    assert.equal(track1.status, 200, 'Ghi nhận event analytics thành công');
+    assert.equal(track1.body.tracked, true);
+
+    // Gửi lại event trùng lặp (dedupe_key) -> Không bị trùng lặp số liệu
+    const track1Dup = await apiCall('POST', '/api/v1/events/analytics/track', {
+      event_name: 'match_invite_opened',
+      resource_type: 'match',
+      resource_id: dMatchId,
+      dedupe_key: `dedupe:match:${dMatchId}:open:test-client-1`,
+      metadata: { referrer: 'zalo' }
+    }, null, { headers: { 'x-forwarded-for': '192.168.1.80' } });
+    assert.equal(track1Dup.status, 200, 'Gửi lại event trùng lặp thành công');
+    assert.equal(track1Dup.body.deduped, true, 'Hệ thống nhận diện đã khử trùng lặp (deduped)');
+
+    // Ingest thêm các sự kiện phễu
+    await apiCall('POST', '/api/v1/events/analytics/track', {
+      event_name: 'house_opened_share',
+      resource_type: 'house',
+      resource_id: houseShareId
+    }, null, { headers: { 'x-forwarded-for': '192.168.1.81' } });
+
+    await apiCall('POST', '/api/v1/events/analytics/track', {
+      event_name: 'house_postcard_shared',
+      resource_type: 'house',
+      resource_id: houseShareId
+    }, null, { headers: { 'x-forwarded-for': '192.168.1.82' } });
+
+    // Non-admin truy cập thống kê -> 403
+    const nonAdminSummary = await apiCall('GET', '/api/v1/admin/events/analytics/summary', undefined, 'token-owner-a');
+    assert.equal(nonAdminSummary.status, 403, 'Non-admin bị từ chối xem thống kê');
+
+    // Admin truy cập báo cáo phân tích tổng hợp -> 200 OK
+    const adminSummary = await apiCall('GET', '/api/v1/admin/events/analytics/summary?days=7', undefined, 'token-admin');
+    assert.equal(adminSummary.status, 200, 'Admin lấy báo cáo phân tích thành công');
+    assert.ok(adminSummary.body.total_events >= 3, 'Tổng số event được ghi nhận');
+    assert.ok(adminSummary.body.funnel_match, 'Báo cáo có funnel_match');
+    assert.ok(adminSummary.body.funnel_house, 'Báo cáo có funnel_house');
+    assert.equal(adminSummary.body.funnel_match.invite_opened >= 1, true, 'Funnel match ghi nhận invite_opened');
+    assert.equal(adminSummary.body.funnel_house.opened_share >= 1, true, 'Funnel house ghi nhận opened_share');
+    assert.equal(adminSummary.body.funnel_house.postcard_shared >= 1, true, 'Funnel house ghi nhận postcard_shared');
+
+    // Kiểm tra code giao diện EventModerationAdmin.jsx và AdminPanelModal.jsx
+    const eventModerationAdminCode = fs.readFileSync('src/components/EventModerationAdmin.jsx', 'utf8');
+    const adminPanelModalCode = fs.readFileSync('src/components/AdminPanelModal.jsx', 'utf8');
+    assert.ok(eventModerationAdminCode.includes('báo cáo vi phạm'), 'Giao diện có tab báo cáo vi phạm');
+    assert.ok(eventModerationAdminCode.includes('Thống kê & Phễu sự kiện'), 'Giao diện có tab Thống kê & Phễu sự kiện');
+    assert.ok(eventModerationAdminCode.includes('Ẩn nội dung vi phạm'), 'Giao diện có nút Ẩn nội dung vi phạm');
+    assert.ok(eventModerationAdminCode.includes('Khôi phục hiển thị'), 'Giao diện có nút Khôi phục hiển thị');
+    assert.ok(eventModerationAdminCode.includes('Bỏ qua báo cáo'), 'Giao diện có nút Bỏ qua báo cáo');
+    assert.ok(adminPanelModalCode.includes('Sự Kiện & Báo Cáo'), 'AdminPanelModal có tab Sự Kiện & Báo Cáo');
+    assert.ok(adminPanelModalCode.includes('<EventModerationAdmin'), 'AdminPanelModal render component EventModerationAdmin');
+    console.log('  [PASS] Test 26: Event Analytics ingestion, deduplication, funnels và Admin Dashboard tích hợp hoàn thiện.');
+
+    // --------------------------------------------------------------------------
+    // Test 27: Chặng E & F - Realtime Broadcast Signal & Smart Polling Fallback
+    // --------------------------------------------------------------------------
+    console.log('--- Test 27: Realtime Broadcast Signal & Smart Polling Fallback ---');
+    // Match Studio: Kiểm tra realtime SSE relay, lightweight signal, focus refetch, polling fallback
+    const matchStreamCode = fs.readFileSync('src/services/matchStream.js', 'utf8');
+    assert.ok(matchStudioCode.includes('watchMatch(matchId'), 'Match Studio kết nối authenticated realtime stream per match');
+    assert.ok(matchStreamCode.includes('/api/v1/events/matches/'), 'Stream service gọi endpoint an toàn');
+    assert.ok(matchStreamCode.includes('stream'), 'Stream service thiết lập SSE connection');
+    assert.ok(matchStudioCode.includes('getMatchView(matchId'), 'Realtime trigger authenticated refetch chứ không tin payload thô');
+    assert.ok(matchStudioCode.includes("addEventListener('focus'"), 'Có listener window focus để đồng bộ tab');
+    assert.ok(matchStudioCode.includes('setInterval('), 'Có smart polling fallback');
+    assert.ok(matchStudioCode.includes('Báo cáo nội dung'), 'Match Studio có nút báo cáo nội dung');
+
+    // House Studio: Kiểm tra báo cáo nội dung và event tracking
+    assert.ok(houseStudioCode.includes('submitContentReport('), 'House Studio có nút và modal báo cáo nội dung');
+    assert.ok(houseStudioCode.includes('house_opened_share'), 'House Studio track event house_opened_share');
+    assert.ok(houseStudioCode.includes('house_copy_link'), 'House Studio track event house_copy_link');
+    assert.ok(houseStudioCode.includes('house_postcard_download'), 'House Studio track event house_postcard_download');
+    assert.ok(houseStudioCode.includes('house_postcard_shared'), 'House Studio track event house_postcard_shared');
+
+    // Service exports kiểm tra không rò rỉ secret / storage paths
+    assert.ok(eventServiceCode.includes('trackEventAction'), 'eventService export trackEventAction');
+    assert.ok(eventServiceCode.includes('submitContentReport'), 'eventService export submitContentReport');
+    assert.ok(eventServiceCode.includes('adminListReports'), 'eventService export adminListReports');
+    assert.ok(eventServiceCode.includes('adminModerateContent'), 'eventService export adminModerateContent');
+    assert.ok(eventServiceCode.includes('adminGetAnalyticsSummary'), 'eventService export adminGetAnalyticsSummary');
+    assert.ok(!eventServiceCode.includes('service_role'), 'eventService tuyệt đối không chứa service_role key');
+
+    console.log('  [PASS] Test 27: Realtime lightweight broadcast, smart polling fallback và content reporting đồng bộ hoàn hảo.');
+
+    // --------------------------------------------------------------------------
+    // Test 28: Freeform House V2 - HTTP API Draft, Reload, Publish & Strict Validations
+    // --------------------------------------------------------------------------
+    console.log('\n--- Test 28: Freeform House V2 - HTTP API Draft, Reload, Publish & Strict Validations ---');
+    // 1. Tạo 40 món đồ tự do (> 30 items)
+    const freeform40 = [];
+    for (let i = 1; i <= 40; i++) {
+      freeform40.push({
+        id: `decor_inst_${i}`,
+        item: 'cat',
+        surface: 'floor',
+        position: [-2.8, 0.15, 0.0],
+        rotation: (i * 10) % 360,
+        scale: 1.0
+      });
+    }
+
+    const housePayload40 = {
+      title: 'Our Freeform Home',
+      theme: 'warm_gold',
+      rooms: [
+        {
+          id: 'beginning',
+          name: 'Phòng Khởi Đầu',
+          lighting: 'sunset',
+          decorations: freeform40,
+          memories: [{ id: 'mem1', photo_path: 'emo-heart/room1.jpg' }]
+        }
+      ]
+    };
+
+    // 2. Lưu draft với 40 món đồ qua HTTP API
+    const curDraft28 = await apiCall('GET', '/api/v1/memories/emo-heart/house/draft', undefined, 'token-owner-b');
+    const save40Res = await apiCall('POST', '/api/v1/memories/emo-heart/house/draft', {
+      ...housePayload40,
+      expected_revision: curDraft28.body?.draft_revision
+    }, 'token-owner-b');
+    assert.equal(save40Res.status, 200, 'Lưu draft với 40 món đồ thành công qua HTTP API');
+
+    // 3. Reload draft qua HTTP API
+    const reload40Res = await apiCall('GET', '/api/v1/memories/emo-heart/house/draft', undefined, 'token-owner-b');
+    assert.equal(reload40Res.status, 200, 'Reload draft thành công');
+    assert.equal(reload40Res.body.rooms[0].decorations.length, 40, 'Reload bảo toàn đầy đủ 40 món đồ không bị cắt gọt');
+
+    // 4. Publish và xem public snapshot
+    const pub40Res = await apiCall('POST', '/api/v1/memories/emo-heart/house/publish', {}, 'token-owner-b');
+    assert.equal(pub40Res.status, 200, 'Publish house thành công');
+
+    const publicViewRes = await apiCall('GET', '/api/v1/events/houses/tag/emo-heart', undefined, null);
+    assert.equal(publicViewRes.status, 200, 'Xem public snapshot thành công');
+    assert.equal(publicViewRes.body.rooms[0].decorations.length, 40, 'Public snapshot hiển thị đủ 40 món đồ');
+
+    // 5. Kiểm tra dữ liệu sai bị từ chối với status 422:
+    const errRev = reload40Res.body.draft_revision;
+
+    // 5a. Tọa độ X vượt giới hạn phòng beginning (X=0.5 thuộc phòng first)
+    const badXRes = await apiCall('POST', '/api/v1/memories/emo-heart/house/draft', {
+      title: 'Bad Room',
+      theme: 'classic',
+      expected_revision: errRev,
+      rooms: [{
+        id: 'beginning',
+        decorations: [{ id: 'bad_x', item: 'cat', surface: 'floor', position: [0.5, 0.15, 0.0] }]
+      }]
+    }, 'token-owner-b');
+    assert.equal(badXRes.status, 422, 'Tọa độ X ngoài bounds phòng bị từ chối');
+
+    // 5b. Bề mặt không tương thích (nến đặt trên sàn)
+    const badSurfaceRes = await apiCall('POST', '/api/v1/memories/emo-heart/house/draft', {
+      title: 'Bad Surface',
+      theme: 'classic',
+      expected_revision: errRev,
+      rooms: [{
+        id: 'beginning',
+        decorations: [{ id: 'candle_floor', item: 'candles', surface: 'floor', position: [-2.8, 0.15, 0.0] }]
+      }]
+    }, 'token-owner-b');
+    assert.equal(badSurfaceRes.status, 422, 'Nến đặt trên sàn bị từ chối');
+
+    // 5c. Tự làm vật đỡ cho chính nó (self-parent)
+    const selfParentRes = await apiCall('POST', '/api/v1/memories/emo-heart/house/draft', {
+      title: 'Self Parent',
+      theme: 'classic',
+      expected_revision: errRev,
+      rooms: [{
+        id: 'beginning',
+        decorations: [{ id: 'self_p', item: 'album', surface: 'table', position: [-2.8, 0.51, 0.0], parent_id: 'self_p' }]
+      }]
+    }, 'token-owner-b');
+    assert.equal(selfParentRes.status, 422, 'Tự làm vật đỡ cho chính nó bị từ chối');
+
+    // 5d. Vật đỡ không tồn tại trong phòng
+    const ghostParentRes = await apiCall('POST', '/api/v1/memories/emo-heart/house/draft', {
+      title: 'Ghost Parent',
+      theme: 'classic',
+      expected_revision: errRev,
+      rooms: [{
+        id: 'beginning',
+        decorations: [{ id: 'child', item: 'mugs', surface: 'table', position: [-2.8, 0.51, 0.0], parent_id: 'no_such_parent' }]
+      }]
+    }, 'token-owner-b');
+    assert.equal(ghostParentRes.status, 422, 'Vật đỡ không tồn tại bị từ chối');
+
+    // 5e. Vật đỡ không có khả năng đỡ đồ (ví dụ: mèo đỡ cốc)
+    const catParentRes = await apiCall('POST', '/api/v1/memories/emo-heart/house/draft', {
+      title: 'Cat Parent',
+      theme: 'classic',
+      expected_revision: errRev,
+      rooms: [{
+        id: 'beginning',
+        decorations: [
+          { id: 'cat_p', item: 'cat', surface: 'floor', position: [-2.8, 0.15, 0.0] },
+          { id: 'mug_child', item: 'mugs', surface: 'table', position: [-2.8, 0.51, 0.0], parent_id: 'cat_p' }
+        ]
+      }]
+    }, 'token-owner-b');
+    assert.equal(catParentRes.status, 422, 'Món đồ không có khả năng đỡ đồ bị từ chối');
+
+    // 5f. Chu trình tham chiếu vật đỡ (A -> B -> C -> A)
+    const cycleRes = await apiCall('POST', '/api/v1/memories/emo-heart/house/draft', {
+      title: 'Cycle Parent',
+      theme: 'classic',
+      expected_revision: errRev,
+      rooms: [{
+        id: 'beginning',
+        decorations: [
+          { id: 'itemA', item: 'album', surface: 'table', position: [-2.8, 0.51, 0.0], parent_id: 'itemB' },
+          { id: 'itemB', item: 'nameplate', surface: 'table', position: [-2.8, 0.51, 0.0], parent_id: 'itemC' },
+          { id: 'itemC', item: 'album', surface: 'table', position: [-2.8, 0.51, 0.0], parent_id: 'itemA' }
+        ]
+      }]
+    }, 'token-owner-b');
+    assert.equal(cycleRes.status, 422, 'Chu trình tham chiếu nhiều cấp bị từ chối');
+
+    console.log('  [PASS] Test 28: Freeform House V2 HTTP API draft, reload, publish và toàn bộ validation được kiểm chứng hoàn hảo.');
+
     console.log('\n================================================================');
-    console.log('  TẤT CẢ 22/22 BEHAVIOR, SECURITY & UI ASSERTIONS ĐẠT KẾT QUẢ PASS');
+    console.log('  TẤT CẢ 28/28 BEHAVIOR, SECURITY & UI ASSERTIONS ĐẠT KẾT QUẢ PASS');
     console.log('================================================================');
 
   } finally {
@@ -1118,4 +1897,3 @@ async function runTests() {
 }
 
 await runTests();
-

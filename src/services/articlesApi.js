@@ -8,6 +8,7 @@ export const toggleArticleBookmark=(article,enabled)=>request('/articles/'+id(ar
 export const addArticleComment=({articleId,content,parentId=null})=>request('/articles/'+id(articleId)+'/comments','POST',{content,parentId});
 export const moderateArticleComment=(comment,status)=>request('/admin/comments/'+id(comment)+'/status','PATCH',{status});
 export const saveArticleAdmin=({articleId=null,payload})=>request('/admin/articles'+(articleId?'/'+id(articleId):''),articleId?'PUT':'POST',payload);
+export const deleteArticleAdmin=articleId=>request('/admin/articles/'+id(articleId),'DELETE');
 export const getArticleAdminData=()=>request('/admin/articles');
 export const getSavedArticles=()=>request('/me/saved-articles');
 export const editArticleComment=(comment,content,remove=false)=>request('/comments/'+id(comment),remove?'DELETE':'PATCH',{content});

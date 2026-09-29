@@ -2,9 +2,9 @@ import MemoryAccountsAdmin from '../components/MemoryAccountsAdmin';
 import {useLanguage} from '../i18n/LanguageProvider';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Shield, Package, Truck, SmartphoneNfc, Power, 
-  CheckCircle2, Clock, AlertTriangle, Key, RefreshCw, 
+import {
+  Shield, Package, Truck, SmartphoneNfc, Power,
+  CheckCircle2, Clock, AlertTriangle, Key, RefreshCw,
   Settings, UserCheck, Eye, Edit3, Lock, Unlock, Database,
   BookOpen, MessageSquare, Plus, Trash2, Check, EyeOff, FileText, Send,
   ArrowLeft, LogOut, ExternalLink, Sparkles, ChevronRight, Store, BarChart3
@@ -20,32 +20,33 @@ import StoreAdminPanel from '../components/StoreAdminPanel';
 import MarkdownContent from '../components/MarkdownContent';
 import { callStore } from '../services/catalogService';
 import { listOrdersForAdmin, updateOrderStatus } from '../services/orderBackendService';
-import { 
-  getSystemAvailability, 
+import {
+  getSystemAvailability,
   updateSystemAvailability,
   signOutUser
 } from '../services/authRoleService';
-import { 
-  getAllShowcaseMemories, 
-  updateMemoryAvailability 
+import {
+  getAllShowcaseMemories,
+  updateMemoryAvailability
 } from '../services/memoryService';
-import { 
-  getArticleAdminData, 
-  saveArticleAdmin, 
-  moderateArticleComment 
+import {
+  getArticleAdminData,
+  saveArticleAdmin,
+  deleteArticleAdmin,
+  moderateArticleComment
 } from '../services/articleService';
 
-export default function AdminView({ 
-  currentUser, 
-  isAdmin = false, 
-  onOpenAuth, 
+export default function AdminView({
+  currentUser,
+  isAdmin = false,
+  onOpenAuth,
   onNavigateToHome,
   onRefresh
 }) {
   const {t}=useLanguage();
   // Tabs: 'orders' | 'marketing' | 'nfc' | 'settings' | 'articles' | 'moderation'
   const [activeTab, setActiveTab] = useState('orders');
-  
+
   // Orders State
   const [orders, setOrders] = useState([]);
   const [orderPage, setOrderPage] = useState(0);
@@ -187,6 +188,21 @@ export default function AdminView({
     }
   };
 
+  const handleDeleteArticle = async (art) => {
+    if (!window.confirm(t(`Bạn có chắc chắn muốn xóa vĩnh viễn bài viết "${art.title}" không? Hành động này không thể hoàn tác.`, `Are you sure you want to permanently delete article "${art.title}"? This cannot be undone.`))) {
+      return;
+    }
+    const res = await deleteArticleAdmin(art.id);
+    if (res.success) {
+      setAdminArticles(prev => prev.filter(a => a.id !== art.id));
+      setSaveMessage(t(`Đã xóa vĩnh viễn bài viết "${art.title}".`, `Permanently deleted article "${art.title}".`));
+      setTimeout(() => setSaveMessage(''), 3000);
+      if (onRefresh) onRefresh();
+    } else {
+      alert(res.message || t('Lỗi khi xóa bài viết.', 'Failed to delete article.'));
+    }
+  };
+
   const handleToggleArticleStatus = async (art) => {
     const nextStatus = art.status === 'published' ? 'archived' : 'published';
     const res = await saveArticleAdmin({
@@ -227,7 +243,7 @@ export default function AdminView({
             {t("Bảng Quản Trị Hệ Thống","Admin dashboard")}
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6 font-light">
-            {t("Trang này chỉ dành cho tài khoản có quyền Quản trị viên (Admin).","This page requires an administrator account.")} 
+            {t("Trang này chỉ dành cho tài khoản có quyền Quản trị viên (Admin).","This page requires an administrator account.")}
             {currentUser ? ` Bạn đang đăng nhập với tài khoản: ${currentUser}.` : t("Vui lòng đăng nhập bằng tài khoản Quản trị để tiếp tục.","Sign in as an administrator to continue.")}
           </p>
 
@@ -267,7 +283,7 @@ export default function AdminView({
   return (
     <div className="min-h-screen bg-dark-950 text-slate-100 pt-24 pb-20 selection:bg-white/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         {/* TOP BAR / BREADCRUMB */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-6 border-b border-white/10">
           <div className="flex items-center gap-3">
@@ -385,7 +401,7 @@ export default function AdminView({
               ) : (
                 <div className="space-y-4">
                   {orders.map((ord) => (
-                    <div 
+                    <div
                       key={ord.id}
                       className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all space-y-4"
                     >
@@ -561,16 +577,16 @@ export default function AdminView({
                   >
                     <div>
                       {art.cover_image && (
-                        <img 
-                          src={art.cover_image} 
-                          alt={art.title} 
-                          className="w-full h-40 object-cover rounded-xl mb-3" 
+                        <img
+                          src={art.cover_image}
+                          alt={art.title}
+                          className="w-full h-40 object-cover rounded-xl mb-3"
                         />
                       )}
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                          art.status === 'published' 
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                          art.status === 'published'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                             : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         }`}>
                           {art.status === 'published' ? 'Đã xuất bản' : 'Bản nháp'}
@@ -608,7 +624,7 @@ export default function AdminView({
                       <h3 className="font-serif text-xl font-bold">
                         {editingArticleId ? t("Chỉnh Sửa Bài Viết","Edit article") : t("Soạn Thảo Bài Viết Mới","New article")}
                       </h3>
-                      <button 
+                      <button
                         onClick={() => setIsEditorOpen(false)}
                         className="p-1 rounded-full hover:bg-white/10"
                       >

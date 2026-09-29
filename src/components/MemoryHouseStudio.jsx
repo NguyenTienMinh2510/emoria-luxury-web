@@ -1,11 +1,23 @@
-import React, { useState, useEffect, useCallback, useId } from 'react';
+import React, { useState, useEffect, useCallback, useId, useRef } from 'react';
+import MemoryHouse3D from './MemoryHouse3D.jsx';
+import {createDraftQueue} from '../services/draftQueue.js';
+import {setDecorationPhoto} from '../services/house3d.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Heart, Sparkles, ArrowLeft, ArrowRight, Upload,
   Trash2, Share2, Copy, Check, Eye, Lock, Globe, RefreshCw,
   AlertCircle, CheckCircle2, Image as ImageIcon, Edit3, X,
-  Maximize2, BookOpen, Compass, ShoppingBag, LayoutGrid
+  Maximize2, BookOpen, Compass, ShoppingBag, LayoutGrid,
+  Loader2, GripVertical, ChevronLeft, ChevronRight,
+  Mail, MessageSquare, Send, Download, QrCode, Flag
 } from 'lucide-react';
+import {
+  renderPostcardCanvas,
+  downloadPostcardFile,
+  sharePostcard,
+  POSTCARD_FORMATS,
+  POSTCARD_TEMPLATES
+} from '../services/postcardGenerator.js';
 import {
   getHouseDraft,
   saveHouseDraft,
@@ -16,8 +28,41 @@ import {
   getPublicHouseByTag,
   uploadEventPhoto,
   HOUSE_ROOMS_SPEC,
-  HOUSE_THEMES
+  HOUSE_THEMES,
+  trackEventAction,
+  submitContentReport, sendHouseReply, getHouseReplies
 } from '../services/eventService.js';
+
+// Helper: Map saved rooms while preserving storytelling order and ensuring all 5 rooms exist
+function mapOrderedRooms(savedRooms) {
+  if (!Array.isArray(savedRooms) || savedRooms.length === 0) {
+    return HOUSE_ROOMS_SPEC.map((spec) => ({
+      id: spec.id,
+      name: spec.name,
+      note: '',
+      memories: [],
+      decorations: [],
+      lighting: 'day'
+    }));
+  }
+  const orderedIds = savedRooms
+    .map((r) => r.id)
+    .filter((id) => HOUSE_ROOMS_SPEC.some((s) => s.id === id));
+  const allIds = [...new Set([...orderedIds, ...HOUSE_ROOMS_SPEC.map((s) => s.id)])];
+  return allIds.map((id) => {
+    const existing = savedRooms.find((r) => r.id === id);
+    const spec = HOUSE_ROOMS_SPEC.find((s) => s.id === id);
+    return {
+      ...existing,
+      id,
+      name: existing?.name || spec?.name || id,
+      note: existing?.note || '',
+      memories: existing?.memories || [],
+      decorations: existing?.decorations || [],
+      lighting: existing?.lighting || 'day'
+    };
+  });
+}
 
 // Visual theme configurations
 const THEME_STYLES = {
@@ -75,7 +120,8 @@ export default function MemoryHouseStudio({
   onSwitchStudio,
   currentUser
 }) {
-  const isPublicVisitor = Boolean(initialShareId) || !currentUser;
+  const [canEdit, setCanEdit] = useState(Boolean(currentUser) && !initialShareId);
+  const isPublicVisitor = Boolean(initialShareId) || !currentUser || !canEdit;
 
   // States
   const [loading, setLoading] = useState(false);
@@ -96,19 +142,78 @@ export default function MemoryHouseStudio({
     }))
   );
   const [isPublished, setIsPublished] = useState(false);
+  const latestRooms = useRef(rooms);
+  latestRooms.current = rooms;
   const [currentShareId, setCurrentShareId] = useState(initialShareId || null);
+
+  // Autosave & Concurrency States
+  const [autosaveState, setAutosaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
+  const isDirty = useRef(false);
+  const saveRevision = useRef(0);
+  const saveQueue = useRef(null);
+  const latestHouse = useRef(null);
+  latestHouse.current={title:houseTitle.trim()||'Ngôi Nhà Kỷ Niệm Của Đôi Mình',theme:selectedTheme,rooms};
+  function resetSaveQueue(revision=0){
+    const tag=tagUid;
+    saveQueue.current=createDraftQueue((payload,expected_revision)=>saveHouseDraft(tag,{...payload,expected_revision}));
+    saveQueue.current.reset(revision);
+  }
+  async function persistHouse(payload,{retry=false}={}){
+    if(!saveQueue.current)throw new Error('Ngôi nhà chưa tải xong.');
+    const result=await saveQueue.current.enqueue(payload,{retry});
+    if(JSON.stringify(payload)===JSON.stringify(latestHouse.current)&&!saveQueue.current.pending){isDirty.current=false;setAutosaveState('saved');}
+    return result;
+  }
+  const isInitialLoad = useRef(true);
 
   // UI Action States
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [uploadingRoomId, setUploadingRoomId] = useState(null);
-  const [lightboxPhoto, setLightboxPhoto] = useState(null);
+  const [lightboxData, setLightboxData] = useState(null);
+  const [likedPhotos, setLikedPhotos] = useState(() => new Set());
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('inappropriate_content');
+  const [reportDetails, setReportDetails] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+  const [heartPopping, setHeartPopping] = useState(false);
+  const lastFocusedElement = useRef(null);
+  const lightboxRef = useRef(null);
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
   const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
+
+  // Chặng C: Love Letter at Journey's End & Visitor Guestbook States
+  const [isLetterModalOpen, setIsLetterModalOpen] = useState(false);
+  const [isGuestbookModalOpen, setIsGuestbookModalOpen] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestMessage, setGuestMessage] = useState('');
+  const [guestSubmitted, setGuestSubmitted] = useState(false);
+  const [guestEntries, setGuestEntries] = useState([]);
+  const [hasSentHeart, setHasSentHeart] = useState(false);
+
+  // Chặng D: Postcard / Social Share Card State
+  const captureHouse3DRef = useRef(null);
+  const postcardCanvasRef = useRef(null);
+  const [isPostcardModalOpen, setIsPostcardModalOpen] = useState(false);
+  const [postcardTemplate, setPostcardTemplate] = useState('polaroid');
+  const [postcardFormat, setPostcardFormat] = useState('square');
+  const [postcardTheme, setPostcardTheme] = useState('dark');
+  const [postcardPhoto, setPostcardPhoto] = useState('');
+  const [postcardCaption, setPostcardCaption] = useState('');
+  const [postcardCoupleNames, setPostcardCoupleNames] = useState('');
+  const [postcardDate, setPostcardDate] = useState('');
+  const [postcardIncludeQR, setPostcardIncludeQR] = useState(true);
+  const [postcardCaptureDataUrl, setPostcardCaptureDataUrl] = useState('');
+  const [isRenderingPostcard, setIsRenderingPostcard] = useState(false);
+  const [postcardShareStatus, setPostcardShareStatus] = useState('');
 
   // Load House Data (either draft for owner or public snapshot for guest/share)
   const loadHouse = useCallback(async () => {
     setLoading(true);
+    setCanEdit(false);
     setError('');
     try {
       if (initialShareId) {
@@ -117,39 +222,24 @@ export default function MemoryHouseStudio({
         if (publicData.title) setHouseTitle(publicData.title);
         if (publicData.theme) setSelectedTheme(publicData.theme);
         if (Array.isArray(publicData.rooms)) {
-          const enriched = publicData.rooms.map((r) => {
-            const spec = HOUSE_ROOMS_SPEC.find((s) => s.id === r.id);
-            return {
-              ...r,
-              name: r.name || spec?.name || r.id,
-              memories: r.memories || []
-            };
-          });
-          setRooms(enriched);
+          setRooms(mapOrderedRooms(publicData.rooms));
         }
         setIsPublished(true);
         setActiveTab('preview');
+        trackEventAction('house_opened_share', 'house', initialShareId, `dedupe:house:${initialShareId}:open`);
       } else if (tagUid && currentUser) {
         // Owner draft mode
         try {
           const draft = await getHouseDraft(tagUid);
+          resetSaveQueue(draft.draft_revision||0);
+          setCanEdit(true);
+          setActiveTab('edit');
           if (draft.title) setHouseTitle(draft.title);
           if (draft.theme) setSelectedTheme(draft.theme);
           setIsPublished(Boolean(draft.is_published));
           if (draft.share_id) setCurrentShareId(draft.share_id);
 
-          if (Array.isArray(draft.rooms) && draft.rooms.length > 0) {
-            const fullRooms = HOUSE_ROOMS_SPEC.map((spec) => {
-              const existing = draft.rooms.find((r) => r.id === spec.id);
-              return {
-                id: spec.id,
-                name: existing?.name || spec.name,
-                note: existing?.note || '',
-                memories: existing?.memories || []
-              };
-            });
-            setRooms(fullRooms);
-          }
+          setRooms(mapOrderedRooms(draft.rooms));
         } catch (draftErr) {
           // Fallback to public published view if not owner of draft
           try {
@@ -157,15 +247,7 @@ export default function MemoryHouseStudio({
             if (publicData.title) setHouseTitle(publicData.title);
             if (publicData.theme) setSelectedTheme(publicData.theme);
             if (Array.isArray(publicData.rooms)) {
-              const enriched = publicData.rooms.map((r) => {
-                const spec = HOUSE_ROOMS_SPEC.find((s) => s.id === r.id);
-                return {
-                  ...r,
-                  name: r.name || spec?.name || r.id,
-                  memories: r.memories || []
-                };
-              });
-              setRooms(enriched);
+              setRooms(mapOrderedRooms(publicData.rooms));
             }
             setIsPublished(true);
             setActiveTab('preview');
@@ -179,15 +261,7 @@ export default function MemoryHouseStudio({
         if (publicData.title) setHouseTitle(publicData.title);
         if (publicData.theme) setSelectedTheme(publicData.theme);
         if (Array.isArray(publicData.rooms)) {
-          const enriched = publicData.rooms.map((r) => {
-            const spec = HOUSE_ROOMS_SPEC.find((s) => s.id === r.id);
-            return {
-              ...r,
-              name: r.name || spec?.name || r.id,
-              memories: r.memories || []
-            };
-          });
-          setRooms(enriched);
+          setRooms(mapOrderedRooms(publicData.rooms));
         }
         setIsPublished(true);
         setActiveTab('preview');
@@ -196,6 +270,9 @@ export default function MemoryHouseStudio({
       setError(err?.message || 'Không thể tải ngôi nhà kỷ niệm.');
     } finally {
       setLoading(false);
+      isInitialLoad.current = true;
+      isDirty.current = false;
+      setAutosaveState('saved');
     }
   }, [initialShareId, tagUid, currentUser]);
 
@@ -203,21 +280,64 @@ export default function MemoryHouseStudio({
     loadHouse();
   }, [loadHouse]);
 
-  // Save Draft
+  // Debounced Autosave (800-1200ms) after changes
+  useEffect(() => {
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+    if (isPublicVisitor || !canEdit || !tagUid) return;
+
+    isDirty.current = true;
+    saveRevision.current += 1;
+    const currentRev = saveRevision.current;
+    setAutosaveState('saving');
+
+    const timer = setTimeout(async () => {
+      try {
+        await persistHouse({...latestHouse.current,rooms:latestRooms.current});
+        if (currentRev === saveRevision.current) {
+          isDirty.current = false;
+          setAutosaveState('saved');
+        }
+      } catch (err) {
+        setError(err.message);
+        if (currentRev === saveRevision.current) {
+          setAutosaveState('error');
+        }
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [houseTitle, selectedTheme, rooms, isPublicVisitor, canEdit, tagUid]);
+
+  // Warn on dirty before leaving page
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  // Save Draft (Manual or programmatic)
   const handleSaveDraft = async (customRooms = rooms) => {
     if (!tagUid || isPublicVisitor) return;
     setIsSaving(true);
+    setAutosaveState('saving');
     setError('');
     try {
-      await saveHouseDraft(tagUid, {
-        title: houseTitle.trim() || 'Ngôi Nhà Kỷ Niệm Của Đôi Mình',
-        theme: selectedTheme,
-        rooms: customRooms
-      });
+      await persistHouse({...latestHouse.current,rooms:customRooms},{retry:true});
       setSuccessMsg('Đã lưu bản nháp ngôi nhà thành công!');
       setTimeout(() => setSuccessMsg(''), 2500);
+      return true;
     } catch (err) {
+      setAutosaveState('error');
       setError(err?.message || 'Lỗi khi lưu bản nháp.');
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -229,12 +349,8 @@ export default function MemoryHouseStudio({
     setIsPublishing(true);
     setError('');
     try {
-      // Save latest draft first
-      await saveHouseDraft(tagUid, {
-        title: houseTitle.trim() || 'Ngôi Nhà Kỷ Niệm Của Đôi Mình',
-        theme: selectedTheme,
-        rooms
-      });
+      await persistHouse(latestHouse.current,{retry:true});
+      if(isDirty.current)throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi xuất bản lại.');
       const res = await publishHouse(tagUid);
       setIsPublished(true);
       if (res.share_id) {
@@ -272,6 +388,7 @@ export default function MemoryHouseStudio({
         setCurrentShareId(res.share_id);
       }
       setIsRevokeModalOpen(false);
+      setIsPublished(false);
       setSuccessMsg('Đã thu hồi liên kết cũ và cấp mã liên kết mới an toàn.');
     } catch (err) {
       setError(err?.message || 'Không thể thu hồi liên kết.');
@@ -279,36 +396,43 @@ export default function MemoryHouseStudio({
   };
 
   // Photo Upload to Room
-  const handlePhotoUpload = async (roomId, file) => {
-    if (!file || !tagUid) return;
+  const handlePhotoUpload = async (roomId, file, decorationTarget) => {
+    if (!file || !tagUid || isPublicVisitor || uploadingRoomId) return;
+    if ((latestRooms.current.find(r => r.id === roomId)?.memories?.length || 0) >= 10) {
+      setError('Mỗi phòng chỉ được chứa tối đa 10 khoảnh khắc.');
+      return;
+    }
     setUploadingRoomId(roomId);
     setError('');
     try {
       const res = await uploadEventPhoto(tagUid, file);
-      const nextRooms = rooms.map((r) => {
+      let createdMemory = null;
+      const nextRooms = latestRooms.current.map((r) => {
         if (r.id !== roomId) return r;
         const currentMems = r.memories || [];
         if (currentMems.length >= 10) {
           throw new Error('Mỗi phòng chỉ được chứa tối đa 10 khoảnh khắc.');
         }
-        return {
-          ...r,
-          memories: [
-            ...currentMems,
-            {
-              id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-              photo_path: res.path,
-              photo_url: res.url,
-              caption: '',
-              date: new Date().toLocaleDateString('vi-VN')
-            }
-          ]
+        createdMemory = {
+          id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          photo_path: res.path,
+          photo_url: res.url,
+          caption: '',
+          date: new Date().toLocaleDateString('vi-VN')
         };
+        const next = {
+          ...r,
+          memories: [...currentMems, createdMemory]
+        };
+        return decorationTarget
+          ? setDecorationPhoto(next, decorationTarget.slot, decorationTarget.item, decorationTarget.index, createdMemory.id)
+          : next;
       });
       setRooms(nextRooms);
-      await handleSaveDraft(nextRooms);
-      setSuccessMsg('Đã thêm ảnh vào phòng kỷ niệm!');
+      const saved = await handleSaveDraft(nextRooms);
+      if(saved) setSuccessMsg('Đã thêm ảnh vào phòng kỷ niệm!');
       setTimeout(() => setSuccessMsg(''), 2500);
+      return createdMemory;
     } catch (err) {
       setError(err?.message || 'Không thể tải ảnh lên phòng.');
     } finally {
@@ -316,13 +440,54 @@ export default function MemoryHouseStudio({
     }
   };
 
-  // Remove Photo
+  // Reorder Storytelling Rooms
+  const handleMoveRoom = (fromIndex, toIndex) => {
+    if (fromIndex === toIndex || toIndex < 0 || toIndex >= rooms.length) return;
+    const currentId = rooms[activeRoomIndex]?.id;
+    const next = [...rooms];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    setRooms(next);
+    if (currentId) {
+      const newActiveIdx = next.findIndex((r) => r.id === currentId);
+      if (newActiveIdx >= 0) setActiveRoomIndex(newActiveIdx);
+    }
+  };
+
+  // Reorder Photos within Room
+  const handleMovePhoto = (roomId, fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+    const nextRooms = rooms.map((r) => {
+      if (r.id !== roomId) return r;
+      const mems = [...(r.memories || [])];
+      if (toIndex < 0 || toIndex >= mems.length) return r;
+      const [item] = mems.splice(fromIndex, 1);
+      mems.splice(toIndex, 0, item);
+      return { ...r, memories: mems };
+    });
+    setRooms(nextRooms);
+  };
+
+  // Remove Photo (with safe cleanup of decoration references)
   const handleRemovePhoto = (roomId, photoIndex) => {
     const nextRooms = rooms.map((r) => {
       if (r.id !== roomId) return r;
+      const removedMem = r.memories?.[photoIndex];
+      const nextMems = (r.memories || []).filter((_, idx) => idx !== photoIndex);
+      let nextDecor = r.decorations;
+      if (removedMem?.id && Array.isArray(r.decorations)) {
+        nextDecor = r.decorations.map((d) => {
+          if (!Array.isArray(d.photos)) return d;
+          return {
+            ...d,
+            photos: d.photos.map((pId) => (pId === removedMem.id ? null : pId))
+          };
+        });
+      }
       return {
         ...r,
-        memories: (r.memories || []).filter((_, idx) => idx !== photoIndex)
+        memories: nextMems,
+        decorations: nextDecor
       };
     });
     setRooms(nextRooms);
@@ -348,6 +513,42 @@ export default function MemoryHouseStudio({
     setRooms(nextRooms);
   };
 
+  // Update Journey's End Love Letter (Chặng C)
+  const handleUpdateJourneyLetter = (field, value) => {
+    const nextRooms = rooms.map((r) => {
+      if (r.id !== 'next-chapter') return r;
+      const cur = r.journey_letter || {
+        title: 'Gửi người thương ở tương lai',
+        content: '',
+        author: '',
+        date: '',
+        is_shared: true
+      };
+      return {
+        ...r,
+        journey_letter: { ...cur, [field]: value }
+      };
+    });
+    setRooms(nextRooms);
+    isDirty.current = true;
+  };
+
+  // Visitor Love Reaction & Guestbook (Chặng C)
+  const replyRequest = useRef(null);
+  const handleSendVisitorHeart = async () => {
+    try{await sendHouseReply({share_id:currentShareId,tag_uid:tagUid,kind:'heart',name:'Khách ghé thăm',message:'',request_id:crypto.randomUUID()});setHasSentHeart(true);setSuccessMsg('Đã gửi trái tim đến chủ nhà!');}
+    catch(err){setError(err.message);}
+  };
+  const handleSendGuestMessage = async e => {
+    e.preventDefault();if(!guestName.trim()||!guestMessage.trim())return;
+    replyRequest.current ||= crypto.randomUUID();
+    try{
+      await sendHouseReply({share_id:currentShareId,tag_uid:tagUid,kind:'message',name:guestName.trim(),message:guestMessage.trim(),request_id:replyRequest.current});
+      setGuestSubmitted(true);replyRequest.current=null;setGuestName('');setGuestMessage('');
+    }catch(err){setError(err.message);setGuestSubmitted(false);}
+  };
+  useEffect(()=>{if(canEdit&&tagUid)getHouseReplies(tagUid).then(setGuestEntries).catch(err=>setError(err.message));},[canEdit,tagUid,isGuestbookModalOpen]);
+
   // Share URL
   const shareUrl = currentShareId
     ? `${window.location.origin}/?view=memory-house&share=${currentShareId}`
@@ -358,13 +559,126 @@ export default function MemoryHouseStudio({
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
+      trackEventAction('house_copy_link', 'house', tagUid || currentShareId || 'house');
     });
   };
 
   const themeStyle = THEME_STYLES[selectedTheme] || THEME_STYLES.warm_gold;
   const currentRoom = rooms[activeRoomIndex] || rooms[0];
 
+  // Postcard handlers (Chặng D)
+  const openPostcardModal = useCallback(() => {
+    if (isPublicVisitor && !isPublished) {
+      setError('Ngôi nhà này hiện đang ở chế độ riêng tư, chưa thể tạo thiệp chia sẻ.');
+      return;
+    }
+
+    const currentRoomPhotos = currentRoom?.memories || [];
+    const allPhotos = rooms.flatMap((r) => r.memories || []);
+    const initialPhoto = currentRoomPhotos[0]?.photo_url || allPhotos[0]?.photo_url || '';
+
+    setPostcardPhoto(initialPhoto);
+    setPostcardCoupleNames(houseTitle || 'Nhà của chúng mình');
+    setPostcardCaption(currentRoom?.note?.trim() || currentRoomPhotos[0]?.caption || 'Cùng nhau gom lại những khoảnh khắc dịu dàng nhất.');
+    setPostcardDate(currentRoomPhotos[0]?.date || new Date().toLocaleDateString('vi-VN'));
+    setPostcardShareStatus('');
+
+    if (captureHouse3DRef.current) {
+      try {
+        const snap = captureHouse3DRef.current();
+        if (snap) setPostcardCaptureDataUrl(snap);
+      } catch (err) {
+        console.warn('Could not capture 3D snapshot:', err);
+      }
+    }
+
+    setIsPostcardModalOpen(true);
+  }, [isPublicVisitor, isPublished, currentRoom, rooms, houseTitle]);
+
+  // Live Canvas Postcard preview update
+  useEffect(() => {
+    if (!isPostcardModalOpen || !postcardCanvasRef.current) return;
+    let cancelled = false;
+    setIsRenderingPostcard(true);
+
+    renderPostcardCanvas({
+      template: postcardTemplate,
+      aspectRatio: postcardFormat,
+      themeMode: postcardTheme,
+      houseTitle,
+      coupleNames: postcardCoupleNames,
+      roomName: currentRoom?.name || 'Ngôi Nhà Kỷ Niệm',
+      caption: postcardCaption,
+      date: postcardDate,
+      photoUrl: postcardPhoto,
+      houseCaptureDataUrl: postcardCaptureDataUrl,
+      publicUrl: (isPublished && postcardIncludeQR) ? shareUrl : null,
+      isPublished,
+      canvasElement: postcardCanvasRef.current
+    }).then(() => {
+      if (!cancelled) setIsRenderingPostcard(false);
+    }).catch((err) => {
+      console.warn('[Postcard] Render preview error:', err);
+      if (!cancelled) setIsRenderingPostcard(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isPostcardModalOpen,
+    postcardTemplate,
+    postcardFormat,
+    postcardTheme,
+    postcardPhoto,
+    postcardCaption,
+    postcardCoupleNames,
+    postcardDate,
+    postcardIncludeQR,
+    postcardCaptureDataUrl,
+    isPublished,
+    shareUrl,
+    houseTitle,
+    currentRoom
+  ]);
+
+  const handleSharePostcard = async () => {
+    if (!postcardCanvasRef.current) return;
+    setPostcardShareStatus('sharing');
+    try {
+      const res = await sharePostcard({
+        canvas: postcardCanvasRef.current,
+        title: `${houseTitle || 'Ngôi Nhà Kỷ Niệm'} - EMORIA`,
+        text: `Ghé thăm thiệp kỷ niệm của ${postcardCoupleNames || 'chúng mình'} tại EMORIA nhé!`,
+        url: isPublished ? shareUrl : ''
+      });
+      if (res.success) {
+        if (res.method === 'web-share-file' || res.method === 'web-share-url') {
+          setPostcardShareStatus('shared');
+        } else {
+          setPostcardShareStatus(res.copied ? 'downloaded-copied' : 'downloaded');
+        }
+        trackEventAction('house_postcard_shared', 'house', tagUid || currentShareId || 'house', null, { template: postcardTemplate, format: postcardFormat });
+      } else if (res.cancelled) {
+        setPostcardShareStatus('');
+      }
+    } catch (err) {
+      console.warn('Share postcard error:', err);
+      downloadPostcardFile(postcardCanvasRef.current, `emoria-postcard-${Date.now()}.png`);
+      setPostcardShareStatus('downloaded');
+    }
+  };
+
+  const handleDownloadPostcard = () => {
+    if (!postcardCanvasRef.current) return;
+    const nameSlug = (postcardCoupleNames || 'emoria').toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+    downloadPostcardFile(postcardCanvasRef.current, `emoria-postcard-${nameSlug}-${Date.now()}.png`);
+    setPostcardShareStatus('downloaded');
+    trackEventAction('house_postcard_download', 'house', tagUid || currentShareId || 'house', null, { template: postcardTemplate, format: postcardFormat });
+  };
+
   const handleGoHome = () => {
+    if(isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
     if (onNavigateHome) {
       onNavigateHome();
     } else if (typeof window !== 'undefined') {
@@ -373,6 +687,7 @@ export default function MemoryHouseStudio({
   };
 
   const handleBackToMemory = () => {
+    if(isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
     if (onNavigateMemory) {
       onNavigateMemory(tagUid);
     } else if (onBack) {
@@ -385,12 +700,146 @@ export default function MemoryHouseStudio({
   };
 
   const handleSwitchToMatch = () => {
+    if(isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
     if (onSwitchStudio) {
       onSwitchStudio('match');
     } else if (typeof window !== 'undefined') {
       window.location.href = `/?view=memory-match${tagUid ? `&tag=${encodeURIComponent(tagUid)}` : ''}`;
     }
   };
+
+  // Lightbox Handlers & Gestures (Chặng B)
+  const handleOpenLightbox = useCallback((photoOrUrl, rId = null) => {
+    lastFocusedElement.current = document.activeElement;
+    if (!photoOrUrl) {
+      setLightboxData(null);
+      return;
+    }
+    const targetUrl = typeof photoOrUrl === 'string' ? photoOrUrl : photoOrUrl.photo_url;
+    const currentRoomId = rId || (typeof photoOrUrl === 'object' && photoOrUrl.roomId) || currentRoom.id;
+    const roomMemories = (latestRooms.current.find((r) => r.id === currentRoomId)?.memories || []).filter((m) => m.photo_url);
+    const foundIndex = roomMemories.findIndex((m) => m.photo_url === targetUrl);
+
+    if (foundIndex >= 0) {
+      const mem = roomMemories[foundIndex];
+      setLightboxData({
+        photoUrl: mem.photo_url,
+        caption: mem.caption || '',
+        date: mem.date || '',
+        roomId: currentRoomId,
+        photoIndex: foundIndex,
+        total: roomMemories.length
+      });
+    } else {
+      setLightboxData({
+        photoUrl: targetUrl,
+        caption: (typeof photoOrUrl === 'object' && photoOrUrl.caption) || '',
+        date: (typeof photoOrUrl === 'object' && photoOrUrl.date) || '',
+        roomId: currentRoomId,
+        photoIndex: 0,
+        total: 1
+      });
+    }
+  }, [currentRoom.id]);
+
+  const handleCloseLightbox = useCallback(() => {
+    setLightboxData(null);
+    if (lastFocusedElement.current && typeof lastFocusedElement.current.focus === 'function') {
+      lastFocusedElement.current.focus();
+    }
+  }, []);
+
+  const handleLightboxNavigate = useCallback((direction) => {
+    setLightboxData((prev) => {
+      if (!prev) return null;
+      const roomMemories = (latestRooms.current.find((r) => r.id === prev.roomId)?.memories || []).filter((m) => m.photo_url);
+      if (roomMemories.length <= 1) return prev;
+      let newIdx = prev.photoIndex + (direction === 'next' ? 1 : -1);
+      if (newIdx < 0) newIdx = roomMemories.length - 1;
+      if (newIdx >= roomMemories.length) newIdx = 0;
+      const mem = roomMemories[newIdx];
+      return {
+        photoUrl: mem.photo_url,
+        caption: mem.caption || '',
+        date: mem.date || '',
+        roomId: prev.roomId,
+        photoIndex: newIdx,
+        total: roomMemories.length
+      };
+    });
+  }, []);
+
+  const handleToggleHeart = useCallback((photoUrl) => {
+    setLikedPhotos((prev) => {
+      const next = new Set(prev);
+      if (next.has(photoUrl)) next.delete(photoUrl);
+      else next.add(photoUrl);
+      return next;
+    });
+    setHeartPopping(true);
+    setTimeout(() => setHeartPopping(false), 600);
+  }, []);
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX > 0) handleLightboxNavigate('prev');
+      else handleLightboxNavigate('next');
+    }
+  };
+
+  // Keyboard navigation & Focus trap for Lightbox
+  useEffect(() => {
+    if (!lightboxData) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCloseLightbox();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleLightboxNavigate('prev');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleLightboxNavigate('next');
+      } else if (e.key === 'Tab') {
+        const focusable = lightboxRef.current?.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusable || focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxData, handleCloseLightbox, handleLightboxNavigate]);
+
+  useEffect(() => {
+    if (lightboxData && lightboxRef.current) {
+      const closeBtn = lightboxRef.current.querySelector('button[data-close-lightbox="true"]');
+      closeBtn?.focus();
+    }
+  }, [lightboxData]);
 
   // Loading State
   if (loading) {
@@ -448,7 +897,7 @@ export default function MemoryHouseStudio({
 
             {onNavigateShop && (
               <button
-                onClick={onNavigateShop}
+                onClick={() => {if(!isDirty.current||window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))onNavigateShop();}}
                 type="button"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
                 title="Xem Cửa Hàng & Bộ Sưu Tập"
@@ -464,6 +913,34 @@ export default function MemoryHouseStudio({
               <Sparkles className="w-3.5 h-3.5" />
               <span>Memory House Studio</span>
             </span>
+
+            {!isPublicVisitor && activeTab === 'edit' && (
+              <div className="shrink-0">
+                {autosaveState === 'saving' && (
+                  <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Đang lưu...</span>
+                  </span>
+                )}
+                {autosaveState === 'saved' && (
+                  <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>Đã lưu</span>
+                  </span>
+                )}
+                {autosaveState === 'error' && (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveDraft()}
+                    className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-300 hover:text-rose-200 border border-rose-500/30 flex items-center gap-1 cursor-pointer"
+                    title="Bấm để thử lưu lại"
+                  >
+                    <AlertCircle className="w-3 h-3" />
+                    <span>Chưa lưu — thử lại</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {isPublished && (
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0">
@@ -497,6 +974,18 @@ export default function MemoryHouseStudio({
                   Dạo xem
                 </button>
               </div>
+            )}
+
+            {(!isPublicVisitor || isPublished) && (
+              <button
+                type="button"
+                onClick={openPostcardModal}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400/20 to-rose-400/20 hover:from-amber-400/30 hover:to-rose-400/30 text-amber-200 border border-amber-400/30 text-xs font-bold transition-all cursor-pointer shadow-sm shrink-0"
+                title="Tạo thiệp bưu thiếp kỷ niệm để chia sẻ lên mạng xã hội"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>Xuất Postcard</span>
+              </button>
             )}
           </div>
         </header>
@@ -560,6 +1049,14 @@ export default function MemoryHouseStudio({
               </button>
               <button
                 type="button"
+                onClick={openPostcardModal}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/30 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Tạo Postcard</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setIsRevokeModalOpen(true)}
                 className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
                 title="Đổi mã liên kết chia sẻ mới nếu muốn vô hiệu hóa liên kết cũ"
@@ -614,6 +1111,16 @@ export default function MemoryHouseStudio({
         {/* ===================================================================== */}
         {/* TAB 1: EDIT MODE (Chủ sở hữu chỉnh sửa nội dung và tải ảnh)             */}
         {/* ===================================================================== */}
+        <MemoryHouse3D
+          rooms={rooms} title={houseTitle} theme={selectedTheme}
+          activeRoomId={currentRoom.id}
+          onSelectRoom={id=>{const index=rooms.findIndex(r=>r.id===id);if(index>=0)setActiveRoomIndex(index);}}
+          onRoomsChange={setRooms} onPhoto={handleOpenLightbox}
+          onUploadPhoto={handlePhotoUpload} uploading={Boolean(uploadingRoomId)}
+          onSave={()=>handleSaveDraft()} saving={isSaving}
+          readOnly={isPublicVisitor || activeTab !== 'edit'}
+          onRegisterCapture={(fn) => { captureHouse3DRef.current = fn; }}
+        />
         {activeTab === 'edit' && !isPublicVisitor && (
           <section id={`room-panel-${currentRoom.id}`} role="tabpanel" aria-labelledby={`room-tab-${currentRoom.id}`}>
             {/* Desktop 2-column layout: Trái là Live Preview khung ngôi nhà, Phải là form chỉnh sửa. Mobile: Live Preview nằm trên. */}
@@ -634,14 +1141,32 @@ export default function MemoryHouseStudio({
                           LIVE PREVIEW
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('preview')}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-[11px] font-bold transition-all cursor-pointer shadow-sm group"
-                      >
-                        <Eye className="w-3 h-3 text-amber-300 group-hover:text-dark-950 transition-colors" />
-                        <span>Dạo xem</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {(currentRoom.memories?.length || 0) < 10 && (
+                          <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 text-dark-950 text-[11px] font-bold transition-all cursor-pointer shadow-sm">
+                            <Upload className="w-3 h-3" />
+                            <span>+ Thêm ảnh</span>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="sr-only"
+                              disabled={uploadingRoomId === currentRoom.id}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handlePhotoUpload(currentRoom.id, file);
+                              }}
+                            />
+                          </label>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('preview')}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-[11px] font-bold transition-all cursor-pointer shadow-sm group"
+                        >
+                          <Eye className="w-3 h-3 text-amber-300 group-hover:text-dark-950 transition-colors" />
+                          <span>Dạo xem</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Architectural Frame Header */}
@@ -811,6 +1336,34 @@ export default function MemoryHouseStudio({
                       <p className="text-xs text-slate-400 mt-1">
                         {HOUSE_ROOMS_SPEC.find((s) => s.id === currentRoom.id)?.description}
                       </p>
+
+                      {/* Storytelling Room Order Controls */}
+                      <div className="flex items-center gap-2 mt-2.5">
+                        <span className="text-[11px] text-slate-400 font-medium">Thứ tự kể chuyện:</span>
+                        <div className="inline-flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveRoom(activeRoomIndex, activeRoomIndex - 1)}
+                            disabled={activeRoomIndex === 0}
+                            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 disabled:opacity-25 disabled:pointer-events-none text-[11px] font-semibold transition-colors cursor-pointer"
+                            title="Di chuyển phòng này lên trước trong mạch truyện"
+                          >
+                            ← Trước
+                          </button>
+                          <span className="px-2 text-[11px] text-amber-300 font-mono font-bold">
+                            {activeRoomIndex + 1}/{rooms.length}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveRoom(activeRoomIndex, activeRoomIndex + 1)}
+                            disabled={activeRoomIndex === rooms.length - 1}
+                            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 disabled:opacity-25 disabled:pointer-events-none text-[11px] font-semibold transition-colors cursor-pointer"
+                            title="Di chuyển phòng này về sau trong mạch truyện"
+                          >
+                            Sau →
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Upload Button */}
@@ -846,10 +1399,11 @@ export default function MemoryHouseStudio({
                     />
                   </div>
 
-                  {/* Polaroid Photo Cards Grid */}
+                  {/* Polaroid Photo Cards Grid with Reordering & Drag-and-drop */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
                       <span>Khoảnh khắc trong phòng ({currentRoom.memories?.length || 0}/10 ảnh)</span>
+                      <span className="text-[10px] text-amber-300/80">Kéo thả hoặc dùng mũi tên để sắp xếp</span>
                     </div>
 
                     {(!currentRoom.memories || currentRoom.memories.length === 0) ? (
@@ -865,7 +1419,17 @@ export default function MemoryHouseStudio({
                         {currentRoom.memories.map((mem, memIdx) => (
                           <div
                             key={mem.id || memIdx}
-                            className={`${themeStyle.polaroidBg} rounded-2xl p-4 shadow-xl space-y-3 transition-transform hover:-translate-y-1 duration-300 relative group`}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('text/plain', String(memIdx));
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              const from = Number(e.dataTransfer.getData('text/plain'));
+                              if (!isNaN(from)) handleMovePhoto(currentRoom.id, from, memIdx);
+                            }}
+                            className={`${themeStyle.polaroidBg} rounded-2xl p-4 shadow-xl space-y-3 transition-transform hover:-translate-y-1 duration-300 relative group cursor-grab active:cursor-grabbing`}
                           >
                             <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-200">
                               <img
@@ -873,6 +1437,10 @@ export default function MemoryHouseStudio({
                                 alt={mem.caption || `Kỷ niệm ${memIdx + 1}`}
                                 className="w-full h-full object-cover"
                               />
+                              <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-mono flex items-center gap-1 backdrop-blur-sm">
+                                <GripVertical className="w-3 h-3 text-amber-300" />
+                                <span>#{memIdx + 1}</span>
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => setLightboxPhoto(mem.photo_url)}
@@ -884,7 +1452,7 @@ export default function MemoryHouseStudio({
                             </div>
 
                             {/* Caption input */}
-                            <div className="space-y-1">
+                            <div className="space-y-1.5">
                               <input
                                 type="text"
                                 value={mem.caption || ''}
@@ -892,8 +1460,28 @@ export default function MemoryHouseStudio({
                                 placeholder="Ghi chú ngọt ngào..."
                                 className="w-full px-2.5 py-1.5 rounded-lg bg-black/5 border border-black/10 text-xs font-serif focus:border-amber-600 focus:outline-none"
                               />
-                              <div className="flex items-center justify-between text-[10px] opacity-60 px-1">
-                                <span>{mem.date || 'Khoảnh khắc'}</span>
+                              <div className="flex items-center justify-between text-[10px] opacity-75 px-1 pt-1">
+                                {/* Photo Reorder Buttons */}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMovePhoto(currentRoom.id, memIdx, memIdx - 1)}
+                                    disabled={memIdx === 0}
+                                    className="px-1.5 py-0.5 rounded bg-black/10 hover:bg-black/20 text-dark-900 disabled:opacity-20 cursor-pointer font-bold"
+                                    title="Di chuyển ảnh về trước"
+                                  >
+                                    ←
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMovePhoto(currentRoom.id, memIdx, memIdx + 1)}
+                                    disabled={memIdx === (currentRoom.memories?.length || 1) - 1}
+                                    className="px-1.5 py-0.5 rounded bg-black/10 hover:bg-black/20 text-dark-900 disabled:opacity-20 cursor-pointer font-bold"
+                                    title="Di chuyển ảnh ra sau"
+                                  >
+                                    →
+                                  </button>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => handleRemovePhoto(currentRoom.id, memIdx)}
@@ -908,18 +1496,139 @@ export default function MemoryHouseStudio({
                       </div>
                     )}
                   </div>
+
+                  {/* Journey's End Love Letter Editor (Chặng C) */}
+                  {currentRoom.id === 'next-chapter' && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/[0.06] border border-amber-400/25 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">💌</span>
+                          <div>
+                            <h4 className="font-serif font-bold text-amber-200 text-sm">
+                              Phong thư cuối hành trình (Gửi tương lai)
+                            </h4>
+                            <p className="text-[11px] text-slate-400">
+                              Lời nhắn tâm tình đọng lại sau chuyến thăm 5 căn phòng kỷ niệm.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsLetterModalOpen(true)}
+                          className="px-3 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-xs font-semibold border border-amber-400/30 transition-colors cursor-pointer self-start sm:self-auto"
+                        >
+                          Xem thử phong thư
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 pt-1">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">
+                            Tiêu đề phong thư
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={100}
+                            value={currentRoom.journey_letter?.title || ''}
+                            onChange={(e) => handleUpdateJourneyLetter('title', e.target.value)}
+                            placeholder="Gửi người thương ở tương lai..."
+                            className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-amber-400 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">
+                            Nội dung bức thư ({currentRoom.journey_letter?.content?.length || 0}/1500)
+                          </label>
+                          <textarea
+                            rows={4}
+                            maxLength={1500}
+                            value={currentRoom.journey_letter?.content || ''}
+                            onChange={(e) => handleUpdateJourneyLetter('content', e.target.value)}
+                            placeholder="Viết những lời chân thành nhất dành tặng người ấy..."
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-amber-400 focus:outline-none leading-relaxed resize-none"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-300 mb-1">
+                              Ký tên người gửi
+                            </label>
+                            <input
+                              type="text"
+                              maxLength={60}
+                              value={currentRoom.journey_letter?.author || ''}
+                              onChange={(e) => handleUpdateJourneyLetter('author', e.target.value)}
+                              placeholder="Tên của bạn hoặc cả hai..."
+                              className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-amber-400 focus:outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-slate-300 mb-1">
+                              Ngày viết thư
+                            </label>
+                            <input
+                              type="text"
+                              maxLength={30}
+                              value={currentRoom.journey_letter?.date || ''}
+                              onChange={(e) => handleUpdateJourneyLetter('date', e.target.value)}
+                              placeholder="28.09.2026..."
+                              className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs focus:border-amber-400 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={currentRoom.journey_letter?.is_shared ?? true}
+                            onChange={(e) => handleUpdateJourneyLetter('is_shared', e.target.checked)}
+                            className="rounded border-white/20 bg-white/10 text-amber-500 focus:ring-0 cursor-pointer"
+                          />
+                          <span className="text-xs text-slate-300">
+                            Cho phép khách ghé thăm mở đọc bức thư này ở cuối chuyến tham quan
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
+                <section className="rounded-2xl border border-white/10 p-4 space-y-3">
+                  <label className="block text-sm">Ai có thể gửi lời nhắn khi ghé nhà?
+                    <select className="block mt-2 bg-stone-900 p-2 rounded-lg" value={rooms.find(r=>r.id==='beginning')?.reply_policy||'off'} onChange={e=>setRooms(prev=>prev.map(r=>r.id==='beginning'?{...r,reply_policy:e.target.value}:r))}>
+                      <option value="off">Tắt lời nhắn</option><option value="visitors">Người có liên kết nhà</option><option value="signed_in">Người đã đăng nhập</option>
+                    </select>
+                  </label><p className="text-xs text-stone-400">Thay đổi có hiệu lực với khách sau khi xuất bản. Chỉ bạn xem được lời hồi đáp.</p>
+                  <button type="button" onClick={()=>getHouseReplies(tagUid).then(setGuestEntries).catch(e=>setError(e.message))} className="text-sm text-amber-200">Làm mới lời hồi đáp</button>
+                  {guestEntries.map(entry=><article key={entry.id} className="border-t border-white/10 py-2 text-sm"><strong>{entry.name}</strong><p>{entry.is_hidden?'Lời nhắn đã được ẩn':entry.kind==='heart'?'♥':entry.message}</p><button type="button" className="text-xs text-rose-300" onClick={()=>submitContentReport('guestbook',entry.id,'other','Chủ nhà báo cáo lời nhắn').then(()=>setSuccessMsg('Đã gửi báo cáo')).catch(e=>setError(e.message))}>Báo cáo lời nhắn</button></article>)}
+                </section>
                 {/* Bottom Actions Bar */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => handleSaveDraft()}
-                    disabled={isSaving}
-                    className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm border border-white/15 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {isSaving ? 'Đang lưu...' : 'Lưu bản nháp'}
-                  </button>
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveDraft()}
+                      disabled={isSaving}
+                      className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm border border-white/15 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {isSaving ? 'Đang lưu...' : 'Lưu bản nháp'}
+                    </button>
+                    {autosaveState === 'saved' && (
+                      <span className="text-xs text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Đã tự động lưu</span>
+                      </span>
+                    )}
+                    {autosaveState === 'saving' && (
+                      <span className="text-xs text-amber-400 flex items-center gap-1">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang tự động lưu...</span>
+                      </span>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-3 w-full sm:w-auto">
                     <button
@@ -986,7 +1695,7 @@ export default function MemoryHouseStudio({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.08 }}
                     className={`${themeStyle.polaroidBg} rounded-2xl p-4 shadow-2xl space-y-3 cursor-pointer transform hover:scale-[1.02] hover:-rotate-1 transition-all duration-300`}
-                    onClick={() => setLightboxPhoto(mem.photo_url)}
+                    onClick={() => handleOpenLightbox(mem, currentRoom.id)}
                   >
                     <div className="aspect-square w-full rounded-xl overflow-hidden bg-slate-200">
                       <img
@@ -1035,33 +1744,189 @@ export default function MemoryHouseStudio({
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Journey's End Section: Love Letter & Guestbook (Chặng C) */}
+            {activeRoomIndex === rooms.length - 1 && (
+              <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-500/[0.08] via-black/40 to-rose-500/[0.08] border border-amber-400/30 backdrop-blur-xl shadow-2xl space-y-6 text-center max-w-2xl mx-auto">
+                <div className="space-y-2">
+                  <span className="text-3xl animate-bounce inline-block">💌</span>
+                  <h3 className="text-xl sm:text-2xl font-serif font-bold text-white">
+                    Kết Thúc Chuyến Thăm Ngôi Nhà Kỷ Niệm
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-md mx-auto">
+                    Cảm ơn bạn đã đồng hành qua 5 căn phòng ngập tràn yêu thương và ký ức của đôi mình.
+                  </p>
+                </div>
+
+                {/* Love Letter Opener */}
+                {rooms.find((r) => r.id === 'next-chapter')?.journey_letter?.is_shared && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsLetterModalOpen(true)}
+                      className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-dark-950 font-bold text-sm shadow-xl shadow-amber-500/20 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span>Mở Phong Thư Cuối Hành Trình</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* "Mình đã ghé nhà" Guestbook & Heart Reaction */}
+                <div className="pt-6 border-t border-white/10 space-y-4">
+                  <h4 className="text-sm font-serif font-bold text-amber-200">
+                    Để lại lời hồi đáp "Mình đã ghé nhà"
+                  </h4>
+
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSendVisitorHeart}
+                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
+                        hasSentHeart
+                          ? 'bg-rose-500/20 border-rose-500/50 text-rose-300 shadow-lg shadow-rose-500/20'
+                          : 'bg-white/10 border-white/15 text-white hover:bg-white/15'
+                      }`}
+                    >
+                      <Heart className={`w-4 h-4 ${hasSentHeart ? 'fill-rose-500 text-rose-500' : ''}`} />
+                      <span>{hasSentHeart ? 'Đã gửi tim yêu thương ♥' : 'Thả tim cho đôi bạn'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsGuestbookModalOpen(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-xs font-semibold transition-all cursor-pointer"
+                    >
+                      <MessageSquare className="w-4 h-4 text-amber-300" />
+                      <span>Gửi lời chúc mừng</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         )}
 
-        {/* Lightbox Modal */}
+        {/* Lightbox Modal with Gestures, Keyboard Nav, Caption, Heart Pop, and Focus Trap (Chặng B) */}
         <AnimatePresence>
-          {lightboxPhoto && (
+          {lightboxData && (
             <motion.div
+              ref={lightboxRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Xem ảnh kỷ niệm chi tiết"
+              tabIndex={-1}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-4"
-              onClick={() => setLightboxPhoto(null)}
+              className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col justify-between p-4 sm:p-6 select-none focus:outline-none"
+              onClick={handleCloseLightbox}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
             >
-              <button
-                type="button"
-                aria-label="Đóng ảnh phóng to"
-                onClick={() => setLightboxPhoto(null)}
-                className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-              <img
-                src={lightboxPhoto}
-                alt="Phóng to ảnh kỷ niệm"
-                className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
+              {/* Top Bar: Counter, Room Name, Close button */}
+              <div className="flex items-center justify-between z-10 w-full max-w-5xl mx-auto pt-2" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white/10 text-slate-300 border border-white/10">
+                    {lightboxData.total > 1 ? `${lightboxData.photoIndex + 1} / ${lightboxData.total}` : '1 / 1'}
+                  </span>
+                  <span className="text-xs font-serif text-amber-300/80">
+                    {rooms.find((r) => r.id === lightboxData.roomId)?.name || 'Kỷ niệm'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  data-close-lightbox="true"
+                  aria-label="Đóng ảnh phóng to"
+                  onClick={handleCloseLightbox}
+                  className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer hover:rotate-90 duration-200"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Main Content Area: Prev Button, Image, Next Button */}
+              <div className="relative flex-1 flex items-center justify-center my-auto w-full max-w-5xl mx-auto overflow-hidden">
+                {lightboxData.total > 1 && (
+                  <button
+                    type="button"
+                    aria-label="Ảnh trước"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLightboxNavigate('prev');
+                    }}
+                    className="absolute left-2 sm:left-4 z-20 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/10 backdrop-blur-md transition-all cursor-pointer hover:scale-110 active:scale-95"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                )}
+
+                <motion.div
+                  key={lightboxData.photoUrl}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="relative max-w-full max-h-[72vh] flex items-center justify-center p-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <img
+                    src={lightboxData.photoUrl}
+                    alt={lightboxData.caption || 'Ảnh kỷ niệm'}
+                    className="max-w-full max-h-[70vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+                  />
+                </motion.div>
+
+                {lightboxData.total > 1 && (
+                  <button
+                    type="button"
+                    aria-label="Ảnh tiếp theo"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLightboxNavigate('next');
+                    }}
+                    className="absolute right-2 sm:right-4 z-20 p-3 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/10 backdrop-blur-md transition-all cursor-pointer hover:scale-110 active:scale-95"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                )}
+              </div>
+
+              {/* Bottom Caption & Heart Reaction Bar */}
+              <div
+                className="w-full max-w-xl mx-auto p-4 rounded-2xl bg-white/[0.06] border border-white/15 backdrop-blur-xl flex items-center justify-between gap-4 z-10"
                 onClick={(e) => e.stopPropagation()}
-              />
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-serif italic text-white truncate">
+                    {lightboxData.caption || 'Khoảnh khắc ngọt ngào bên nhau'}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {lightboxData.date || 'Emoria Memory Space'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <motion.button
+                    type="button"
+                    aria-label={likedPhotos.has(lightboxData.photoUrl) ? 'Bỏ thích ảnh' : 'Thả tim ảnh'}
+                    onClick={() => handleToggleHeart(lightboxData.photoUrl)}
+                    animate={heartPopping ? { scale: [1, 1.4, 0.9, 1.1, 1] } : { scale: 1 }}
+                    transition={{ duration: 0.5 }}
+                    className={`p-2.5 rounded-full border transition-all cursor-pointer ${
+                      likedPhotos.has(lightboxData.photoUrl)
+                        ? 'bg-rose-500/20 border-rose-500/50 text-rose-400 shadow-lg shadow-rose-500/20'
+                        : 'bg-white/10 border-white/10 text-white hover:text-rose-300 hover:bg-white/15'
+                    }`}
+                  >
+                    <Heart
+                      className={`w-5 h-5 transition-transform ${
+                        likedPhotos.has(lightboxData.photoUrl) ? 'fill-rose-500 text-rose-500' : ''
+                      }`}
+                    />
+                  </motion.button>
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1099,6 +1964,563 @@ export default function MemoryHouseStudio({
                     Xác nhận đổi link mới
                   </button>
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Journey's End Love Letter Modal (Chặng C) */}
+        <AnimatePresence>
+          {isLetterModalOpen && (() => {
+            const letter = rooms.find((r) => r.id === 'next-chapter')?.journey_letter || {
+              title: 'Gửi người thương ở tương lai',
+              content: 'Cảm ơn vì đã luôn ở bên, lắng nghe và đồng hành cùng nhau qua từng chặng đường cuộc sống.',
+              author: 'Đôi Mình',
+              date: 'Mãi Mãi'
+            };
+            return (
+              <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                  className="w-full max-w-lg bg-[#fbf6ee] text-[#4a362a] rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden border-4 border-[#e5d4be]"
+                >
+                  <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-400 via-rose-300 to-amber-500" />
+
+                  {/* Wax Seal Badge */}
+                  <div className="flex items-center justify-between border-b border-[#e5d4be] pb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-9 h-9 rounded-full bg-red-800 text-amber-200 font-serif font-bold text-xs flex items-center justify-center shadow-md border-2 border-red-900">
+                        EM
+                      </div>
+                      <span className="text-[11px] uppercase tracking-widest font-mono font-bold text-[#8c6b53]">
+                        Phong Thư Cuối Hành Trình
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsLetterModalOpen(false)}
+                      className="p-1 rounded-full text-[#8c6b53] hover:text-[#4a362a] transition-colors cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Letter Content */}
+                  <div className="space-y-4 font-serif">
+                    <h3 className="text-xl sm:text-2xl font-bold text-[#35251c] text-center leading-snug">
+                      "{letter.title || 'Gửi người thương ở tương lai'}"
+                    </h3>
+
+                    <p className="text-sm sm:text-base italic leading-relaxed text-[#4a362a] whitespace-pre-wrap max-h-[50vh] overflow-y-auto px-2">
+                      {letter.content || 'Ngôi nhà kỷ niệm là nơi lưu giữ từng nhịp đập yêu thương. Dù thời gian trôi qua bao lâu, những khoảnh khắc ngọt ngào bên nhau vẫn luôn vẹn nguyên như ngày đầu.'}
+                    </p>
+
+                    <div className="pt-4 border-t border-[#e5d4be] flex items-center justify-between text-xs text-[#8c6b53] font-medium">
+                      <span>{letter.date || 'Hôm nay & Mai sau'}</span>
+                      <span className="font-bold font-serif text-sm text-[#4a362a]">
+                        — {letter.author || 'Đôi Mình'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsLetterModalOpen(false)}
+                      className="px-6 py-2.5 rounded-2xl bg-[#4a362a] text-[#fbf6ee] hover:bg-[#35251c] text-xs font-bold transition-colors cursor-pointer shadow-md"
+                    >
+                      Gấp lại phong thư
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            );
+          })()}
+        </AnimatePresence>
+
+        {/* Visitor Guestbook Modal (Chặng C) */}
+        <AnimatePresence>
+          {isGuestbookModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="w-full max-w-md bg-dark-900 border border-white/15 rounded-3xl p-6 shadow-2xl space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-300 flex items-center justify-center">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">Gửi Lời Chúc Mừng</h3>
+                      <p className="text-[11px] text-slate-400">Lưu lại dấu ấn ghé thăm ngôi nhà kỷ niệm</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsGuestbookModalOpen(false)}
+                    className="p-1 rounded-full text-slate-400 hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {guestSubmitted ? (
+                  <div className="py-8 text-center space-y-2">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
+                    <h4 className="text-base font-bold text-white">Đã gửi lời chúc thành công!</h4>
+                    <p className="text-xs text-slate-300">Chủ nhà sẽ nhận được lời chúc ấm áp của bạn.</p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSendGuestMessage} className="space-y-3.5 pt-1">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Tên hoặc biệt danh của bạn
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={50}
+                        value={guestName}
+                        onChange={(e) => setGuestName(e.target.value)}
+                        placeholder="Ví dụ: Bạn thân, Em gái, ..."
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-xs focus:border-amber-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Lời nhắn yêu thương ({guestMessage.length}/300)
+                      </label>
+                      <textarea
+                        required
+                        rows={3}
+                        maxLength={300}
+                        value={guestMessage}
+                        onChange={(e) => setGuestMessage(e.target.value)}
+                        placeholder="Chúc hai bạn mãi hạnh phúc và trọn vẹn yêu thương..."
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/15 text-white text-xs focus:border-amber-400 focus:outline-none resize-none leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsGuestbookModalOpen(false)}
+                        className="px-4 py-2 text-xs text-slate-400 hover:text-white font-medium cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-dark-950 text-xs font-bold shadow-lg transition-colors cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Gửi lời chúc</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Postcard & Social Share Card Modal (Chặng D) */}
+        <AnimatePresence>
+          {isPostcardModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="w-full max-w-4xl bg-dark-900 border border-white/15 rounded-3xl p-5 sm:p-7 shadow-2xl relative flex flex-col my-auto max-h-[95vh] overflow-hidden"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4 shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400/20 to-rose-400/20 text-amber-300 flex items-center justify-center border border-amber-400/30">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white font-serif">
+                        Tạo Thiệp Kỷ Niệm (Postcard Social)
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        Xuất ảnh chất lượng cao 1080p sẵn sàng đăng Story, Feed hoặc gửi cho người thương
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPostcardModalOpen(false)}
+                    className="p-1.5 rounded-full text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Body: 2 Columns */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto flex-1 pr-1 scrollbar-thin">
+                  {/* Left Column: Live Canvas Preview */}
+                  <div className="lg:col-span-6 flex flex-col items-center justify-center bg-black/50 p-4 rounded-2xl border border-white/10 relative min-h-[320px]">
+                    {isRenderingPostcard && (
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-10 rounded-2xl">
+                        <Loader2 className="w-7 h-7 text-amber-400 animate-spin" />
+                      </div>
+                    )}
+                    <canvas
+                      ref={postcardCanvasRef}
+                      className="max-h-[50vh] sm:max-h-[55vh] w-auto max-w-full rounded-xl shadow-2xl border border-white/10 object-contain"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-2 font-mono">
+                      Kích thước xuất: {POSTCARD_FORMATS[postcardFormat]?.width} × {POSTCARD_FORMATS[postcardFormat]?.height} px
+                    </p>
+                  </div>
+
+                  {/* Right Column: Controls */}
+                  <div className="lg:col-span-6 space-y-4 text-xs">
+                    {/* Template Picker */}
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1.5">Mẫu thiệp</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.values(POSTCARD_TEMPLATES).map((tmpl) => (
+                          <button
+                            key={tmpl.id}
+                            type="button"
+                            onClick={() => setPostcardTemplate(tmpl.id)}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                              postcardTemplate === tmpl.id
+                                ? 'bg-amber-400/15 border-amber-400/50 text-amber-200'
+                                : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                            }`}
+                          >
+                            <span className="font-bold block text-xs">{tmpl.name}</span>
+                            <span className="text-[10px] text-slate-400 block mt-0.5 line-clamp-1">{tmpl.description}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Format / Aspect Ratio */}
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1.5">Tỉ lệ khung hình</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPostcardFormat('square')}
+                          className={`p-2 rounded-xl border font-semibold transition-all cursor-pointer text-center ${
+                            postcardFormat === 'square'
+                              ? 'bg-amber-400/15 border-amber-400/50 text-amber-200'
+                              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                          }`}
+                        >
+                          1:1 Vuông (Feed Post)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPostcardFormat('story')}
+                          className={`p-2 rounded-xl border font-semibold transition-all cursor-pointer text-center ${
+                            postcardFormat === 'story'
+                              ? 'bg-amber-400/15 border-amber-400/50 text-amber-200'
+                              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                          }`}
+                        >
+                          9:16 Dọc (Story / Reels)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Theme Mode */}
+                    <div>
+                      <label className="block text-slate-400 font-semibold mb-1.5">Tông màu thiệp</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPostcardTheme('dark')}
+                          className={`p-2 rounded-xl border font-semibold transition-all cursor-pointer text-center ${
+                            postcardTheme === 'dark'
+                              ? 'bg-amber-400/15 border-amber-400/50 text-amber-200'
+                              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                          }`}
+                        >
+                          ✦ Đêm Sang Trọng (Obsidian)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPostcardTheme('light')}
+                          className={`p-2 rounded-xl border font-semibold transition-all cursor-pointer text-center ${
+                            postcardTheme === 'light'
+                              ? 'bg-amber-400/15 border-amber-400/50 text-amber-200'
+                              : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                          }`}
+                        >
+                          ☀ Ánh Sáng Ấm (Champagne)
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Photo selection if polaroid */}
+                    {postcardTemplate === 'polaroid' && (
+                      <div>
+                        <label className="block text-slate-400 font-semibold mb-1.5">
+                          Chọn ảnh kỷ niệm hiển thị ({rooms.flatMap(r => r.memories || []).length} ảnh)
+                        </label>
+                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                          {rooms.flatMap(r => r.memories || []).map((m, idx) => (
+                            <button
+                              key={m.id || idx}
+                              type="button"
+                              onClick={() => {
+                                setPostcardPhoto(m.photo_url);
+                                if (m.caption) setPostcardCaption(m.caption);
+                                if (m.date) setPostcardDate(m.date);
+                              }}
+                              className={`relative w-12 h-12 rounded-lg overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                                postcardPhoto === m.photo_url ? 'border-amber-400 scale-105' : 'border-white/15 opacity-60 hover:opacity-100'
+                              }`}
+                            >
+                              <img src={m.photo_url} alt="" className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Editable fields */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-400 mb-1 font-medium">Tên hai người / Tiêu đề</label>
+                        <input
+                          type="text"
+                          maxLength={50}
+                          value={postcardCoupleNames}
+                          onChange={(e) => setPostcardCoupleNames(e.target.value)}
+                          placeholder="Minh & Thảo..."
+                          className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/15 text-white focus:border-amber-400 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 mb-1 font-medium">Ngày kỷ niệm</label>
+                        <input
+                          type="text"
+                          maxLength={30}
+                          value={postcardDate}
+                          onChange={(e) => setPostcardDate(e.target.value)}
+                          placeholder="29.09.2026..."
+                          className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/15 text-white focus:border-amber-400 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Lời tựa ngắn ({postcardCaption.length}/140)</label>
+                      <textarea
+                        rows={2}
+                        maxLength={140}
+                        value={postcardCaption}
+                        onChange={(e) => setPostcardCaption(e.target.value)}
+                        placeholder="Viết một câu chúc hoặc trích dẫn tình yêu..."
+                        className="w-full px-3 py-1.5 rounded-xl bg-white/5 border border-white/15 text-white focus:border-amber-400 focus:outline-none resize-none leading-relaxed"
+                      />
+                    </div>
+
+                    {/* QR Code Option */}
+                    <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={postcardIncludeQR && isPublished}
+                          disabled={!isPublished}
+                          onChange={(e) => setPostcardIncludeQR(e.target.checked)}
+                          className="rounded border-white/20 bg-white/10 text-amber-500 focus:ring-0 disabled:opacity-40"
+                        />
+                        <span className="font-semibold text-slate-200">
+                          Đính kèm mã QR quét để ghé thăm nhà
+                        </span>
+                      </label>
+                      <p className="text-[11px] text-slate-400 pl-5">
+                        {isPublished
+                          ? 'Mã QR chuẩn quốc tế cho phép bạn bè quét camera trực tiếp để vào thăm 5 căn phòng.'
+                          : '✦ Ngôi nhà đang ở chế độ riêng tư (Draft). Thiệp sẽ hiển thị dấu niêm phong kỷ niệm riêng tư thay vì mã QR công khai.'}
+                      </p>
+                    </div>
+
+                    {/* Status feedback */}
+                    {postcardShareStatus === 'shared' && (
+                      <p className="text-emerald-400 font-semibold text-xs flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" /> Đã mở chia sẻ thành công!
+                      </p>
+                    )}
+                    {postcardShareStatus === 'downloaded' && (
+                      <p className="text-emerald-400 font-semibold text-xs flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" /> Đã tải ảnh thiệp về máy của bạn!
+                      </p>
+                    )}
+                    {postcardShareStatus === 'downloaded-copied' && (
+                      <p className="text-emerald-400 font-semibold text-xs flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" /> Đã tải ảnh và sao chép liên kết vào clipboard!
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10 mt-4 shrink-0">
+                  <p className="text-[11px] text-slate-400 italic text-center sm:text-left">
+                    Lưu ý: Tệp ảnh sau khi bạn tải xuống hoặc chia sẻ sẽ được lưu trên thiết bị của bạn.
+                  </p>
+
+                  <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={handleDownloadPostcard}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/15 transition-all cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 text-amber-300" />
+                      <span>Tải ảnh PNG</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSharePostcard}
+                      disabled={postcardShareStatus === 'sharing'}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-dark-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      <span>{postcardShareStatus === 'sharing' ? 'Đang chia sẻ...' : 'Chia sẻ ngay'}</span>
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Visitor Content Report Entrypoint */}
+        {(isPublicVisitor || !canEdit) && (
+          <div className="flex justify-end pt-4 pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowReportModal(true);
+                setReportSuccess(false);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-rose-400 text-xs transition-colors cursor-pointer border border-white/5"
+            >
+              <Flag className="w-3.5 h-3.5" />
+              <span>Báo cáo nội dung</span>
+            </button>
+          </div>
+        )}
+
+        {/* Content Report Modal */}
+        <AnimatePresence>
+          {showReportModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4"
+              >
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+                    <Flag className="w-4 h-4" />
+                    <span>Báo Cáo Nội Dung Vi Phạm</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(false)}
+                    className="text-slate-400 hover:text-white p-1 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {reportSuccess ? (
+                  <div className="text-center py-6 space-y-2">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
+                    <p className="text-sm font-semibold text-white">Đã gửi báo cáo thành công</p>
+                    <p className="text-xs text-slate-400">
+                      Cảm ơn bạn. Ban quản trị sẽ nhanh chóng xem xét và xử lý để bảo vệ môi trường văn minh.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowReportModal(false)}
+                      className="mt-4 px-6 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold cursor-pointer"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      setIsReporting(true);
+                      try {
+                        await submitContentReport('house', initialShareId || currentShareId || tagUid || 'house', reportReason, reportDetails);
+                        setReportSuccess(true);
+                      } catch (err) {
+                        alert(err?.message || 'Lỗi khi gửi báo cáo.');
+                      } finally {
+                        setIsReporting(false);
+                      }
+                    }}
+                    className="space-y-4 text-xs"
+                  >
+                    <p className="text-slate-300">
+                      Nếu bạn phát hiện hình ảnh, ghi chú hoặc lời nhắn trong ngôi nhà này vi phạm tiêu chuẩn cộng đồng, vui lòng cho chúng tôi biết:
+                    </p>
+
+                    <div className="space-y-1.5">
+                      <label className="text-slate-400 font-semibold block">Lý do báo cáo:</label>
+                      <select
+                        value={reportReason}
+                        onChange={(e) => setReportReason(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-rose-400"
+                      >
+                        <option value="inappropriate_content">Nội dung không phù hợp văn hóa</option>
+                        <option value="harassment">Quấy rối / Đả kích cá nhân</option>
+                        <option value="copyright">Vi phạm quyền riêng tư / Bản quyền</option>
+                        <option value="spam">Spam / Quảng cáo</option>
+                        <option value="other">Lý do khác</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-slate-400 font-semibold block">Chi tiết bổ sung (tùy chọn):</label>
+                      <textarea
+                        rows={3}
+                        value={reportDetails}
+                        onChange={(e) => setReportDetails(e.target.value)}
+                        placeholder="Mô tả cụ thể phòng hoặc hình ảnh vi phạm..."
+                        className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-rose-400"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => setShowReportModal(false)}
+                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isReporting}
+                        className="px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold disabled:opacity-50 cursor-pointer"
+                      >
+                        {isReporting ? 'Đang gửi...' : 'Gửi báo cáo'}
+                      </button>
+                    </div>
+                  </form>
+                )}
               </motion.div>
             </div>
           )}

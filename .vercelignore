@@ -15,3 +15,5 @@ test-accounts.json
 scripts/*.py
 !scripts/prepare-ar-assets.mjs
 supabase
+docs/memoryhouse
+*.blend1

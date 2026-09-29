@@ -14,6 +14,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
   const [videoUrl,setVideoUrl]=useState('');
   const [retrying,setRetrying]=useState(false);
   const [gallerySuccess,setGallerySuccess]=useState('');
+  const [uploadProgress,setUploadProgress]=useState(null);
 
   const urls=useRef(new Set()), abort=useRef(null), mounted=useRef(true);
 
@@ -62,7 +63,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
     setBusy(true);onBusy?.(true);setError('');setGallerySuccess('');
     try{await action();}
     catch(e){if(mounted.current)setError(e.name==='AbortError'?t("Đã hủy ghép video.","Video assembly cancelled."):e.message);}
-    finally{abort.current=null;onBusy?.(false);if(mounted.current)setBusy(false);}
+    finally{abort.current=null;onBusy?.(false);if(mounted.current){setBusy(false);setUploadProgress(null);}}
   };
 
   const handleUploadFile=async file=>{
@@ -70,7 +71,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
     if(!['video/mp4','video/webm'].includes(file.type)||file.size>MOVIE_LIMITS.outputBytes){
       throw new Error(t("Video phải là định dạng MP4 hoặc WebM, dung lượng tối đa 50 MB.","Choose an MP4 or WebM video, up to 50 MB."));
     }
-    const uploaded=await uploadModeratedMedia(tag,file,videoConsent,'intro');
+    const uploaded=await uploadModeratedMedia(tag,file,videoConsent,'intro',setUploadProgress);
     onChange(uploaded.path);
     setModInfo({
       status:uploaded.approved?'ready':'rejected',
@@ -81,9 +82,9 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
 
   const handleRetryModeration=async()=>{
     if(!path||retrying)return;
-    setRetrying(true);setError('');
+    setRetrying(true);setError('');onBusy?.(true);
     try{
-      const res=await moderateUploadedMedia(tag,path,videoConsent);
+      const res=await moderateUploadedMedia(tag,path,videoConsent,setUploadProgress);
       setModInfo({
         status:res.approved?'ready':'rejected',
         labels:res.labels||[],
@@ -92,7 +93,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
     }catch(err){
       setError(err.message);
     }finally{
-      setRetrying(false);
+      setRetrying(false);setUploadProgress(null);onBusy?.(false);
     }
   };
 
@@ -124,7 +125,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
   const handleAddRenderedToGallery=async()=>{
     if(!result)return;
     run(async()=>{
-      const uploaded=await uploadModeratedMedia(tag,result,videoConsent,'gallery');
+      const uploaded=await uploadModeratedMedia(tag,result,videoConsent,'gallery',setUploadProgress);
       if(onAddToGallery){
         onAddToGallery({
           path:uploaded.path,
@@ -540,9 +541,10 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
 
       {/* Pop-up chờ xử lý & kiểm duyệt AI */}
       <MediaModerationModal
-        isOpen={busy || retrying}
+        isOpen={!!uploadProgress}
+        jobs={uploadProgress?[uploadProgress]:[]}
         title={t("Đang tải lên & kiểm duyệt video","Uploading & moderating video")}
-        detail={t("Hệ thống đang kiểm tra nội dung và tự động phân tích nhãn chủ đề cho video mở đầu. Quá trình thường chỉ mất vài giây, vui lòng giữ tab này mở...","We are checking your opening video. Please keep this tab open until moderation finishes.")}
+        detail={t("Vui lòng giữ tab này mở đến khi tải lên và kiểm duyệt hoàn tất.","Please keep this tab open until uploading and review finish.")}
       />
     </section>
   );

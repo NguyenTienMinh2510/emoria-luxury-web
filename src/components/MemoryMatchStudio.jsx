@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback, useId } from 'react';
+import React, { useState, useEffect, useCallback, useId, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import {
   Heart, Sparkles, ArrowLeft, ArrowRight, CheckCircle2, Copy,
   Share2, RefreshCw, AlertCircle, Plus, Trash2, Image as ImageIcon,
-  Check, Lock, Unlock, HelpCircle, Trophy, Flame, Home, ShoppingBag
+  Check, Lock, Unlock, HelpCircle, Trophy, Flame, Home, ShoppingBag,
+  Loader2, GripVertical, ChevronUp, ChevronDown, Flag
 } from 'lucide-react';
 import {
   createMatch,
@@ -15,8 +16,20 @@ import {
   getMatchView,
   listMatches,
   uploadEventPhoto,
-  DEFAULT_MATCH_QUESTIONS
+  DEFAULT_MATCH_QUESTIONS,
+  trackEventAction,
+  submitContentReport
 } from '../services/eventService.js';
+import {
+  MATCH_TOPICS,
+  getTopicQuestions,
+  getRandomReplacement,
+  getComplementaryInsight,
+  getPlayedQuestions,
+  recordPlayedQuestions
+} from '../services/matchQuestionBank.js';
+import {createDraftQueue} from '../services/draftQueue.js';
+import {watchMatch} from '../services/matchStream.js';
 
 export default function MemoryMatchStudio({
   tagUid,
@@ -30,7 +43,8 @@ export default function MemoryMatchStudio({
   currentUser
 }) {
   const [matchId, setMatchId] = useState(initialMatchId || null);
-  const [inviteToken, setInviteToken] = useState(initialInviteToken || '');
+  const [accessInviteToken, setAccessInviteToken] = useState(initialInviteToken || '');
+  const [shareInviteToken, setShareInviteToken] = useState('');
   const [viewData, setViewData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -48,12 +62,88 @@ export default function MemoryMatchStudio({
   const [isStartingMatch, setIsStartingMatch] = useState(false);
   const [uploadingImageIndex, setUploadingImageIndex] = useState(null);
 
+  // Handlers for Topic Packs and Question Reroll
+  const handleSelectTopic = (topicId) => {
+    setSelectedTopic(topicId);
+    const playedTexts = getPlayedQuestions(tagUid);
+    const newQuestions = getTopicQuestions(topicId, 5, playedTexts);
+    recordPlayedQuestions(tagUid, newQuestions.map(q => q.text));
+    setQuestions(newQuestions);
+    const topicObj = MATCH_TOPICS.find(t => t.id === topicId);
+    if (topicObj) {
+      setDraftTitle(`Couple Match: ${topicObj.title}`);
+    }
+    isDirty.current = true;
+    setAutosaveState('saving');
+  };
+
+  const handleRerollQuestion = (index) => {
+    const currentTexts = questions.map(q => q.text);
+    const replacement = getRandomReplacement(selectedTopic, currentTexts);
+    const updated = [...questions];
+    updated[index] = {
+      ...updated[index],
+      text: replacement.text,
+      options: replacement.options,
+      image_path: null,
+      image_url: null
+    };
+    setQuestions(updated);
+    isDirty.current = true;
+    setAutosaveState('saving');
+  };
+
+  // Autosave state
+  const [autosaveState, setAutosaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
+  const isDirty = useRef(false);
+  const isInitialLoad = useRef(true);
+  const saveRevision = useRef(0);
+  const justCreatedIdRef = useRef(null);
+  const draftQueue=useRef(null),progressQueue=useRef(null),creating=useRef(null);
+  function resetQueues(id,data,token){
+    draftQueue.current=createDraftQueue((payload,expected_revision)=>saveMatchQuestions(id,{...payload,expected_revision}));
+    draftQueue.current.reset(data.draft_revision||0);
+    progressQueue.current=createDraftQueue(async(payload,expected_revision)=>{
+      const result=await saveMatchProgress(id,{...payload,inviteToken:token || undefined,expected_revision});
+      return {...result,draft_revision:result.progress_revision};
+    });
+    progressQueue.current.reset(data.progress_revision||0);
+  }
+  async function persistDraft(payload,retry=false){
+    if(!draftQueue.current)throw new Error('Bản nháp chưa tải xong.');
+    const result = await draftQueue.current.enqueue(payload,{retry});
+    if(JSON.stringify(payload)===JSON.stringify(draftPayload())&&!draftQueue.current.pending){isDirty.current=false;setAutosaveState('saved');}
+    return result;
+  }
+  function draftPayload(){const d=latestDraftRef.current;return {questions:d.questions,title:d.title.trim()||'Couple Match',partner_name:d.partnerName.trim()||null,owner_name:d.ownerName.trim()||null};}
+  const latestDraftRef = useRef({
+    title: draftTitle,
+    partnerName,
+    ownerName,
+    questions,
+    matchId
+  });
+
+  latestDraftRef.current = {
+      title: draftTitle,
+      partnerName,
+      ownerName,
+      questions,
+      matchId
+    };
+
   // Match playing state (1 question per screen)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeMatchesList, setActiveMatchesList] = useState([]);
+  const [partnerNotice, setPartnerNotice] = useState('');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('inappropriate_content');
+  const [reportDetails, setReportDetails] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
 
   const radioGroupId = useId();
 
@@ -61,18 +151,27 @@ export default function MemoryMatchStudio({
   const loadMatchData = useCallback(async (targetId, tokenToUse) => {
     if (!targetId) return;
     setLoading(true);
+    isInitialLoad.current = true;
     setError('');
+    const effectiveToken = tokenToUse !== undefined ? tokenToUse : accessInviteToken;
     try {
-      const data = await getMatchView(targetId, { inviteToken: tokenToUse || inviteToken });
+      const data = await getMatchView(targetId, { inviteToken: effectiveToken || undefined });
+      resetQueues(targetId, data, effectiveToken || '');
       setViewData(data);
+      if (data.invite_token) {
+        setShareInviteToken(data.invite_token);
+      }
+      if (effectiveToken) {
+        trackEventAction('match_invite_opened', 'match', targetId, null, {}, effectiveToken);
+      }
       if (data.status === 'draft') {
         setStudioMode('editor');
-        if (data.questions && data.questions.length >= 3) {
+        if (Array.isArray(data.questions)) {
           setQuestions(data.questions);
         }
         if (data.title) setDraftTitle(data.title);
-        if (data.partner_name) setPartnerName(data.partner_name);
-        if (data.owner_name) setOwnerName(data.owner_name);
+        setPartnerName(data.partner_name || '');
+        setOwnerName(data.owner_name || '');
       } else {
         setStudioMode('player');
         // Restore progress answers if any
@@ -98,12 +197,16 @@ export default function MemoryMatchStudio({
     } finally {
       setLoading(false);
     }
-  }, [inviteToken]);
+  }, [accessInviteToken]);
 
   // Initial load
   useEffect(() => {
+    if (justCreatedIdRef.current === matchId) {
+      justCreatedIdRef.current = null;
+      return;
+    }
     if (matchId) {
-      loadMatchData(matchId, inviteToken);
+      loadMatchData(matchId, accessInviteToken);
     } else if (tagUid && currentUser) {
       // Check existing matches for this memory space
       setLoading(true);
@@ -114,7 +217,6 @@ export default function MemoryMatchStudio({
             // Pick most recent active or draft match
             const recent = list[0];
             setMatchId(recent.id);
-            loadMatchData(recent.id, '');
           } else {
             setLoading(false);
             setStudioMode('editor');
@@ -127,16 +229,81 @@ export default function MemoryMatchStudio({
     } else {
       setLoading(false);
     }
-  }, [matchId, tagUid, currentUser, loadMatchData, inviteToken]);
+  }, [matchId, tagUid, currentUser, loadMatchData, accessInviteToken]);
+
+  // Autosave debouncer (1000ms)
+  useEffect(() => {
+    if (loading) return;
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+    if (studioMode !== 'editor' || loading || !currentUser) return;
+
+    isDirty.current = true;
+    setAutosaveState('saving');
+    const currentRev = ++saveRevision.current;
+
+    const timer = setTimeout(async () => {
+      try {
+        const payload = {
+          questions: latestDraftRef.current.questions,
+          title: latestDraftRef.current.title.trim() || 'Couple Match',
+          partner_name: latestDraftRef.current.partnerName.trim() || null,
+          owner_name: latestDraftRef.current.ownerName.trim() || null
+        };
+        if(!matchId){await handleCreateNewMatch();return;}
+        await persistDraft(payload);
+        if (saveRevision.current === currentRev) {
+          isDirty.current = false;
+          setAutosaveState('saved');
+        }
+      } catch (err) {
+        if (saveRevision.current === currentRev) {
+          setAutosaveState('error');setError(err.message);
+        }
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [draftTitle, partnerName, ownerName, questions, studioMode, matchId, loading]);
+
+  // Warn before leaving if dirty
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  // Authoritative private broadcasts relayed by our authenticated SSE endpoint.
+  useEffect(()=>{
+    if(!matchId||!viewData?.my_submitted||viewData?.both_submitted)return;
+    let stopped=false,pending=false;
+    const refresh=async()=>{if(stopped||pending||document.visibilityState==='hidden')return;pending=true;
+      try{const data=await getMatchView(matchId,{inviteToken: accessInviteToken || undefined});if(!stopped){setViewData(data);if(data.both_submitted)setPartnerNotice('Người ấy đã hoàn thành. Cùng mở kết quả nhé!');}}
+      catch(err){if(!stopped)setError(err.message);}finally{pending=false;}};
+    const disconnect=watchMatch(matchId,accessInviteToken,state=>{if(state.both_submitted)refresh();},refresh);
+    const timer=setInterval(refresh,15000);
+    window.addEventListener('focus',refresh);
+    return()=>{stopped=true;disconnect();clearInterval(timer);window.removeEventListener('focus',refresh);};
+  },[matchId,accessInviteToken,viewData?.my_submitted,viewData?.both_submitted]);
 
   // Handle creating a brand new match draft
-  const handleCreateNewMatch = async () => {
+  const handleCreateNewMatch = () => {
+    if(creating.current)return creating.current;
+    creating.current=(async()=>{
     if (!tagUid) {
       setError('Cần mã kỷ vật để tạo thử thách.');
       return;
     }
     setError('');
     setIsSavingDraft(true);
+    setAutosaveState('saving');
     try {
       const created = await createMatch({
         tagUid,
@@ -144,31 +311,75 @@ export default function MemoryMatchStudio({
         partnerName: partnerName.trim() || null,
         ownerName: ownerName.trim() || null
       });
+      justCreatedIdRef.current = created.id;
+      resetQueues(created.id,{draft_revision:0},'');
       setMatchId(created.id);
       // Save initial questions
-      await saveMatchQuestions(created.id, {
-        questions,
+      await persistDraft(draftPayload());
+      setSuccessMsg('Đã tạo bản nháp thử thách mới!');
+      setViewData({status:'draft'});
+      return created.id;
+    } catch (err) {
+      setAutosaveState('error');
+      setError(err?.message || 'Lỗi khi tạo lượt chơi.');
+    } finally {
+      setIsSavingDraft(false);
+    }
+    })().finally(()=>{creating.current=null;});return creating.current;
+  };
+
+  // Reorder questions
+  const handleMoveQuestion = (fromIndex, toIndex) => {
+    if (fromIndex === toIndex || toIndex < 0 || toIndex >= questions.length) return;
+    setQuestions((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  };
+
+  // Handle saving questions in draft (allows drafting without blocking prematurely)
+  const handleSaveDraft = async (customQuestions) => {
+    const qsToSave = customQuestions || questions;
+    if (qsToSave.length > 10) {
+      setError('Số câu hỏi trong bản nháp không được vượt quá 10 câu.');
+      return false;
+    }
+    if (!matchId) {
+      return Boolean(await handleCreateNewMatch());
+    }
+
+    setError('');
+    setIsSavingDraft(true);
+    setAutosaveState('saving');
+    try {
+      await persistDraft({
+        questions: qsToSave,
         title: draftTitle.trim() || 'Couple Match',
         partner_name: partnerName.trim() || null,
         owner_name: ownerName.trim() || null
-      });
-      setSuccessMsg('Đã tạo bản nháp thử thách mới!');
-      await loadMatchData(created.id, '');
+      },true);
+      setSuccessMsg('Đã lưu nội dung câu hỏi thành công.');
+      setTimeout(() => setSuccessMsg(''), 2500);
+      return true;
     } catch (err) {
-      setError(err?.message || 'Lỗi khi tạo lượt chơi.');
+      setAutosaveState('error');
+      setError(err?.message || 'Không thể lưu câu hỏi.');
+      return false;
     } finally {
       setIsSavingDraft(false);
     }
   };
 
-  // Handle saving questions in draft
-  const handleSaveDraft = async () => {
+  // Start match & generate invite token (enforces strict 3-7 questions & non-empty options)
+  const handleBeginMatch = async () => {
     if (!matchId) {
-      await handleCreateNewMatch();
+      setError('Vui lòng lưu bản nháp trước.');
       return;
     }
     if (questions.length < 3 || questions.length > 7) {
-      setError('Số câu hỏi phải từ 3 đến 7 câu.');
+      setError('Số câu hỏi để bắt đầu thử thách phải từ 3 đến 7 câu.');
       return;
     }
     for (let i = 0; i < questions.length; i++) {
@@ -188,44 +399,20 @@ export default function MemoryMatchStudio({
         }
       }
     }
-
-    setError('');
-    setIsSavingDraft(true);
-    try {
-      await saveMatchQuestions(matchId, {
-        questions,
-        title: draftTitle.trim() || 'Couple Match',
-        partner_name: partnerName.trim() || null,
-        owner_name: ownerName.trim() || null
-      });
-      setSuccessMsg('Đã lưu nội dung câu hỏi thành công.');
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (err) {
-      setError(err?.message || 'Không thể lưu câu hỏi.');
-    } finally {
-      setIsSavingDraft(false);
-    }
-  };
-
-  // Start match & generate invite token
-  const handleBeginMatch = async () => {
-    if (!matchId) {
-      setError('Vui lòng lưu bản nháp trước.');
-      return;
-    }
     setError('');
     setIsStartingMatch(true);
     try {
       // Ensure questions are saved first
-      await saveMatchQuestions(matchId, {
+      await persistDraft({
         questions,
         title: draftTitle.trim() || 'Couple Match',
         partner_name: partnerName.trim() || null,
         owner_name: ownerName.trim() || null
       });
+      if(isDirty.current)throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi bắt đầu lại.');
       const res = await beginMatch(matchId);
       if (res.invite_token) {
-        setInviteToken(res.invite_token);
+        setShareInviteToken(res.invite_token);
       }
       setSuccessMsg('Lượt chơi đã kích hoạt! Hãy gửi liên kết cho người ấy.');
       await loadMatchData(matchId, '');
@@ -239,14 +426,17 @@ export default function MemoryMatchStudio({
   // Handle uploading question image
   const handleQuestionImageUpload = async (qIndex, file) => {
     if (!file || !tagUid) return;
+    const targetId = questions[qIndex]?.id;
     setUploadingImageIndex(qIndex);
     setError('');
     try {
       const res = await uploadEventPhoto(tagUid, file);
       setQuestions((prev) => {
         const next = [...prev];
-        next[qIndex] = {
-          ...next[qIndex],
+        const index = next.findIndex(q => q.id === targetId);
+        if(index < 0)return prev;
+        next[index] = {
+          ...next[index],
           image_path: res.path,
           image_url: res.url
         };
@@ -263,6 +453,7 @@ export default function MemoryMatchStudio({
 
   // Handle question option select
   const handleSelectOption = (optionIndex) => {
+    if(isSubmitting || viewData?.my_submitted)return;
     const updated = [...answers];
     while (updated.length <= currentQuestionIndex) {
       updated.push(null);
@@ -272,10 +463,10 @@ export default function MemoryMatchStudio({
 
     // Auto-save progress in background
     if (matchId) {
-      saveMatchProgress(matchId, {
-        answers: updated,
-        inviteToken
-      }).catch(() => {});
+      setAutosaveState('saving');isDirty.current=true;
+      progressQueue.current?.enqueue({answers:updated}).then(()=>{
+        if(!progressQueue.current.pending){isDirty.current=false;setAutosaveState('saved');}
+      }).catch(err=>{setError(err.message);setAutosaveState('error');});
     }
   };
 
@@ -292,12 +483,13 @@ export default function MemoryMatchStudio({
     setError('');
     setIsSubmitting(true);
     try {
+      await progressQueue.current?.flush();
       await submitMatch(matchId, {
         answers,
-        inviteToken
+        inviteToken: accessInviteToken || undefined
       });
       setSuccessMsg('Đã nộp bài thành công!');
-      await loadMatchData(matchId, inviteToken);
+      await loadMatchData(matchId, accessInviteToken);
     } catch (err) {
       setError(err?.message || 'Không thể nộp bài.');
     } finally {
@@ -329,10 +521,9 @@ export default function MemoryMatchStudio({
   }, [studioMode, viewData, questions, currentQuestionIndex, answers]);
 
   // Copy share invite link
-  const inviteLink = matchId && viewData?.invite_token
-    ? `${window.location.origin}/?view=memory-match&match=${matchId}&invite=${viewData.invite_token}`
-    : inviteToken
-    ? `${window.location.origin}/?view=memory-match&match=${matchId}&invite=${inviteToken}`
+  const activeShareToken = shareInviteToken || viewData?.invite_token || accessInviteToken;
+  const inviteLink = matchId && activeShareToken
+    ? `${window.location.origin}/?view=memory-match&match=${matchId}&invite=${activeShareToken}`
     : '';
 
   const handleCopyLink = () => {
@@ -340,6 +531,7 @@ export default function MemoryMatchStudio({
     navigator.clipboard.writeText(inviteLink).then(() => {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
+      if (matchId) trackEventAction('house_copy_link', 'match', matchId);
     });
   };
 
@@ -358,7 +550,7 @@ export default function MemoryMatchStudio({
 
   // Helper question manipulation
   const addQuestion = () => {
-    if (questions.length >= 7) return;
+    if (questions.length >= 10) return;
     setQuestions((prev) => [
       ...prev,
       {
@@ -372,7 +564,7 @@ export default function MemoryMatchStudio({
   };
 
   const removeQuestion = (idx) => {
-    if (questions.length <= 3) return;
+    if (questions.length <= 1) return;
     setQuestions((prev) => prev.filter((_, i) => i !== idx));
   };
 
@@ -424,6 +616,7 @@ export default function MemoryMatchStudio({
   const progressPercent = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
 
   const handleGoHome = () => {
+    if(isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
     if (onNavigateHome) {
       onNavigateHome();
     } else if (typeof window !== 'undefined') {
@@ -432,6 +625,7 @@ export default function MemoryMatchStudio({
   };
 
   const handleBackToMemory = () => {
+    if(isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
     if (onNavigateMemory) {
       onNavigateMemory(tagUid);
     } else if (onBack) {
@@ -444,6 +638,7 @@ export default function MemoryMatchStudio({
   };
 
   const handleSwitchToHouse = () => {
+    if(isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
     if (onSwitchStudio) {
       onSwitchStudio('house');
     } else if (typeof window !== 'undefined') {
@@ -489,7 +684,7 @@ export default function MemoryMatchStudio({
 
           {onNavigateShop && (
             <button
-              onClick={onNavigateShop}
+              onClick={() => {if(!isDirty.current||window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))onNavigateShop();}}
               type="button"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
               title="Xem Cửa Hàng & Bộ Sưu Tập"
@@ -505,6 +700,34 @@ export default function MemoryMatchStudio({
             <Sparkles className="w-3.5 h-3.5" />
             <span>Couple Match Studio</span>
           </div>
+
+          {studioMode === 'editor' && (
+            <div className="shrink-0">
+              {autosaveState === 'saving' && (
+                <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-300 border border-rose-500/30 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Đang lưu...</span>
+                </span>
+              )}
+              {autosaveState === 'saved' && (
+                <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Đã lưu</span>
+                </span>
+              )}
+              {autosaveState === 'error' && (
+                <button
+                  type="button"
+                  onClick={() => handleSaveDraft()}
+                  className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-300 hover:text-rose-200 border border-rose-500/30 flex items-center gap-1 cursor-pointer"
+                  title="Bấm để thử lưu lại"
+                >
+                  <AlertCircle className="w-3 h-3" />
+                  <span>Chưa lưu — thử lại</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {viewData?.status === 'draft' && currentUser && (
             <button
@@ -613,10 +836,13 @@ export default function MemoryMatchStudio({
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <span>Danh sách câu hỏi</span>
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">
-                  {questions.length}/7 câu
+                  {questions.length}/10 câu
+                </span>
+                <span className="text-[11px] text-slate-400 font-normal">
+                  (Cần từ 3 đến 7 câu để kích hoạt chơi)
                 </span>
               </h2>
-              {questions.length < 7 && (
+              {questions.length < 10 && (
                 <button
                   type="button"
                   onClick={addQuestion}
@@ -631,27 +857,61 @@ export default function MemoryMatchStudio({
             {questions.map((q, qIndex) => (
               <div
                 key={q.id || qIndex}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', String(qIndex));
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const from = Number(e.dataTransfer.getData('text/plain'));
+                  if (!isNaN(from)) handleMoveQuestion(from, qIndex);
+                }}
                 className="bg-black/40 border border-white/10 rounded-2xl p-5 space-y-4 transition-all hover:border-white/20"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-300 flex items-center justify-center text-xs font-bold">
-                      {qIndex + 1}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <GripVertical className="w-4 h-4 text-slate-500 cursor-grab" />
+                      <span className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-300 flex items-center justify-center text-xs font-bold">
+                        {qIndex + 1}
+                      </span>
+                    </div>
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                       Câu hỏi {qIndex + 1}
                     </span>
                   </div>
-                  {questions.length > 3 && (
+
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => removeQuestion(qIndex)}
-                      className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                      title="Xóa câu hỏi này"
+                      onClick={() => handleMoveQuestion(qIndex, qIndex - 1)}
+                      disabled={qIndex === 0}
+                      className="p-1 rounded bg-white/5 hover:bg-white/15 text-slate-300 disabled:opacity-20 transition-colors cursor-pointer"
+                      title="Di chuyển câu hỏi lên trên"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <ChevronUp className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => handleMoveQuestion(qIndex, qIndex + 1)}
+                      disabled={qIndex === questions.length - 1}
+                      className="p-1 rounded bg-white/5 hover:bg-white/15 text-slate-300 disabled:opacity-20 transition-colors cursor-pointer"
+                      title="Di chuyển câu hỏi xuống dưới"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                    {questions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeQuestion(qIndex)}
+                        className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-white/5 transition-colors cursor-pointer ml-1"
+                        title="Xóa câu hỏi này"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Question Text */}
@@ -764,14 +1024,28 @@ export default function MemoryMatchStudio({
 
           {/* Action Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10">
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={isSavingDraft}
-              className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white text-sm font-semibold border border-white/15 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isSavingDraft ? 'Đang lưu bản nháp...' : 'Lưu bản nháp'}
-            </button>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => handleSaveDraft()}
+                disabled={isSavingDraft}
+                className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white text-sm font-semibold border border-white/15 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isSavingDraft ? 'Đang lưu bản nháp...' : 'Lưu bản nháp'}
+              </button>
+              {autosaveState === 'saved' && (
+                <span className="text-xs text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Đã tự động lưu</span>
+                </span>
+              )}
+              {autosaveState === 'saving' && (
+                <span className="text-xs text-rose-300 flex items-center gap-1">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Đang tự động lưu...</span>
+                </span>
+              )}
+            </div>
 
             <button
               type="button"
@@ -996,7 +1270,7 @@ export default function MemoryMatchStudio({
 
             <button
               type="button"
-              onClick={() => loadMatchData(matchId, inviteToken)}
+              onClick={() => loadMatchData(matchId, accessInviteToken)}
               className="mt-6 inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white text-dark-950 font-bold text-xs hover:bg-slate-200 transition-all cursor-pointer shadow-lg"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -1133,6 +1407,158 @@ export default function MemoryMatchStudio({
           </div>
         </section>
       )}
+      {/* Realtime Partner Submitted Toast */}
+      <AnimatePresence>
+        {partnerNotice && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 right-6 z-50 max-w-sm p-4 rounded-2xl bg-gradient-to-r from-rose-900/90 to-purple-900/90 border border-rose-500/40 text-white shadow-2xl backdrop-blur-xl flex items-center gap-3"
+          >
+            <div className="w-10 h-10 rounded-full bg-rose-500/30 flex items-center justify-center shrink-0 text-rose-300">
+              <Sparkles className="w-5 h-5 animate-spin" />
+            </div>
+            <div className="flex-1 text-xs">
+              <p className="font-bold text-sm text-rose-200">Tin nhắn mới ✨</p>
+              <p className="text-slate-200 mt-0.5">{partnerNotice}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPartnerNotice('')}
+              className="text-slate-400 hover:text-white p-1 cursor-pointer"
+            >
+              ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Footer Utility: Report Content Button */}
+      {matchId && (
+        <footer className="mt-12 pt-6 border-t border-white/5 flex items-center justify-between text-xs text-slate-500">
+          <span>EMORIA Couple Match Studio</span>
+          <button
+            type="button"
+            onClick={() => {
+              setShowReportModal(true);
+              setReportSuccess(false);
+            }}
+            className="inline-flex items-center gap-1.5 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+          >
+            <Flag className="w-3.5 h-3.5" />
+            <span>Báo cáo nội dung</span>
+          </button>
+        </footer>
+      )}
+
+      {/* Content Report Modal */}
+      <AnimatePresence>
+        {showReportModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+                  <Flag className="w-4 h-4" />
+                  <span>Báo Cáo Nội Dung Vi Phạm</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(false)}
+                  className="text-slate-400 hover:text-white p-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {reportSuccess ? (
+                <div className="text-center py-6 space-y-2">
+                  <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
+                  <p className="text-sm font-semibold text-white">Đã gửi báo cáo thành công</p>
+                  <p className="text-xs text-slate-400">
+                    Cảm ơn bạn. Ban quản trị sẽ nhanh chóng xem xét và xử lý để bảo vệ môi trường văn minh.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(false)}
+                    className="mt-4 px-6 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              ) : (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setIsReporting(true);
+                    try {
+                      await submitContentReport('match', matchId, reportReason, reportDetails, initialInviteToken);
+                      setReportSuccess(true);
+                    } catch (err) {
+                      alert(err?.message || 'Lỗi khi gửi báo cáo.');
+                    } finally {
+                      setIsReporting(false);
+                    }
+                  }}
+                  className="space-y-4 text-xs"
+                >
+                  <p className="text-slate-300">
+                    Nếu bạn phát hiện câu hỏi hoặc hình ảnh trong thử thách này vi phạm tiêu chuẩn cộng đồng, vui lòng cho chúng tôi biết:
+                  </p>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-400 font-semibold block">Lý do báo cáo:</label>
+                    <select
+                      value={reportReason}
+                      onChange={(e) => setReportReason(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-rose-400"
+                    >
+                      <option value="inappropriate_content">Nội dung không phù hợp văn hóa</option>
+                      <option value="harassment">Quấy rối / Đả kích cá nhân</option>
+                      <option value="copyright">Vi phạm quyền riêng tư / Bản quyền</option>
+                      <option value="spam">Spam / Quảng cáo</option>
+                      <option value="other">Lý do khác</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-400 font-semibold block">Chi tiết bổ sung (tùy chọn):</label>
+                    <textarea
+                      rows={3}
+                      value={reportDetails}
+                      onChange={(e) => setReportDetails(e.target.value)}
+                      placeholder="Mô tả cụ thể câu hỏi hoặc hình ảnh vi phạm..."
+                      className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-rose-400"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setShowReportModal(false)}
+                      className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isReporting}
+                      className="px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold disabled:opacity-50 cursor-pointer"
+                    >
+                      {isReporting ? 'Đang gửi...' : 'Gửi báo cáo'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

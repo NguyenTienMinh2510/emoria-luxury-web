@@ -1,19 +1,24 @@
 import {supabase} from '../lib/supabaseClient.js';
 import {apiRequest} from './apiClient.js';
+import {estimateMediaSeconds, mediaProgress, recordMediaTiming} from './mediaUploadProgress.js';
 
-export async function moderateUploadedMedia(tag,path,consent) {
+export async function moderateUploadedMedia(tag,path,consent,onProgress=()=>{},file={type:/\.(jpg|jpeg|png|webp)$/i.test(path)?'image/jpeg':'video/mp4'}) {
+  if(!consent)throw new Error('Bạn cần đồng ý kiểm duyệt bằng Google trước khi tải lên.');
+  onProgress(mediaProgress(file,'reviewing',estimateMediaSeconds(file,'reviewing')));
+  const startedAt=Date.now();
   const result=await apiRequest(`/memories/${encodeURIComponent(tag)}/video-labels/analyze`,{
     method:'POST',
     body:{path,consent,include_labels:true},
     timeoutMs:175000
   });
+  recordMediaTiming(file,'reviewing',(Date.now()-startedAt)/1000);
   if(result.approved!==true)throw new Error(result.reason||'Phương tiện chưa đạt kiểm duyệt và không được gắn vào kỷ vật.');
   return result;
 }
 
 export const moderateUploadedVideo = moderateUploadedMedia;
 
-export async function uploadModeratedMedia(tag,file,consent,role='intro') {
+export async function uploadModeratedMedia(tag,file,consent,role='intro',onProgress=()=>{}) {
   if(!consent)throw new Error('Bạn cần đồng ý kiểm duyệt bằng Google trước khi tải lên.');
   const allowed=['video/mp4','video/webm','image/jpeg','image/png','image/webp'];
   if(!allowed.includes(file?.type)||!file?.size||file.size>50*1024*1024){
@@ -23,9 +28,12 @@ export async function uploadModeratedMedia(tag,file,consent,role='intro') {
   const ext=extMap[file.type]||(file.type.startsWith('image/')?'jpg':'mp4');
   const prefix=role==='intro'?'intro-':'gallery-';
   const path=`${tag}/${prefix}${crypto.randomUUID()}.${ext}`;
+  onProgress(mediaProgress(file,'uploading'));
+  const startedAt=Date.now();
   const {error}=await supabase.storage.from('emoria-memory').upload(path,file,{contentType:file.type,upsert:false});
   if(error)throw error;
-  const mod=await moderateUploadedMedia(tag,path,true);
+  recordMediaTiming(file,'uploading',(Date.now()-startedAt)/1000);
+  const mod=await moderateUploadedMedia(tag,path,true,onProgress,file);
   return {path,labels:mod.labels||[],approved:mod.approved};
 }
 

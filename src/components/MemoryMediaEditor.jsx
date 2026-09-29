@@ -4,12 +4,14 @@ import {supabase} from '../lib/supabaseClient';
 import {uploadModeratedMedia, moderateUploadedMedia, fetchMediaUploads} from '../services/videoUpload.js';
 import {Images, UploadCloud, RefreshCw, Trash2, CheckCircle2, AlertTriangle, Music} from 'lucide-react';
 import MediaModerationModal from './MediaModerationModal.jsx';
+import {mediaProgress, runMediaBatch} from '../services/mediaUploadProgress.js';
 
 export default function MemoryMediaEditor({tag, items, onChange, audio, onAudio, videoConsent=false, onBusy=()=>{}}){
   const {t}=useLanguage();
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[statusText,setStatusText]=useState('');
   const [retryingPath,setRetryingPath]=useState('');
   const [uploadsMap,setUploadsMap]=useState({});
+  const [jobs,setJobs]=useState({}),[batchCount,setBatchCount]=useState({completed:0,total:0});
 
   // Fetch moderation statuses for gallery media
   const loadStatuses=async()=>{
@@ -22,65 +24,79 @@ export default function MemoryMediaEditor({tag, items, onChange, audio, onAudio,
   };
 
   useEffect(()=>{
-    loadStatuses();
-  },[tag,items.length]);
+    if(!busy)loadStatuses();
+  },[tag,items.length,busy]);
 
-  const uploadFile=async(file)=>{
+  const uploadFile=async(file,index)=>{
     if(!file)return;
     const allowed=['image/jpeg','image/png','image/webp','video/mp4','video/webm','audio/mpeg','audio/wav','audio/ogg','audio/mp4'];
-    if(!allowed.includes(file.type)||file.size>50*1024*1024){
+    if(!allowed.includes(file.type)||!file.size||file.size>50*1024*1024){
       throw new Error(`Tệp "${file.name}" không hợp lệ. Chọn ảnh JPEG/PNG/WebP, video MP4/WebM hoặc audio MP3/WAV/OGG/M4A, tối đa 50 MB.`);
     }
+    const updateProgress=progress=>setJobs(previous=>({...previous,[index]:progress}));
 
     if(file.type.startsWith('audio/')){
+      updateProgress(mediaProgress(file,'uploading'));
       const path=`${tag}/audio-${crypto.randomUUID()}.${file.type.split('/')[1]||'mp3'}`;
       const res=await supabase.storage.from('emoria-memory').upload(path,file,{upsert:false,contentType:file.type});
       if(res.error)throw res.error;
-      onAudio('storage://'+path);
-      return;
+      return {audio:'storage://'+path};
     }
 
     // Moderate images and videos with Gemini AI
     setStatusText(`Đang tải & kiểm duyệt "${file.name}"...`);
-    const uploaded=await uploadModeratedMedia(tag,file,videoConsent,'gallery');
+    const uploaded=await uploadModeratedMedia(tag,file,videoConsent,'gallery',updateProgress);
     const type=file.type.startsWith('image/')?'image':'video';
-    onChange([...items,{path:uploaded.path,type,caption:file.name}]);
+    return {path:uploaded.path,type,caption:file.name};
   };
 
   const handleMultiUpload=async(files)=>{
     if(!files||!files.length||busy)return;
-    setError('');setBusy(true);onBusy(true);
+    let slots=30-items.length;
+    const selected=files.filter(file=>file.type.startsWith('audio/')||slots-->0);
+    const limitMessage=selected.length<files.length?t("Đã đạt giới hạn tối đa 30 media trong Bộ sưu tập.","The gallery has reached its 30-file limit."):'';
+    const accepted=new Array(selected.length),failures=[];
+    setError(limitMessage);setBusy(true);onBusy(true);setJobs({});
+    setBatchCount({completed:0,total:selected.length});
     try{
-      for(const file of files){
-        if(items.length>=30){
-          setError(t("Đã đạt giới hạn tối đa 30 media trong Bộ sưu tập.","The gallery has reached its 30-file limit."));
-          break;
+      await runMediaBatch(selected,uploadFile,(result,index)=>{
+        if(result.status==='fulfilled'){
+          accepted[index]=result.value;
+          if(result.value.audio){
+            onAudio(accepted.filter(value=>value?.audio).at(-1).audio);
+          }else{
+            onChange([...items,...accepted.filter(value=>value&&!value.audio)]);
+            setUploadsMap(previous=>({...previous,[result.value.path]:{status:'ready'}}));
+          }
+        }else{
+          failures.push(`${selected[index].name}: ${result.reason.message}`);
+          setError([limitMessage,...failures].filter(Boolean).join('\n'));
         }
-        await uploadFile(file);
-      }
-      await loadStatuses();
+        setJobs(previous=>{const next={...previous};delete next[index];return next;});
+        setBatchCount(previous=>({...previous,completed:previous.completed+1}));
+      });
     }catch(e){
       setError(e.message);
     }finally{
-      setBusy(false);onBusy(false);setStatusText('');
+      setBusy(false);onBusy(false);setStatusText('');setJobs({});
     }
   };
 
   const retryItem=async(path)=>{
     if(!path||retryingPath)return;
-    setRetryingPath(path);setError('');
+    setRetryingPath(path);setError('');setBatchCount({completed:0,total:1});onBusy(true);
     try{
-      await moderateUploadedMedia(tag,path,videoConsent);
-      await loadStatuses();
+      await moderateUploadedMedia(tag,path,videoConsent,progress=>setJobs({retry:progress}));
+      setUploadsMap(previous=>({...previous,[path]:{...previous[path],status:'ready',reason:''}}));
     }catch(err){
       setError(err.message);
     }finally{
-      setRetryingPath('');
+      setRetryingPath('');setJobs({});onBusy(false);
     }
   };
 
   return (
-    <section className="space-y-4 p-5 rounded-2xl bg-white/5 border border-white/15">
+    <fieldset disabled={busy||!!retryingPath} className="min-w-0 space-y-4 p-5 rounded-2xl bg-white/5 border border-white/15">
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -237,9 +253,12 @@ export default function MemoryMediaEditor({tag, items, onChange, audio, onAudio,
       {/* Pop-up chờ xử lý & kiểm duyệt AI */}
       <MediaModerationModal
         isOpen={busy || !!retryingPath}
+        jobs={Object.values(jobs)}
+        completed={batchCount.completed}
+        total={batchCount.total}
         title={t("Đang tải lên & kiểm duyệt phương tiện","Uploading & moderating media")}
-        detail={t("Hệ thống đang kiểm tra nội dung và tự động phân tích nhãn chủ đề cho ảnh/video. Quá trình xử lý thường chỉ mất vài giây, vui lòng giữ tab này mở...","We are checking your media. Please keep this tab open until moderation finishes.")}
+        detail={t("Vui lòng giữ tab này mở đến khi tải lên và kiểm duyệt hoàn tất.","Please keep this tab open until uploading and review finish.")}
       />
-    </section>
+    </fieldset>
   );
 }

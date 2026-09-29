@@ -49,17 +49,18 @@ export async function signEventPaths(paths, expiresIn = 3600) {
 }
 
 /**
- * Gắn signed URL cho các câu hỏi của Couple Match và xóa raw private photo_path
+ * Gắn signed URL cho các câu hỏi của Couple Match. Giữ image_path cho chủ sở hữu
+ * để lưu bản nháp; xóa raw storage path cho khách/partner.
  */
-export function enrichMatchQuestionsWithSignedUrls(questions, signedMap = {}) {
+export function enrichMatchQuestionsWithSignedUrls(questions, signedMap = {}, { ownerDraft = false } = {}) {
   if (!Array.isArray(questions)) return questions;
   return questions.map(q => {
     const copy = { ...q };
     if (copy.image_path) {
       // Chỉ gán image_url nếu có signed URL thật từ storage service
       copy.image_url = signedMap[copy.image_path] || null;
-      // Xóa raw storage path để không lộ internal key ra frontend
-      delete copy.image_path;
+      // Chỉ bản nháp của chủ sở hữu mới cần giữ image_path để sửa/autosave
+      if (!ownerDraft) delete copy.image_path;
     } else {
       copy.image_url = null;
     }
@@ -68,24 +69,30 @@ export function enrichMatchQuestionsWithSignedUrls(questions, signedMap = {}) {
 }
 
 /**
- * Gắn signed URL cho các kỷ niệm trong 5 phòng của Memory House và xóa raw private photo_path
+ * Gắn signed URL cho Memory House. Giữ photo_path cho chủ nhà để lưu lại bản nháp;
+ * loại bỏ đường dẫn này khỏi snapshot trả về khách.
  */
-export function enrichHouseRoomsWithSignedUrls(rooms, signedMap = {}) {
+export function enrichHouseRoomsWithSignedUrls(rooms, signedMap = {}, {ownerDraft=false} = {}) {
   if (!Array.isArray(rooms)) return rooms;
-  return rooms.map(r => ({
-    ...r,
-    memories: (r.memories || []).map(m => {
+  return rooms.map(r => {
+    const roomCopy = { ...r };
+    if (!ownerDraft && roomCopy.journey_letter) {
+      if (roomCopy.journey_letter.is_shared !== true) {
+        delete roomCopy.journey_letter;
+      }
+    }
+    roomCopy.memories = (r.memories || []).map(m => {
       const copy = { ...m };
       if (copy.photo_path) {
         // Chỉ gán photo_url nếu có signed URL thật từ storage service
         copy.photo_url = signedMap[copy.photo_path] || null;
-        // Xóa raw storage path để bảo vệ namespace
-        delete copy.photo_path;
+        // Chỉ bản nháp đã xác thực quyền chủ sở hữu cần giữ định danh ảnh.
+        if (!ownerDraft) delete copy.photo_path;
       } else {
         copy.photo_url = null;
       }
       return copy;
-    })
-  }));
+    });
+    return roomCopy;
+  });
 }
-
