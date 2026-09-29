@@ -1,5 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
-import {labelVideo} from './geminiVideo.js';
+import {labelVideo} from './aiService.js';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const serverClient=()=>{
   if(!process.env.SUPABASE_SERVICE_ROLE_KEY)throw fail(503,'Server chưa cấu hình phân tích video.');

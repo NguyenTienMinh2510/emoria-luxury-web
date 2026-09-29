@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { labelWithQwen } from './qwenVideo.js';
+import { labelWithQwen } from './aiService.js';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 

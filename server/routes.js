@@ -3,7 +3,7 @@ import {createClient} from '@supabase/supabase-js';
 import {eventRpc,isEventRpc,streamMatch} from './eventGateway.js';
 import {normalizeCheckout} from '../src/services/checkoutPayload.js';
 import {analyzeVideo,readVideoLabels,readVideoUploads} from './videoLabels.js';
-import {craftLetter} from './geminiLetter.js';
+import {craftLetter} from './aiService.js';
 import {tryOnConfig} from './tryOn.js';
 import {signEventPaths,enrichMatchQuestionsWithSignedUrls,enrichHouseRoomsWithSignedUrls} from './eventMedia.js';
 import {moderateHousePhotos} from './houseModeration.js';
