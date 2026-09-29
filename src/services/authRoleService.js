@@ -44,6 +44,17 @@ export async function fetchSystemStatus() {
     };
     return { success: true, ...serverSystemAvailability };
   } catch (error) {
+    try {
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('rpc_get_system_status');
+      if (!rpcErr && rpcData && rpcData.success === true && typeof rpcData.is_maintenance_mode === 'boolean') {
+        serverSystemAvailability = {
+          isMaintenanceMode: rpcData.is_maintenance_mode,
+          maintenanceMessage: rpcData.maintenance_message || '',
+          vipPasscode: '',
+        };
+        return { success: true, ...serverSystemAvailability };
+      }
+    } catch {}
     serverSystemAvailability = { ...UNAVAILABLE_SYSTEM };
     return { success: false, ...serverSystemAvailability, error: error.message };
   }
@@ -128,7 +139,22 @@ export async function resolveCurrentSessionRole() {
 
     const user = session.user;
 
-    const {isAdmin,profile}=await apiRequest('/me/session');
+    let isAdmin = false;
+    let profile = null;
+    try {
+      const sessionData = await apiRequest('/me/session');
+      isAdmin = sessionData?.isAdmin === true;
+      profile = sessionData?.profile || null;
+    } catch {
+      try {
+        const [adminRes, profileRes] = await Promise.all([
+          supabase.rpc('is_admin'),
+          supabase.from('profiles').select('full_name, phone, birthday, gender, address, bio, avatar_url').eq('id', user.id).maybeSingle()
+        ]);
+        isAdmin = adminRes?.data === true;
+        profile = profileRes?.data || null;
+      } catch {}
+    }
 
     return {
       role: isAdmin ? ROLES.ADMIN : ROLES.GUEST, // Owner được xác định theo từng memory_space
