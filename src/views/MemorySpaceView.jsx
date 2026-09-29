@@ -1490,7 +1490,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                   
                   <label className="flex gap-3 items-start p-4 rounded-xl border border-white/15 bg-black/30 text-xs leading-relaxed">
                     <input type="checkbox" checked={videoConsent} disabled={movieBusy} onChange={e=>setVideoConsent(e.target.checked)} className="mt-0.5 accent-amber-400" />
-                    <span className="text-slate-300">{t("Tôi đồng ý gửi hình ảnh và video tải lên cho Google Gemini để kiểm duyệt. Phương tiện vi phạm sẽ bị từ chối; quản trị viên xem được lịch sử tải, nhãn AI và lý do kiểm duyệt.","I consent to sending uploaded images and videos to Google Gemini for moderation. Violating content is rejected; administrators can see upload history, AI labels and moderation reasons.")}</span>
+                    <span className="text-slate-300">{t("Tôi đồng ý gửi hình ảnh và video tải lên cho hệ thống AI để kiểm duyệt. Phương tiện vi phạm sẽ bị từ chối; quản trị viên xem được lịch sử tải, nhãn AI và lý do kiểm duyệt.","I consent to sending uploaded images and videos to the AI system for moderation. Violating content is rejected; administrators can see upload history, AI labels and moderation reasons.")}</span>
                   </label>
 
                   <div className="space-y-2">

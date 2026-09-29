@@ -137,7 +137,7 @@ export default function MemoryMediaEditor({tag, items, onChange, audio, onAudio,
         {busy && (
           <div role="status" className="flex items-center gap-2 text-xs text-amber-200">
             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            <span>{statusText || t("Đang tải lên và kiểm duyệt với Gemini AI...","Uploading and moderating with Gemini AI...")}</span>
+            <span>{statusText || t("Đang tải lên và kiểm duyệt với AI...","Uploading and moderating with AI...")}</span>
           </div>
         )}
 

@@ -98,6 +98,9 @@ console.log('PASS luxury unboxing and AI muse render: wax seal, crystal chime ch
 const {default:MemoryMatchStudio}=await compile('src/components/MemoryMatchStudio.jsx','memory-match-studio');
 const matchHtml=render(MemoryMatchStudio,{tagUid:'emo-heart',matchId:'fixture-match-id',currentUser:'user-owner-a'});
 assert.ok(matchHtml.includes('Couple Match'));
+assert.ok(matchHtml.includes('Chọn Chủ Đề'), 'Match renders the topic picker');
+assert.ok(matchHtml.includes('Rung Động') && matchHtml.includes('Thói Quen') && matchHtml.includes('Tâm Hồn'), 'Topic cards are visible');
+assert.ok(!matchHtml.includes('Nhập nội dung câu hỏi') && !matchHtml.includes('Thêm câu hỏi'), 'Old authoring form does not override topic packs');
 assert.ok(matchHtml.includes('Trang chủ'), 'Match Studio header có nút Trang chủ');
 assert.ok(matchHtml.includes('Quay lại kỷ vật'), 'Match Studio header có nút Quay lại kỷ vật');
 assert.ok(matchHtml.includes('Chuyển sang House Studio'), 'Match Studio header có nút Chuyển sang House Studio');

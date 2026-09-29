@@ -16,12 +16,12 @@ import {
   getMatchView,
   listMatches,
   uploadEventPhoto,
-  DEFAULT_MATCH_QUESTIONS,
   trackEventAction,
   submitContentReport
 } from '../services/eventService.js';
 import {
   MATCH_TOPICS,
+  QUESTION_POOL,
   getTopicQuestions,
   getRandomReplacement,
   getComplementaryInsight,
@@ -57,7 +57,8 @@ export default function MemoryMatchStudio({
   const [draftTitle, setDraftTitle] = useState('Couple Match: Thấu Hiểu Đôi Lứa');
   const [partnerName, setPartnerName] = useState('');
   const [ownerName, setOwnerName] = useState('');
-  const [questions, setQuestions] = useState(DEFAULT_MATCH_QUESTIONS.slice(0, 5));
+  const [selectedTopic, setSelectedTopic] = useState('romance');
+  const [questions, setQuestions] = useState(() => getTopicQuestions('romance', 5));
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isStartingMatch, setIsStartingMatch] = useState(false);
   const [uploadingImageIndex, setUploadingImageIndex] = useState(null);
@@ -67,7 +68,6 @@ export default function MemoryMatchStudio({
     setSelectedTopic(topicId);
     const playedTexts = getPlayedQuestions(tagUid);
     const newQuestions = getTopicQuestions(topicId, 5, playedTexts);
-    recordPlayedQuestions(tagUid, newQuestions.map(q => q.text));
     setQuestions(newQuestions);
     const topicObj = MATCH_TOPICS.find(t => t.id === topicId);
     if (topicObj) {
@@ -167,7 +167,10 @@ export default function MemoryMatchStudio({
       if (data.status === 'draft') {
         setStudioMode('editor');
         if (Array.isArray(data.questions)) {
-          setQuestions(data.questions);
+          if(data.questions.length) {
+            setQuestions(data.questions);
+            setSelectedTopic(MATCH_TOPICS.find(t => data.questions.every(q => QUESTION_POOL[t.id].some(p => p.text === q.text)))?.id || null);
+          }
         }
         if (data.title) setDraftTitle(data.title);
         setPartnerName(data.partner_name || '');
@@ -201,7 +204,11 @@ export default function MemoryMatchStudio({
 
   // Initial load
   useEffect(() => {
-    if (justCreatedIdRef.current === matchId) {
+    if (justCreatedIdRef.current === 'new' && !matchId) {
+      justCreatedIdRef.current = null;
+      return;
+    }
+    if (justCreatedIdRef.current !== null && justCreatedIdRef.current === matchId) {
       justCreatedIdRef.current = null;
       return;
     }
@@ -215,7 +222,7 @@ export default function MemoryMatchStudio({
           setActiveMatchesList(list || []);
           if (list && list.length > 0) {
             // Pick most recent active or draft match
-            const recent = list[0];
+            const recent = list.find(m => m.status === 'draft') || list[0];
             setMatchId(recent.id);
           } else {
             setLoading(false);
@@ -374,10 +381,7 @@ export default function MemoryMatchStudio({
 
   // Start match & generate invite token (enforces strict 3-7 questions & non-empty options)
   const handleBeginMatch = async () => {
-    if (!matchId) {
-      setError('Vui lòng lưu bản nháp trước.');
-      return;
-    }
+    if(uploadingImageIndex !== null)return;
     if (questions.length < 3 || questions.length > 7) {
       setError('Số câu hỏi để bắt đầu thử thách phải từ 3 đến 7 câu.');
       return;
@@ -402,6 +406,8 @@ export default function MemoryMatchStudio({
     setError('');
     setIsStartingMatch(true);
     try {
+      const targetId = matchId || await handleCreateNewMatch();
+      if(!targetId)return;
       // Ensure questions are saved first
       await persistDraft({
         questions,
@@ -410,12 +416,13 @@ export default function MemoryMatchStudio({
         owner_name: ownerName.trim() || null
       });
       if(isDirty.current)throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi bắt đầu lại.');
-      const res = await beginMatch(matchId);
+      const res = await beginMatch(targetId);
+      recordPlayedQuestions(tagUid, questions.map(q => q.text));
       if (res.invite_token) {
         setShareInviteToken(res.invite_token);
       }
       setSuccessMsg('Lượt chơi đã kích hoạt! Hãy gửi liên kết cho người ấy.');
-      await loadMatchData(matchId, '');
+      await loadMatchData(targetId, '');
     } catch (err) {
       setError(err?.message || 'Không thể bắt đầu lượt chơi.');
     } finally {
@@ -649,7 +656,7 @@ export default function MemoryMatchStudio({
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-6 sm:py-10 text-slate-100">
       {/* Top Header Bar with Multi-Page Navigation */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-white/10">
+      <header className="sticky top-0 z-30 bg-stone-950/95 backdrop-blur-md rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border border-white/10" aria-label="Điều hướng studio">
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleGoHome}
@@ -735,7 +742,7 @@ export default function MemoryMatchStudio({
               type="button"
               className="text-xs text-slate-400 hover:text-white underline cursor-pointer shrink-0"
             >
-              {studioMode === 'editor' ? 'Xem trước khi chơi' : 'Sửa câu hỏi'}
+              {studioMode === 'editor' ? 'Xem trước khi chơi' : 'Chọn chủ đề'}
             </button>
           )}
         </div>
@@ -786,12 +793,12 @@ export default function MemoryMatchStudio({
         <section aria-labelledby="draft-editor-title" className="space-y-6">
           <div className="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
             <div className="max-w-xl">
-              <span className="text-xs uppercase tracking-widest text-rose-400 font-bold">Biên Soạn Thử Thách</span>
+              <span className="text-xs uppercase tracking-widest text-rose-400 font-bold">Một buổi hẹn, thêm chút thấu hiểu</span>
               <h1 id="draft-editor-title" className="text-2xl sm:text-3xl font-serif font-bold text-white mt-1">
-                Tạo Câu Hỏi Thấu Hiểu Cho Cặp Đôi
+                Chọn Chủ Đề · Khám Phá Đôi Mình
               </h1>
               <p className="text-sm text-slate-300 mt-2 leading-relaxed">
-                Tạo từ 3 đến 7 câu hỏi ngọt ngào. Hai bạn sẽ trả lời độc lập và cùng mở khóa kết quả đối chiếu sau khi cả hai hoàn thành.
+                Chọn một chủ đề, EMORIA chuẩn bị câu hỏi cho hai bạn. Cùng trả lời độc lập và mở kết quả sau khi cả hai hoàn thành.
               </p>
             </div>
 
@@ -830,106 +837,25 @@ export default function MemoryMatchStudio({
             </div>
           </div>
 
-          {/* Questions Editor Accordion */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between px-2">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Danh sách câu hỏi</span>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">
-                  {questions.length}/10 câu
-                </span>
-                <span className="text-[11px] text-slate-400 font-normal">
-                  (Cần từ 3 đến 7 câu để kích hoạt chơi)
-                </span>
-              </h2>
-              {questions.length < 10 && (
-                <button
-                  type="button"
-                  onClick={addQuestion}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 py-1 px-3 rounded-full bg-rose-500/10 border border-rose-500/20 cursor-pointer transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Thêm câu hỏi</span>
-                </button>
-              )}
+            <h2 className="text-lg font-serif text-white">Chọn chủ đề cho buổi hẹn</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="group" aria-label="Chủ đề Couple Match">
+              {MATCH_TOPICS.map(topic => <button key={topic.id} type="button" onClick={() => handleSelectTopic(topic.id)}
+                disabled={isStartingMatch || uploadingImageIndex !== null} aria-pressed={selectedTopic === topic.id}
+                className={`text-left p-4 rounded-2xl border bg-gradient-to-br ${topic.color} ${selectedTopic === topic.id ? 'ring-2 ring-rose-300' : ''} disabled:opacity-50`}>
+                <span className="text-2xl mr-2">{topic.emoji}</span><span className="font-semibold">{topic.title}</span>
+                <span className="block text-xs text-slate-300 mt-2">{topic.tagline}</span>
+              </button>)}
             </div>
-
-            {questions.map((q, qIndex) => (
-              <div
-                key={q.id || qIndex}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('text/plain', String(qIndex));
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const from = Number(e.dataTransfer.getData('text/plain'));
-                  if (!isNaN(from)) handleMoveQuestion(from, qIndex);
-                }}
-                className="bg-black/40 border border-white/10 rounded-2xl p-5 space-y-4 transition-all hover:border-white/20"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      <GripVertical className="w-4 h-4 text-slate-500 cursor-grab" />
-                      <span className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-300 flex items-center justify-center text-xs font-bold">
-                        {qIndex + 1}
-                      </span>
-                    </div>
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      Câu hỏi {qIndex + 1}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleMoveQuestion(qIndex, qIndex - 1)}
-                      disabled={qIndex === 0}
-                      className="p-1 rounded bg-white/5 hover:bg-white/15 text-slate-300 disabled:opacity-20 transition-colors cursor-pointer"
-                      title="Di chuyển câu hỏi lên trên"
-                    >
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMoveQuestion(qIndex, qIndex + 1)}
-                      disabled={qIndex === questions.length - 1}
-                      className="p-1 rounded bg-white/5 hover:bg-white/15 text-slate-300 disabled:opacity-20 transition-colors cursor-pointer"
-                      title="Di chuyển câu hỏi xuống dưới"
-                    >
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    </button>
-                    {questions.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeQuestion(qIndex)}
-                        className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-white/5 transition-colors cursor-pointer ml-1"
-                        title="Xóa câu hỏi này"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Question Text */}
-                <input
-                  type="text"
-                  value={q.text}
-                  onChange={(e) => {
-                    const text = e.target.value;
-                    setQuestions((prev) => {
-                      const next = [...prev];
-                      next[qIndex] = { ...next[qIndex], text };
-                      return next;
-                    });
-                  }}
-                  placeholder="Nhập nội dung câu hỏi..."
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-medium focus:border-rose-400 focus:outline-none transition-colors"
-                />
-
+            <p className="text-sm text-slate-300">EMORIA chọn sẵn 5 câu hỏi. Bạn có thể đổi câu khác trong cùng chủ đề hoặc thêm ảnh của đôi mình.</p>
+            {!selectedTopic && questions.length > 0 && <p className="text-xs text-amber-200">Bộ câu hỏi từ bản nháp trước vẫn được giữ lại. Chọn chủ đề để thay bằng một bộ mới.</p>}
+            {questions.map((q, qIndex) => <article key={q.id || qIndex} className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-semibold text-white">{qIndex + 1}. {q.text}</h3>
+                {selectedTopic && <button type="button" onClick={() => handleRerollQuestion(qIndex)} disabled={isStartingMatch || uploadingImageIndex !== null}
+                  className="shrink-0 text-xs text-rose-300 border border-rose-300/30 rounded-full px-3 py-2 disabled:opacity-50">Đổi câu khác</button>}
+              </div>
+              <ul className="grid sm:grid-cols-2 gap-2 text-xs text-slate-300">{q.options.map((option,i) => <li key={i} className="rounded-xl bg-black/20 px-3 py-2">{String.fromCharCode(65+i)}. {option}</li>)}</ul>
                 {/* Optional Image */}
                 <div className="flex items-center gap-3">
                   {q.image_url ? (
@@ -967,59 +893,8 @@ export default function MemoryMatchStudio({
                   )}
                 </div>
 
-                {/* Options List */}
-                <div className="space-y-2 pt-2 border-t border-white/5">
-                  <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
-                    <span>Các đáp án lựa chọn ({q.options.length}/4)</span>
-                    {q.options.length < 4 && (
-                      <button
-                        type="button"
-                        onClick={() => addOption(qIndex)}
-                        className="text-rose-400 hover:text-rose-300 font-semibold cursor-pointer"
-                      >
-                        + Thêm đáp án
-                      </button>
-                    )}
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {q.options.map((opt, optIndex) => (
-                      <div key={optIndex} className="flex items-center gap-2">
-                        <span className="w-6 text-center text-xs font-bold text-slate-500">
-                          {String.fromCharCode(65 + optIndex)}.
-                        </span>
-                        <input
-                          type="text"
-                          value={opt}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setQuestions((prev) => {
-                              const next = [...prev];
-                              const opts = [...next[qIndex].options];
-                              opts[optIndex] = val;
-                              next[qIndex] = { ...next[qIndex], options: opts };
-                              return next;
-                            });
-                          }}
-                          placeholder={`Đáp án ${optIndex + 1}`}
-                          className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-xs focus:border-rose-400 focus:outline-none transition-colors"
-                        />
-                        {q.options.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => removeOption(qIndex, optIndex)}
-                            className="p-1 text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
-                            title="Xóa lựa chọn"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
+            </article>)}
           </div>
 
           {/* Action Bar */}
@@ -1050,7 +925,7 @@ export default function MemoryMatchStudio({
             <button
               type="button"
               onClick={handleBeginMatch}
-              disabled={isStartingMatch || isSavingDraft}
+              disabled={isStartingMatch || isSavingDraft || uploadingImageIndex !== null || !currentUser}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-bold text-sm shadow-xl shadow-rose-500/25 transition-all cursor-pointer disabled:opacity-50"
             >
               <Heart className="w-4 h-4 fill-white" />
@@ -1335,9 +1210,15 @@ export default function MemoryMatchStudio({
                   <button
                     type="button"
                     onClick={() => {
+                      justCreatedIdRef.current = 'new';
+                      setViewData(null);
+                      setAccessInviteToken('');
+                      setShareInviteToken('');
+                      setAnswers([]);
+                      setCurrentQuestionIndex(0);
                       setMatchId(null);
                       setStudioMode('editor');
-                      setQuestions(DEFAULT_MATCH_QUESTIONS.slice(0, 5));
+                      handleSelectTopic(selectedTopic || 'romance');
                     }}
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/15 transition-colors cursor-pointer"
                   >

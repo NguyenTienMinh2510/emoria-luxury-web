@@ -105,7 +105,8 @@ for (const file of [
   'tests/event_analytics_and_moderation.test.sql',
   'supabase/migrations/20260929200000_freeform_house_decorations_v2.sql',
   'tests/memory_house_decorations_v2.test.sql',
-  'supabase/migrations/20260929210000_admin_article_deletion.sql'
+  'supabase/migrations/20260929210000_admin_article_deletion.sql',
+  'supabase/migrations/20260930010000_event_rpc_permissions.sql'
 ]) {
   const result=spawnSync('docker',['exec','-i',container,'psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1'],{
     input:readFileSync(file,'utf8'),encoding:'utf8',timeout:60000

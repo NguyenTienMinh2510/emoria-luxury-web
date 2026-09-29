@@ -29,12 +29,11 @@ const publicResult=(result,includeLabels=false)=>({
 });
 export async function analyzeVideo(c) {
   const tag=c.params[0],path=c.body.path;
-  if(c.body.consent!==true)throw fail(400,'Cần đồng ý gửi phương tiện này cho Google Gemini để phân tích.');
+  if(c.body.consent!==true)throw fail(400,'Cần đồng ý gửi phương tiện này cho hệ thống AI để phân tích.');
   if(typeof path!=='string'||path.length>200||!path.startsWith(tag+'/')||path.includes('..')||!/^[-a-zA-Z0-9_./]+$/.test(path))throw fail(422,'Đường dẫn phương tiện không hợp lệ.');
   const view=await c.db(c.client.rpc('rpc_get_memory_view',{p_tag_uid:tag,p_grant_token:null}));
   if(!view.is_owner||!view.is_unlocked)throw fail(403,'Chỉ chủ sở hữu được gửi phương tiện cho AI.');
-  const key=process.env.GEMINI_API_KEY;
-  if(!key)throw fail(503,'Chưa cấu hình GEMINI_API_KEY trên server.');
+  const key=process.env.GEMINI_API_KEY||process.env.MODAL_TAGGER_URL||'modal-qwen';
   const client=serverClient();
   const lease=await c.db(client.rpc('reserve_video_labels',{p_user:c.user.id,p_tag:tag,p_path:path}));
   if(lease.cached)return publicResult(lease,view.is_admin===true&&c.body.include_labels===true);

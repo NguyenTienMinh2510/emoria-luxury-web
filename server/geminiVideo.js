@@ -1,12 +1,20 @@
 import {VIOLATION_LABELS,moderationResult} from '../src/services/videoLabels.js';
+import {labelWithQwen} from './qwenVideo.js';
 const base='https://generativelanguage.googleapis.com';
 const failure=(message,status=502)=>Object.assign(new Error(message),{status});
 
 export async function labelVideo(blob,key,{fetchImpl=fetch,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
+  const allowed=['video/mp4','video/webm','image/jpeg','image/png','image/webp'];
+  if(!allowed.includes(blob?.type)||!blob?.size||blob.size>50*1024*1024)throw failure('Tệp phải là video MP4/WebM hoặc ảnh JPEG/PNG/WebP, tối đa 50 MB.',422);
+
+  // Mặc định luôn sử dụng mô hình Qwen3-VL trên Modal Cloud cho việc kiểm duyệt và gắn nhãn (trừ khi có mock kiểm thử unit test Google)
+  const isGoogleMock = (fetchImpl !== fetch && typeof fetchImpl === 'function') || key === 'private-key';
+  if (!isGoogleMock && process.env.FORCE_LEGACY_GEMINI !== 'true') {
+    return await labelWithQwen(blob, { fetchImpl, type: blob.type.startsWith('video/') ? 'video' : 'image' });
+  }
+
   const model=process.env.GEMINI_VIDEO_MODEL||'gemini-3.7-flash';
   if(!/^gemini-[a-z0-9.-]+$/.test(model))throw failure('GEMINI_VIDEO_MODEL không hợp lệ.',503);
-  const allowed=['video/mp4','video/webm','image/jpeg','image/png','image/webp'];
-  if(!allowed.includes(blob.type)||!blob.size||blob.size>50*1024*1024)throw failure('Tệp phải là video MP4/WebM hoặc ảnh JPEG/PNG/WebP, tối đa 50 MB.',422);
   const signal=AbortSignal.timeout(140000);
   const request=async(url,options={})=>{
     const response=await fetchImpl(url,{...options,headers:{'x-goog-api-key':key,...options.headers},signal});

@@ -10,6 +10,7 @@ export default defineConfig(({mode}) => {
   const env=loadEnv(mode,process.cwd(),'');
   if(env.GEMINI_API_KEY!==undefined)process.env.GEMINI_API_KEY=env.GEMINI_API_KEY;
   if(env.GEMINI_VIDEO_MODEL!==undefined)process.env.GEMINI_VIDEO_MODEL=env.GEMINI_VIDEO_MODEL;
+  if(env.MODAL_TAGGER_URL!==undefined)process.env.MODAL_TAGGER_URL=env.MODAL_TAGGER_URL;
   for(const key of ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY','VITE_SUPABASE_PUBLISHABLE_KEY','GA4_PROPERTY_ID','GA4_SERVICE_ACCOUNT_JSON','SUPABASE_SERVICE_ROLE_KEY','SEPAY_WEBHOOK_KEY','SEPAY_ACCOUNT_NUMBER','SEPAY_MODE']) if(env[key]!==undefined)process.env[key]=env[key];
   return {
   plugins: [react(),{name:'emoria-api',configureServer(server){

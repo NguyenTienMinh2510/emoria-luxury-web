@@ -120,7 +120,7 @@ BEGIN
             p_z := (d->'position'->>2)::numeric;
           EXCEPTION WHEN OTHERS THEN
             RAISE EXCEPTION 'Tọa độ vị trí không hợp lệ' USING ERRCODE='22023';
-          END BEGIN;
+          END;
           IF p_x < -10 OR p_x > 10 OR p_y < -1 OR p_y > 10 OR p_z < -10 OR p_z > 10 THEN
             RAISE EXCEPTION 'Vị trí đồ trang trí vượt quá giới hạn căn phòng' USING ERRCODE='22023';
           END IF;

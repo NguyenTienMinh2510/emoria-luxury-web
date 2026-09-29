@@ -5,10 +5,13 @@ import {roomDecorations, DECORATIONS, ROOM_BOUNDS, getRoomBoundingBox, getDefaul
 
 export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, getPlacement, onError, onReady}) {
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+  const compact = window.matchMedia?.('(pointer: coarse)').matches || host.clientWidth < 640;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,compact ? 1 : 1.5));
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  // Shadows change with furniture, not with the camera or floating dust.
+  renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;
   host.appendChild(renderer.domElement);
   renderer.domElement.setAttribute('aria-label','Ngôi nhà 3D: kéo để xoay, chạm phòng để chọn');
   renderer.domElement.style.cssText='width:100%;height:100%;display:block;touch-action:pan-y';
@@ -24,7 +27,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   // Lighting setup for 3 distinct moods (Chặng C)
   const ambient=new THREE.HemisphereLight('#fff5e3','#b89d88',1.5);scene.add(ambient);
   const sun=new THREE.DirectionalLight('#ffe3bb',2.4);sun.position.set(-4,8,7);scene.add(sun);
-  sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
+  sun.castShadow=true;sun.shadow.mapSize.set(compact ? 512 : 1024,compact ? 512 : 1024);
   Object.assign(sun.shadow.camera,{left:-7,right:7,top:7,bottom:-7,near:.5,far:24});
   sun.shadow.normalBias=.025;sun.shadow.bias=-.0001;
   const fill=new THREE.DirectionalLight('#ffffff',.8);fill.position.set(5,3,4);scene.add(fill);
@@ -46,7 +49,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   const photoSurfaces=()=>[...surfaces,...decorSurfaces];
 
   // Micro-particles system (Chặng C)
-  const PARTICLE_COUNT = 45;
+  const PARTICLE_COUNT = compact ? 20 : 35;
   const particleGeo = new THREE.BufferGeometry();
   const particlePos = new Float32Array(PARTICLE_COUNT * 3);
   const particleVel = new Float32Array(PARTICLE_COUNT * 3);
@@ -91,14 +94,20 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   let isReducedMotion = typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
   let isCanvasVisible = true;
   let particleRaf = 0;
+  let lastParticleTime = 0;
 
-  function updateParticles() {
+  function updateParticles(now) {
     if (dead || !isTabVisible || isReducedMotion || !isCanvasVisible) return;
+    particleRaf = requestAnimationFrame(updateParticles);
+    const elapsed = now - lastParticleTime;
+    if (elapsed < 1000 / 30) return;
+    const step = Math.min(elapsed, 70) / (1000 / 60);
+    lastParticleTime = now;
     const pos = particleGeo.attributes.position.array;
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-      pos[i * 3 + 1] += particleVel[i * 3 + 1];
-      pos[i * 3] += particleVel[i * 3];
-      pos[i * 3 + 2] += particleVel[i * 3 + 2];
+      pos[i * 3 + 1] += particleVel[i * 3 + 1] * step;
+      pos[i * 3] += particleVel[i * 3] * step;
+      pos[i * 3 + 2] += particleVel[i * 3 + 2] * step;
       if (pos[i * 3 + 1] > 5.5) pos[i * 3 + 1] = 0.5;
       if (pos[i * 3] > 6) pos[i * 3] = -6;
       if (pos[i * 3] < -6) pos[i * 3] = 6;
@@ -107,11 +116,11 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     }
     particleGeo.attributes.position.needsUpdate = true;
     render();
-    particleRaf = requestAnimationFrame(updateParticles);
   }
 
   function restartParticleLoop() {
     cancelAnimationFrame(particleRaf);
+    lastParticleTime = performance.now();
     if (!dead && isTabVisible && !isReducedMotion && isCanvasVisible) {
       particleRaf = requestAnimationFrame(updateParticles);
     }
@@ -181,7 +190,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   }
   let titleMesh,titleTexture,lastTitle='';
   let currentTween=null;
-  const render=()=>{if(!dead){cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{if(!dead)renderer.render(scene,camera);});}};
+  const render=()=>{if(!dead&&!frame&&isTabVisible&&isCanvasVisible){frame=requestAnimationFrame(()=>{frame=0;if(!dead&&isTabVisible&&isCanvasVisible)renderer.render(scene,camera);});}};
   controls.addEventListener('change',render);
   controls.addEventListener('start',()=>{
     if(currentTween){
@@ -316,6 +325,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     }
     const key=JSON.stringify(rooms.map(r=>[r.id,roomDecorations(r)]));
     if(key!==decorKey){
+      renderer.shadowMap.needsUpdate=true;
       decorKey=key;clearDecor();
       for(const room of rooms)for(const d of roomDecorations(room)){
         const source=library.getObjectByName('decor_'+d.item);
@@ -847,7 +857,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     setInteracting,
     capture() {
       if (dead || !renderer) return null;
-      render();
+      renderer.render(scene,camera);
       try {
         return renderer.domElement.toDataURL('image/png');
       } catch (err) {

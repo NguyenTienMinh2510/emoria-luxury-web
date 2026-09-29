@@ -199,7 +199,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
                   </span>
                 ) : modInfo.status==='processing' ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 font-medium">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> {t("Đang kiểm duyệt với Gemini...","Reviewing with Gemini...")}
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> {t("Đang kiểm duyệt với AI...","Reviewing with AI...")}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-700/50 border border-white/10 text-amber-200 font-medium">
@@ -302,7 +302,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
               {t("Kéo & thả video mở đầu vào đây, hoặc","Drop an opening video here, or")} <span className="text-amber-300 underline">{t("bấm để chọn","click to choose")}</span>
             </p>
             <p className="text-xs text-slate-400">
-              {t("Hỗ trợ định dạng MP4 hoặc WebM (tối đa 50 MB). Model Gemini sẽ tự động kiểm duyệt và trả về nhãn AI.","Supports MP4 and WebM (up to 50 MB). Gemini automatically checks the content.")}
+              {t("Hỗ trợ định dạng MP4 hoặc WebM (tối đa 50 MB). Hệ thống AI sẽ tự động kiểm duyệt và trả về nhãn nội dung.","Supports MP4 and WebM (up to 50 MB). AI automatically moderates content and returns topic labels.")}
             </p>
           </div>
         </div>

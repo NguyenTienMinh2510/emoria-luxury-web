@@ -862,7 +862,7 @@ export default function MemoryHouseStudio({
     <div className={`w-full min-h-screen bg-gradient-to-b ${themeStyle.bg} text-slate-100 px-4 py-6 sm:py-10 transition-colors duration-500`}>
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Top Navigation Bar with Multi-Page Navigation */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+        <header className="sticky top-0 z-30 bg-stone-950/95 backdrop-blur-md rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-white/10" aria-label="Điều hướng studio">
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleGoHome}

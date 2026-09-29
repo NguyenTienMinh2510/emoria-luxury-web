@@ -6,6 +6,7 @@ import {analyzeVideo,readVideoLabels,readVideoUploads} from './videoLabels.js';
 import {craftLetter} from './geminiLetter.js';
 import {tryOnConfig} from './tryOn.js';
 import {signEventPaths,enrichMatchQuestionsWithSignedUrls,enrichHouseRoomsWithSignedUrls} from './eventMedia.js';
+import {moderateHousePhotos} from './houseModeration.js';
 const route=(method,path,access,run,status)=>({method,pattern:new RegExp(`^${path}$`),access,run,status});
 const rpc=(c,name,args={})=>isEventRpc(name)?eventRpc(c,name,args):c.db(c.client.rpc(name,args));
 const integer=(value,fallback,max=10000)=>{const n=Number(value??fallback);if(!Number.isInteger(n)||n<0||n>max)throw Object.assign(new Error('Tham số phân trang không hợp lệ.'),{status:400});return n;};
@@ -301,6 +302,7 @@ export const routes=[
     });
   }),
   route('POST','/memories/([^/]+)/house/publish','user',async c=>{
+    await moderateHousePhotos(c,c.params[0]);
     const res=await rpc(c,'rpc_house_publish',{p_tag_uid:c.params[0]});
 
     return res;
