@@ -20,8 +20,8 @@ export const DECORATIONS = [
   name,
   image: `/memoryhouse/models/thumbnails/${id}.png`,
   reference: `/memoryhouse/Create_ONE_isolated_miniature__${reference}.jpg`,
-  photoCount: { frame: 1, album: 2, bunting: 3 }[id] || 0,
-  textLabel: { calendar: 'Ngày / lời nhắn trên lịch', nameplate: 'Chữ trên biển tên' }[id] || null,
+  photoCount: { calendar: 1, nameplate: 1, frame: 1, album: 2, bunting: 3 }[id] || 0,
+  textLabel: { calendar: 'Ngày / lời nhắn trên lịch', nameplate: 'Chữ trên biển tên', frame: 'Lời nhắn trên khung ảnh', album: 'Lời nhắn trên album', bunting: 'Lời nhắn trên dây ảnh' }[id] || null,
   defaultSurface: defaultSurface || 'table',
   supportedSurfaces: [...new Set(['floor', 'table', 'shelf', ...supportedSurfaces])]
 }));
@@ -32,6 +32,18 @@ export const DECOR_SLOTS = [
   { id: 'table', name: 'Trên bàn' },
   { id: 'right', name: 'Góc phải' }
 ];
+
+// Keep the established rooms JSON format while applying one mood to the house.
+export const houseLighting = rooms => rooms?.find(r => r.id === 'beginning')?.lighting || rooms?.[0]?.lighting || 'day';
+export const withHouseLighting = (rooms, lighting) => ['day', 'sunset', 'night'].includes(lighting) ? rooms.map(room => ({ ...room, lighting })) : rooms;
+
+export function gyroTilt(beta, gamma, baseline, orientation = 0, sensitivity = .6) {
+  if (![beta, gamma, ...baseline, orientation, sensitivity].every(Number.isFinite)) return [0, 0];
+  const delta = (value, base) => ((value - base + 540) % 360) - 180;
+  const b = delta(beta, baseline[0]), g = delta(gamma, baseline[1]), angle = orientation * Math.PI / 180;
+  const soften = value => Math.abs(value) < .8 ? 0 : Math.sign(value) * Math.min(1, (Math.abs(value) - .8) / 18) * Math.max(.2, Math.min(1.5, sensitivity));
+  return [soften(g * Math.cos(angle) + b * Math.sin(angle)), soften(b * Math.cos(angle) - g * Math.sin(angle))];
+}
 
 // Coordinate boundaries per room in meters (X center, Y floor, Z center, Width, Height, Depth)
 export const ROOM_BOUNDS = {

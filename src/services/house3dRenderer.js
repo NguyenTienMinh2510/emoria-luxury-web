@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {roomDecorations, getDefaultPosition} from './house3d.js';
+import {roomDecorations, getDefaultPosition, houseLighting, gyroTilt} from './house3d.js';
 import {createPlacementSolver, placementTriangles, transformDecoration} from './housePlacement.js';
 
-export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, onPlacementPreview, getPlacement, isEditing, onError, onReady}) {
+export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, onPlacementPreview, getPlacement, isEditing, onGyroChange, onError, onReady}) {
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
   const compact = window.matchMedia?.('(pointer: coarse)').matches || host.clientWidth < 640;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,compact ? 1 : 1.5));
@@ -19,7 +19,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   const scene=new THREE.Scene();scene.background=new THREE.Color('#e9dfd2');
   const camera=new THREE.PerspectiveCamera(34,1,.1,80);
   const controls=new OrbitControls(camera,renderer.domElement);
-  controls.enablePan=false;controls.minDistance=4;controls.maxDistance=23;
+  controls.enablePan=false;controls.minDistance=4;controls.maxDistance=40;
   controls.minPolarAngle=.55;controls.maxPolarAngle=1.48;
   controls.minAzimuthAngle=-.65;controls.maxAzimuthAngle=.65;
   controls.touches.ONE=THREE.TOUCH.ROTATE;controls.touches.TWO=THREE.TOUCH.DOLLY_PAN;
@@ -129,6 +129,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
 
   const onVisibilityChange = () => {
     isTabVisible = !document.hidden;
+    if (!isTabVisible) resetGyroOffset();
     restartParticleLoop();
   };
   if (typeof document !== 'undefined') {
@@ -149,15 +150,10 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   const targetGyroOffset = new THREE.Vector3(0, 0, 0);
 
   function resetGyroOffset() {
-    if (currentGyroOffset.lengthSq() > 0) {
-      camera.position.sub(currentGyroOffset);
-      currentGyroOffset.set(0, 0, 0);
-      targetGyroOffset.set(0, 0, 0);
-      baseGamma = null;
-      baseBeta = null;
-      controls.update();
-      render();
-    }
+    cancelAnimationFrame(gyroRaf); gyroRaf = 0; gyroBaseline = null;
+    camera.position.sub(currentGyroOffset);
+    currentGyroOffset.set(0, 0, 0); targetGyroOffset.set(0, 0, 0);
+    controls.update(); render();
   }
 
   function clearDecor(){
@@ -194,6 +190,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   const render=()=>{if(!dead&&!frame&&isTabVisible&&isCanvasVisible){frame=requestAnimationFrame(()=>{frame=0;if(!dead&&isTabVisible&&isCanvasVisible)renderer.render(scene,camera);});}};
   controls.addEventListener('change',render);
   controls.addEventListener('start',()=>{
+    resetGyroOffset();
     if(currentTween){
       cancelAnimationFrame(currentTween.raf);
       currentTween=null;
@@ -201,6 +198,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   });
 
   function tweenCamera(targetPos, targetLookAt, duration=650) {
+    resetGyroOffset();
     if(typeof window!=='undefined'&&window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches){
       camera.position.copy(targetPos);
       controls.target.copy(targetLookAt);
@@ -237,8 +235,12 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     currentTween={raf:requestAnimationFrame(animate)};
   }
 
+  let focusedRoom = null;
+  function viewDistance(width, height, depth = 0) { return Math.max(height, width / camera.aspect) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.15 + depth / 2; }
   function overview(smooth=false){
-    const destPos=new THREE.Vector3(7,6.1,17);
+    focusedRoom = null;
+    resetGyroOffset();
+    const destPos=new THREE.Vector3(.35,.22,1).normalize().multiplyScalar(viewDistance(10,5.8,2.6)).add(new THREE.Vector3(0,2.45,0));
     const destTarget=new THREE.Vector3(0,2.45,0);
     if(smooth){
       tweenCamera(destPos,destTarget,650);
@@ -250,7 +252,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     }
   }
   overview(false);
-  const observer=new ResizeObserver(()=>{const w=host.clientWidth,h=host.clientHeight;if(w&&h){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();render();}});observer.observe(host);
+  const observer=new ResizeObserver(()=>{const w=host.clientWidth,h=host.clientHeight;if(w&&h){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();if(focusedRoom)focusRoom(focusedRoom,false);else overview(false);render();}});observer.observe(host);
   function disposeTree(root){if(!root)return;root.traverse(o=>{if(o.isMesh){o.geometry.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material]))m.dispose();}});}
   const loader=new GLTFLoader();
   Promise.allSettled([loader.loadAsync('/memoryhouse/models/memory-house.glb'),loader.loadAsync('/memoryhouse/models/decorations.glb')]).then(results=>{
@@ -283,8 +285,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     const rooms=next.rooms||[];
     const colors={classic:'#c2a77e',warm_gold:'#c9a375',rose_romance:'#d6a0a6',midnight:'#8995bc',minimal_dark:'#8e8b88',editorial_cream:'#d4c4a5'};
     house.traverse(o=>{if(o.isMesh&&o.material?.name==='Theme blush')o.material.color.set(colors[next.theme]||colors.warm_gold);});
-    const active=rooms.find(r=>r.id===next.activeRoomId);
-    const light=active?.lighting||'day';
+    const light=houseLighting(rooms);
 
     // 3 Light Moods (Chặng C)
     if(light==='night'){
@@ -388,15 +389,8 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
           o.userData.decorText = d.text || null;
 
           if (isText) {
-            o.userData.isTextSurface = true;
-            o.material = new THREE.MeshBasicMaterial({color:'#ffffff', side:THREE.DoubleSide});
-            decorMaterials.push(o.material);
-            const placeholder = d.item === 'calendar' ? '01 / 01' : 'Emoria';
-            const displayText = (d.text && d.text.trim()) ? d.text : placeholder;
-            const texture = textTexture(displayText, o.userData.photoAspect || 2);
-            decorTextTextures.push(texture);
-            o.material.map = texture;
-            return;
+            o.userData.decorPhotoIndex = 0;
+            o.userData.placeholderText = d.item === 'calendar' ? '01 / 01' : 'Emoria';
           }
 
           if(Number.isInteger(o.userData.decorPhotoIndex)){
@@ -419,11 +413,17 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
       const memories=rooms.find(r=>r.id===surface.userData.roomId)?.memories;
       const memory=Number.isInteger(surface.userData.decorPhotoIndex)?memories?.find(m=>m.id===surface.userData.memoryId):memories?.[surface.userData.photoIndex];
       const url=memory?.photo_url;surface.userData.url=url||null;surface.userData.memory=memory||null;surface.material.map=null;surface.material.color.set('#f8ecda');
-      const aspect=surface.userData.photoAspect||4/3,textureKey=`${url}|${aspect}`;surface.userData.textureKey=url?textureKey:null;
+      const caption = surface.userData.decorText || '';
+      if (!url && (caption || surface.userData.placeholderText)) {
+        let texture = surface.userData.textTexture;
+        if (!texture) { texture = textTexture(caption || surface.userData.placeholderText, surface.userData.photoAspect || 4/3); surface.userData.textTexture = texture; decorTextTextures.push(texture); }
+        surface.material.map = texture; surface.material.color.set('#fff');
+      }
+      const aspect=surface.userData.photoAspect||4/3,textureKey=JSON.stringify([url,aspect,caption]);surface.userData.textureKey=url?textureKey:null;
       if(url){
         needed.add(textureKey);
         if(textures.has(textureKey)){surface.material.map=textures.get(textureKey);surface.material.color.set('#ffffff');}
-        else if(!failedPhotos.has(url)) loadPhoto(url,textureKey,aspect);
+        else if(!failedPhotos.has(url)) loadPhoto(url,textureKey,aspect,caption);
       }
       surface.material.needsUpdate=true;
     }
@@ -431,7 +431,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     render();
   }
   const pending=new Set();
-  function loadPhoto(url,key,aspect){
+  function loadPhoto(url,key,aspect,caption){
     if(pending.has(key))return;pending.add(key);
     const img=new Image();img.crossOrigin='anonymous';img.decoding='async';
     img.onload=()=>{
@@ -440,6 +440,24 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
         const c=document.createElement('canvas');c.width=Math.round(512*Math.min(1,aspect));c.height=Math.round(512/Math.max(1,aspect));const ctx=c.getContext('2d');
         const scale=Math.max(c.width/img.width,c.height/img.height),w=img.width*scale,h=img.height*scale;
         ctx.drawImage(img,(c.width-w)/2,(c.height-h)/2,w,h);
+        if (caption) {
+          const lines = caption.split('\n');
+          ctx.font = `600 ${Math.max(12, Math.round(c.height * .065))}px Georgia, serif`;
+          const wrapped = [];
+          for (const line of lines) {
+            let current = '';
+            for (const word of line.split(' ')) {
+              if (current && ctx.measureText(current + ' ' + word).width > c.width - 24) { wrapped.push(current); current = word; }
+              else current += (current ? ' ' : '') + word;
+            }
+            wrapped.push(current);
+          }
+          const lineHeight = Math.max(16, c.height * .08), shown = wrapped.slice(0, 4);
+          const top = c.height - shown.length * lineHeight - 12;
+          ctx.fillStyle = 'rgba(25,18,14,.72)'; ctx.fillRect(0, top, c.width, c.height - top);
+          ctx.fillStyle = '#fff5df'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          shown.forEach((line, i) => ctx.fillText(line, c.width / 2, top + 6 + (i + .5) * lineHeight, c.width - 20));
+        }
         const texture=new THREE.CanvasTexture(c);texture.flipY=false;texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());textures.set(key,texture);
         for(const s of photoSurfaces())if(s.userData.textureKey===key){s.material.map=texture;s.material.color.set('#fff');s.material.needsUpdate=true;}render();
       }catch{failedPhotos.add(url);}
@@ -620,81 +638,66 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   function lost(e){e.preventDefault();onError?.('Chế độ 3D tạm dừng. Chuyển sang khung 2D hoặc tải lại mô hình.');}
   renderer.domElement.addEventListener('pointerdown',pointerDown,true);renderer.domElement.addEventListener('pointerup',pointerUp);renderer.domElement.addEventListener('pointermove',pointerMove);renderer.domElement.addEventListener('pointercancel',pointerCancel);renderer.domElement.addEventListener('lostpointercapture',pointerCancel);renderer.domElement.addEventListener('webglcontextlost',lost);
 
-  function enableGyroscope(enable) {
-    if (!enable) {
-      gyroActive = false;
-      resetGyroOffset();
-      if (gyroHandler && typeof window !== 'undefined') {
-        window.removeEventListener('deviceorientation', gyroHandler);
-        gyroHandler = null;
+  function animateGyro() {
+    gyroRaf = 0;
+    if (!gyroActive || dead || !isTabVisible || !isCanvasVisible || down || currentTween || !controls.enabled) return;
+    camera.position.sub(currentGyroOffset);
+    currentGyroOffset.lerp(targetGyroOffset, .12);
+    camera.position.add(currentGyroOffset); render();
+    if (currentGyroOffset.distanceToSquared(targetGyroOffset) > .000001) gyroRaf = requestAnimationFrame(animateGyro);
+  }
+  const orientationChanged = () => resetGyroOffset();
+  async function enableGyroscope(enable) {
+    clearTimeout(gyroTimeout);
+    if (gyroHandler) window.removeEventListener('deviceorientation', gyroHandler);
+    window.removeEventListener('orientationchange', orientationChanged);
+    gyroHandler = null; gyroActive = false; resetGyroOffset();
+    if (!enable) { onGyroChange?.(false, ''); return false; }
+    const Orientation = window.DeviceOrientationEvent;
+    if (!Orientation) { onGyroChange?.(false, 'Thiết bị này không cung cấp cảm biến nghiêng. Bạn vẫn có thể kéo để xoay.'); return false; }
+    try {
+      if (typeof Orientation.requestPermission === 'function' && await Orientation.requestPermission() !== 'granted') {
+        onGyroChange?.(false, 'Chưa được cấp quyền cảm biến. Bạn có thể tiếp tục kéo để xoay.'); return false;
       }
-      return Promise.resolve(false);
-    }
-    if (typeof window === 'undefined' || !window.DeviceOrientationEvent) {
-      return Promise.resolve(false);
-    }
-    const startListener = () => {
-      baseGamma = null;
-      baseBeta = null;
-      gyroHandler = (e) => {
-        if (!gyroActive || controls.state !== -1 || currentTween) {
-          if (currentGyroOffset.lengthSq() > 0) resetGyroOffset();
-          return;
-        }
-        if (baseGamma === null || baseBeta === null) {
-          baseGamma = e.gamma || 0;
-          baseBeta = e.beta || 45;
-        }
-        const dGamma = Math.max(-15, Math.min(15, (e.gamma || 0) - baseGamma));
-        const dBeta = Math.max(-15, Math.min(15, (e.beta || 45) - baseBeta));
-
-        // Offset bounded in camera local coordinate space (max 0.12 units)
-        const forward = new THREE.Vector3();
-        camera.getWorldDirection(forward);
-        const right = new THREE.Vector3().crossVectors(camera.up, forward).normalize();
-        const up = new THREE.Vector3().crossVectors(forward, right).normalize();
-
-        targetGyroOffset.copy(right).multiplyScalar((dGamma / 15) * 0.10)
-          .addScaledVector(up, (dBeta / 15) * 0.08);
-
-        // Remove previously applied offset and apply lerped offset from baseline
-        camera.position.sub(currentGyroOffset);
-        currentGyroOffset.lerp(targetGyroOffset, 0.08);
-        camera.position.add(currentGyroOffset);
-        render();
-      };
-      window.addEventListener('deviceorientation', gyroHandler);
-      gyroActive = true;
-      return true;
+    } catch { onGyroChange?.(false, 'Chưa bật được cảm biến. Hãy mở trang bằng HTTPS trên điện thoại.'); return false; }
+    if (dead) return false;
+    gyroActive = true;
+    gyroTimeout = setTimeout(() => {
+      enableGyroscope(false);
+      onGyroChange?.(false, 'Chưa nhận được cảm biến. Hãy thử lại trên điện thoại hoặc kéo để xoay.');
+    }, 3500);
+    gyroHandler = e => {
+      if (!Number.isFinite(e.beta) || !Number.isFinite(e.gamma)) return;
+      clearTimeout(gyroTimeout);
+      if (!gyroActive || !isTabVisible || !isCanvasVisible || down || currentTween || !controls.enabled) { gyroBaseline = null; return; }
+      gyroBaseline ||= [e.beta, e.gamma];
+      const [x, y] = gyroTilt(e.beta, e.gamma, gyroBaseline, window.screen.orientation?.angle ?? window.orientation ?? 0, gyroSensitivity);
+      const forward = camera.getWorldDirection(new THREE.Vector3());
+      const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+      const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+      targetGyroOffset.copy(right).multiplyScalar(x * .28).addScaledVector(up, -y * .2);
+      if (!gyroRaf) gyroRaf = requestAnimationFrame(animateGyro);
     };
+    window.addEventListener('deviceorientation', gyroHandler, { passive: true });
+    window.addEventListener('orientationchange', orientationChanged);
+    onGyroChange?.(true, ''); return true;
+  }
 
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      return DeviceOrientationEvent.requestPermission()
-        .then((perm) => {
-          if (perm === 'granted') {
-            return startListener();
-          }
-          return false;
-        })
-        .catch(() => false);
-    } else {
-      return Promise.resolve(startListener());
-    }
+  function focusRoom(roomId, smooth = true) {
+    const root=roomObjects.get(roomId);if(!root)return;
+    focusedRoom = roomId; resetGyroOffset();
+    const box=new THREE.Box3().setFromObject(root),target=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
+    const destPos=target.clone().add(new THREE.Vector3(.12,.14,1).normalize().multiplyScalar(viewDistance(size.x,size.y,size.z)));
+    if(smooth) tweenCamera(destPos,target,500);
+    else { controls.target.copy(target);camera.position.copy(destPos);controls.update();render(); }
   }
 
   return {
     update,
     overview,
-    focus(roomId,smooth=true){
-      const root=roomObjects.get(roomId);if(!root)return;
-      const box=new THREE.Box3().setFromObject(root),target=box.getCenter(new THREE.Vector3());
-      const destPos=target.clone().add(new THREE.Vector3(.8,1,5.5));
-      if(smooth){
-        tweenCamera(destPos,target,700);
-      }else{
-        controls.target.copy(target);camera.position.copy(destPos);controls.update();render();
-      }
-    },
+    focus: focusRoom,
+    calibrateGyroscope: resetGyroOffset,
+    setGyroSensitivity(value) { if (Number.isFinite(value)) gyroSensitivity = Math.max(.2, Math.min(1.5, value)); },
     enableGyroscope,
     raycastSurface,
     findPlacement,
@@ -718,6 +721,8 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
       observer.disconnect();intersectionObserver.disconnect();controls.dispose();
       if(typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityChange);
       if(gyroHandler && typeof window !== 'undefined') window.removeEventListener('deviceorientation', gyroHandler);
+      clearTimeout(gyroTimeout); cancelAnimationFrame(gyroRaf);
+      window.removeEventListener('orientationchange', orientationChanged);
       resetGyroOffset();
       renderer.domElement.removeEventListener('pointerdown',pointerDown,true);renderer.domElement.removeEventListener('pointerup',pointerUp);renderer.domElement.removeEventListener('pointermove',pointerMove);renderer.domElement.removeEventListener('pointercancel',pointerCancel);renderer.domElement.removeEventListener('lostpointercapture',pointerCancel);renderer.domElement.removeEventListener('webglcontextlost',lost);
       clearDecor();

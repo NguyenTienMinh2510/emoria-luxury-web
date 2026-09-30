@@ -6,9 +6,9 @@ import {
   addDecorationInstance,
   updateDecorationInstance,
   removeDecorationInstance,
-  generateInstanceId
+  generateInstanceId, houseLighting, withHouseLighting
 } from '../services/house3d.js';
-import { createMusicBoxPlayer } from '../services/musicBoxPlayer.js';
+import { createMusicBoxPlayer, MUSIC_TRACKS } from '../services/musicBoxPlayer.js';
 import MemoryHouse2D from './MemoryHouse2D.jsx';
 
 // Style Packages (Gói phong cách một chạm)
@@ -61,7 +61,7 @@ export default function MemoryHouse3D({
 }) {
   const host = useRef(null), engine = useRef(null), latest = useRef({});
   const fileInput = useRef(null), uploadTarget = useRef(null), tourTimer = useRef(null);
-  const musicBox = useRef(null);
+  const musicBox = useRef(null), contentEditor = useRef(null);
 
   const [view, setView] = useState('3d'), [status, setStatus] = useState('loading'), [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
@@ -74,12 +74,15 @@ export default function MemoryHouse3D({
   const [placingScale, setPlacingScale] = useState(1);
   const [pendingPlacement, setPendingPlacement] = useState(null);
   const [removing, setRemoving] = useState(false);
-  const [editingContent, setEditingContent] = useState(false);
+
   const [history, setHistory] = useState({ past: [], future: [] });
 
   // Music Box, Gyroscope, Decor Inspection, Welcome Door
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [musicVolume, setMusicVolume] = useState(0.55);
+  const [musicTrack, setMusicTrack] = useState(MUSIC_TRACKS[0].id);
+  const [gyroSensitivity, setGyroSensitivity] = useState(.6);
+  const [gyroNotice, setGyroNotice] = useState('');
   const [isGyroEnabled, setIsGyroEnabled] = useState(false);
   const [inspectingDecor, setInspectingDecor] = useState(null);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
@@ -95,16 +98,16 @@ export default function MemoryHouse3D({
 
   // Initialize Music Box Player (Web Audio API)
   useEffect(() => {
-    musicBox.current = createMusicBoxPlayer();
+    musicBox.current = createMusicBoxPlayer({ onStateChange: ({ playing, trackId }) => { setIsMusicPlaying(playing); setMusicTrack(trackId); } });
     return () => {
       musicBox.current?.dispose();
       musicBox.current = null;
     };
   }, []);
 
-  function toggleMusic() {
+  async function toggleMusic() {
     if (!musicBox.current) return;
-    const playing = musicBox.current.toggle();
+    const playing = await musicBox.current.toggle();
     setIsMusicPlaying(playing);
   }
 
@@ -125,51 +128,29 @@ export default function MemoryHouse3D({
     fileInput.current?.click();
   }
 
-  // History State Handlers (Undo / Redo)
+  // Snapshot only editable decoration/mood fields, preserving uploads during undo.
+  const snapshot = () => rooms.map(r => ({ id: r.id, decorations: roomDecorations(r), lighting: r.lighting || 'day' }));
+  function commitRooms(nextRooms, recordHistory = true) {
+    if (readOnly) return;
+    if (recordHistory) setHistory(h => ({ past: [...h.past.slice(-25), snapshot()], future: [] }));
+    onRoomsChange?.(nextRooms);
+  }
   function commitChange(nextRoom, recordHistory = true) {
-    if (readOnly || !room) return;
-    if (recordHistory) {
-      setHistory(h => ({
-        past: [
-          ...h.past.slice(-25),
-          { roomId: room.id, decorations: roomDecorations(room), lighting: room.lighting || 'day' }
-        ],
-        future: []
-      }));
-    }
-    onRoomsChange?.(rooms.map(r => r.id === room.id ? nextRoom : r));
+    if (room) commitRooms(rooms.map(r => r.id === room.id ? nextRoom : r), recordHistory);
   }
-
+  function restoreSnapshot(saved) {
+    onRoomsChange?.(rooms.map(r => ({ ...r, ...saved.find(s => s.id === r.id) })));
+    setSelectedInstanceId(null); cancelPlacement();
+  }
   function handleUndo() {
-    if (readOnly || history.past.length === 0) return;
-    const prev = history.past[history.past.length - 1];
-    const newPast = history.past.slice(0, -1);
-    const target = rooms.find(r => r.id === prev.roomId);
-    const currentSnap = { roomId: target.id, decorations: roomDecorations(target), lighting: target.lighting || 'day' };
-    setHistory({
-      past: newPast,
-      future: [currentSnap, ...history.future.slice(0, 25)]
-    });
-    onRoomsChange?.(rooms.map(r => r.id === prev.roomId ? { ...r, decorations: prev.decorations, lighting: prev.lighting } : r));
-    setSelectedInstanceId(null);
-    engine.current?.setSelectionHighlight(null);
-    cancelPlacement();
+    if (readOnly || !history.past.length) return;
+    setHistory({ past: history.past.slice(0, -1), future: [snapshot(), ...history.future.slice(0, 25)] });
+    restoreSnapshot(history.past.at(-1));
   }
-
   function handleRedo() {
-    if (readOnly || history.future.length === 0) return;
-    const next = history.future[0];
-    const newFuture = history.future.slice(1);
-    const target = rooms.find(r => r.id === next.roomId);
-    const currentSnap = { roomId: target.id, decorations: roomDecorations(target), lighting: target.lighting || 'day' };
-    setHistory({
-      past: [...history.past, currentSnap],
-      future: newFuture
-    });
-    onRoomsChange?.(rooms.map(r => r.id === next.roomId ? { ...r, decorations: next.decorations, lighting: next.lighting } : r));
-    setSelectedInstanceId(null);
-    engine.current?.setSelectionHighlight(null);
-    cancelPlacement();
+    if (readOnly || !history.future.length) return;
+    setHistory({ past: [...history.past, snapshot()], future: history.future.slice(1) });
+    restoreSnapshot(history.future[0]);
   }
 
   // 3D Engine Setup
@@ -197,8 +178,7 @@ export default function MemoryHouse3D({
       const targetRoom = rooms.find(r => r.id === data.roomId);
       if (!targetRoom) return;
       const updated = removeDecorationInstance(targetRoom, data.id, { action: 'delete_children' });
-      setHistory(h => ({ past: [...h.past.slice(-25), { roomId: targetRoom.id, decorations: roomDecorations(targetRoom), lighting: targetRoom.lighting || 'day' }], future: [] }));
-      onRoomsChange?.(rooms.map(r => r.id === targetRoom.id ? updated : r));
+      commitRooms(rooms.map(r => r.id === targetRoom.id ? updated : r));
       setSelectedInstanceId(null);
     } else {
       if (data.roomId) onSelectRoom?.(data.roomId);
@@ -215,6 +195,7 @@ export default function MemoryHouse3D({
         engine.current = createHouseRenderer(host.current, {
           getPlacement: () => latest.current.placement,
           isEditing: () => !latest.current.readOnly,
+          onGyroChange: (enabled, message) => { setIsGyroEnabled(enabled); setGyroNotice(message); },
           onPlacementPreview: hit => latest.current.onPlacementPreview?.(hit),
           onRoom: id => {
             latest.current.onSelectRoom?.(id);
@@ -272,7 +253,7 @@ export default function MemoryHouse3D({
 
   useEffect(() => {
     cancelPlacement();
-    setSelectedInstanceId(null);
+    if (!roomDecorations(room).some(d => (d.id || d.slot) === selectedInstanceId)) setSelectedInstanceId(null);
     setRemoving(false);
   }, [activeRoomId, readOnly]);
 
@@ -443,11 +424,11 @@ export default function MemoryHouse3D({
     const nextDecor = [...existingDecor, ...added];
     const updatedRoom = {
       ...room,
-      lighting: pkg.lighting || room.lighting || 'day',
       decorations: nextDecor
     };
-    commitChange(updatedRoom, true);
+    commitRooms(withHouseLighting(rooms.map(r => r.id === room.id ? updatedRoom : r), pkg.lighting));
     engine.current?.focus(room.id, true);
+    host.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
   // Helper: Classify photo aspect ratio
@@ -559,7 +540,7 @@ export default function MemoryHouse3D({
     setTimeout(() => setArrangeNotice(''), 4500);
   }
 
-  const button = 'px-3 py-1.5 rounded-xl border border-white/15 bg-white/10 text-xs text-white hover:bg-white/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+  const button = 'min-h-11 min-w-11 px-3 py-2 rounded-xl border border-white/15 bg-white/10 text-xs text-white hover:bg-white/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
 
   return (
     <section aria-label="Ngôi nhà kỷ niệm 3D" className="rounded-3xl border border-white/15 bg-gradient-to-b from-stone-900/90 to-stone-950/90 shadow-2xl backdrop-blur-xl overflow-hidden relative">
@@ -587,46 +568,12 @@ export default function MemoryHouse3D({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Interactive Music Box Toggle */}
-          <button
-            type="button"
-            onClick={toggleMusic}
-            className={`${button} flex items-center gap-1.5 ${isMusicPlaying ? 'bg-amber-400 text-stone-950 font-bold border-amber-300 shadow-md' : 'bg-white/5'}`}
-            title="Chạm để bật/tắt giai điệu hộp nhạc du dương"
-          >
-            <span className={`inline-block transition-transform duration-700 ${isMusicPlaying ? 'animate-spin' : ''}`}>
-              🎵
-            </span>
-            <span>{isMusicPlaying ? 'Hộp nhạc: Bật' : 'Hộp nhạc'}</span>
+          <button type="button" onClick={toggleMusic} className={button} aria-pressed={isMusicPlaying}>
+            🎵 {isMusicPlaying ? 'Dừng nhạc' : 'Bật nhạc'}
           </button>
-
-          {isMusicPlaying && (
-            <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-xl border border-white/10">
-              <span className="text-[10px] text-stone-300">Âm lượng</span>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={musicVolume}
-                onChange={e => handleVolumeChange(parseFloat(e.target.value))}
-                className="w-14 accent-amber-300 h-1 cursor-pointer"
-                aria-label="Âm lượng hộp nhạc"
-              />
-            </div>
-          )}
-
-          {/* Gyroscope Tilt Toggle */}
-          {typeof window !== 'undefined' && (
-            <button
-              type="button"
-              onClick={toggleGyro}
-              className={`${button} ${isGyroEnabled ? 'bg-indigo-500/20 text-indigo-300 border-indigo-400/40' : 'bg-white/5'}`}
-              title="Nghiêng điện thoại để đổi góc nhìn nhẹ nhàng"
-            >
-              📱 {isGyroEnabled ? 'Cảm biến: Bật' : 'Nghiêng máy'}
-            </button>
-          )}
+          <button type="button" onClick={toggleGyro} disabled={status !== 'ready' || view !== '3d'} className={button} aria-pressed={isGyroEnabled}>
+            📱 {isGyroEnabled ? 'Tắt nghiêng' : 'Nghiêng máy'}
+          </button>
 
           {/* Undo / Redo Buttons */}
           {!readOnly && (
@@ -659,10 +606,33 @@ export default function MemoryHouse3D({
         </div>
       </div>
 
+      <details className="border-b border-white/10 px-3 py-2 sm:px-4">
+        <summary className="cursor-pointer py-2 text-sm font-semibold text-amber-200">Không khí & âm nhạc của ngôi nhà</summary>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-3 text-sm">
+          <label className="space-y-1"><span>Ánh sáng toàn bộ nhà</span>
+            <select aria-label="Ánh sáng toàn bộ nhà" disabled={readOnly} value={houseLighting(rooms)} onChange={e => commitRooms(withHouseLighting(rooms, e.target.value))} className="block w-full min-h-11 rounded-xl bg-stone-900 border border-white/20 px-3 text-base sm:text-sm">
+              <option value="day">Bình minh trong trẻo</option><option value="sunset">Hoàng hôn mật ngọt</option><option value="night">Đêm hẹn hò</option>
+            </select>
+            <span className="block text-xs text-stone-400">Giữ nguyên khi đổi phòng và lưu cùng ngôi nhà.</span>
+          </label>
+          <label className="space-y-1"><span>Danh sách nhạc · 6 giai điệu</span>
+            <select aria-label="Chọn giai điệu" value={musicTrack} onChange={e => musicBox.current?.selectTrack(e.target.value)} className="block w-full min-h-11 rounded-xl bg-stone-900 border border-white/20 px-3 text-base sm:text-sm">
+              {MUSIC_TRACKS.map(track => <option key={track.id} value={track.id}>{track.name}</option>)}
+            </select>
+            <span className="block text-xs text-stone-400">Tự chuyển bài khi phát hết; chỉ phát khi bạn bật.</span>
+          </label>
+          <div className="space-y-2"><button type="button" className={button} onClick={() => musicBox.current?.nextTrack()}>Bài tiếp theo ⏭</button>
+            <label className="flex items-center gap-3">Âm lượng<input type="range" aria-label="Âm lượng nhạc" min="0" max="1" step="0.05" value={musicVolume} onChange={e => handleVolumeChange(Number(e.target.value))} className="w-full min-w-0 accent-amber-300" /></label>
+          </div>
+        </div>
+        {isGyroEnabled && <div className="flex flex-wrap gap-3 items-center pb-3 text-sm"><button type="button" className={button} onClick={() => engine.current?.calibrateGyroscope()}>Lấy lại tâm nhìn</button><label className="flex items-center gap-2">Độ nhạy<input type="range" aria-label="Độ nhạy nghiêng máy" min="0.2" max="1.5" step="0.1" value={gyroSensitivity} onChange={e => { const value = Number(e.target.value); setGyroSensitivity(value); engine.current?.setGyroSensitivity(value); }} /></label></div>}
+        {gyroNotice && <p role="status" className="pb-3 text-xs text-amber-200">{gyroNotice}</p>}
+      </details>
+
       {/* 3D Canvas Container */}
       {view === '3d' ? (
         <>
-          <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full min-h-[340px] max-h-[580px] bg-stone-950 overflow-hidden">
+          <div className="relative h-[58svh] min-h-[340px] sm:h-auto sm:aspect-[16/9] w-full max-h-[580px] bg-stone-950 overflow-hidden">
             <div ref={host} className="w-full h-full" />
 
             {/* Soft Welcome Door Entrance */}
@@ -714,7 +684,7 @@ export default function MemoryHouse3D({
             {removing && !readOnly && <div className="absolute top-3 left-3 right-3 z-30 p-3 rounded-xl bg-stone-900/95 text-xs text-white flex justify-between gap-3"><span>Chạm món muốn gỡ (kèm đồ bên trên, nếu có). Có thể Hoàn tác.</span><button type="button" className={button} onClick={() => setRemoving(false)}>Xong</button></div>}
             {/* Floating Placement Confirmation Banner */}
             {!readOnly && placingItem && placingAsset && (
-              <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between gap-3 p-3 rounded-2xl bg-stone-900/95 border border-amber-400/40 backdrop-blur-xl shadow-2xl animate-scaleUp">
+              <div className="absolute top-2 left-2 right-2 sm:top-3 sm:left-3 sm:right-3 z-30 flex flex-wrap items-center justify-between gap-2 p-2 sm:p-3 rounded-2xl bg-stone-900/95 border border-amber-400/40 backdrop-blur-xl shadow-2xl animate-scaleUp">
                 <div className="flex items-center gap-2.5">
                   <img src={placingAsset.image} alt="" className="w-9 h-9 rounded-xl object-cover border border-amber-300/30" />
                   <div>
@@ -754,7 +724,7 @@ export default function MemoryHouse3D({
 
             {/* Floating Concise Action Toolbar for Selected Instance */}
             {!readOnly && selectedInstance && selectedAsset && !placingItem && (
-              <div className="absolute top-3 left-3 right-3 z-30 flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-stone-900/95 border border-amber-400/40 backdrop-blur-xl shadow-2xl animate-scaleUp">
+              <div className="absolute top-2 left-2 right-2 sm:top-3 sm:left-3 sm:right-3 z-30 flex flex-wrap items-center justify-between gap-2 p-2 sm:p-3 rounded-2xl bg-stone-900/95 border border-amber-400/40 backdrop-blur-xl shadow-2xl animate-scaleUp">
                 <div className="flex items-center gap-2.5">
                   <img src={selectedAsset.image} alt="" className="w-9 h-9 rounded-xl object-cover border border-amber-300/30" />
                   <div>
@@ -816,11 +786,11 @@ export default function MemoryHouse3D({
                   {(selectedAsset.photoCount > 0 || selectedAsset.textLabel) && (
                     <button
                       type="button"
-                      onClick={() => setEditingContent(!editingContent)}
-                      className={`${button} ${editingContent ? 'bg-amber-400/20 text-amber-300 border-amber-400/40' : ''}`}
+                      onClick={() => contentEditor.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })}
+                      className={`${button} bg-amber-400/20 text-amber-300 border-amber-400/40`}
                       title="Gắn ảnh hoặc thay đổi nội dung chữ"
                     >
-                      Nội dung
+                      Viết chữ / Gắn ảnh
                     </button>
                   )}
 
@@ -1023,7 +993,7 @@ export default function MemoryHouse3D({
                           type="button"
                           onClick={() => {
                             setSelectedInstanceId(instId);
-                            setEditingContent(true);
+                            requestAnimationFrame(() => contentEditor.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
                           }}
                           className={`${button} text-[10px] px-2 py-1`}
                         >
@@ -1047,8 +1017,87 @@ export default function MemoryHouse3D({
         </div>
       )}
 
+            {/* Personalized Content Editor for Selected Instance */}
+            {!readOnly && selectedInstance && selectedAsset && (selectedAsset.textLabel || selectedAsset.photoCount > 0) && (
+              <div ref={contentEditor} className="m-3 sm:m-4 rounded-2xl border border-amber-200/25 bg-amber-200/5 p-4 space-y-4 animate-scaleUp" aria-label="Cá nhân hóa đồ vật">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-amber-100 text-sm flex items-center gap-2">
+                    <span>Viết chữ / Gắn ảnh · {selectedAsset.name}</span>
+                    
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInstanceId(null)}
+                    className="text-stone-400 hover:text-white text-xs cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
+
+                {selectedAsset.textLabel && (
+                  <label className="block text-sm text-slate-300">
+                    {selectedAsset.textLabel}
+                    <textarea
+                      value={selectedInstance.text || ''}
+                      maxLength={80}
+                      rows={2}
+                      placeholder={selectedInstance.item === 'calendar' ? '28.09.2026\nNgày mình có nhau' : 'Minh & An\nNhà là nơi có nhau'}
+                      className="mt-2 block w-full rounded-xl border border-white/20 bg-stone-900 p-3 text-white text-base sm:text-sm"
+                      onChange={e => {
+                        const updated = updateDecorationInstance(room, selectedInstanceId, { text: e.target.value });
+                        commitChange(updated, true);
+                      }}
+                    />
+                    <span className="text-[11px] text-stone-400">
+                      {(selectedInstance.text || '').length}/80 ký tự · Hiện trên mặt đồ vật; nếu có ảnh, chữ nằm dưới ảnh
+                    </span>
+                  </label>
+                )}
+
+                {Array.from({ length: selectedAsset.photoCount }, (_, index) => {
+                  const photoId = selectedInstance.photos?.[index];
+                  const photo = room.memories?.find(m => m.id === photoId);
+                  return (
+                    <div key={index} className="flex flex-wrap items-center gap-3">
+                      {photo?.photo_url && (
+                        <img src={photo.photo_url} alt={`Ảnh ${index + 1} trên ${selectedAsset.name}`} className="h-16 w-16 rounded-xl object-cover border border-white/10" />
+                      )}
+                      <label className="flex-1 min-w-32 text-xs text-slate-300">
+                        Ảnh {index + 1} trên {selectedAsset.name}
+                        <select
+                          value={photo?.id || ''}
+                          className="mt-1 block w-full rounded-lg border border-white/20 bg-stone-900 p-2 text-white text-base sm:text-sm cursor-pointer"
+                          onChange={e => {
+                            const updated = setDecorationPhoto(room, selectedInstanceId, selectedInstance.item, index, e.target.value || null);
+                            commitChange(updated, true);
+                          }}
+                        >
+                          <option value="">Chưa chọn ảnh</option>
+                          {(room.memories || []).map((m, i) => (
+                            <option key={m.id} value={m.id}>
+                              {m.caption || `Kỷ niệm ${i + 1}`}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      {onUploadPhoto && (
+                        <button
+                          type="button"
+                          className={button}
+                          disabled={uploading || (room.memories?.length || 0) >= 10}
+                          onClick={() => chooseUpload({ slot: selectedInstanceId, item: selectedInstance.item, index })}
+                        >
+                          Tải ảnh {index + 1} lên đồ vật
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
       {/* Rooms selector pills */}
-      <div className="px-4 py-3 flex flex-wrap gap-2 border-t border-white/5" role="group" aria-label="Chọn phòng trong nhà 3D">
+      <div className="px-3 py-3 flex gap-2 overflow-x-auto whitespace-nowrap border-t border-white/5" role="group" aria-label="Chọn phòng trong nhà 3D">
         {rooms.map(r => (
           <button
             key={r.id}
@@ -1168,18 +1217,6 @@ export default function MemoryHouse3D({
                   {removing ? '✓ Đang gỡ đồ' : 'Gỡ đồ bằng chạm'}
                 </button>
 
-                <label className="text-xs text-stone-300 flex items-center gap-1.5 ml-2">
-                  <span>Mood ánh sáng:</span>
-                  <select
-                    className="bg-stone-900 rounded-lg p-2 border border-white/20 text-white cursor-pointer"
-                    value={room.lighting || 'day'}
-                    onChange={e => commitChange({ ...room, lighting: e.target.value }, true)}
-                  >
-                    <option value="day">Bình minh trong trẻo</option>
-                    <option value="sunset">Hoàng hôn mật ngọt</option>
-                    <option value="night">Đêm hẹn hò</option>
-                  </select>
-                </label>
 
                 {onSave && (
                   <button
@@ -1232,85 +1269,7 @@ export default function MemoryHouse3D({
               ))}
             </div>
 
-            {/* Personalized Content Editor for Selected Instance */}
-            {selectedInstance && selectedAsset && (selectedAsset.textLabel || selectedAsset.photoCount > 0) && (
-              <div className="rounded-2xl border border-amber-200/25 bg-amber-200/5 p-4 space-y-4 animate-scaleUp" aria-label="Cá nhân hóa đồ vật">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-amber-100 text-sm flex items-center gap-2">
-                    <span>Dấu ấn của đôi mình · {selectedAsset.name}</span>
-                    <span className="text-[10px] text-stone-400">#{selectedInstance.id || selectedInstance.slot}</span>
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedInstanceId(null)}
-                    className="text-stone-400 hover:text-white text-xs cursor-pointer"
-                  >
-                    Đóng
-                  </button>
-                </div>
 
-                {selectedAsset.textLabel && (
-                  <label className="block text-sm text-slate-300">
-                    {selectedAsset.textLabel}
-                    <textarea
-                      value={selectedInstance.text || ''}
-                      maxLength={80}
-                      rows={2}
-                      placeholder={selectedInstance.item === 'calendar' ? '28.09.2026\nNgày mình có nhau' : 'Minh & An\nNhà là nơi có nhau'}
-                      className="mt-2 block w-full rounded-xl border border-white/20 bg-stone-900 p-3 text-white text-xs"
-                      onChange={e => {
-                        const updated = updateDecorationInstance(room, selectedInstanceId, { text: e.target.value });
-                        commitChange(updated, true);
-                      }}
-                    />
-                    <span className="text-[11px] text-stone-400">
-                      {(selectedInstance.text || '').length}/80 ký tự · Cập nhật tức thì lên mô hình 3D
-                    </span>
-                  </label>
-                )}
-
-                {Array.from({ length: selectedAsset.photoCount }, (_, index) => {
-                  const photoId = selectedInstance.photos?.[index];
-                  const photo = room.memories?.find(m => m.id === photoId);
-                  return (
-                    <div key={index} className="flex flex-wrap items-center gap-3">
-                      {photo?.photo_url && (
-                        <img src={photo.photo_url} alt={`Ảnh ${index + 1} trên ${selectedAsset.name}`} className="h-16 w-16 rounded-xl object-cover border border-white/10" />
-                      )}
-                      <label className="flex-1 min-w-32 text-xs text-slate-300">
-                        Ảnh {index + 1} trên {selectedAsset.name}
-                        <select
-                          value={photo?.id || ''}
-                          className="mt-1 block w-full rounded-lg border border-white/20 bg-stone-900 p-2 text-white text-xs cursor-pointer"
-                          onChange={e => {
-                            const updated = setDecorationPhoto(room, selectedInstanceId, selectedInstance.item, index, e.target.value || null);
-                            commitChange(updated, true);
-                          }}
-                        >
-                          <option value="">Chưa chọn ảnh</option>
-                          {(room.memories || []).map((m, i) => (
-                            <option key={m.id} value={m.id}>
-                              {m.caption || `Kỷ niệm ${i + 1}`}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      {onUploadPhoto && (
-                        <button
-                          type="button"
-                          className={button}
-                          disabled={uploading || (room.memories?.length || 0) >= 10}
-                          onClick={() => chooseUpload({ slot: selectedInstanceId, item: selectedInstance.item, index })}
-                        >
-                          Tải ảnh {index + 1} lên đồ vật
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       )}

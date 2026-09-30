@@ -108,8 +108,11 @@ export function createPlacementSolver({ template, roomId, triangles, collisionTr
   }
   function find(target = new THREE.Vector3(room.centerX, room.floorY + .7, 0)) {
     const direct = [...surfaces.values()].map(s => candidate(s, target.x, s.wall ? target.y : target.z)).filter(Boolean);
-    const available = direct.length ? direct : choices();
-    return available.reduce((best, hit) => !best || new THREE.Vector3(...hit.position).distanceToSquared(target) < new THREE.Vector3(...best.position).distanceToSquared(target) ? hit : best, null);
+    const distance = hit => (hit.position[0] - target.x) ** 2 + (hit.position[1] - target.y) ** 2 + (hit.position[2] - target.z) ** 2;
+    const nearest = (best, hit) => !best || distance(hit) < distance(best) ? hit : best;
+    const best = direct.reduce(nearest, null);
+    // Near an edge, prefer the adjacent tabletop over the floor far below it.
+    return best && distance(best) < .01 ? best : choices().reduce(nearest, best);
   }
   return { find, bounds };
 }

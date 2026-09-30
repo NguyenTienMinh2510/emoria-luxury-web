@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createPlacementSolver, placementTriangles, transformDecoration } from '../src/services/housePlacement.js';
-import { DECORATIONS, HOUSE_ROOM_IDS } from '../src/services/house3d.js';
+import { DECORATIONS, HOUSE_ROOM_IDS, addDecorationInstance, updateDecorationInstance } from '../src/services/house3d.js';
 
 const loader = new GLTFLoader();
 async function load(name) {
@@ -24,6 +24,10 @@ for (const roomId of HOUSE_ROOM_IDS) {
     assert(hit?.isValid, `${roomId}/${asset.id}: a real surface must fit the model`);
     const again = solver.find(new THREE.Vector3(...hit.position));
     assert.deepEqual(again, hit, 'Revalidation must preserve the preview position');
+    const placed = addDecorationInstance({ id: roomId, decorations: [] }, asset.id, { ...hit, id: 'placed' });
+    const moved = updateDecorationInstance(placed, 'placed', { position: hit.position }, { validatedPlacement: true });
+    assert.deepEqual(moved.decorations[0].position, hit.position.map(v => Math.round(v * 1000) / 1000), 'Validated pivot must not be clamped away from its support');
+    assert.deepEqual(updateDecorationInstance(moved, 'placed', { text: 'test' }).decorations[0].position, moved.decorations[0].position, 'Editing text cannot move the model');
     const model = template.clone(true);
     transformDecoration(model, hit.position, 0, scale);
     const interior = new THREE.Box3().setFromObject(model, true).expandByScalar(-.002);
