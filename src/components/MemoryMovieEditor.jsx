@@ -198,7 +198,7 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
 
           <p className="text-[11px] text-slate-400 font-mono break-all">{path}</p>
 
-          {/* Trạng thái kiểm duyệt & Nhãn AI của Gemini */}
+          {/* Trạng thái kiểm duyệt & Nhãn AI */}
           <div className="p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-xs">

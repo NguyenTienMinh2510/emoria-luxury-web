@@ -17,7 +17,7 @@ import {
   SmartphoneNfc, Volume2, VolumeX, Play, Pause, Heart, Mail, 
   Share2, Lock, Unlock, Sparkles, Calendar, User, Eye, Send, 
   ChevronLeft, ChevronRight, CheckCircle2, ShieldCheck, Image as ImageIcon,
-  Edit3, Key, Clock, AlertTriangle, Save, X, Loader2, ArrowLeft, Music, Feather, Film, Home, Upload
+  Edit3, Key, Clock, AlertTriangle, Save, X, Loader2, ArrowLeft, Music, Feather, Film, Home, Upload, Maximize2
 } from 'lucide-react';
 import { getHouseDraft, getPublicHouseByTag, HOUSE_ROOMS_SPEC, HOUSE_THEMES } from '../services/eventService.js';
 import { 
@@ -88,22 +88,36 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   const [isPlaying,setIsPlaying]=useState(false),[audioError,setAudioError]=useState('');
   const audioRef=useRef(null);
   const letterVideoRef=useRef(null);
+  const letterSectionRef=useRef(null);
+  const letterVideoContainerRef=useRef(null);
 
   // Letter Reveal State
   const [isLetterOpen, setIsLetterOpen] = useState(false);
 
-  // Tự động phát video tâm sự ngay khi mở thư
+  // Tự động cuộn zoom vào video intro & phát video tâm sự ngay khi mở thư
   useEffect(() => {
-    if (isLetterOpen && letterVideoRef.current) {
-      const playPromise = letterVideoRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          if (letterVideoRef.current) {
-            letterVideoRef.current.muted = true;
-            letterVideoRef.current.play().catch(() => {});
-          }
-        });
+    if (isLetterOpen) {
+      const scrollTimer = setTimeout(() => {
+        if (letterVideoContainerRef.current) {
+          letterVideoContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else if (letterSectionRef.current) {
+          letterSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 160);
+
+      if (letterVideoRef.current) {
+        const playPromise = letterVideoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            if (letterVideoRef.current) {
+              letterVideoRef.current.muted = true;
+              letterVideoRef.current.play().catch(() => {});
+            }
+          });
+        }
       }
+
+      return () => clearTimeout(scrollTimer);
     }
   }, [isLetterOpen, memoryData?.intro_video_url]);
 
@@ -637,12 +651,38 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
           </motion.div>
         </div>
       ) : memoryData.intro_video_url && !movieDone ? (
-        <MemoryCinema url={memoryData.intro_video_url} title={memoryData.title} recipient={memoryData.recipient} onComplete={()=>{setMovieDone(true);setIsLetterOpen(true);window.scrollTo({top:0,behavior:'smooth'});}} onRefresh={()=>loadMemory(currentTag)}/>
+        <MemoryCinema
+          url={memoryData.intro_video_url}
+          title={memoryData.title}
+          recipient={memoryData.recipient}
+          onComplete={() => {
+            setMovieDone(true);
+            setIsLetterOpen(true);
+            setTimeout(() => {
+              if (letterSectionRef.current) {
+                letterSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }, 220);
+          }}
+          onRefresh={() => loadMemory(currentTag)}
+        />
       ) : (
         /* 4. MAIN MEMORY SPACE (Đã mở khóa hoặc công khai) */
         <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-10">
           <div className="flex flex-wrap items-center gap-3">
-            {memoryData.intro_video_url&&<button className="store-button" onClick={()=>{audioRef.current?.pause();setIsPlaying(false);setMovieDone(false);}}>▶ {memoryData.is_owner?t("Xem trải nghiệm người nhận","Preview recipient experience"):t("Xem lại bộ phim kỷ niệm","Replay memory film")}</button>}
+            {memoryData.intro_video_url && (
+              <button
+                className="store-button"
+                onClick={() => {
+                  audioRef.current?.pause();
+                  setIsPlaying(false);
+                  setMovieDone(false);
+                  window.scrollTo({ top: 0, behavior: 'instant' });
+                }}
+              >
+                ▶ {memoryData.is_owner ? t("Xem trải nghiệm người nhận", "Preview recipient experience") : t("Xem lại bộ phim kỷ niệm", "Replay memory film")}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowUnboxing(true)}
@@ -693,7 +733,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
 
           {/* C. Hand-written Secret Letter & Spotlight Video (Chỉ hiển thị khi đã mở khóa PIN thành công) */}
           {(memoryData.letter || memoryData.intro_video_url) && (
-            <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
+            <div ref={letterSectionRef} className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-amber-300" />
@@ -718,17 +758,39 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden space-y-6"
                   >
-                    {/* Video Tâm Sự - Spotlight Centerpiece tự bật khi mở thư */}
+                    {/* Video Tâm Sự - Spotlight Centerpiece tự động zoom vào màn hình khi mở thư */}
                     {memoryData.intro_video_url && (
-                      <div className="rounded-2xl overflow-hidden border-2 border-amber-400/40 shadow-[0_20px_50px_rgba(0,0,0,0.95),0_0_35px_rgba(212,175,55,0.25)] bg-black">
+                      <motion.div 
+                        ref={letterVideoContainerRef}
+                        initial={{ opacity: 0, scale: 0.88, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+                        className="rounded-2xl overflow-hidden border-2 border-amber-400/50 shadow-[0_20px_60px_rgba(0,0,0,0.95),0_0_45px_rgba(212,175,55,0.35)] bg-black ring-1 ring-amber-400/30"
+                      >
                         <div className="px-4 py-2.5 bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-transparent border-b border-white/10 flex items-center justify-between text-xs text-amber-200">
                           <span className="flex items-center gap-2 font-medium tracking-wide">
                             <Film className="w-4 h-4 text-amber-400 animate-pulse" />
                             <span>{tBilingual("Thước Phim Tâm Sự Cùng Bức Thư", "Heartfelt Video with Letter")}</span>
                           </span>
-                          <span className="text-[10px] uppercase tracking-widest text-amber-300 font-semibold px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30">
-                            {t("Tự động phát", "Auto Playing")}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                audioRef.current?.pause();
+                                setIsPlaying(false);
+                                setMovieDone(false);
+                                window.scrollTo({ top: 0, behavior: 'instant' });
+                              }}
+                              className="text-[11px] text-amber-300 hover:text-amber-100 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 transition-all cursor-pointer"
+                              title={t("Phóng to chế độ rạp chiếu", "Zoom to Cinema Theater")}
+                            >
+                              <Maximize2 className="w-3 h-3" />
+                              <span>{t("Phóng to rạp chiếu", "Cinema view")}</span>
+                            </button>
+                            <span className="text-[10px] uppercase tracking-widest text-amber-300 font-semibold px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30">
+                              {t("Tự động phát", "Auto Playing")}
+                            </span>
+                          </div>
                         </div>
                         <div className="relative aspect-video w-full bg-black">
                           <video
@@ -746,7 +808,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                             }}
                           />
                         </div>
-                      </div>
+                      </motion.div>
                     )}
 
                     {/* Dòng Thư Tay */}
@@ -1829,8 +1891,12 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             try { sessionStorage.setItem('emoria_unboxed_' + currentTag, '1'); } catch {}
             if (memoryData.intro_video_url) {
               setMovieDone(false);
+              window.scrollTo({ top: 0, behavior: 'instant' });
             } else {
               setIsLetterOpen(true);
+              setTimeout(() => {
+                letterSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, 250);
             }
           }}
         />

@@ -3,7 +3,7 @@ import {apiRequest} from './apiClient.js';
 import {estimateMediaSeconds, mediaProgress, recordMediaTiming} from './mediaUploadProgress.js';
 
 export async function moderateUploadedMedia(tag,path,consent,onProgress=()=>{},file={type:/\.(jpg|jpeg|png|webp)$/i.test(path)?'image/jpeg':'video/mp4'}) {
-  if(!consent)throw new Error('Bạn cần đồng ý kiểm duyệt bằng Google trước khi tải lên.');
+  if(!consent)throw new Error('Bạn cần đồng ý kiểm duyệt bằng AI trước khi tải lên.');
   onProgress(mediaProgress(file,'reviewing',estimateMediaSeconds(file,'reviewing')));
   const startedAt=Date.now();
   const result=await apiRequest(`/memories/${encodeURIComponent(tag)}/video-labels/analyze`,{
@@ -19,7 +19,7 @@ export async function moderateUploadedMedia(tag,path,consent,onProgress=()=>{},f
 export const moderateUploadedVideo = moderateUploadedMedia;
 
 export async function uploadModeratedMedia(tag,file,consent,role='intro',onProgress=()=>{}) {
-  if(!consent)throw new Error('Bạn cần đồng ý kiểm duyệt bằng Google trước khi tải lên.');
+  if(!consent)throw new Error('Bạn cần đồng ý kiểm duyệt bằng AI trước khi tải lên.');
   const allowed=['video/mp4','video/webm','image/jpeg','image/png','image/webp'];
   if(!allowed.includes(file?.type)||!file?.size||file.size>50*1024*1024){
     throw new Error('Chọn ảnh JPEG/PNG/WebP hoặc video MP4/WebM, dung lượng tối đa 50 MB.');

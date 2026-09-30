@@ -43,7 +43,7 @@ export default function MemoryMediaEditor({tag, items, onChange, audio, onAudio,
       return {audio:'storage://'+path};
     }
 
-    // Moderate images and videos with Gemini AI
+    // Moderate images and videos with AI
     setStatusText(`Đang tải & kiểm duyệt "${file.name}"...`);
     const uploaded=await uploadModeratedMedia(tag,file,videoConsent,'gallery',updateProgress);
     const type=file.type.startsWith('image/')?'image':'video';

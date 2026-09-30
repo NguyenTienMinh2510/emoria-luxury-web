@@ -1,4 +1,4 @@
-export const VIOLATION_LABELS = {SEXUAL_EXPLICIT:'Tình dục tường minh',CHILD_EXPLOITATION:'Nội dung gây hại hoặc bóc lột trẻ em',GRAPHIC_VIOLENCE:'Bạo lực ghê rợn',HATE_HARASSMENT:'Thù ghét hoặc quấy rối',SELF_HARM_PROMOTION:'Cổ súy tự hại',DANGEROUS_ILLEGAL:'Cổ súy hành vi nguy hiểm hoặc phạm pháp',PROVIDER_SAFETY:'Bộ lọc an toàn Google đã chặn nội dung'};
+export const VIOLATION_LABELS = {SEXUAL_EXPLICIT:'Tình dục tường minh',CHILD_EXPLOITATION:'Nội dung gây hại hoặc bóc lột trẻ em',GRAPHIC_VIOLENCE:'Bạo lực ghê rợn',HATE_HARASSMENT:'Thù ghét hoặc quấy rối',SELF_HARM_PROMOTION:'Cổ súy tự hại',DANGEROUS_ILLEGAL:'Cổ súy hành vi nguy hiểm hoặc phạm pháp',PROVIDER_SAFETY:'Bộ lọc an toàn AI đã chặn nội dung'};
 export function moderationResult(value) {
   const labels=normalizeVideoLabels(value?.labels);
   if(!Array.isArray(value?.violations)||value.violations.some(v=>!Object.hasOwn(VIOLATION_LABELS,v)))throw new Error('AI chưa trả đủ kết quả kiểm duyệt.');

@@ -153,7 +153,7 @@ export default function AiLetterMuseModal({
             />
           </div>
 
-          <label className="flex items-start gap-2 text-xs mb-4"><input type="checkbox" checked={consent} disabled={loading} onChange={e=>setConsent(e.target.checked)}/>{t('Tôi đồng ý gửi tên và kỷ niệm đã nhập cho Google để tạo thư.','I consent to sending the names and memories entered here to Google to create a letter.')}</label>
+          <label className="flex items-start gap-2 text-xs mb-4"><input type="checkbox" checked={consent} disabled={loading} onChange={e=>setConsent(e.target.checked)}/>{t('Tôi đồng ý gửi tên và kỷ niệm đã nhập cho hệ thống AI để tạo thư.','I consent to sending the names and memories entered here to the AI system to create a letter.')}</label>
           {/* Action Button: Generate */}
           <div className="mb-6">
             <button
