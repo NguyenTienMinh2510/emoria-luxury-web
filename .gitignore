@@ -27,3 +27,5 @@ scripts/finish-*.py
 .env*
 supabase/.temp/
 *.blend1
+__pycache__/
+*.pyc

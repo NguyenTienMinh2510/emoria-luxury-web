@@ -12,7 +12,7 @@ export async function moderateUploadedMedia(tag,path,consent,onProgress=()=>{},f
     timeoutMs:175000
   });
   recordMediaTiming(file,'reviewing',(Date.now()-startedAt)/1000);
-  if(result.approved!==true)throw new Error(result.reason||'Phương tiện chưa đạt kiểm duyệt và không được gắn vào kỷ vật.');
+  if(result.approved!==true)throw Object.assign(new Error(result.reason||'Phương tiện chưa đạt kiểm duyệt và không được gắn vào kỷ vật.'),{code:'MEDIA_REJECTED'});
   return result;
 }
 
@@ -33,7 +33,13 @@ export async function uploadModeratedMedia(tag,file,consent,role='intro',onProgr
   const {error}=await supabase.storage.from('emoria-memory').upload(path,file,{contentType:file.type,upsert:false});
   if(error)throw error;
   recordMediaTiming(file,'uploading',(Date.now()-startedAt)/1000);
-  const mod=await moderateUploadedMedia(tag,path,true,onProgress,file);
+  let mod;
+  try { mod=await moderateUploadedMedia(tag,path,true,onProgress,file); }
+  catch(error) {
+    // Keep the uploaded file available for review retries without replacing the approved intro.
+    if(error.code!=='MEDIA_REJECTED')error.uploadedPath=path;
+    throw error;
+  }
   return {path,labels:mod.labels||[],approved:mod.approved};
 }
 

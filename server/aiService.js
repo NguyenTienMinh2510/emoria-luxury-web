@@ -40,11 +40,14 @@ function getFallbackLetter({ occasion = 'anniversary', tone = 'romantic', recipi
  * @param {Object} options
  * @returns {Promise<{ approved: boolean, labels: string[], violations: string[], reason: string|null, model: string }>}
  */
-export async function labelWithQwen(media, { fetchImpl = fetch, type } = {}) {
+export async function labelWithQwen(media, { fetchImpl = fetch, type, url } = {}) {
   let base64;
   let mediaType = type;
 
-  if (typeof media?.arrayBuffer === 'function') {
+  if (url) {
+    // Only callers that sign an authorized Storage object may supply this URL.
+    if (new URL(url).protocol !== 'https:' || !['video', 'image'].includes(type)) throw failure('Đường dẫn phương tiện không hợp lệ.', 422);
+  } else if (typeof media?.arrayBuffer === 'function') {
     const ab = await media.arrayBuffer();
     base64 = Buffer.from(ab).toString('base64');
     if (!mediaType) mediaType = media.type?.startsWith('video/') ? 'video' : 'image';
@@ -63,7 +66,7 @@ export async function labelWithQwen(media, { fetchImpl = fetch, type } = {}) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      video_base64: base64,
+      ...(url ? {url} : {video_base64: base64}),
       type: mediaType || 'image'
     }),
     signal: AbortSignal.timeout(120000)
@@ -73,15 +76,15 @@ export async function labelWithQwen(media, { fetchImpl = fetch, type } = {}) {
     throw failure(`Hệ thống AI kiểm duyệt không phản hồi (${response.status}). Vui lòng thử lại sau.`, response.status === 429 ? 429 : 502);
   }
 
-  const result = await response.json();
-  if (result.success === false && result.error && (!result.violations || result.violations.length === 0)) {
-    throw failure(`Lỗi kiểm duyệt AI: ${result.error}`, 502);
+  let result, mod;
+  try {
+    result = await response.json();
+    if (result.success !== true || result.error) throw new Error('Incomplete moderation');
+    mod = moderationResult(result);
+    if (result.approved === false && mod.approved) throw new Error('Conflicting moderation');
+  } catch {
+    throw failure('AI chưa trả đủ kết quả kiểm duyệt. Vui lòng thử lại.', 502);
   }
-
-  const mod = moderationResult({
-    labels: Array.isArray(result.labels) ? result.labels : [],
-    violations: Array.isArray(result.violations) ? result.violations : []
-  });
 
   return {
     ...mod,

@@ -79,6 +79,18 @@ try{
   await rejection;
   const recovery=moderateUploadedMedia('tag','tag/next.jpg',true);
   assert.equal((await recovery).approved,true,'A rejected file cannot block later uploads');
+  const request=globalThis.__mediaTest.request;
+  globalThis.__mediaTest.request=async()=>{throw new Error('AI temporarily unavailable');};
+  let failedPath;
+  await assert.rejects(uploadModeratedMedia('tag',video,true,'intro'),error=>{
+    failedPath=error.uploadedPath;return failedPath.startsWith('tag/intro-');
+  });
+  const uploadedCount=transfers;
+  globalThis.__mediaTest.request=request;
+  assert.equal((await moderateUploadedMedia('tag',failedPath,true)).approved,true);
+  assert.equal(transfers,uploadedCount,'Retry reviews the existing object without another upload');
+  globalThis.__mediaTest.request=async()=>({approved:false,reason:'Rejected'});
+  await assert.rejects(uploadModeratedMedia('tag',video,true,'intro'),error=>error.code==='MEDIA_REJECTED'&&!error.uploadedPath);
 }finally{mock.timers.reset();delete globalThis.__mediaTest;}
 
 const {default:Modal}=await compile('src/components/MediaModerationModal.jsx','modal');

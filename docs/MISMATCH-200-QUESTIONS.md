@@ -8,11 +8,11 @@
 ## 📌 HƯỚNG DẪN ĐỌC & SỬ DỤNG
 1. **Quy ước tên nhân vật minh họa:**
    - **Minh**: Đại diện cho **{owner}** – Người tạo lượt chơi (chủ phòng).
-   - **An**: Đại diện cho **{partner}** – Người được mời tham gia.
+   - **Thanh**: Đại diện cho **{partner}** – Người được mời tham gia.
    - Khi chạy trên web Emoria, hệ thống sẽ tự động thay thế bằng tên thật do hai người nhập vào Studio.
 2. **Cơ chế cố định góc nhìn (Không dùng xưng hô "bạn/đối phương"):**
-   - Với câu hỏi về **Minh**: Minh tự trả lời về chính mình, An đoán xem Minh sẽ chọn đáp án nào.
-   - Với câu hỏi về **An**: An tự trả lời về chính mình, Minh đoán xem An sẽ chọn đáp án nào.
+   - Với câu hỏi về **Minh**: Minh tự trả lời về chính mình, Thanh đoán xem Minh sẽ chọn đáp án nào.
+   - Với câu hỏi về **Thanh**: Thanh tự trả lời về chính mình, Minh đoán xem Thanh sẽ chọn đáp án nào.
    - Nếu cả hai người chọn cùng một đáp án -> **Trùng khớp (Match)!**
    - Nếu chọn khác nhau -> Mismatch Studio sẽ đưa ra gợi ý **Mảnh ghép bù trừ** để hai bạn cùng trò chuyện và hiểu nhau hơn.
 3. **Phong cách câu hỏi & câu trả lời:**
@@ -32,8 +32,8 @@
 - **C.** Có chung sở thích
 - **D.** Nhớ đúng tên, không gọi nhầm
 
-### Câu 2: An thường bắt đầu cuộc trò chuyện bằng gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 2: Thanh thường bắt đầu cuộc trò chuyện bằng gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Hỏi hôm nay thế nào
 - **B.** Gửi một chuyện vừa gặp
 - **C.** Gửi ảnh hoặc video vui
@@ -46,8 +46,8 @@
 - **C.** Hỏi lúc nào rảnh trước
 - **D.** Rủ bất chợt nếu đang tiện
 
-### Câu 4: An dễ nhớ điều gì sau một lần gặp?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 4: Thanh dễ nhớ điều gì sau một lần gặp?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Câu chuyện đã nghe
 - **B.** Món ăn hoặc đồ uống
 - **C.** Một hành động chu đáo
@@ -60,8 +60,8 @@
 - **C.** Đợi gặp rồi kể
 - **D.** Gửi ảnh thay lời muốn nói
 
-### Câu 6: Kiểu lời khen nào khiến An vui nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 6: Kiểu lời khen nào khiến Thanh vui nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Khen việc vừa làm tốt
 - **B.** Khen sự cố gắng
 - **C.** Khen gu chọn đồ
@@ -74,8 +74,8 @@
 - **C.** Dành thời gian gặp gỡ
 - **D.** Giúp một việc đang cần
 
-### Câu 8: An thích kiểu quà nhỏ nào nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 8: Thanh thích kiểu quà nhỏ nào nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Món ăn thích
 - **B.** Đồ dùng đúng lúc đang thiếu
 - **C.** Món liên quan đến sở thích
@@ -88,8 +88,8 @@
 - **C.** Cuối tuần rảnh không?
 - **D.** Gửi meme để kiểm tra sóng
 
-### Câu 10: An thích cuộc gặp đông người hay ít người hơn?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 10: Thanh thích cuộc gặp đông người hay ít người hơn?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Chỉ hai người cho dễ nói
 - **B.** Nhóm nhỏ ba bốn người
 - **C.** Đông vui càng tốt
@@ -102,8 +102,8 @@
 - **C.** Trao đổi được điều mới
 - **D.** Im một lúc vẫn thoải mái
 
-### Câu 12: An thường giữ kỷ niệm bằng cách nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 12: Thanh thường giữ kỷ niệm bằng cách nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Chụp nhiều ảnh
 - **B.** Giữ món đồ nhỏ
 - **C.** Lưu tin nhắn đáng nhớ
@@ -116,8 +116,8 @@
 - **C.** Cho xem ảnh rồi kể
 - **D.** Kể ngắn, chỗ hay thì hỏi thêm
 
-### Câu 14: Nếu muốn cảm ơn An, cách nào hợp nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 14: Nếu muốn cảm ơn Thanh, cách nào hợp nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Nói thẳng lời cảm ơn
 - **B.** Mời một món ăn hoặc đồ uống
 - **C.** Giúp lại khi có dịp
@@ -130,8 +130,8 @@
 - **C.** Gặp nhau ăn uống
 - **D.** Nhẹ nhàng thôi, đừng làm bất ngờ
 
-### Câu 16: Một buổi gặp lý tưởng của An nên kết thúc lúc nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 16: Một buổi gặp lý tưởng của Thanh nên kết thúc lúc nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Đúng giờ đã tính
 - **B.** Khi hết chuyện để nói
 - **C.** Khi bắt đầu thấy mệt
@@ -144,8 +144,8 @@
 - **C.** Chuyện thường ngày
 - **D.** Ảnh hài hợp tâm trạng
 
-### Câu 18: An dễ nhận lời hoạt động nào nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 18: Thanh dễ nhận lời hoạt động nào nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Ăn một món cụ thể
 - **B.** Đi dạo một vòng
 - **C.** Ngồi uống nước trò chuyện
@@ -158,8 +158,8 @@
 - **C.** Rủ luôn dịp tiếp theo
 - **D.** Nghỉ ngơi, hôm sau mới nhắn
 
-### Câu 20: Trong một cuộc hẹn, điều gì quan trọng nhất với An?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 20: Trong một cuộc hẹn, điều gì quan trọng nhất với Thanh?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Giữ đúng lời đã hẹn
 - **B.** Có thời gian nói chuyện
 - **C.** Không bị giục vội
@@ -172,8 +172,8 @@
 - **C.** Cuối tuần sáng sớm thong thả
 - **D.** Bất cứ khi nào cần hóng gió xả stress
 
-### Câu 22: An thường phản ứng thế nào khi bất ngờ được tặng một món quà không nhân dịp gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 22: Thanh thường phản ứng thế nào khi bất ngờ được tặng một món quà không nhân dịp gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Mắt sáng rỡ rồi mở xem ngay
 - **B.** Nghi ngờ hỏi ngay "Hôm nay có vụ gì à?"
 - **C.** Cảm động nhưng dặn lần sau đừng tốn kém
@@ -186,8 +186,8 @@
 - **C.** Tiếp lời đúng ý mình đang định nói
 - **D.** Tự động mua đúng món mình đang thèm
 
-### Câu 24: Khi ngồi chung xe đi xa, An thường đóng vai trò gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 24: Khi ngồi chung xe đi xa, Thanh thường đóng vai trò gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** DJ chuyên nghiệp chọn playlist
 - **B.** Hoa tiêu xem bản đồ chỉ đường
 - **C.** Bếp trưởng bóc đồ ăn vặt tiếp tế
@@ -200,8 +200,8 @@
 - **C.** Cùng nhau ghé nhà sách đọc truyện
 - **D.** Ở nhà cùng nấu mì gói xem phim
 
-### Câu 26: An thường làm gì khi đối phương vô tình kể chuyện hơi nhạt?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 26: Thanh thường làm gì khi đối phương vô tình kể chuyện hơi nhạt?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Cười trừ cho đỡ ngượng
 - **B.** Trêu thẳng "Chuyện nhạt quá đổi chuyện khác đi"
 - **C.** Ráng hỏi thêm để cứu câu chuyện
@@ -214,8 +214,8 @@
 - **C.** Tự giác nhận lỗi và không thanh minh
 - **D.** Làm mặt đáng yêu để xin tha
 
-### Câu 28: An thích một buổi hẹn hò bất ngờ hay được lên lịch trước?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 28: Thanh thích một buổi hẹn hò bất ngờ hay được lên lịch trước?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Bất ngờ hoàn toàn cho thú vị
 - **B.** Lên lịch trước để kịp chuẩn bị đồ đẹp
 - **C.** Báo trước 1 tiếng là đủ
@@ -228,8 +228,8 @@
 - **C.** Những phát ngôn ngây ngô bất ngờ
 - **D.** Biểu cảm lúc đang cố cãi cùn
 
-### Câu 30: Khi đi ăn cùng nhau, An thường nhường miếng ngon cuối cùng cho ai?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 30: Khi đi ăn cùng nhau, Thanh thường nhường miếng ngon cuối cùng cho ai?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Nhường thẳng cho đối phương
 - **B.** Chia đôi sòng phẳng mỗi người một nửa
 - **C.** Hỏi lịch sự 1 câu rồi gắp ăn luôn
@@ -242,8 +242,8 @@
 - **C.** Tên gọi ngọt ngào
 - **D.** Để nguyên họ và tên đầy đủ cho nghiêm túc
 
-### Câu 32: An thích được an ủi bằng hành động nào nhất khi gặp chuyện ấm ức?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 32: Thanh thích được an ủi bằng hành động nào nhất khi gặp chuyện ấm ức?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Một cái ôm thật chặt không cần nói
 - **B.** Cùng ngồi mắng đứa làm mình bực
 - **C.** Dẫn đi ăn một bữa thật ngon
@@ -256,8 +256,8 @@
 - **C.** Yêu cầu xóa ngay trong 3 nốt nhạc
 - **D.** Đem đi làm meme đại diện luôn
 
-### Câu 34: An thích kiểu chụp ảnh nào nhất khi đi chơi cùng nhau?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 34: Thanh thích kiểu chụp ảnh nào nhất khi đi chơi cùng nhau?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Chụp bắt khoảnh khắc tự nhiên
 - **B.** Tạo dáng chuẩn chỉnh nghiêm túc
 - **C.** Chụp đồ ăn và phong cảnh là chính
@@ -270,8 +270,8 @@
 - **C.** Nhá hàng trước rồi mới chịu kể
 - **D.** Giữ được đến cuối ngày
 
-### Câu 36: An thường có phản xạ gì khi đối phương nhìn chằm chằm vào mình?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 36: Thanh thường có phản xạ gì khi đối phương nhìn chằm chằm vào mình?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Cười ngượng rồi nhìn đi chỗ khác
 - **B.** Hỏi ngay "Mặt dính gì à?"
 - **C.** Nhìn lại thi xem ai chớp mắt trước
@@ -284,8 +284,8 @@
 - **C.** Kèm một câu dặn dò mai dậy sớm
 - **D.** Gửi kèm một chiếc meme hài hước
 
-### Câu 38: Khi đối phương bị ốm nhẹ, An sẽ làm gì đầu tiên?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 38: Khi đối phương bị ốm nhẹ, Thanh sẽ làm gì đầu tiên?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Đặt cháo hoặc thuốc giao tận nơi
 - **B.** Nhắn tin nhắc uống nước và nghỉ ngơi liên tục
 - **C.** Chạy qua chăm sóc trực tiếp
@@ -298,8 +298,8 @@
 - **C.** Lúc về đến nơi nhắn tin "Đã về an toàn"
 - **D.** Lúc cùng bàn xem lần tới sẽ đi đâu
 
-### Câu 40: Điều gì khiến An cảm thấy cuộc trò chuyện giữa hai người không bao giờ nhàm chán?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 40: Điều gì khiến Thanh cảm thấy cuộc trò chuyện giữa hai người không bao giờ nhàm chán?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Có thể nói từ chuyện vĩ mô đến chuyện nhảm nhí
 - **B.** Cùng chung gu hài hước, cười cùng một điểm
 - **C.** Cả hai đều thoải mái là chính mình
@@ -318,8 +318,8 @@
 - **C.** Xem điện thoại trước
 - **D.** Thương lượng thêm năm phút với cái gối
 
-### Câu 2: Chưa biết ăn gì, An thường chọn cách nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 2: Chưa biết ăn gì, Thanh thường chọn cách nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Ăn món quen
 - **B.** Xem quán quanh mình
 - **C.** Nhờ gợi ý vài món
@@ -332,8 +332,8 @@
 - **C.** Món ít ngọt
 - **D.** Món đang được giảm giá
 
-### Câu 4: An hay để chìa khóa ở đâu?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 4: Thanh hay để chìa khóa ở đâu?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Một chỗ cố định
 - **B.** Trong túi mang hằng ngày
 - **C.** Gần cửa ra vào
@@ -346,8 +346,8 @@
 - **C.** Làm sở thích riêng
 - **D.** Dọn vài việc còn dang dở
 
-### Câu 6: An mua đồ theo kiểu nào nhiều hơn?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 6: Thanh mua đồ theo kiểu nào nhiều hơn?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Lên danh sách trước
 - **B.** Thiếu gì mua nấy
 - **C.** Chờ dịp giảm giá
@@ -360,8 +360,8 @@
 - **C.** Mời người đi cùng thử
 - **D.** Hỏi món này làm thế nào
 
-### Câu 8: An thích chỗ ngồi nào khi vào quán?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 8: Thanh thích chỗ ngồi nào khi vào quán?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Gần cửa sổ
 - **B.** Góc yên tĩnh
 - **C.** Gần quầy cho tiện gọi
@@ -374,8 +374,8 @@
 - **C.** Cất máy để dành lúc cần
 - **D.** Vẫn dùng, tin vào phép màu
 
-### Câu 10: An thường chọn quần áo đi ra ngoài theo gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 10: Thanh thường chọn quần áo đi ra ngoài theo gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Thoải mái là chính
 - **B.** Hợp nơi sắp đến
 - **C.** Hợp tâm trạng
@@ -388,8 +388,8 @@
 - **C.** Chuẩn bị đồ cho ngày mai
 - **D.** Nằm xuống là muốn ngủ
 
-### Câu 12: Trong siêu thị, An dễ mua thêm gì nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 12: Trong siêu thị, Thanh dễ mua thêm gì nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Đồ ăn vặt
 - **B.** Trái cây
 - **C.** Đồ dùng nhỏ
@@ -402,8 +402,8 @@
 - **C.** Ngồi quán ăn thong thả
 - **D.** Khi nào đói mới ăn
 
-### Câu 14: Nhận một tin nhắn không gấp, An thường trả lời khi nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 14: Nhận một tin nhắn không gấp, Thanh thường trả lời khi nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Đọc là trả lời luôn
 - **B.** Xong việc đang làm
 - **C.** Gom lại trả lời lúc rảnh
@@ -416,8 +416,8 @@
 - **C.** Có tiếng người vừa phải
 - **D.** Đeo tai nghe ở đâu cũng được
 
-### Câu 16: An hay lưu điều cần nhớ bằng cách nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 16: Thanh hay lưu điều cần nhớ bằng cách nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Ghi chú điện thoại
 - **B.** Đặt nhắc lịch
 - **C.** Viết ra giấy
@@ -430,8 +430,8 @@
 - **C.** Chia phần nhỏ để thử
 - **D.** Để người khác chọn giúp
 
-### Câu 18: An thích lúc nào trong ngày nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 18: Thanh thích lúc nào trong ngày nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Sáng sớm yên tĩnh
 - **B.** Giữa ngày nhiều năng lượng
 - **C.** Chiều khi xong việc
@@ -444,8 +444,8 @@
 - **C.** Để vài ngày xem còn thích không
 - **D.** Bỏ qua vì chưa thật sự cần
 
-### Câu 20: Đồ ăn mang về còn dư, An thường xử lý thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 20: Đồ ăn mang về còn dư, Thanh thường xử lý thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Cất hộp cho bữa sau
 - **B.** Chia cho người muốn ăn
 - **C.** Biến thành món khác
@@ -458,8 +458,8 @@
 - **C.** Không đường, chỉ uống nguyên bản
 - **D.** Tùy hứng, quán gợi ý sao uống vậy
 
-### Câu 22: An thường để bao nhiêu tab trình duyệt mở cùng một lúc trên máy tính/điện thoại?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 22: Thanh thường để bao nhiêu tab trình duyệt mở cùng một lúc trên máy tính/điện thoại?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Dưới 5 tab, dùng xong tắt ngay
 - **B.** Khoảng 10-20 tab để tra cứu
 - **C.** Vài chục tab đến mức hiện icon nhỏ xíu
@@ -472,8 +472,8 @@
 - **C.** Tự nhủ lát ra ghi nhưng ra tới cửa là quên sạch
 - **D.** Hát vang một bài ăn mừng ý tưởng
 
-### Câu 24: Khi đi chợ hoặc siêu thị mà quên mang túi đựng, An sẽ làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 24: Khi đi chợ hoặc siêu thị mà quên mang túi đựng, Thanh sẽ làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Mua thêm túi ni lông hoặc túi vải
 - **B.** Ôm hết đống đồ trong tay đi ra xe
 - **C.** Xin một thùng carton cũ để đựng
@@ -486,8 +486,8 @@
 - **C.** Chỗ nào trống thì nhét vào
 - **D.** Ghế ngồi trong phòng là chiếc tủ quần áo thứ hai
 
-### Câu 26: An thường chọn vị trí ngồi nào khi đi xe buýt hoặc máy bay?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 26: Thanh thường chọn vị trí ngồi nào khi đi xe buýt hoặc máy bay?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Cạnh cửa sổ để ngắm cảnh và ngủ
 - **B.** Cạnh lối đi cho dễ đứng lên di chuyển
 - **C.** Ngồi hàng đầu cho thoáng
@@ -500,8 +500,8 @@
 - **C.** Tin tức hoặc chuyện giật gân trong ngày
 - **D.** Video unboxing hoặc đồ công nghệ
 
-### Câu 28: An xử lý thế nào khi quần áo phơi khô nhưng chưa muốn gấp?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 28: Thanh xử lý thế nào khi quần áo phơi khô nhưng chưa muốn gấp?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Gom lại để trên giường hoặc ghế đợi rảnh
 - **B.** Gấp ngay lập tức cho phẳng phiu
 - **C.** Treo nguyên trên móc, khi nào mặc thì lấy
@@ -514,8 +514,8 @@
 - **C.** Uống trà, cà phê thay nước lọc
 - **D.** Phải cài app nhắc uống nước mới nhớ
 
-### Câu 30: Khi đi ăn buffet, chiến thuật quen thuộc của An là gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 30: Khi đi ăn buffet, chiến thuật quen thuộc của Thanh là gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Ăn hải sản và thịt bò trước cho gỡ vốn
 - **B.** Ăn mỗi món một ít để nếm thử
 - **C.** Thích gì ăn nấy không tính toán
@@ -528,8 +528,8 @@
 - **C.** Đầy đủ ví tiền, điện thoại, chìa khóa
 - **D.** Bê nguyên cả túi xách như đi chơi xa
 
-### Câu 32: An phản ứng thế nào khi phát hiện một gói đồ ship tới nơi?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 32: Thanh phản ứng thế nào khi phát hiện một gói đồ ship tới nơi?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Rạch hộp khui hàng ngay lập tức
 - **B.** Để trên bàn ngắm một lúc rồi mới bóc
 - **C.** Quên mất mình từng đặt món này
@@ -542,8 +542,8 @@
 - **C.** Gần 1 tiếng để chọn đồ và chỉnh trang
 - **D.** Tuyên bố "5 phút nữa xong" nhưng nửa tiếng sau vẫn chưa thấy đâu
 
-### Câu 34: An giải quyết thế nào với chiếc bát đĩa cuối cùng trong bồn rửa?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 34: Thanh giải quyết thế nào với chiếc bát đĩa cuối cùng trong bồn rửa?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Rửa ngay lập tức cho sạch bồn
 - **B.** Ngâm nước để đó lát rửa sau
 - **C.** Chờ tích đủ nhiều bát rồi rửa một thể
@@ -556,8 +556,8 @@
 - **C.** Chụp ảnh gửi xin ý kiến người khác
 - **D.** Đi ngắm cho đã rồi về đặt online cho rẻ
 
-### Câu 36: An thích không gian làm việc hoặc học tập thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 36: Thanh thích không gian làm việc hoặc học tập thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Mặt bàn trống trơn ngăn nắp
 - **B.** Đầy đủ sổ sách, bút viết, ly nước xung quanh
 - **C.** Vừa làm vừa mở nhạc nền hoặc podcast
@@ -570,8 +570,8 @@
 - **C.** Tìm quán mới có nhiều đánh giá 5 sao
 - **D.** Món nào giao nhanh nhất dưới 20 phút
 
-### Câu 38: Khi chiếc vớ (tất) bị lủng một lỗ nhỏ xíu ở ngón chân, An sẽ làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 38: Khi chiếc vớ (tất) bị lủng một lỗ nhỏ xíu ở ngón chân, Thanh sẽ làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Vứt ngay đi mua đôi mới
 - **B.** Vẫn đi tiếp, khéo giấu vào trong giày không ai thấy
 - **C.** Cất vào góc tính đem khâu lại
@@ -584,8 +584,8 @@
 - **C.** Khi nào bừa bộn không chịu nổi mới dọn
 - **D.** Khi có hứng đột xuất vào lúc nửa đêm
 
-### Câu 40: An thường để âm lượng chuông điện thoại ở chế độ nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 40: Thanh thường để âm lượng chuông điện thoại ở chế độ nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Rung hoàn toàn, ghét tiếng chuông ồn ào
 - **B.** Bật chuông to rõ ràng để không lỡ cuộc gọi
 - **C.** Bật chế độ không làm phiền quanh năm
@@ -604,8 +604,8 @@
 - **C.** Không gian yên tĩnh
 - **D.** Chỗ để đồ ăn trong tầm với
 
-### Câu 2: Nếu đổi một thứ trong phòng, An sẽ đổi gì trước?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 2: Nếu đổi một thứ trong phòng, Thanh sẽ đổi gì trước?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Đèn
 - **B.** Bàn ghế
 - **C.** Chỗ cất đồ
@@ -618,8 +618,8 @@
 - **C.** Đi chơi một buổi
 - **D.** Mua món dùng hằng ngày
 
-### Câu 4: Trong thời gian tới, An muốn thử hoạt động nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 4: Trong thời gian tới, Thanh muốn thử hoạt động nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Nấu một món mới
 - **B.** Tập một môn vận động
 - **C.** Học kỹ năng sáng tạo
@@ -632,8 +632,8 @@
 - **C.** Gặp những người lâu chưa gặp
 - **D.** Mỗi ngày làm một việc mình thích
 
-### Câu 6: An thích lên kế hoạch trước bao lâu cho chuyến đi ngắn?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 6: Thanh thích lên kế hoạch trước bao lâu cho chuyến đi ngắn?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Vài tuần
 - **B.** Vài ngày
 - **C.** Tối hôm trước
@@ -646,8 +646,8 @@
 - **C.** Gọn và tiện cất
 - **D.** Giá phù hợp
 
-### Câu 8: An muốn duy trì thói quen nào nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 8: Thanh muốn duy trì thói quen nào nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Ngủ đúng giờ hơn
 - **B.** Vận động đều hơn
 - **C.** Dành thời gian cho sở thích
@@ -660,8 +660,8 @@
 - **C.** Góc ngồi thư giãn
 - **D.** Để trống cho thoáng
 
-### Câu 10: An thích một ngày nghỉ có lịch trình thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 10: Thanh thích một ngày nghỉ có lịch trình thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Chốt các việc chính
 - **B.** Chỉ chốt một hoạt động
 - **C.** Tùy hứng trong ngày
@@ -674,8 +674,8 @@
 - **C.** Món nhanh dưới hai mươi phút
 - **D.** Món đem mời mọi người
 
-### Câu 12: Điều gì khiến An muốn quay lại một nơi từng đến?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 12: Điều gì khiến Thanh muốn quay lại một nơi từng đến?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Đồ ăn ngon
 - **B.** Không khí dễ chịu
 - **C.** Có kỷ niệm vui
@@ -688,8 +688,8 @@
 - **C.** Tìm hiểu kỹ trước
 - **D.** Thử luôn một buổi
 
-### Câu 14: An muốn dành thêm thời gian cho điều gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 14: Thanh muốn dành thêm thời gian cho điều gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Nghỉ ngơi
 - **B.** Người thân quen
 - **C.** Một sở thích đang bỏ dở
@@ -702,8 +702,8 @@
 - **C.** Xem hoặc đọc thứ thích
 - **D.** Làm việc đang trì hoãn
 
-### Câu 16: An thích chỗ ở có ưu điểm nào nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 16: Thanh thích chỗ ở có ưu điểm nào nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Gần nơi cần đi
 - **B.** Yên tĩnh
 - **C.** Có nhiều ánh sáng
@@ -716,8 +716,8 @@
 - **C.** Dụng cụ cho sở thích
 - **D.** Đồ phục vụ việc đi lại
 
-### Câu 18: An thích cách theo dõi mục tiêu nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 18: Thanh thích cách theo dõi mục tiêu nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Đánh dấu mỗi ngày
 - **B.** Nhìn kết quả theo tuần
 - **C.** Nhờ một người nhắc nhẹ
@@ -730,8 +730,8 @@
 - **C.** Một buổi không phải làm gì
 - **D.** Đi đâu đó đổi gió
 
-### Câu 20: Trong một kế hoạch đi chơi, An muốn chốt điều gì trước?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 20: Trong một kế hoạch đi chơi, Thanh muốn chốt điều gì trước?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Chi phí
 - **B.** Ngày giờ
 - **C.** Đi với ai
@@ -744,8 +744,8 @@
 - **C.** Giá sách lớn từ sàn tới trần
 - **D.** Cửa kính lớn nhìn ra ban công đầy cây xanh
 
-### Câu 22: An thích phong cách thiết kế nội thất nào cho không gian sống?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 22: Thanh thích phong cách thiết kế nội thất nào cho không gian sống?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Tối giản hiện đại ít đồ cho thoáng
 - **B.** Ấm cúng nhiều gỗ phong cách Nhật hoặc Bắc Âu
 - **C.** Cổ điển sang trọng tinh tế
@@ -758,8 +758,8 @@
 - **C.** Một bể cá cảnh ngắm cho thư giãn
 - **D.** Không nuôi gì cả, chăm mình còn chưa xong
 
-### Câu 24: Trong căn bếp tương lai, thiết bị nào An muốn có nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 24: Trong căn bếp tương lai, thiết bị nào Thanh muốn có nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Máy rửa bát để giải phóng đôi bàn tay
 - **B.** Nồi chiên không dầu và lò nướng xịn
 - **C.** Máy pha cà phê tự động tại nhà
@@ -772,8 +772,8 @@
 - **C.** Một căn nhà nhìn ra bờ biển thoáng đãng
 - **D.** Một ngôi nhà nhỏ trên đồi không khí mát lành
 
-### Câu 26: Nếu có một khu ban công rộng, An sẽ biến nó thành gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 26: Nếu có một khu ban công rộng, Thanh sẽ biến nó thành gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Góc cà phê thư giãn ngắm phố
 - **B.** Vườn rau xanh và hoa lá mini
 - **C.** Nơi tập thể dục hoặc yoga đón nắng
@@ -786,8 +786,8 @@
 - **C.** Căn bếp để nấu những bữa ăn ngon
 - **D.** Phòng làm việc và giải trí cá nhân
 
-### Câu 28: An nhìn nhận thế nào về việc phân chia việc nhà trong tương lai?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 28: Thanh nhìn nhận thế nào về việc phân chia việc nhà trong tương lai?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Chia đều theo danh sách rõ ràng, việc ai nấy làm
 - **B.** Ai rảnh hoặc thấy việc trước thì tự giác làm
 - **C.** Thuê dịch vụ hoặc dùng máy móc hỗ trợ tối đa
@@ -800,8 +800,8 @@
 - **C.** Một chuyến trekking khám phá thiên nhiên hoang dã
 - **D.** Nghỉ dưỡng tại resort biển sang trọng
 
-### Câu 30: An muốn căn nhà tương lai sử dụng hệ thống nhà thông minh ở mức độ nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 30: Thanh muốn căn nhà tương lai sử dụng hệ thống nhà thông minh ở mức độ nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Tự động hóa toàn bộ bằng giọng nói và cảm biến
 - **B.** Chỉ cần khóa cửa vân tay và robot hút bụi
 - **C.** Thích công tắc cơ học truyền thống cho bền
@@ -814,8 +814,8 @@
 - **C.** Tiện ích đa năng, gập mở tiết kiệm diện tích
 - **D.** Giá cả hợp lý vừa túi tiền
 
-### Câu 32: An muốn dành buổi tối cuối tuần tại nhà để làm gì nhiều nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 32: Thanh muốn dành buổi tối cuối tuần tại nhà để làm gì nhiều nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Nấu một bữa ăn cầu kỳ rồi cùng nhau thưởng thức
 - **B.** Nằm dài cày một bộ phim dài tập
 - **C.** Mời bạn bè thân thiết về nhà tụ tập ăn uống
@@ -828,8 +828,8 @@
 - **C.** Góc tập gym hoặc thể thao nhỏ gọn
 - **D.** Góc chăm sóc cây cảnh và hoa lá
 
-### Câu 34: Nếu nhà có một phòng ngủ phụ còn trống, An muốn tận dụng làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 34: Nếu nhà có một phòng ngủ phụ còn trống, Thanh muốn tận dụng làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Phòng để quần áo và trang điểm riêng
 - **B.** Phòng ngủ dành riêng cho khách hoặc người thân ghé chơi
 - **C.** Phòng làm việc và đọc sách riêng biệt
@@ -842,8 +842,8 @@
 - **C.** Làm mấy đồ nhỏ nhỏ thì được, việc nặng xin kiếu
 - **D.** Chỉ nhận chân giám sát và cổ vũ tinh thần
 
-### Câu 36: An thích mùi hương nào thoang thoảng trong không gian sống nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 36: Thanh thích mùi hương nào thoang thoảng trong không gian sống nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Tinh dầu sả chanh hoặc bạc hà tươi mát
 - **B.** Mùi gỗ trầm ấm hoặc quế dịu nhẹ
 - **C.** Mùi hoa cỏ dịu ngọt tự nhiên
@@ -856,8 +856,8 @@
 - **C.** Phân chia người lo khoản này, người lo khoản kia
 - **D.** Cứ chi tiêu hợp lý, cuối tháng tổng kết một lần
 
-### Câu 38: Điều gì khiến An cảm thấy một căn nhà thực sự trở thành tổ ấm?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 38: Điều gì khiến Thanh cảm thấy một căn nhà thực sự trở thành tổ ấm?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Bếp luôn đỏ lửa và có đồ ăn nóng
 - **B.** Cảm giác bước chân vào cửa là rũ bỏ được hết mệt mỏi
 - **C.** Đầy ắp tiếng cười và những câu chuyện vụn vặt
@@ -870,8 +870,8 @@
 - **C.** Đặt đồ ăn về nhà quây quần nhẹ nhàng
 - **D.** Rủ nhau đi ăn quán cho đỡ phải dọn dẹp bãi chiến trường
 
-### Câu 40: Trong 5 năm tới, mục tiêu nào An muốn ưu tiên hoàn thành trước?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 40: Trong 5 năm tới, mục tiêu nào Thanh muốn ưu tiên hoàn thành trước?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Ổn định công việc và tích lũy một khoản tài chính vững vàng
 - **B.** Đi du lịch đến ít nhất 3 vùng đất mới
 - **C.** Nâng cao sức khỏe và duy trì lối sống lành mạnh
@@ -890,8 +890,8 @@
 - **C.** Nhờ người kia gọi món trước
 - **D.** Nhắn đang tới với tốc độ rất hối lỗi
 
-### Câu 2: Gọi nhầm món nhưng món đã lên, An dễ xử lý thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 2: Gọi nhầm món nhưng món đã lên, Thanh dễ xử lý thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Thử ăn nếu phù hợp
 - **B.** Hỏi quán có đổi được không
 - **C.** Đổi với người đồng ý
@@ -904,8 +904,8 @@
 - **C.** Quay lại chỗ vừa rẽ
 - **D.** Coi như được tham quan thêm một đoạn
 
-### Câu 4: Gửi nhầm ảnh vào cuộc trò chuyện, An phản ứng thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 4: Gửi nhầm ảnh vào cuộc trò chuyện, Thanh phản ứng thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Thu hồi rồi giải thích
 - **B.** Nhắn xin lỗi ngay
 - **C.** Kiểm tra xem ai đã đọc
@@ -918,8 +918,8 @@
 - **C.** Giữ làm ảnh hậu trường
 - **D.** Hỏi mọi người có thấy ổn không
 
-### Câu 6: Đang ra ngoài thì trời đổ mưa, An thường làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 6: Đang ra ngoài thì trời đổ mưa, Thanh thường làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Tìm chỗ trú gần nhất
 - **B.** Lấy áo mưa hoặc ô
 - **C.** Đợi bớt mưa rồi đi
@@ -932,8 +932,8 @@
 - **C.** Nhắn hỏi đang ở đâu
 - **D.** Đi ngang để kiểm tra cho chắc
 
-### Câu 8: Quên tên người vừa được giới thiệu, An sẽ làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 8: Quên tên người vừa được giới thiệu, Thanh sẽ làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Hỏi lại ngay
 - **B.** Nhờ người khác nhắc nhỏ
 - **C.** Chờ nghe ai đó gọi tên
@@ -946,8 +946,8 @@
 - **C.** Đổi sang quán khác
 - **D.** Đọc lại menu như lần đầu gặp mặt
 
-### Câu 10: Một bài nhạc rất quen vang lên, An thường thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 10: Một bài nhạc rất quen vang lên, Thanh thường thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Hát theo nhỏ nhỏ
 - **B.** Gõ nhịp
 - **C.** Tìm tên bài để lưu
@@ -960,8 +960,8 @@
 - **C.** Báo người phục vụ
 - **D.** Xin lỗi rồi nhờ cùng dọn
 
-### Câu 12: Đặt đồ ăn thiếu một món, An thường làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 12: Đặt đồ ăn thiếu một món, Thanh thường làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Liên hệ quán
 - **B.** Kiểm tra lại đơn
 - **C.** Ăn món có trước rồi xử lý
@@ -974,8 +974,8 @@
 - **C.** Để người khác lấy
 - **D.** Nhận nhiệm vụ dọn đĩa nếu ai cũng nhường
 
-### Câu 14: Mở camera trước bất ngờ, An dễ phản ứng thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 14: Mở camera trước bất ngờ, Thanh dễ phản ứng thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Chỉnh lại tóc
 - **B.** Đổi góc máy
 - **C.** Tắt camera rồi mở lại
@@ -988,8 +988,8 @@
 - **C.** Xem mình có cần không
 - **D.** Cho vào giỏ để suy nghĩ tiếp
 
-### Câu 16: Xem phim có đoạn đáng sợ, An thường làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 16: Xem phim có đoạn đáng sợ, Thanh thường làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Xem tiếp bình thường
 - **B.** Che mắt một chút
 - **C.** Giảm tiếng
@@ -1002,8 +1002,8 @@
 - **C.** Kiểm tra túi áo và túi xách
 - **D.** Đi lại hành trình vừa xong
 
-### Câu 18: Đang kể chuyện thì quên ý chính, An sẽ làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 18: Đang kể chuyện thì quên ý chính, Thanh sẽ làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Nhờ nhắc đoạn vừa kể
 - **B.** Dừng nghĩ một chút
 - **C.** Chuyển chuyện rồi nhớ lại sau
@@ -1016,8 +1016,8 @@
 - **C.** Nghe nếu là chuyện gấp
 - **D.** Để hết bữa rồi gọi lại
 
-### Câu 20: Mua đồ cần tự lắp, An bắt đầu thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 20: Mua đồ cần tự lắp, Thanh bắt đầu thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Đọc hướng dẫn
 - **B.** Bày đủ bộ phận ra
 - **C.** Xem video cách lắp
@@ -1030,8 +1030,8 @@
 - **C.** Tìm sợi thun hoặc dây buộc tạm rồi đi tiếp
 - **D.** Đứng yên tại chỗ gọi cứu viện gấp
 
-### Câu 22: Vào nhà hàng sang trọng nhưng đọc menu không hiểu món nào, An sẽ làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 22: Vào nhà hàng sang trọng nhưng đọc menu không hiểu món nào, Thanh sẽ làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Chỉ vào món có hình ảnh nhìn ngon mắt nhất
 - **B.** Nhờ bạn nhân viên gợi ý món dễ ăn nhất quán
 - **C.** Chọn món có mức giá tầm trung cho an toàn
@@ -1044,8 +1044,8 @@
 - **C.** Cười xòa nhận luôn bụng đòi ăn trưa rồi
 - **D.** Cúi gằm mặt xuống sổ ghi chép lia lịa
 
-### Câu 24: Vô tình vẫy tay chào nhiệt tình nhưng nhận ra mình nhận nhầm người, An xử lý sao?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 24: Vô tình vẫy tay chào nhiệt tình nhưng nhận ra mình nhận nhầm người, Thanh xử lý sao?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Tiện tay vuốt tóc hoặc gãi đầu giả vờ không có gì
 - **B.** Vẫy tiếp về phía sau coi như đang vẫy người khác
 - **C.** Cười ngượng rồi bước thật nhanh đi chỗ khác
@@ -1058,8 +1058,8 @@
 - **C.** Cười gượng hỏi sao lại nghĩ ra món độc lạ này
 - **D.** Thật thà bảo lần sau hỏi gu mình trước nhé
 
-### Câu 26: Đi mua sắm mà tiền trong tài khoản thiếu đúng vài nghìn đồng, An sẽ làm gì ở quầy thu ngân?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 26: Đi mua sắm mà tiền trong tài khoản thiếu đúng vài nghìn đồng, Thanh sẽ làm gì ở quầy thu ngân?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Lục tung các túi tìm vài đồng tiền lẻ
 - **B.** Bỏ lại món đồ rẻ nhất vừa chọn
 - **C.** Mở app ngân hàng khác chuyển tiền gấp
@@ -1072,8 +1072,8 @@
 - **C.** Tự bật cười một mình rồi đi tiếp
 - **D.** Ngó quanh xem có ai vừa nhìn thấy không
 
-### Câu 28: Nhắn tin than thở về ai đó nhưng gửi nhầm thẳng vào người đó, An xử lý sao?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 28: Nhắn tin than thở về ai đó nhưng gửi nhầm thẳng vào người đó, Thanh xử lý sao?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Thu hồi trong vòng 1 giây với tốc độ ánh sáng
 - **B.** Nhắn thêm vài câu bẻ lái sang chủ đề khác
 - **C.** Tắt nguồn điện thoại coi như vừa biến mất khỏi trái đất
@@ -1086,8 +1086,8 @@
 - **C.** Đưa cho người bên cạnh bảo mở hộ xem nào
 - **D.** Bỏ cuộc, chuyển sang ăn món khác
 
-### Câu 30: Vô tình gặp người quen cũ khi đang mặc bộ đồ luộm thuộm nhất, An sẽ làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 30: Vô tình gặp người quen cũ khi đang mặc bộ đồ luộm thuộm nhất, Thanh sẽ làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Đeo khẩu trang, đội mũ kéo sụp xuống giả vờ không thấy
 - **B.** Rẽ vội vào một con hẻm hoặc cửa hàng gần nhất
 - **C.** Ngẩng cao đầu tự tin lướt qua như người xa lạ
@@ -1100,8 +1100,8 @@
 - **C.** Hỏi vọng ra hát thế có hay bằng ca sĩ không
 - **D.** Coi như không có chuyện gì xảy ra, hát nốt điệp khúc
 
-### Câu 32: Đi ra ngoài mà phát hiện mình mặc áo trái hoặc quên kéo khóa quần, An xử lý ra sao?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 32: Đi ra ngoài mà phát hiện mình mặc áo trái hoặc quên kéo khóa quần, Thanh xử lý ra sao?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Lẻn vào nhà vệ sinh chỉnh lại ngay lập tức
 - **B.** Bình tĩnh khoác thêm áo khoác che lại
 - **C.** Cầu nguyện nãy giờ không ai để ý
@@ -1114,8 +1114,8 @@
 - **C.** Chạy ra khỏi phòng đóng chặt cửa cầu cứu
 - **D.** Bình tĩnh thương lượng yêu cầu gián tự bay ra
 
-### Câu 34: Đi thử đồ trong shop mà cái áo bị kẹt vào đầu không chui ra được, An sẽ làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 34: Đi thử đồ trong shop mà cái áo bị kẹt vào đầu không chui ra được, Thanh sẽ làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Loay hoay tìm cách vùng vẫy trong hoảng loạn
 - **B.** Đứng thở dốc vài giây bình tĩnh gỡ từng chút
 - **C.** Gọi nhỏ nhân viên vào phòng thay đồ giải cứu
@@ -1128,8 +1128,8 @@
 - **C.** Cố nuốt luôn với vẻ mặt nhăn nhó
 - **D.** Há miệng phì phò than thở với người đối diện
 
-### Câu 36: Đang giả vờ ngủ để trốn làm việc nhà mà có người gọi đúng tên, An sẽ làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 36: Đang giả vờ ngủ để trốn làm việc nhà mà có người gọi đúng tên, Thanh sẽ làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Vẫn nhắm tịt mắt, giả vờ ngáy khò khò
 - **B.** Từ từ mở mắt hỏi ủa ai gọi gì thế
 - **C.** Tự giác dậy luôn vì biết đã bị phát hiện
@@ -1142,8 +1142,8 @@
 - **C.** Đăng luôn làm nội dung hài tự dìm bản thân
 - **D.** Gửi riêng cho đứa bạn thân nhất để cùng cười bò
 
-### Câu 38: Vào thang máy đông người mà điện thoại bỗng phát âm thanh lạ, An sẽ làm gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 38: Vào thang máy đông người mà điện thoại bỗng phát âm thanh lạ, Thanh sẽ làm gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Vội vàng ấn nút tắt âm thanh với vẻ mặt vô tội
 - **B.** Nhìn ngó xung quanh như thể chuông của người khác
 - **C.** Cười trừ bảo âm báo thức của em hơi vui nhộn
@@ -1156,8 +1156,8 @@
 - **C.** Rủ người đối diện ăn cùng cho thơm đều
 - **D.** Ghé cửa hàng tiện lợi gần nhất mua kẹo
 
-### Câu 40: Bị người khác chụp lén lúc đang ngáp ngủ hoặc ăn uống nhồm nhoàm, An sẽ phản ứng thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 40: Bị người khác chụp lén lúc đang ngáp ngủ hoặc ăn uống nhồm nhoàm, Thanh sẽ phản ứng thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Đòi giật điện thoại xóa ngay lập tức
 - **B.** Yêu cầu gửi ảnh qua để làm ảnh dìm hàng
 - **C.** Canh lúc đối phương sơ hở chụp lại trả thù
@@ -1176,8 +1176,8 @@
 - **C.** Ăn uống và nghỉ ngơi
 - **D.** Làm gì đó để đổi tâm trạng
 
-### Câu 2: Khi kể chuyện bực mình, An thường mong nhận được gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 2: Khi kể chuyện bực mình, Thanh thường mong nhận được gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Được nghe cho hết
 - **B.** Một lời khuyên cụ thể
 - **C.** Một câu đồng cảm
@@ -1190,8 +1190,8 @@
 - **C.** Hỏi lúc nào tiện nghe
 - **D.** Nhắn trước để có thời gian nghĩ
 
-### Câu 4: Khi chưa trả lời tin nhắn, An muốn người khác hiểu thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 4: Khi chưa trả lời tin nhắn, Thanh muốn người khác hiểu thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Có thể đang bận
 - **B.** Đang cần nghĩ cách trả lời
 - **C.** Chưa tiện mở máy
@@ -1204,8 +1204,8 @@
 - **C.** Chủ động đỡ một việc
 - **D.** Dành thời gian lắng nghe
 
-### Câu 6: Khi hai người hiểu lầm nhau, An thích bắt đầu bằng cách nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 6: Khi hai người hiểu lầm nhau, Thanh thích bắt đầu bằng cách nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Nói rõ chuyện đã xảy ra
 - **B.** Nghe hết ý của nhau
 - **C.** Nghỉ một chút rồi nói
@@ -1218,8 +1218,8 @@
 - **C.** Cho khoảng yên để làm
 - **D.** Có người cùng ngồi xử lý
 
-### Câu 8: Lúc buồn mà chưa muốn kể, An thích được đối xử thế nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 8: Lúc buồn mà chưa muốn kể, Thanh thích được đối xử thế nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Cho thời gian riêng
 - **B.** Ngồi cùng nhưng không hỏi dồn
 - **C.** Rủ làm việc nhẹ nhàng
@@ -1232,8 +1232,8 @@
 - **C.** Thấy buồn ngủ
 - **D.** Không còn hứng làm việc thường thích
 
-### Câu 10: Lời xin lỗi nào có ý nghĩa nhất với An?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 10: Lời xin lỗi nào có ý nghĩa nhất với Thanh?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Nói rõ đã sai ở đâu
 - **B.** Nghe cảm xúc của người kia
 - **C.** Sửa việc có thể sửa
@@ -1246,8 +1246,8 @@
 - **C.** Thông tin rõ hơn
 - **D.** Thử một bước nhỏ trước
 
-### Câu 12: An thích được động viên theo cách nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 12: Thanh thích được động viên theo cách nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Nhắc điều đã làm tốt
 - **B.** Giúp một việc cụ thể
 - **C.** Tin tưởng cho tự làm
@@ -1260,8 +1260,8 @@
 - **C.** Đề xuất một dịp khác
 - **D.** Cần nghĩ một lúc mới trả lời
 
-### Câu 14: Để thấy thoải mái trong nhóm mới, An cần gì nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 14: Để thấy thoải mái trong nhóm mới, Thanh cần gì nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Được giới thiệu với mọi người
 - **B.** Có chủ đề dễ tham gia
 - **C.** Không bị ép phải nói nhiều
@@ -1274,8 +1274,8 @@
 - **C.** Kể lại quá trình
 - **D.** Chuyển sang việc nhẹ hơn
 
-### Câu 16: Điều nhỏ nào dễ khiến An mất hứng nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 16: Điều nhỏ nào dễ khiến Thanh mất hứng nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Bị ngắt lời liên tục
 - **B.** Bị đổi hẹn không báo
 - **C.** Bị trêu đúng điều không thích
@@ -1288,8 +1288,8 @@
 - **C.** Tập trung xong một việc
 - **D.** Làm sở thích riêng
 
-### Câu 18: An thích được hỏi thăm với tần suất nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 18: Thanh thích được hỏi thăm với tần suất nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Một chút mỗi ngày
 - **B.** Vài lần mỗi tuần
 - **C.** Khi có chuyện muốn chia sẻ
@@ -1302,8 +1302,8 @@
 - **C.** Tự thử rồi mới nhờ
 - **D.** Viết tin nhắn rõ từng ý
 
-### Câu 20: Khi ý kiến khác nhau, An ưu tiên điều gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 20: Khi ý kiến khác nhau, Thanh ưu tiên điều gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Hiểu vì sao khác nhau
 - **B.** Tìm phương án cả hai chấp nhận
 - **C.** Thử từng cách nếu được
@@ -1316,8 +1316,8 @@
 - **C.** Tạm gác lại mọi thứ nghỉ ngơi một vài ngày
 - **D.** Lập lại kế hoạch từng bước cụ thể để giải quyết
 
-### Câu 22: An thường bộc lộ sự quan tâm bằng hành động thầm lặng nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 22: Thanh thường bộc lộ sự quan tâm bằng hành động thầm lặng nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Chuẩn bị sẵn những món người kia cần trước khi kịp hỏi
 - **B.** Lặng lẽ dọn dẹp hoặc làm đỡ việc đang dang dở
 - **C.** Chú ý đến những thay đổi nhỏ trong nét mặt hoặc giọng nói
@@ -1330,8 +1330,8 @@
 - **C.** Bị ngắt lời và phủ nhận cảm xúc của mình
 - **D.** Những lời nói nặng nề lúc mất bình tĩnh
 
-### Câu 24: Khi An im lặng không muốn nói chuyện, lý do lớn nhất thường là gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 24: Khi Thanh im lặng không muốn nói chuyện, lý do lớn nhất thường là gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Cần thời gian riêng để tự xử lý cảm xúc tiêu cực
 - **B.** Đang sợ nói ra lúc nóng giận sẽ làm tổn thương người khác
 - **C.** Quá mệt mỏi không còn đủ năng lượng để giải thích
@@ -1344,8 +1344,8 @@
 - **C.** Có trách nhiệm và giữ đúng lời hứa
 - **D.** Tốt bụng và luôn tôn trọng không gian riêng của nhau
 
-### Câu 26: Cách tốt nhất để An cảm nhận được tình cảm chân thành là gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 26: Cách tốt nhất để Thanh cảm nhận được tình cảm chân thành là gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Những hành động chăm sóc nhỏ hằng ngày
 - **B.** Lời nói ngọt ngào và những cái ôm ấm áp
 - **C.** Sự ưu tiên về thời gian dành cho nhau
@@ -1358,8 +1358,8 @@
 - **C.** Chia sẻ bớt những chi tiêu hằng ngày một cách tế nhị
 - **D.** Không tạo thêm áp lực hay so sánh với người khác
 
-### Câu 28: An thường tha thứ cho một lỗi lầm khi đối phương làm điều gì?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 28: Thanh thường tha thứ cho một lỗi lầm khi đối phương làm điều gì?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Chân thành nhận lỗi và không tái phạm lần sau
 - **B.** Cho thấy sự thay đổi tích cực qua hành động cụ thể
 - **C.** Biết lắng nghe cảm xúc tổn thương của mình
@@ -1372,8 +1372,8 @@
 - **C.** Đạt được những cột mốc mục tiêu đã đặt ra
 - **D.** Luôn giữ được sự chân thành với những người mình yêu quý
 
-### Câu 30: Khi An phải đưa ra một quyết định lớn thay đổi cuộc sống, họ dựa vào đâu nhiều nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 30: Khi Thanh phải đưa ra một quyết định lớn thay đổi cuộc sống, họ dựa vào đâu nhiều nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Lý trí và phân tích các mặt lợi hại cẩn thận
 - **B.** Trực giác và cảm xúc mách bảo
 - **C.** Lời khuyên từ những người thân tín nhất
@@ -1386,8 +1386,8 @@
 - **C.** Dành thời gian một mình viết nhật ký hoặc nghe nhạc
 - **D.** Đi dạo ngoài trời hít thở không khí tự nhiên
 
-### Câu 32: An trân trọng điều gì nhất ở một người bạn hoặc người đồng hành lâu năm?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 32: Thanh trân trọng điều gì nhất ở một người bạn hoặc người đồng hành lâu năm?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Dù có chuyện gì xảy ra vẫn luôn đứng về phía mình
 - **B.** Hiểu được cả những điều mình chưa kịp nói ra
 - **C.** Chấp nhận và yêu quý cả những khuyết điểm của nhau
@@ -1400,8 +1400,8 @@
 - **C.** Hãy nhớ lại lý do vì sao ngày trước bắt đầu
 - **D.** Cứ làm điều khiến bạn thấy thoải mái nhất
 
-### Câu 34: An đối diện với nỗi sợ hãi hoặc bất an bằng cách nào?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 34: Thanh đối diện với nỗi sợ hãi hoặc bất an bằng cách nào?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Tìm hiểu thật kỹ về nỗi sợ đó để kiểm soát nó
 - **B.** Tâm sự với người mình tin tưởng nhất để giải tỏa
 - **C.** Tập trung vào những việc tích cực khác để quên đi
@@ -1414,8 +1414,8 @@
 - **C.** Sự thấu hiểu và tôn trọng lối sống của nhau
 - **D.** Cảm giác luôn có một nơi chốn an toàn để trở về
 
-### Câu 36: Khi có chuyện buồn, An thường tìm đến ai trước tiên?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 36: Khi có chuyện buồn, Thanh thường tìm đến ai trước tiên?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Người yêu hoặc người bạn thân nhất
 - **B.** Gia đình thân yêu
 - **C.** Giữ trong lòng tự mình vượt qua
@@ -1428,8 +1428,8 @@
 - **C.** Được ở bên cạnh những người mình yêu thương
 - **D.** Tự do làm những điều mình mong muốn
 
-### Câu 38: Điều gì khiến An dễ xúc động và rơi nước mắt nhất?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 38: Điều gì khiến Thanh dễ xúc động và rơi nước mắt nhất?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Những câu chuyện về tình cảm gia đình ấm áp
 - **B.** Nhìn thấy người thân yêu phải chịu vất vả
 - **C.** Một cử chỉ ân cần bất ngờ khi mình đang kiệt sức
@@ -1442,8 +1442,8 @@
 - **C.** Nhường nhịn một bước nếu chuyện không quá nghiêm trọng
 - **D.** Tìm điểm chung ở giữa để cả hai cùng vui vẻ
 
-### Câu 40: Lời động viên nào có sức mạnh lớn nhất đối với An trong những ngày khó khăn?
-*(Nhân vật được hỏi: An (Người được mời))*
+### Câu 40: Lời động viên nào có sức mạnh lớn nhất đối với Thanh trong những ngày khó khăn?
+*(Nhân vật được hỏi: Thanh (Người được mời))*
 - **A.** Luôn có mình ở đây bên cạnh bạn
 - **B.** Bạn đã làm rất tốt rồi, đừng quá khắt khe với bản thân
 - **C.** Mọi chuyện rồi sẽ ổn thỏa cả thôi

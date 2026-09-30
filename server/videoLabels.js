@@ -1,5 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
-import {labelVideo} from './aiService.js';
+import {labelWithQwen} from './aiService.js';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const serverClient=()=>{
   if(!process.env.SUPABASE_SERVICE_ROLE_KEY)throw fail(503,'Server chưa cấu hình phân tích video.');
@@ -33,14 +33,17 @@ export async function analyzeVideo(c) {
   if(typeof path!=='string'||path.length>200||!path.startsWith(tag+'/')||path.includes('..')||!/^[-a-zA-Z0-9_./]+$/.test(path))throw fail(422,'Đường dẫn phương tiện không hợp lệ.');
   const view=await c.db(c.client.rpc('rpc_get_memory_view',{p_tag_uid:tag,p_grant_token:null}));
   if(!view.is_owner||!view.is_unlocked)throw fail(403,'Chỉ chủ sở hữu được gửi phương tiện cho AI.');
-  const key=process.env.GEMINI_API_KEY||process.env.MODAL_TAGGER_URL||'modal-qwen';
   const client=serverClient();
   const lease=await c.db(client.rpc('reserve_video_labels',{p_user:c.user.id,p_tag:tag,p_path:path}));
   if(lease.cached)return publicResult(lease,view.is_admin===true&&c.body.include_labels===true);
   try {
-    const download=await client.storage.from('emoria-memory').download(path);
-    if(download.error)throw fail(422,'Không thể đọc phương tiện đã tải lên.');
-    const result=await labelVideo(download.data,key);
+    const storage=client.storage.from('emoria-memory');
+    const info=await c.db(storage.info(path));
+    const mime=info.contentType||info.metadata?.mimetype;
+    if(!['video/mp4','video/webm','image/jpeg','image/png','image/webp'].includes(mime))throw fail(422,'Định dạng phương tiện không được hỗ trợ.');
+    const signed=await c.db(storage.createSignedUrl(path,300));
+    // Modal downloads directly; never relay a 50 MB file as a 67 MB JSON body through Vercel.
+    const result=await labelWithQwen(null,{url:signed.signedUrl,type:mime.startsWith('video/')?'video':'image'});
     // Recheck ownership after the external request before retaining private derived data.
     const current=await c.db(c.client.rpc('rpc_get_memory_view',{p_tag_uid:tag,p_grant_token:null}));
     if(!current.is_owner||!current.is_unlocked)throw fail(403,'Quyền sở hữu kỷ vật đã thay đổi.');
@@ -52,6 +55,7 @@ export async function analyzeVideo(c) {
     }
     return publicResult(result,view.is_admin===true&&c.body.include_labels===true);
   }catch(error){
+    console.warn('[Media review failed]',{name:error.name,status:error.status||503});
     await client.from('memory_video_labels').update({status:'failed',reason:'Chưa hoàn tất kiểm duyệt do lỗi kỹ thuật; không kết luận vi phạm.'}).eq('path',path).eq('request_id',lease.request_id).eq('status','processing');
     throw error.status?error:fail(503,'Kiểm duyệt bị gián đoạn. Phương tiện chưa được sử dụng; hãy thử lại sau.');
   }

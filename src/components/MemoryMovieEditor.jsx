@@ -15,6 +15,8 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
   const [retrying,setRetrying]=useState(false);
   const [gallerySuccess,setGallerySuccess]=useState('');
   const [uploadProgress,setUploadProgress]=useState(null);
+  const [pendingPath,setPendingPath]=useState('');
+  useEffect(()=>setPendingPath(''),[tag]);
 
   const urls=useRef(new Set()), abort=useRef(null), mounted=useRef(true);
 
@@ -71,7 +73,10 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
     if(!['video/mp4','video/webm'].includes(file.type)||file.size>MOVIE_LIMITS.outputBytes){
       throw new Error(t("Video phải là định dạng MP4 hoặc WebM, dung lượng tối đa 50 MB.","Choose an MP4 or WebM video, up to 50 MB."));
     }
-    const uploaded=await uploadModeratedMedia(tag,file,videoConsent,'intro',setUploadProgress);
+    let uploaded;
+    try { uploaded=await uploadModeratedMedia(tag,file,videoConsent,'intro',setUploadProgress); }
+    catch(error) { if(error.uploadedPath)setPendingPath(error.uploadedPath);throw error; }
+    setPendingPath('');
     onChange(uploaded.path);
     setModInfo({
       status:uploaded.approved?'ready':'rejected',
@@ -81,16 +86,19 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
   };
 
   const handleRetryModeration=async()=>{
-    if(!path||retrying)return;
+    const reviewPath=pendingPath||path;
+    if(!reviewPath||retrying)return;
     setRetrying(true);setError('');onBusy?.(true);
     try{
-      const res=await moderateUploadedMedia(tag,path,videoConsent,setUploadProgress);
+      const res=await moderateUploadedMedia(tag,reviewPath,videoConsent,setUploadProgress);
+      if(pendingPath){onChange(reviewPath);setPendingPath('');}
       setModInfo({
         status:res.approved?'ready':'rejected',
         labels:res.labels||[],
         reason:res.reason||''
       });
     }catch(err){
+      if(err.code==='MEDIA_REJECTED')setPendingPath('');
       setError(err.message);
     }finally{
       setRetrying(false);setUploadProgress(null);onBusy?.(false);
@@ -152,6 +160,11 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
           </p>
         </div>
       </div>
+
+      {pendingPath&&<div className="rounded-xl border border-amber-400/30 p-3 space-y-2">
+        <p role="status" className="text-xs text-amber-200">{t('Tệp đã tải lên nhưng chưa hoàn tất kiểm duyệt. Bạn có thể thử lại mà không cần tải tệp lên lần nữa.','Your file is uploaded but review is incomplete. Retry without uploading it again.')}</p>
+        <button type="button" className="store-button" disabled={!videoConsent||busy||retrying} onClick={handleRetryModeration}>{t('Thử lại kiểm duyệt','Retry review')}</button>
+      </div>}
 
       {/* KHU VỰC 1: VIDEO ĐẠI DIỆN ĐANG SỬ DỤNG */}
       {path ? (
