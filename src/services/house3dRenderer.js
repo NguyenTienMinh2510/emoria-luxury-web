@@ -145,7 +145,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   // Subtle Gyroscope View / Device Orientation (Chặng C)
   let gyroActive = false;
   let gyroHandler = null;
-  let baseGamma = null, baseBeta = null;
+  let gyroBaseline = null, gyroRaf = 0, gyroTimeout = null, gyroSensitivity = .65;
   const currentGyroOffset = new THREE.Vector3(0, 0, 0);
   const targetGyroOffset = new THREE.Vector3(0, 0, 0);
 

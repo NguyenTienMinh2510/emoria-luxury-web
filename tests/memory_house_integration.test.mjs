@@ -13,7 +13,7 @@ const {default:handler}=await import('../api/v1.js');
 const server=http.createServer(handler);server.listen(0,'127.0.0.1');await once(server,'listening');
 const base=`http://127.0.0.1:${server.address().port}/api/v1`;
 const client=key=>createClient(config.API_URL,key,{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(url,opts)=>fetch(url,{...opts,signal:AbortSignal.timeout(15000)})}});
-const root=client(config.SERVICE_ROLE_KEY),owner=client(config.ANON_KEY),other=client(config.ANON_KEY);
+const root=client(config.SERVICE_ROLE_KEY),owner=client(config.ANON_KEY),other=client(config.ANON_KEY),admin=client(config.ANON_KEY);
 const ok=async promise=>{const r=await promise;assert.ifError(r.error);return r.data;};
 const tag=`test-house-${crypto.randomUUID()}`,path=`${tag}/photo.png`;
 let token,otherToken,created=false,uploaded=false,revision=0;
@@ -63,13 +63,25 @@ try{
   await api('POST',route+'/publish',{});
   await api('POST',route+'/revoke',{});
   await api('GET',publicRoute,null,null,404);
+  const adminSession=await ok(admin.auth.signInWithPassword({email:'admin@emoria.test',password:accounts.password}));
+  const adminToken=adminSession.session.access_token;
+  assert.equal((await api('GET','/me/session',null,adminToken)).isAdmin,true);
+  await api('GET',route+'/draft',null,adminToken,403);
+  await api('POST',route+'/unpublish',{});
+  await ok(root.from('memory_spaces').update({owner_id:adminSession.user.id}).eq('tag_uid',tag));
+  const adminDraft=await api('GET',route+'/draft',null,adminToken);
+  assert.equal(adminDraft.is_published,false,'An admin owner can open a private house');
+  await api('PUT',route+'/draft',{title:'Admin-owned private house',rooms:serializeHouseRooms(adminDraft.rooms)},adminToken);
+  assert.equal((await api('GET',route+'/draft',null,adminToken)).title,'Admin-owned private house');
+  await api('GET',route+'/draft',null,token,403);
+  console.log('PASS admin owner opens and edits private House; admin without ownership and former owner remain denied.');
   console.log('PASS real local House HTTP/Auth/Storage: owner upload, non-owner denial, signed image bytes, reopen-save, photo/text placement, frozen publish, invalid photo rejection, unpublish/revoke.');
 }finally{
   try{
     if(uploaded)await ok(root.storage.from('emoria-event-media').remove([path]));
     if(created)await ok(root.from('memory_spaces').delete().eq('tag_uid',tag));
   }finally{
-    await Promise.allSettled([owner.auth.signOut(),other.auth.signOut()]);
+    await Promise.allSettled([owner.auth.signOut(),other.auth.signOut(),admin.auth.signOut()]);
     server.closeAllConnections();await new Promise(resolve=>server.close(resolve));
   }
 }

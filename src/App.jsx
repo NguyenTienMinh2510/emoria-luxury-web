@@ -52,7 +52,7 @@ export default function App() {
   const [routeReady, setRouteReady] = useState(false);
   const [systemReady,setSystemReady]=useState(false);
   const [chipId,setChipId]=useState('');
-  const [currentTag, setCurrentTag] = useState('emoria-lumen');
+  const [currentTag, setCurrentTag] = useState('');
   const [selectedArticleSlug, setSelectedArticleSlug] = useState('nghe-thuat-che-tac-da-quy-emoria');
   const [activeMatchId, setActiveMatchId] = useState(null);
   const [matchInviteToken, setMatchInviteToken] = useState(null);
@@ -151,6 +151,7 @@ export default function App() {
   useEffect(() => {
     const readRoute = () => {
       const q=new URLSearchParams(window.location.search);
+      setHouseShareId(q.get('share') || null);
       const payment=q.get('payment');
       const orderId=q.get('orderId');
       const token=q.get('token');
@@ -165,8 +166,7 @@ export default function App() {
         if (q.get('tag')) setCurrentTag(q.get('tag'));
         setCurrentView('memory-match');
       } else if (q.get('view') === 'memory-house' || q.get('share')) {
-        if (q.get('share')) setHouseShareId(q.get('share'));
-        if (q.get('tag')) setCurrentTag(q.get('tag'));
+        setCurrentTag(q.get('tag') || '');
         setCurrentView('memory-house');
       } else if (payment && orderId) {
         if (payment === 'success') {
@@ -480,7 +480,7 @@ export default function App() {
 
         {/* VIEW 3: DEDICATED MEMORY SPACE VAULT SHOWCASE */}
         {currentView==='nfc'&&<NfcLanding chipId={chipId} onResolved={handleOpenMemoryViewer} onMyMemories={()=>{setCurrentTag('');setCurrentView('memory');}}/>}
-        {currentView === 'memory' && (
+        {(currentView === 'memory' || (currentView === 'memory-house' && !currentTag && !houseShareId)) && (
           <MemorySpaceView
             key={authSession.user?.id || 'guest'}
             currentUser={authSession.user?.id || null}
@@ -497,6 +497,7 @@ export default function App() {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onOpenHouseStudio={(tag) => {
+              setHouseShareId(null);
               if (tag) setCurrentTag(tag);
               setCurrentView('memory-house');
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -610,6 +611,7 @@ export default function App() {
               if (target === 'house') {
                 setActiveMatchId(null);
                 setMatchInviteToken(null);
+                setHouseShareId(null);
                 setCurrentView('memory-house');
               } else {
                 setHouseShareId(null);
@@ -621,9 +623,10 @@ export default function App() {
         )}
 
         {/* VIEW 9: MEMORY HOUSE STUDIO */}
-        {currentView === 'memory-house' && (
+        {currentView === 'memory-house' && (currentTag || houseShareId) && (
           <MemoryHouseStudio
-            tagUid={currentTag || 'emoria-lumen'}
+            key={`${authSession.user?.id || 'guest'}:${currentTag}:${houseShareId || ''}`}
+            tagUid={currentTag || null}
             shareId={houseShareId}
             currentUser={authSession.user?.id || null}
             onBack={() => {
@@ -662,6 +665,7 @@ export default function App() {
               } else {
                 setActiveMatchId(null);
                 setMatchInviteToken(null);
+                setHouseShareId(null);
                 setCurrentView('memory-house');
               }
               window.scrollTo({ top: 0, behavior: 'smooth' });

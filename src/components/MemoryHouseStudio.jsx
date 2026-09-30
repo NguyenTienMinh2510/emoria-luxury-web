@@ -125,6 +125,8 @@ export default function MemoryHouseStudio({
 
   // States
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const loadSequence = useRef(0);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [activeTab, setActiveTab] = useState(isPublicVisitor ? 'preview' : 'edit'); // 'edit' | 'preview'
@@ -212,13 +214,16 @@ export default function MemoryHouseStudio({
 
   // Load House Data (either draft for owner or public snapshot for guest/share)
   const loadHouse = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     setLoading(true);
     setCanEdit(false);
+    setLoadError('');
     setError('');
     try {
       if (initialShareId) {
         // Public share mode
         const publicData = await getPublicHouse(initialShareId);
+        if (sequence !== loadSequence.current) return;
         if (publicData.title) setHouseTitle(publicData.title);
         if (publicData.theme) setSelectedTheme(publicData.theme);
         if (Array.isArray(publicData.rooms)) {
@@ -231,19 +236,23 @@ export default function MemoryHouseStudio({
         // Owner draft mode
         try {
           const draft = await getHouseDraft(tagUid);
+          if (sequence !== loadSequence.current) return;
           resetSaveQueue(draft.draft_revision||0);
           setCanEdit(true);
           setActiveTab('edit');
           if (draft.title) setHouseTitle(draft.title);
           if (draft.theme) setSelectedTheme(draft.theme);
           setIsPublished(Boolean(draft.is_published));
-          if (draft.share_id) setCurrentShareId(draft.share_id);
+          setCurrentShareId(draft.share_id || null);
 
           setRooms(mapOrderedRooms(draft.rooms));
         } catch (draftErr) {
+          if (sequence !== loadSequence.current) return;
+          if (draftErr.status !== 403) throw draftErr;
           // Fallback to public published view if not owner of draft
           try {
             const publicData = await getPublicHouseByTag(tagUid);
+            if (sequence !== loadSequence.current) return;
             if (publicData.title) setHouseTitle(publicData.title);
             if (publicData.theme) setSelectedTheme(publicData.theme);
             if (Array.isArray(publicData.rooms)) {
@@ -258,6 +267,7 @@ export default function MemoryHouseStudio({
       } else if (tagUid) {
         // Guest mode (unauthenticated) - only read published snapshot, NEVER query draft
         const publicData = await getPublicHouseByTag(tagUid);
+        if (sequence !== loadSequence.current) return;
         if (publicData.title) setHouseTitle(publicData.title);
         if (publicData.theme) setSelectedTheme(publicData.theme);
         if (Array.isArray(publicData.rooms)) {
@@ -267,8 +277,9 @@ export default function MemoryHouseStudio({
         setActiveTab('preview');
       }
     } catch (err) {
-      setError(err?.message || 'Không thể tải ngôi nhà kỷ niệm.');
+      if (sequence === loadSequence.current) setLoadError(err?.message || 'Không thể tải ngôi nhà kỷ niệm.');
     } finally {
+      if (sequence !== loadSequence.current) return;
       setLoading(false);
       isInitialLoad.current = true;
       isDirty.current = false;
@@ -278,6 +289,7 @@ export default function MemoryHouseStudio({
 
   useEffect(() => {
     loadHouse();
+    return () => { loadSequence.current += 1; };
   }, [loadHouse]);
 
   // Debounced Autosave (800-1200ms) after changes
@@ -857,6 +869,17 @@ export default function MemoryHouseStudio({
       </div>
     );
   }
+
+  if (loadError) return (
+    <div className="min-h-[70vh] flex flex-col items-center justify-center gap-4 p-6 pt-28 text-center text-slate-200">
+      <h1 className="text-xl font-semibold">Chưa mở được House Studio</h1>
+      <p role="alert">{loadError}</p>
+      <div className="flex flex-wrap justify-center gap-3">
+        <button type="button" className="store-button" onClick={loadHouse}>Thử tải lại</button>
+        <button type="button" className="store-button" onClick={handleBackToMemory}>Quay lại kỷ vật</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className={`w-full min-h-screen bg-gradient-to-b ${themeStyle.bg} text-slate-100 px-4 pt-24 sm:pt-28 pb-16 transition-colors duration-500`}>
