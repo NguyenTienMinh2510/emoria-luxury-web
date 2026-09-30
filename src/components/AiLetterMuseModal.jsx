@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X, Heart, Feather, Loader2, Check, RefreshCw } from 'lucide-react';
 import { apiRequest } from '../services/apiClient.js';
 import { useLanguage } from '../i18n/LanguageProvider.jsx';
+import { triggerAiWarmup } from '../services/aiWarmup.js';
 
 export default function AiLetterMuseModal({
   isOpen,
@@ -19,6 +20,13 @@ export default function AiLetterMuseModal({
   const [loading, setLoading] = useState(false);
   const [generatedLetter, setGeneratedLetter] = useState('');
   const [error, setError] = useState('');
+
+  // Đánh thức trước GPU container trên Modal ngay khi người dùng mở modal
+  useEffect(() => {
+    if (isOpen) {
+      triggerAiWarmup();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

@@ -5,6 +5,7 @@ import {uploadModeratedMedia, moderateUploadedMedia, fetchMediaUploads} from '..
 import {Images, UploadCloud, RefreshCw, Trash2, CheckCircle2, AlertTriangle, Music} from 'lucide-react';
 import MediaModerationModal from './MediaModerationModal.jsx';
 import {mediaProgress, runMediaBatch} from '../services/mediaUploadProgress.js';
+import { triggerAiWarmup } from '../services/aiWarmup.js';
 
 export default function MemoryMediaEditor({tag, items, onChange, audio, onAudio, videoConsent=false, onBusy=()=>{}}){
   const {t}=useLanguage();
@@ -12,6 +13,11 @@ export default function MemoryMediaEditor({tag, items, onChange, audio, onAudio,
   const [retryingPath,setRetryingPath]=useState('');
   const [uploadsMap,setUploadsMap]=useState({});
   const [jobs,setJobs]=useState({}),[batchCount,setBatchCount]=useState({completed:0,total:0});
+
+  // Đánh thức GPU container ngầm ngay khi mở Media Editor
+  useEffect(() => {
+    triggerAiWarmup();
+  }, []);
 
   // Fetch moderation statuses for gallery media
   const loadStatuses=async()=>{

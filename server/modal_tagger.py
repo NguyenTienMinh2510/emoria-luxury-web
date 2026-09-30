@@ -120,7 +120,7 @@ def extract_frames_from_video(video_path, max_frames=16, edge=448):
     image=image,
     volumes={"/cache": model_volume},
     timeout=300,
-    scaledown_window=120, # Giữ GPU thức 2 phút sau lượt chạy để phản hồi tức thì
+    scaledown_window=600, # Giữ GPU thức 10 phút sau lượt chạy để phản hồi tức thì các lượt tiếp theo
 )
 class QwenTagger:
     @modal.enter()
@@ -210,6 +210,14 @@ class QwenTagger:
             "model": MODEL_NAME,
         }
 
+    @modal.fastapi_endpoint(method="GET")
+    def warmup(self):
+        return {"success": True, "status": "ready", "model": MODEL_NAME}
+
+    @modal.fastapi_endpoint(method="POST")
+    def warmup_post(self, payload: dict = None):
+        return {"success": True, "status": "ready", "model": MODEL_NAME}
+
     @modal.fastapi_endpoint(method="POST")
     def craft_letter(self, payload: dict):
         try:
@@ -225,6 +233,10 @@ class QwenTagger:
         from PIL import Image
         started = time.monotonic()
         stage = "download"
+
+        # Nếu payload là yêu cầu warmup đánh thức container
+        if payload.get("task") == "warmup" or payload.get("type") == "warmup":
+            return {"success": True, "status": "ready", "model": MODEL_NAME}
 
         # Nếu payload là yêu cầu viết thư tay
         if payload.get("task") == "letter" or payload.get("type") == "letter" or "occasion" in payload:

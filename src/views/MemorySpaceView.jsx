@@ -8,6 +8,7 @@ import MemoryCinema from '../components/MemoryCinema';
 import LuxuryUnboxingExperience from '../components/LuxuryUnboxingExperience';
 import AiLetterMuseModal from '../components/AiLetterMuseModal';
 import CuratedMelodiesModal from '../components/CuratedMelodiesModal';
+import { triggerAiWarmup } from '../services/aiWarmup.js';
 import confetti from 'canvas-confetti';
 import {callStore} from '../services/catalogService';
 import {useStore} from '../components/StoreProvider';
@@ -58,6 +59,14 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
 
   // Studio Editor Modal State
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+
+  // Đánh thức GPU container trên Modal ngầm ngay khi mở Studio
+  useEffect(() => {
+    if (isEditorOpen) {
+      triggerAiWarmup();
+    }
+  }, [isEditorOpen]);
+
   const [editTitle, setEditTitle] = useState('');
   const [editAuthor, setEditAuthor] = useState('');
   const [editQuote, setEditQuote] = useState('');

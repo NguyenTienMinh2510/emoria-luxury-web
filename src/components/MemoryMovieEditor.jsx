@@ -5,6 +5,7 @@ import {uploadModeratedMedia, moderateUploadedMedia, fetchMediaUploads} from '..
 import {inspectMovieFile, renderMemoryMovie, MOVIE_LIMITS} from '../services/memoryMovie';
 import {UploadCloud, RefreshCw, Trash2, CheckCircle2, AlertTriangle, Film} from 'lucide-react';
 import MediaModerationModal from './MediaModerationModal.jsx';
+import { triggerAiWarmup } from '../services/aiWarmup.js';
 
 export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoConsent=false, onAddToGallery}) {
   const {t}=useLanguage();
@@ -17,6 +18,11 @@ export default function MemoryMovieEditor({tag, path, onChange, onBusy, videoCon
   const [uploadProgress,setUploadProgress]=useState(null);
   const [pendingPath,setPendingPath]=useState('');
   useEffect(()=>setPendingPath(''),[tag]);
+
+  // Đánh thức GPU container ngầm ngay khi mở Movie Editor
+  useEffect(() => {
+    triggerAiWarmup();
+  }, []);
 
   const urls=useRef(new Set()), abort=useRef(null), mounted=useRef(true);
 

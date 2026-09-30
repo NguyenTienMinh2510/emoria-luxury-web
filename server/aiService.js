@@ -230,3 +230,32 @@ export async function craftLetter(c) {
     return { letter: fallback };
   }
 }
+
+/**
+ * Pre-warm the Modal Qwen GPU container asynchronously.
+ */
+export async function warmupAi() {
+  const endpoint = MODAL_TAGGER_ENDPOINT.replace(/\/+$/, '');
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: 'warmup' }),
+      signal: AbortSignal.timeout(45000)
+    });
+    const data = await response.json().catch(() => ({}));
+    return {
+      success: true,
+      warmed: true,
+      model: data.model || 'Qwen/Qwen3-VL-4B-Instruct',
+      status: data.status || 'ready'
+    };
+  } catch (err) {
+    return {
+      success: false,
+      warmed: false,
+      message: err.message
+    };
+  }
+}
+

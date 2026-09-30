@@ -3,7 +3,7 @@ import {createClient} from '@supabase/supabase-js';
 import {eventRpc,isEventRpc,streamMatch} from './eventGateway.js';
 import {normalizeCheckout} from '../src/services/checkoutPayload.js';
 import {analyzeVideo,readVideoLabels,readVideoUploads} from './videoLabels.js';
-import {craftLetter} from './aiService.js';
+import {craftLetter,warmupAi} from './aiService.js';
 import {tryOnConfig} from './tryOn.js';
 import {signEventPaths,enrichMatchQuestionsWithSignedUrls,enrichHouseRoomsWithSignedUrls} from './eventMedia.js';
 import {moderateHousePhotos} from './houseModeration.js';
@@ -20,6 +20,8 @@ export const routes=[
     if(!config)throw Object.assign(new Error('AR is not available for this product.'),{status:404});
     return config;
   }),
+  route('POST','/ai/warmup','public',warmupAi),
+  route('GET','/ai/warmup','public',warmupAi),
   route('POST','/ai/craft-letter','user',craftLetter),
   route('GET','/admin/accounts','admin',c=>rpc(c,'rpc_admin_accounts',{p_search:(c.query.get('search')||'').slice(0,120)})),
   route('POST','/admin/memories','admin',c=>rpc(c,'rpc_admin_create_memory',{p_owner:c.body.ownerId,p_title:c.body.title}),201),
