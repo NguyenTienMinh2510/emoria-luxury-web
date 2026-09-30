@@ -34,8 +34,25 @@ assert.equal(formatMatchQuestion('{owner} hỏi {partner}', 'An', 'an'),'An (ng�
 assert.equal(formatMatchQuestion('{owner} hỏi {partner}','',''),'[Tên người tạo] hỏi [Tên người được mời]');
 console.log('PASS 200 questions: fixed names, valid strings, independent snapshots and replay rotation.');
 
+if (!fs.existsSync('.local/supabase.json')) {
+  console.log('[NOT RUN] Local isolated Supabase not found (.local/supabase.json missing); skipping local DB integration on CI/Vercel.');
+  process.exit(0);
+}
+
 const config=JSON.parse(fs.readFileSync('.local/supabase.json','utf8'));
 assert.equal(config.API_URL,'http://127.0.0.1:55321','Only isolated local Supabase is allowed');
+
+try {
+  const ping = await fetch(`${config.API_URL}/auth/v1/health`, { signal: AbortSignal.timeout(1500) });
+  if (!ping.ok) {
+    console.log(`[NOT RUN] Local Supabase at ${config.API_URL} is unhealthy (status ${ping.status}); skipping live DB test.`);
+    process.exit(0);
+  }
+} catch {
+  console.log(`[NOT RUN] Local Supabase at ${config.API_URL} is not reachable; skipping live DB test.`);
+  process.exit(0);
+}
+
 Object.assign(process.env,{SUPABASE_URL:config.API_URL,SUPABASE_PUBLISHABLE_KEY:config.ANON_KEY,SUPABASE_SERVICE_ROLE_KEY:config.SERVICE_ROLE_KEY});
 const {default:handler}=await import('../api/v1.js');
 const folder=path.resolve('.local/mismatch-test');fs.mkdirSync(folder,{recursive:true});

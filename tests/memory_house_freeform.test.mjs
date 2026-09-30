@@ -582,4 +582,3 @@ let passed = 0;
 console.log('\n================================================================');
 console.log(`  HOÀN THÀNH TẤT CẢ ${passed}/${passed} KIỂM THỬ FREEFORM DECORATION PASS!`);
 console.log('================================================================\n');
-import './memory_house_placement.test.mjs';
