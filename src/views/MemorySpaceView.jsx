@@ -29,7 +29,7 @@ import {
   getShowcaseMemoriesList 
 } from '../services/memoryService';
 
-export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToHome, onNavigateToShop, currentUser, onOpenAuth, onSelectTag, onOpenPrivacy, onOpenMatchStudio, onOpenHouseStudio }) {
+export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToHome, onNavigateToShop, currentUser, onOpenAuth, onSelectTag, onOpenPrivacy, onOpenHouseStudio }) {
   const {t, tBilingual, language}=useLanguage();
   const {settings}=useStore();
   const [editMedia,setEditMedia]=useState([]);
@@ -499,17 +499,6 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>{t("Chỉnh Sửa (Studio)","Edit in Studio")}</span>
               </button>
-              {onOpenMatchStudio && (
-                <button
-                  type="button"
-                  onClick={() => onOpenMatchStudio(currentTag)}
-                  className="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all"
-                  title={t("Mở Couple Match Studio","Open Couple Match Studio")}
-                >
-                  <Heart className="w-3.5 h-3.5 fill-rose-300/30" />
-                  <span className="hidden md:inline">Match Studio</span>
-                </button>
-              )}
               {onOpenHouseStudio && (
                 <button
                   type="button"

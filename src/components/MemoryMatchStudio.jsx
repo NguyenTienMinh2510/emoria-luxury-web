@@ -611,7 +611,7 @@ export default function MemoryMatchStudio({
   };
 
   if (!currentUser) return (
-    <section className="max-w-xl mx-auto p-8 space-y-4 text-center">
+    <section className="max-w-xl mx-auto p-8 pt-28 space-y-4 text-center">
       <h1 className="text-3xl font-bold">Mismatch · Chơi cùng người quen</h1>
       <p>Đăng nhập để tạo hoặc tham gia lượt chơi. Không cần sở hữu Memory Space.</p>
       <button type="button" onClick={onOpenAuth} className="px-6 py-3 rounded-xl bg-rose-500 text-white font-bold">Đăng nhập để chơi</button>
@@ -621,7 +621,7 @@ export default function MemoryMatchStudio({
   // Render Loading
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center" role="status">
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 pt-28 text-center" role="status">
         <motion.div
           animate={{ scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] }}
           transition={{ repeat: Infinity, duration: 1.8 }}
@@ -673,9 +673,9 @@ export default function MemoryMatchStudio({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-6 sm:py-10 text-slate-100">
+    <div className="w-full max-w-4xl mx-auto px-4 pt-24 sm:pt-28 pb-16 text-slate-100">
       {/* Top Header Bar with Multi-Page Navigation */}
-      <header className="sticky top-0 z-30 bg-stone-950/95 backdrop-blur-md rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border border-white/10" aria-label="Điều hướng studio">
+      <header className="sticky top-20 sm:top-24 z-30 bg-stone-950/95 backdrop-blur-md rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border border-white/10 shadow-xl" aria-label="Điều hướng studio">
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleGoHome}

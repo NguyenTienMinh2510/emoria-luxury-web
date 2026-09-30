@@ -496,11 +496,6 @@ export default function App() {
               setCurrentView('shop');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            onOpenMatchStudio={(tag) => {
-              if (tag) setCurrentTag(tag);
-              setCurrentView('memory-match');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
             onOpenHouseStudio={(tag) => {
               if (tag) setCurrentTag(tag);
               setCurrentView('memory-house');

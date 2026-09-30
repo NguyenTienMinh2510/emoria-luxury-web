@@ -844,7 +844,7 @@ export default function MemoryHouseStudio({
   // Loading State
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center" role="status">
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 pt-28 text-center" role="status">
         <motion.div
           animate={{ scale: [1, 1.1, 1], rotate: [0, 4, -4, 0] }}
           transition={{ repeat: Infinity, duration: 2 }}
@@ -859,10 +859,10 @@ export default function MemoryHouseStudio({
   }
 
   return (
-    <div className={`w-full min-h-screen bg-gradient-to-b ${themeStyle.bg} text-slate-100 px-4 py-6 sm:py-10 transition-colors duration-500`}>
+    <div className={`w-full min-h-screen bg-gradient-to-b ${themeStyle.bg} text-slate-100 px-4 pt-24 sm:pt-28 pb-16 transition-colors duration-500`}>
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Top Navigation Bar with Multi-Page Navigation */}
-        <header className="sticky top-0 z-30 bg-stone-950/95 backdrop-blur-md rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-white/10" aria-label="Điều hướng studio">
+        <header className="sticky top-20 sm:top-24 z-30 bg-stone-950/95 backdrop-blur-md rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-white/10 shadow-xl" aria-label="Điều hướng studio">
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleGoHome}
