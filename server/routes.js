@@ -129,14 +129,15 @@ export const routes=[
   route('POST','/events/matches','user',async c=>{
 
     const tag=c.body.tag_uid||c.body.tagUid||c.body.tag;
-    if(!tag||typeof tag!=='string')throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'),{status:400});
+    if(tag != null && typeof tag!=='string')throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'),{status:400});
     return rpc(c,'rpc_match_create',{
-      p_tag_uid:tag,
-      p_title:c.body.title||'Couple Match',
+      p_tag_uid:tag || null,
+      p_title:c.body.title||'Mismatch',
       p_partner_name:c.body.partner_name||c.body.partnerName||null,
       p_owner_name:c.body.owner_name||c.body.ownerName||null
     });
   },201),
+  route('GET','/events/matches','user',c=>rpc(c,'rpc_match_list',{p_tag_uid:null})),
   route('PUT','/events/matches/([^/]+)/questions','user',c=>{
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.params[0]))throw Object.assign(new Error('Mã lượt chơi không hợp lệ.'),{status:400});
     if(!Array.isArray(c.body.questions)||c.body.questions.length>10)throw Object.assign(new Error('Số câu hỏi trong bản nháp tối đa là 10 câu.'),{status:400});
@@ -375,6 +376,7 @@ export const routes=[
         .filter(m=>m.role==='owner')
         .map(m=>String(m.tag_uid||'').toLowerCase())
     );
+    ownedTags.add(`match_${c.user.id}`);
     for(const tag of tags){
       if(!ownedTags.has(tag)){
         throw Object.assign(new Error(`Từ chối quyền: Bạn không sở hữu kỷ vật mang mã ${tag}.`),{status:403});

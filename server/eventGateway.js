@@ -53,7 +53,7 @@ export async function streamMatch(c){
       if(closed||busy)return;busy=true;
       try{
         const view=await c.db(client.rpc('rpc_event_dispatch',{p_action:'rpc_match_get_view',p_args:args,p_caller:c.user?.id||null}));
-        if(!closed)res.write(`data: ${JSON.stringify({my_submitted:view.my_submitted,both_submitted:view.both_submitted,other_submitted:view.other_submitted})}\n\n`);
+        if(!closed)res.write(`data: ${JSON.stringify({my_submitted:view.my_submitted,both_submitted:view.both_submitted,other_submitted:view.other_submitted,other_opened_at:view.other_opened_at,other_answered_count:view.other_answered_count,total_questions:view.total_questions})}\n\n`);
       }catch{if(!closed)res.write('event: denied\ndata: {}\n\n');close();}finally{busy=false;}
     };
     channel.on('broadcast',{event:'changed'},check).subscribe(status=>{if(status==='SUBSCRIBED')check();else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')close();});

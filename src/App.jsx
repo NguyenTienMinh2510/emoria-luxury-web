@@ -379,6 +379,7 @@ export default function App() {
         currentView={currentView}
         onSelectView={(view) => {
           setCurrentView(view);
+          if(view==='memory-match' && currentView!=='memory-match'){setActiveMatchId(null);setMatchInviteToken(null);}
           if(view==='memory')setCurrentTag('');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
@@ -575,7 +576,9 @@ export default function App() {
         {/* VIEW 8: COUPLE MATCH STUDIO */}
         {currentView === 'memory-match' && (
           <MemoryMatchStudio
-            tagUid={currentTag || 'emoria-lumen'}
+            tagUid={currentTag || null}
+            onOpenAuth={() => setIsAuthOpen(true)}
+            onMatchChange={(id) => {setActiveMatchId(id);setMatchInviteToken(null);}}
             matchId={activeMatchId}
             inviteToken={matchInviteToken}
             currentUser={authSession.user?.id || null}

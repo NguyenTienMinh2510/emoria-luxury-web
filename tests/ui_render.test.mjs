@@ -96,10 +96,11 @@ assert.ok(melodiesHtml.includes('Clair de Lune'));
 console.log('PASS luxury unboxing and AI muse render: wax seal, crystal chime chords, letter muse prompts, and curated melodies modal.');
 
 const {default:MemoryMatchStudio}=await compile('src/components/MemoryMatchStudio.jsx','memory-match-studio');
-const matchHtml=render(MemoryMatchStudio,{tagUid:'emo-heart',matchId:'fixture-match-id',currentUser:'user-owner-a'});
-assert.ok(matchHtml.includes('Couple Match'));
+const matchHtml=render(MemoryMatchStudio,{currentUser:'user-owner-a'});
+assert.ok(matchHtml.includes('Mismatch'));
 assert.ok(matchHtml.includes('Chọn Chủ Đề'), 'Match renders the topic picker');
-assert.ok(matchHtml.includes('Rung Động') && matchHtml.includes('Thói Quen') && matchHtml.includes('Tâm Hồn'), 'Topic cards are visible');
+assert.ok(matchHtml.includes('Cảm xúc &amp; Kết nối') && matchHtml.includes('Không gian sống &amp; Tương lai') && matchHtml.includes('Tình huống hóc búa'), 'Universal topic cards are visible');
+assert.ok(render(MemoryMatchStudio,{}).includes('Đăng nhập để chơi'));
 assert.ok(!matchHtml.includes('Nhập nội dung câu hỏi') && !matchHtml.includes('Thêm câu hỏi'), 'Old authoring form does not override topic packs');
 assert.ok(matchHtml.includes('Trang chủ'), 'Match Studio header có nút Trang chủ');
 assert.ok(matchHtml.includes('Quay lại kỷ vật'), 'Match Studio header có nút Quay lại kỷ vật');

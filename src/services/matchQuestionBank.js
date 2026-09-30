@@ -1,424 +1,1869 @@
-/**
- * EMORIA Couple Match - Question Bank & Vibe Check Engine
- * Cung cấp 5 chủ đề phong phú, bốc ngẫu nhiên thông minh chống lặp,
- * và biến mismatch thành "Mảnh ghép bù trừ" ngọt ngào.
- */
-
+// Names refer to fixed participants, never to the reader's point of view.
 export const MATCH_TOPICS = [
-  {
-    id: 'romance',
-    title: 'Rung Động & Lãng Mạn',
-    emoji: '💖',
-    tagline: 'Khoảnh khắc đầu tiên & cảm xúc sâu thẳm',
-    color: 'from-rose-500/20 to-pink-500/10 border-rose-500/30 text-rose-300'
-  },
-  {
-    id: 'lifestyle',
-    title: 'Thói Quen & Đời Thường',
-    emoji: '☕',
-    tagline: 'Sở thích, món ăn & tật xấu đáng yêu',
-    color: 'from-amber-500/20 to-orange-500/10 border-amber-500/30 text-amber-300'
-  },
-  {
-    id: 'future_home',
-    title: 'Ngôi Nhà & Tương Lai',
-    emoji: '🏡',
-    tagline: 'Tổ ấm trong mơ & kế hoạch bên nhau',
-    color: 'from-emerald-500/20 to-teal-500/10 border-emerald-500/30 text-emerald-300'
-  },
-  {
-    id: 'funny',
-    title: 'Tình Huống Hóc Búa',
-    emoji: '🎭',
-    tagline: 'Lạc đường, trễ hẹn & phản ứng dở khóc dở cười',
-    color: 'from-violet-500/20 to-purple-500/10 border-violet-500/30 text-violet-300'
-  },
-  {
-    id: 'deep_soul',
-    title: 'Thấu Hiểu Tâm Hồn',
-    emoji: '🌙',
-    tagline: 'Ngôn ngữ tình yêu & vỗ về tổn thương',
-    color: 'from-sky-500/20 to-indigo-500/10 border-sky-500/30 text-sky-300'
-  }
-];
+  ["romance","Cảm xúc & Kết nối","💛","Những chuyện nhỏ khiến mình quý nhau hơn"],
+  ["lifestyle","Thói quen & Đời thường","☕","Ăn gì, ngủ sao, tiêu tiền kiểu nào"],
+  ["future_home","Không gian sống & Tương lai","🏡","Góc riêng, điều muốn thử và kế hoạch sắp tới"],
+  ["funny","Tình huống hóc búa","🎭","Trễ hẹn, nhầm tin và những pha khó đỡ"],
+  ["deep_soul","Thấu hiểu & Quan tâm","🌙","Hiểu cách nhau nghỉ ngơi, góp ý và cần giúp đỡ"],
+].map(([id,title,emoji,tagline])=>({id,title,emoji,tagline,color:'from-rose-500/15 to-violet-500/10 border-white/15 text-rose-200'}));
 
-export const QUESTION_POOL = {
-  romance: [
-    {
-      text: 'Khoảnh khắc nào khiến bạn nhận ra mình đã thực sự "đổ gục" trước người ấy?',
-      options: ['Ánh mắt dịu dàng bất ngờ chạm nhau', 'Hành động chăm sóc âm thầm không nói trước', 'Nụ cười rạng rỡ làm sáng bừng không gian', 'Một câu nói vu vơ nhưng chạm đúng tâm tư']
-    },
-    {
-      text: 'Điều lãng mạn nhất mà đối phương từng làm cho bạn là gì?',
-      options: ['Bất ngờ xuất hiện khi bạn đang mệt mỏi nhất', 'Một món quà nhỏ mang ý nghĩa kỷ niệm riêng', 'Bức thư tay hoặc tin nhắn dài ấm áp lúc nửa đêm', 'Một bữa ăn tự tay nấu vụng về nhưng tràn đầy tình cảm']
-    },
-    {
-      text: 'Giai điệu nào gợi nhắc bạn nhớ nhất về tình yêu của hai bạn?',
-      options: ['Bản tình ca acoustic êm đềm mộc mạc', 'Bài hát cả hai vô tình nghe chung trong chuyến đi đầu tiên', 'Giai điệu trong bộ phim từng xem cùng nhau dưới mưa', 'Một bài hát sôi động cả hai hay ngân nga khi ngồi xe']
-    },
-    {
-      text: 'Nụ hôn đáng nhớ nhất của hai bạn diễn ra ở đâu?',
-      options: ['Dưới cơn mưa rào bất chợt', 'Góc ban công lộng gió buổi hoàng hôn', 'Trong rạp phim lúc đèn vừa tắt', 'Trước hiên nhà lúc chia tay sau buổi hẹn']
-    },
-    {
-      text: 'Cử chỉ ngọt ngào nào của đối phương khiến tim bạn đập nhanh nhất?',
-      options: ['Xoa đầu hoặc vén tóc nhẹ nhàng', 'Bất ngờ siết chặt tay giữa phố đông người', 'Cái ôm từ phía sau ấm áp', 'Hôn nhẹ lên trán trước khi tạm biệt']
-    },
-    {
-      text: 'Nếu được quay lại một ngày kỷ niệm, bạn muốn sống lại ngày nào nhất?',
-      options: ['Buổi hẹn hò chính thức đầu tiên bỡ ngỡ', 'Khoảnh khắc nhận lời yêu nhau', 'Chuyến du lịch xa đầu tiên chỉ có hai người', 'Một ngày bình thường nhưng đầy ắp tiếng cười']
-    },
-    {
-      text: 'Điều gì ở đối phương khiến bạn cảm thấy tự hào nhất khi giới thiệu với bạn bè?',
-      options: ['Sự tử tế và cách đối nhân xử thế ấm áp', 'Sự hài hước duyên dáng làm mọi người vui vẻ', 'Nụ cười tỏa nắng và vẻ ngoài thu hút', 'Sự chăm chỉ và đam mê trong công việc']
-    },
-    {
-      text: 'Biệt danh bí mật mà bạn thầm thích gọi đối phương là gì?',
-      options: ['Tên gọi đáng yêu gắn với thú cưng (Mèo con, Cún con)', 'Cách gọi ngọt ngào quen thuộc (Em iu, Anh iu)', 'Tên viết tắt hoặc biệt danh riêng chỉ hai đứa biết', 'Một biệt danh trêu chọc hài hước']
-    },
-    {
-      text: 'Lời khen nào từ người ấy khiến bạn nhớ mãi không quên?',
-      options: ['"Ở bên cạnh em/anh, anh/em cảm thấy bình yên nhất"', '"Em/anh là điều may mắn nhất trong đời anh/em"', '"Hôm nay em/anh xinh đẹp / bảnh bao lắm"', '"Cảm ơn vì đã luôn hiểu anh/em"']
-    },
-    {
-      text: 'Món quà kỷ niệm ý nghĩa nhất bạn muốn tặng đối phương vào dịp tới?',
-      options: ['Một món trang sức kỷ niệm mang dấu ấn riêng', 'Một chuyến đi xa chỉ có hai đứa', 'Một album ảnh tự làm ghi lại từng chặng đường', 'Một bữa tối tự nấu dưới ánh nến ấm cúng']
-    },
-    {
-      text: 'Khi nhìn vào mắt người ấy, bạn nhìn thấy điều gì rõ nhất?',
-      options: ['Sự an toàn và che chở vô điều kiện', 'Tình yêu nồng nhiệt và chân thành', 'Cả tương lai tươi sáng phía trước', 'Hình bóng phản chiếu của chính mình']
-    },
-    {
-      text: 'Nếu tình yêu của hai bạn là một loài hoa, đó sẽ là hoa gì?',
-      options: ['Hoa hồng đỏ rực cháy đam mê', 'Hoa baby trắng tinh khôi và bình yên', 'Hoa hướng dương luôn hướng về ánh sáng', 'Hoa oải hương thủy chung và sâu lắng']
-    }
+const packs = {
+  "romance": [
+    [
+      "Điều gì dễ khiến {owner} có thiện cảm khi mới trò chuyện?",
+      [
+        "Biết lắng nghe",
+        "Nói chuyện có duyên",
+        "Có chung sở thích",
+        "Nhớ đúng tên, không gọi nhầm"
+      ]
+    ],
+    [
+      "{partner} thường bắt đầu cuộc trò chuyện bằng gì?",
+      [
+        "Hỏi hôm nay thế nào",
+        "Gửi một chuyện vừa gặp",
+        "Gửi ảnh hoặc video vui",
+        "Đợi có chuyện cụ thể mới nhắn"
+      ]
+    ],
+    [
+      "{owner} thích được rủ gặp theo kiểu nào?",
+      [
+        "Chốt rõ giờ và địa điểm",
+        "Cho vài lựa chọn rồi cùng chọn",
+        "Hỏi lúc nào rảnh trước",
+        "Rủ bất chợt nếu đang tiện"
+      ]
+    ],
+    [
+      "{partner} dễ nhớ điều gì sau một lần gặp?",
+      [
+        "Câu chuyện đã nghe",
+        "Món ăn hoặc đồ uống",
+        "Một hành động chu đáo",
+        "Pha ngớ ngẩn cả hai cùng cười"
+      ]
+    ],
+    [
+      "Khi có tin vui, {owner} thường chia sẻ bằng cách nào?",
+      [
+        "Nhắn ngay vài dòng",
+        "Gọi kể cho đã",
+        "Đợi gặp rồi kể",
+        "Gửi ảnh thay lời muốn nói"
+      ]
+    ],
+    [
+      "Kiểu lời khen nào khiến {partner} vui nhất?",
+      [
+        "Khen việc vừa làm tốt",
+        "Khen sự cố gắng",
+        "Khen gu chọn đồ",
+        "Khen nói chuyện vui"
+      ]
+    ],
+    [
+      "{owner} hay thể hiện sự quý mến qua việc gì?",
+      [
+        "Chủ động hỏi han",
+        "Nhớ sở thích của người kia",
+        "Dành thời gian gặp gỡ",
+        "Giúp một việc đang cần"
+      ]
+    ],
+    [
+      "{partner} thích kiểu quà nhỏ nào nhất?",
+      [
+        "Món ăn thích",
+        "Đồ dùng đúng lúc đang thiếu",
+        "Món liên quan đến sở thích",
+        "Một tấm ảnh kèm lời nhắn"
+      ]
+    ],
+    [
+      "Khi lâu rồi chưa nói chuyện, {owner} dễ mở lời thế nào?",
+      [
+        "Dạo này sao rồi?",
+        "Thấy cái này nhớ tới nhau",
+        "Cuối tuần rảnh không?",
+        "Gửi meme để kiểm tra sóng"
+      ]
+    ],
+    [
+      "{partner} thích cuộc gặp đông người hay ít người hơn?",
+      [
+        "Chỉ hai người cho dễ nói",
+        "Nhóm nhỏ ba bốn người",
+        "Đông vui càng tốt",
+        "Tùy hoạt động hôm đó"
+      ]
+    ],
+    [
+      "Điều gì dễ làm {owner} thấy một cuộc trò chuyện hợp ý?",
+      [
+        "Được nói hết câu",
+        "Cùng cười vì chuyện nhỏ",
+        "Trao đổi được điều mới",
+        "Im một lúc vẫn thoải mái"
+      ]
+    ],
+    [
+      "{partner} thường giữ kỷ niệm bằng cách nào?",
+      [
+        "Chụp nhiều ảnh",
+        "Giữ món đồ nhỏ",
+        "Lưu tin nhắn đáng nhớ",
+        "Nhớ trong đầu rồi kể lại"
+      ]
+    ],
+    [
+      "{owner} thích nghe kể chuyện theo kiểu nào?",
+      [
+        "Nói kết quả trước",
+        "Kể từ đầu đến cuối",
+        "Cho xem ảnh rồi kể",
+        "Kể ngắn, chỗ hay thì hỏi thêm"
+      ]
+    ],
+    [
+      "Nếu muốn cảm ơn {partner}, cách nào hợp nhất?",
+      [
+        "Nói thẳng lời cảm ơn",
+        "Mời một món ăn hoặc đồ uống",
+        "Giúp lại khi có dịp",
+        "Viết một lời nhắn riêng"
+      ]
+    ],
+    [
+      "{owner} thích được chúc mừng ngày đặc biệt thế nào?",
+      [
+        "Một tin nhắn riêng",
+        "Một cuộc gọi ngắn",
+        "Gặp nhau ăn uống",
+        "Nhẹ nhàng thôi, đừng làm bất ngờ"
+      ]
+    ],
+    [
+      "Một buổi gặp lý tưởng của {partner} nên kết thúc lúc nào?",
+      [
+        "Đúng giờ đã tính",
+        "Khi hết chuyện để nói",
+        "Khi bắt đầu thấy mệt",
+        "Sau câu thêm năm phút lần thứ ba"
+      ]
+    ],
+    [
+      "{owner} thường gửi loại nội dung nào để bắt chuyện?",
+      [
+        "Đồ ăn và chỗ đi chơi",
+        "Nhạc hoặc phim hay",
+        "Chuyện thường ngày",
+        "Ảnh hài hợp tâm trạng"
+      ]
+    ],
+    [
+      "{partner} dễ nhận lời hoạt động nào nhất?",
+      [
+        "Ăn một món cụ thể",
+        "Đi dạo một vòng",
+        "Ngồi uống nước trò chuyện",
+        "Chơi một trò đơn giản"
+      ]
+    ],
+    [
+      "Sau buổi gặp vui, {owner} thường làm gì?",
+      [
+        "Nhắn đã về tới nơi",
+        "Gửi ảnh vừa chụp",
+        "Rủ luôn dịp tiếp theo",
+        "Nghỉ ngơi, hôm sau mới nhắn"
+      ]
+    ],
+    [
+      "Trong một cuộc hẹn, điều gì quan trọng nhất với {partner}?",
+      [
+        "Giữ đúng lời đã hẹn",
+        "Có thời gian nói chuyện",
+        "Không bị giục vội",
+        "Được cùng chọn hoạt động"
+      ]
+    ],
+    [
+      "{owner} thích được rủ đi dạo vào khung giờ nào nhất?",
+      [
+        "Chiều mát vừa tan làm",
+        "Tối muộn phố xá vắng dần",
+        "Cuối tuần sáng sớm thong thả",
+        "Bất cứ khi nào cần hóng gió xả stress"
+      ]
+    ],
+    [
+      "{partner} thường phản ứng thế nào khi bất ngờ được tặng một món quà không nhân dịp gì?",
+      [
+        "Mắt sáng rỡ rồi mở xem ngay",
+        "Nghi ngờ hỏi ngay \"Hôm nay có vụ gì à?\"",
+        "Cảm động nhưng dặn lần sau đừng tốn kém",
+        "Chụp ảnh khoe ngay lập tức"
+      ]
+    ],
+    [
+      "{owner} cảm thấy được thấu hiểu nhất khi người kia làm gì?",
+      [
+        "Nhớ một thói quen nhỏ của mình",
+        "Không hỏi dồn khi thấy mình im lặng",
+        "Tiếp lời đúng ý mình đang định nói",
+        "Tự động mua đúng món mình đang thèm"
+      ]
+    ],
+    [
+      "Khi ngồi chung xe đi xa, {partner} thường đóng vai trò gì?",
+      [
+        "DJ chuyên nghiệp chọn playlist",
+        "Hoa tiêu xem bản đồ chỉ đường",
+        "Bếp trưởng bóc đồ ăn vặt tiếp tế",
+        "Hành khách ngủ gật sau 15 phút"
+      ]
+    ],
+    [
+      "Nếu phải chọn một kiểu hẹn hò không tốn kém, {owner} sẽ chọn gì?",
+      [
+        "Đi dạo công viên ngắm cảnh",
+        "Ra bờ sông ngồi uống trà đá cắn hướng dương",
+        "Cùng nhau ghé nhà sách đọc truyện",
+        "Ở nhà cùng nấu mì gói xem phim"
+      ]
+    ],
+    [
+      "{partner} thường làm gì khi đối phương vô tình kể chuyện hơi nhạt?",
+      [
+        "Cười trừ cho đỡ ngượng",
+        "Trêu thẳng \"Chuyện nhạt quá đổi chuyện khác đi\"",
+        "Ráng hỏi thêm để cứu câu chuyện",
+        "Đứng hình 3 giây rồi mới phản ứng"
+      ]
+    ],
+    [
+      "Khi muốn xin lỗi một cách tinh tế, {owner} thường làm gì?",
+      [
+        "Mua một món ăn người kia thích",
+        "Nhắn một tin dài chân thành",
+        "Tự giác nhận lỗi và không thanh minh",
+        "Làm mặt đáng yêu để xin tha"
+      ]
+    ],
+    [
+      "{partner} thích một buổi hẹn hò bất ngờ hay được lên lịch trước?",
+      [
+        "Bất ngờ hoàn toàn cho thú vị",
+        "Lên lịch trước để kịp chuẩn bị đồ đẹp",
+        "Báo trước 1 tiếng là đủ",
+        "Tùy tâm trạng hôm đó"
+      ]
+    ],
+    [
+      "{owner} dễ bật cười nhất vì điều gì ở người kia?",
+      [
+        "Điệu cười đặc trưng không lẫn đi đâu",
+        "Những pha vụng về rất đáng yêu",
+        "Những phát ngôn ngây ngô bất ngờ",
+        "Biểu cảm lúc đang cố cãi cùn"
+      ]
+    ],
+    [
+      "Khi đi ăn cùng nhau, {partner} thường nhường miếng ngon cuối cùng cho ai?",
+      [
+        "Nhường thẳng cho đối phương",
+        "Chia đôi sòng phẳng mỗi người một nửa",
+        "Hỏi lịch sự 1 câu rồi gắp ăn luôn",
+        "Gắp cho người kia kèm câu \"Ăn đi cho béo\""
+      ]
+    ],
+    [
+      "{owner} thích lưu biệt danh của đối phương trong danh bạ theo kiểu nào?",
+      [
+        "Tên thật kèm một emoji nhẹ nhàng",
+        "Biệt danh hài hước chỉ hai đứa hiểu",
+        "Tên gọi ngọt ngào",
+        "Để nguyên họ và tên đầy đủ cho nghiêm túc"
+      ]
+    ],
+    [
+      "{partner} thích được an ủi bằng hành động nào nhất khi gặp chuyện ấm ức?",
+      [
+        "Một cái ôm thật chặt không cần nói",
+        "Cùng ngồi mắng đứa làm mình bực",
+        "Dẫn đi ăn một bữa thật ngon",
+        "Cho không gian yên tĩnh tự nguôi"
+      ]
+    ],
+    [
+      "{owner} thường làm gì khi đối phương gửi một bức ảnh \"dìm hàng\" của mình?",
+      [
+        "Thả tim rồi lưu về máy",
+        "Lập tức tìm ảnh dìm của đối phương để đáp trả",
+        "Yêu cầu xóa ngay trong 3 nốt nhạc",
+        "Đem đi làm meme đại diện luôn"
+      ]
+    ],
+    [
+      "{partner} thích kiểu chụp ảnh nào nhất khi đi chơi cùng nhau?",
+      [
+        "Chụp bắt khoảnh khắc tự nhiên",
+        "Tạo dáng chuẩn chỉnh nghiêm túc",
+        "Chụp đồ ăn và phong cảnh là chính",
+        "Tự sướng góc cận mặt hài hước"
+      ]
+    ],
+    [
+      "Khi có một bí mật vui, {owner} thường giữ được trong bao lâu trước khi kể cho đối phương?",
+      [
+        "Kể ngay lập tức không nén nổi",
+        "Giữ được vài tiếng đợi lúc gặp mặt",
+        "Nhá hàng trước rồi mới chịu kể",
+        "Giữ được đến cuối ngày"
+      ]
+    ],
+    [
+      "{partner} thường có phản xạ gì khi đối phương nhìn chằm chằm vào mình?",
+      [
+        "Cười ngượng rồi nhìn đi chỗ khác",
+        "Hỏi ngay \"Mặt dính gì à?\"",
+        "Nhìn lại thi xem ai chớp mắt trước",
+        "Vuốt tóc làm dáng tự tin"
+      ]
+    ],
+    [
+      "{owner} thích nhận được tin nhắn chúc ngủ ngon vào lúc nào?",
+      [
+        "Trước khi chuẩn bị đi ngủ",
+        "Lúc nào cũng được, miễn là có nhắn",
+        "Kèm một câu dặn dò mai dậy sớm",
+        "Gửi kèm một chiếc meme hài hước"
+      ]
+    ],
+    [
+      "Khi đối phương bị ốm nhẹ, {partner} sẽ làm gì đầu tiên?",
+      [
+        "Đặt cháo hoặc thuốc giao tận nơi",
+        "Nhắn tin nhắc uống nước và nghỉ ngơi liên tục",
+        "Chạy qua chăm sóc trực tiếp",
+        "Mắng nhẹ một câu vì tội không giữ ấm"
+      ]
+    ],
+    [
+      "{owner} trân trọng khoảnh khắc nào nhất sau một chuyến đi chơi dài?",
+      [
+        "Lúc ngồi cạnh nhau cùng ngắm hoàng hôn",
+        "Lúc cùng ngồi xem lại đống ảnh chụp",
+        "Lúc về đến nơi nhắn tin \"Đã về an toàn\"",
+        "Lúc cùng bàn xem lần tới sẽ đi đâu"
+      ]
+    ],
+    [
+      "Điều gì khiến {partner} cảm thấy cuộc trò chuyện giữa hai người không bao giờ nhàm chán?",
+      [
+        "Có thể nói từ chuyện vĩ mô đến chuyện nhảm nhí",
+        "Cùng chung gu hài hước, cười cùng một điểm",
+        "Cả hai đều thoải mái là chính mình",
+        "Thậm chí ngồi im không nói vẫn thấy dễ chịu"
+      ]
+    ]
   ],
-
-  lifestyle: [
-    {
-      text: 'Món ăn nào cả hai luôn muốn gọi mỗi khi đi ăn cùng nhau?',
-      options: ['Đồ nướng lẩu nóng hổi xuýt xoa', 'Món ăn đường phố quen thuộc bên góc vỉa hè', 'Bữa tối lãng mạn phong cách phương Tây', 'Đồ ngọt, trà sữa hoặc chè thanh mát']
-    },
-    {
-      text: 'Buổi sáng lý tưởng của hai bạn vào ngày nghỉ sẽ diễn ra như thế nào?',
-      options: ['Ngủ nướng đã đời rồi dậy cùng ăn brunch trễ', 'Dậy sớm đón bình minh rồi đi cà phê góc phố quen', 'Cùng nhau chuẩn bị bữa sáng ấm cúng tại nhà', 'Vận động thể thao nhẹ nhàng rồi đi dạo']
-    },
-    {
-      text: 'Khi đối phương giận dỗi đáng yêu, "chiêu" dỗ dành nào hiệu quả nhất?',
-      options: ['Mua ngay món ăn hoặc trà sữa người ấy mê', 'Ôm chặt không buông cho đến khi chịu cười', 'Chân thành nói lời xin lỗi kèm gương mặt ăn năn', 'Làm trò hề hài hước để người ấy bật cười']
-    },
-    {
-      text: 'Khi cả hai có 3 tiếng thảnh thơi vào chiều Chủ nhật, bạn sẽ chọn gì?',
-      options: ['Cùng nằm sofa xem một bộ phim hay', 'Đi dạo siêu thị mua sắm đồ ăn vặt', 'Mỗi người một góc yên tĩnh đọc sách cạnh nhau', 'Chạy xe lòng vòng ngắm phố xá hoàng hôn']
-    },
-    {
-      text: 'Tật xấu nào của đối phương mà bạn thấy vừa buồn cười vừa thương?',
-      options: ['Hay quên chìa khóa hoặc đồ đạc lung tung', 'Lúc đói bụng thì càu nhàu như đứa trẻ', 'Thức khuya lướt điện thoại rồi sáng dậy than mệt', 'Chọn đồ lâu ơi là lâu mỗi khi ra ngoài']
-    },
-    {
-      text: 'Phong cách chi tiêu khi đi chơi chung của hai bạn là gì?',
-      options: ['Lên kế hoạch dự trù cẩn thận từ trước', 'Cứ thoải mái tận hưởng, quan trọng là niềm vui', 'Săn deal giảm giá thông minh', 'Tùy hứng, lúc tiết kiệm lúc sang chảnh']
-    },
-    {
-      text: 'Thức uống nào đối phương chọn chuẩn xác nhất cho bạn khi không cần hỏi?',
-      options: ['Cà phê đậm vị hoặc bạc xỉu ít ngọt', 'Trà sữa ít đường nhiều trân châu', 'Nước ép hoa quả thanh mát', 'Trà thảo mộc ấm áp']
-    },
-    {
-      text: 'Ai là người thường mở lời làm hòa trước sau mỗi lần tranh cãi nhỏ?',
-      options: ['Người có lỗi rõ hơn sẽ tự giác mở lời', 'Người yêu đối phương nhiều hơn một chút', 'Cả hai cùng im lặng rồi tự nhiên cười xòa', 'Gửi một meme hài hước để phá vỡ băng tuyết']
-    },
-    {
-      text: 'Khi đi du lịch chung, ai là người đóng vai trò "hoa tiêu kiêm thủ quỹ"?',
-      options: ['Bạn là người lên lịch trình và quản lý chi tiêu', 'Người ấy chu đáo quán xuyến mọi thứ', 'Chia đôi nhiệm vụ: người lái xe, người lo ăn uống', 'Đi theo hệ tự do, tới đâu hay tới đó']
-    },
-    {
-      text: 'Mùi hương nào trên người đối phương khiến bạn cảm thấy thân thuộc nhất?',
-      options: ['Mùi nước hoa nhẹ nhàng tinh tế', 'Mùi dầu gội thơm mát quen thuộc', 'Mùi nước giặt quần áo sạch sẽ ấm áp', 'Mùi tự nhiên đặc trưng của riêng người ấy']
-    },
-    {
-      text: 'Khi đối phương bị ốm hoặc mệt, bạn thường chăm sóc bằng cách nào?',
-      options: ['Nấu một bát cháo nóng hoặc canh bồi bổ', 'Chuẩn bị thuốc, nước ấm và túc trực bên cạnh', 'Xoa bóp, đắp khăn mát và hỏi han dịu dàng', 'Giữ không gian yên tĩnh tuyệt đối cho người ấy ngủ']
-    },
-    {
-      text: 'Thể loại phim nào cả hai thường chọn khi xem chung ở nhà?',
-      options: ['Phim hài hước lãng mạn (Rom-Com)', 'Phim hành động kịch tính hoặc siêu anh hùng', 'Phim trinh thám giật gân đấu trí', 'Phim hoạt hình đáng yêu nhẹ nhàng']
-    }
+  "lifestyle": [
+    [
+      "Báo thức reo lần đầu, {owner} thường làm gì?",
+      [
+        "Dậy ngay",
+        "Bấm ngủ thêm",
+        "Xem điện thoại trước",
+        "Thương lượng thêm năm phút với cái gối"
+      ]
+    ],
+    [
+      "Chưa biết ăn gì, {partner} thường chọn cách nào?",
+      [
+        "Ăn món quen",
+        "Xem quán quanh mình",
+        "Nhờ gợi ý vài món",
+        "Mở tủ lạnh xem còn gì"
+      ]
+    ],
+    [
+      "Khi gọi nước, {owner} thường ưu tiên gì?",
+      [
+        "Món quen cho chắc",
+        "Món mới để thử",
+        "Món ít ngọt",
+        "Món đang được giảm giá"
+      ]
+    ],
+    [
+      "{partner} hay để chìa khóa ở đâu?",
+      [
+        "Một chỗ cố định",
+        "Trong túi mang hằng ngày",
+        "Gần cửa ra vào",
+        "Chỗ nào tiện tay lúc về"
+      ]
+    ],
+    [
+      "Được rảnh nửa ngày, {owner} thích làm gì nhất?",
+      [
+        "Ngủ bù",
+        "Ra ngoài đổi không khí",
+        "Làm sở thích riêng",
+        "Dọn vài việc còn dang dở"
+      ]
+    ],
+    [
+      "{partner} mua đồ theo kiểu nào nhiều hơn?",
+      [
+        "Lên danh sách trước",
+        "Thiếu gì mua nấy",
+        "Chờ dịp giảm giá",
+        "Thấy hợp mắt mới cân nhắc"
+      ]
+    ],
+    [
+      "Khi ăn món ngon, {owner} thường làm gì đầu tiên?",
+      [
+        "Ăn ngay cho nóng",
+        "Chụp ảnh trước",
+        "Mời người đi cùng thử",
+        "Hỏi món này làm thế nào"
+      ]
+    ],
+    [
+      "{partner} thích chỗ ngồi nào khi vào quán?",
+      [
+        "Gần cửa sổ",
+        "Góc yên tĩnh",
+        "Gần quầy cho tiện gọi",
+        "Chỗ nào mát nhất"
+      ]
+    ],
+    [
+      "Điện thoại còn 10% pin, {owner} thường làm gì?",
+      [
+        "Tìm chỗ sạc",
+        "Bật tiết kiệm pin",
+        "Cất máy để dành lúc cần",
+        "Vẫn dùng, tin vào phép màu"
+      ]
+    ],
+    [
+      "{partner} thường chọn quần áo đi ra ngoài theo gì?",
+      [
+        "Thoải mái là chính",
+        "Hợp nơi sắp đến",
+        "Hợp tâm trạng",
+        "Bộ dễ lấy nhất"
+      ]
+    ],
+    [
+      "Trước khi ngủ, {owner} hay làm gì nhất?",
+      [
+        "Xem điện thoại một lúc",
+        "Đọc hoặc nghe gì đó",
+        "Chuẩn bị đồ cho ngày mai",
+        "Nằm xuống là muốn ngủ"
+      ]
+    ],
+    [
+      "Trong siêu thị, {partner} dễ mua thêm gì nhất?",
+      [
+        "Đồ ăn vặt",
+        "Trái cây",
+        "Đồ dùng nhỏ",
+        "Chỉ mua đúng thứ cần"
+      ]
+    ],
+    [
+      "{owner} thích ăn sáng theo kiểu nào?",
+      [
+        "Ăn ở nhà",
+        "Mua mang đi",
+        "Ngồi quán ăn thong thả",
+        "Khi nào đói mới ăn"
+      ]
+    ],
+    [
+      "Nhận một tin nhắn không gấp, {partner} thường trả lời khi nào?",
+      [
+        "Đọc là trả lời luôn",
+        "Xong việc đang làm",
+        "Gom lại trả lời lúc rảnh",
+        "Nghĩ đã trả lời nhưng mới nghĩ thôi"
+      ]
+    ],
+    [
+      "Lúc cần tập trung, {owner} thích không gian nào?",
+      [
+        "Yên lặng",
+        "Có nhạc không lời",
+        "Có tiếng người vừa phải",
+        "Đeo tai nghe ở đâu cũng được"
+      ]
+    ],
+    [
+      "{partner} hay lưu điều cần nhớ bằng cách nào?",
+      [
+        "Ghi chú điện thoại",
+        "Đặt nhắc lịch",
+        "Viết ra giấy",
+        "Tự nhẩm để nhớ"
+      ]
+    ],
+    [
+      "Đi ăn món lạ, {owner} thường chọn mức thử nghiệm nào?",
+      [
+        "Gọi đúng món nổi tiếng nhất",
+        "Chọn món gần giống món quen",
+        "Chia phần nhỏ để thử",
+        "Để người khác chọn giúp"
+      ]
+    ],
+    [
+      "{partner} thích lúc nào trong ngày nhất?",
+      [
+        "Sáng sớm yên tĩnh",
+        "Giữa ngày nhiều năng lượng",
+        "Chiều khi xong việc",
+        "Tối được làm điều mình thích"
+      ]
+    ],
+    [
+      "Khi gặp món muốn mua hơi quá ngân sách, {owner} sẽ làm gì?",
+      [
+        "Đợi tích đủ tiền",
+        "Tìm món tương tự rẻ hơn",
+        "Để vài ngày xem còn thích không",
+        "Bỏ qua vì chưa thật sự cần"
+      ]
+    ],
+    [
+      "Đồ ăn mang về còn dư, {partner} thường xử lý thế nào?",
+      [
+        "Cất hộp cho bữa sau",
+        "Chia cho người muốn ăn",
+        "Biến thành món khác",
+        "Lần sau gọi ít hơn"
+      ]
+    ],
+    [
+      "Khi gọi trà sữa hoặc cà phê, {owner} thường chọn mức đường đá thế nào?",
+      [
+        "100% đường đá đầy đủ cho đã",
+        "Giảm ngọt 50% hoặc 30% cho heathy",
+        "Không đường, chỉ uống nguyên bản",
+        "Tùy hứng, quán gợi ý sao uống vậy"
+      ]
+    ],
+    [
+      "{partner} thường để bao nhiêu tab trình duyệt mở cùng một lúc trên máy tính/điện thoại?",
+      [
+        "Dưới 5 tab, dùng xong tắt ngay",
+        "Khoảng 10-20 tab để tra cứu",
+        "Vài chục tab đến mức hiện icon nhỏ xíu",
+        "Không đếm nổi, máy đơ mới chịu tắt bớt"
+      ]
+    ],
+    [
+      "{owner} thường làm gì khi đang đi tắm mà chợt nảy ra một ý tưởng hay ho?",
+      [
+        "Tắm vội ra ghi chú ngay kẻo quên",
+        "Cố lẩm nhẩm trong đầu suốt lúc tắm",
+        "Tự nhủ lát ra ghi nhưng ra tới cửa là quên sạch",
+        "Hát vang một bài ăn mừng ý tưởng"
+      ]
+    ],
+    [
+      "Khi đi chợ hoặc siêu thị mà quên mang túi đựng, {partner} sẽ làm gì?",
+      [
+        "Mua thêm túi ni lông hoặc túi vải",
+        "Ôm hết đống đồ trong tay đi ra xe",
+        "Xin một thùng carton cũ để đựng",
+        "Nhét bớt vào balo hoặc túi áo khoác"
+      ]
+    ],
+    [
+      "{owner} thường sắp xếp tủ quần áo theo phong cách nào?",
+      [
+        "Phân loại ngăn nắp theo màu hoặc loại áo quần",
+        "Treo móc những bộ hay mặc, còn lại gấp gọn",
+        "Chỗ nào trống thì nhét vào",
+        "Ghế ngồi trong phòng là chiếc tủ quần áo thứ hai"
+      ]
+    ],
+    [
+      "{partner} thường chọn vị trí ngồi nào khi đi xe buýt hoặc máy bay?",
+      [
+        "Cạnh cửa sổ để ngắm cảnh và ngủ",
+        "Cạnh lối đi cho dễ đứng lên di chuyển",
+        "Ngồi hàng đầu cho thoáng",
+        "Chỗ nào còn trống là ngồi"
+      ]
+    ],
+    [
+      "Khi lướt mạng xã hội vào ban đêm, {owner} thường dừng lại ở nội dung gì lâu nhất?",
+      [
+        "Video dạy nấu ăn hoặc review ẩm thực",
+        "Video động vật hài hước dễ thương",
+        "Tin tức hoặc chuyện giật gân trong ngày",
+        "Video unboxing hoặc đồ công nghệ"
+      ]
+    ],
+    [
+      "{partner} xử lý thế nào khi quần áo phơi khô nhưng chưa muốn gấp?",
+      [
+        "Gom lại để trên giường hoặc ghế đợi rảnh",
+        "Gấp ngay lập tức cho phẳng phiu",
+        "Treo nguyên trên móc, khi nào mặc thì lấy",
+        "Nhờ người khác gấp hộ"
+      ]
+    ],
+    [
+      "{owner} thường uống bao nhiêu nước mỗi ngày?",
+      [
+        "Uống đều đặn trên 2 lít",
+        "Đặt bình to trước mặt nhưng chỉ nhớ uống khi khát khô cổ",
+        "Uống trà, cà phê thay nước lọc",
+        "Phải cài app nhắc uống nước mới nhớ"
+      ]
+    ],
+    [
+      "Khi đi ăn buffet, chiến thuật quen thuộc của {partner} là gì?",
+      [
+        "Ăn hải sản và thịt bò trước cho gỡ vốn",
+        "Ăn mỗi món một ít để nếm thử",
+        "Thích gì ăn nấy không tính toán",
+        "Lỡ ăn no từ mấy món khai vị và bánh ngọt"
+      ]
+    ],
+    [
+      "{owner} thường mang theo những gì khi ra ngoài chỉ để mua đồ gần nhà?",
+      [
+        "Chỉ cầm duy nhất chiếc điện thoại",
+        "Điện thoại kèm chìa khóa xe",
+        "Đầy đủ ví tiền, điện thoại, chìa khóa",
+        "Bê nguyên cả túi xách như đi chơi xa"
+      ]
+    ],
+    [
+      "{partner} phản ứng thế nào khi phát hiện một gói đồ ship tới nơi?",
+      [
+        "Rạch hộp khui hàng ngay lập tức",
+        "Để trên bàn ngắm một lúc rồi mới bóc",
+        "Quên mất mình từng đặt món này",
+        "Nhờ người khác khui hộp giúp"
+      ]
+    ],
+    [
+      "{owner} thường mất bao lâu để chuẩn bị trước khi bước ra khỏi nhà?",
+      [
+        "Dưới 10 phút, cực kỳ nhanh gọn",
+        "Khoảng 20 đến 30 phút",
+        "Gần 1 tiếng để chọn đồ và chỉnh trang",
+        "Tuyên bố \"5 phút nữa xong\" nhưng nửa tiếng sau vẫn chưa thấy đâu"
+      ]
+    ],
+    [
+      "{partner} giải quyết thế nào với chiếc bát đĩa cuối cùng trong bồn rửa?",
+      [
+        "Rửa ngay lập tức cho sạch bồn",
+        "Ngâm nước để đó lát rửa sau",
+        "Chờ tích đủ nhiều bát rồi rửa một thể",
+        "Nhìn đắm đuối hy vọng có ai rửa giùm"
+      ]
+    ],
+    [
+      "Khi đi mua sắm quần áo, {owner} thường quyết định thế nào?",
+      [
+        "Thử đồ kỹ càng rồi mới mua",
+        "Nhìn ưng mắt là mua luôn khỏi thử",
+        "Chụp ảnh gửi xin ý kiến người khác",
+        "Đi ngắm cho đã rồi về đặt online cho rẻ"
+      ]
+    ],
+    [
+      "{partner} thích không gian làm việc hoặc học tập thế nào?",
+      [
+        "Mặt bàn trống trơn ngăn nắp",
+        "Đầy đủ sổ sách, bút viết, ly nước xung quanh",
+        "Vừa làm vừa mở nhạc nền hoặc podcast",
+        "Nằm trên giường làm việc cho thoải mái"
+      ]
+    ],
+    [
+      "{owner} thường chọn thức ăn theo tiêu chí nào khi đặt đồ ăn giao tận nơi?",
+      [
+        "Quán có mã giảm giá hoặc freeship",
+        "Quán quen vị ngon ăn mãi không chán",
+        "Tìm quán mới có nhiều đánh giá 5 sao",
+        "Món nào giao nhanh nhất dưới 20 phút"
+      ]
+    ],
+    [
+      "Khi chiếc vớ (tất) bị lủng một lỗ nhỏ xíu ở ngón chân, {partner} sẽ làm gì?",
+      [
+        "Vứt ngay đi mua đôi mới",
+        "Vẫn đi tiếp, khéo giấu vào trong giày không ai thấy",
+        "Cất vào góc tính đem khâu lại",
+        "Chuyển thành vớ đi trong nhà"
+      ]
+    ],
+    [
+      "{owner} có thói quen dọn dẹp phòng vào lúc nào?",
+      [
+        "Dọn định kỳ vào cuối tuần",
+        "Mỗi ngày dọn một chút",
+        "Khi nào bừa bộn không chịu nổi mới dọn",
+        "Khi có hứng đột xuất vào lúc nửa đêm"
+      ]
+    ],
+    [
+      "{partner} thường để âm lượng chuông điện thoại ở chế độ nào?",
+      [
+        "Rung hoàn toàn, ghét tiếng chuông ồn ào",
+        "Bật chuông to rõ ràng để không lỡ cuộc gọi",
+        "Bật chế độ không làm phiền quanh năm",
+        "Im lặng tuyệt đối, gọi nhỡ cả chục cuộc mới biết"
+      ]
+    ]
   ],
-
-  future_home: [
-    {
-      text: 'Không gian quan trọng nhất trong tổ ấm tương lai của hai bạn là gì?',
-      options: ['Góc bếp ấm cúng với bàn ăn ngập nắng', 'Phòng khách êm ái với màn hình chiếu phim lớn', 'Phòng ngủ yên bình với nệm êm ánh sáng dịu', 'Ban công xanh mát với nhiều hoa lá và bàn trà nhỏ']
-    },
-    {
-      text: 'Trong ngôi nhà tương lai, hai bạn có muốn nuôi thú cưng không?',
-      options: ['Một chú mèo lười tròn xoe thích được ôm', 'Một chú cún trung thành lăng xăng đón cửa', 'Nuôi cả cún lẫn mèo cho nhà cửa rộn ràng', 'Chỉ có hai đứa và nhiều cây xanh thanh bình']
-    },
-    {
-      text: 'Phân chia việc nhà lý tưởng nhất theo bạn sẽ như thế nào?',
-      options: ['Một người nấu ăn ngon, một người rửa bát sạch', 'Cùng nhau làm việc nhà vào sáng cuối tuần có bật nhạc', 'Ai rảnh hơn hoặc thấy việc thì tự giác làm', 'Thuê dịch vụ dọn dẹp để dành thời gian yêu nhau']
-    },
-    {
-      text: 'Tông màu chủ đạo bạn muốn phủ lên ngôi nhà chung của hai đứa?',
-      options: ['Trắng kem & gỗ sồi ấm cúng phong cách Bắc Âu', 'Xám đen hiện đại sang trọng và tối giản', 'Pastel nhẹ nhàng lãng mạn như quán cà phê Hàn Quốc', 'Tông màu thiên nhiên xanh mướt mát mắt']
-    },
-    {
-      text: 'Vào một buổi tối mùa đông trong ngôi nhà riêng, hai bạn sẽ làm gì?',
-      options: ['Cùng cuộn mình trong chăn ấm xem Netflix', 'Nấu nồi lẩu nóng hổi rồi vừa ăn vừa tâm sự', 'Ngồi nhâm nhi tách trà nóng nghe nhạc không lời', 'Cùng chơi board game hoặc game đối kháng']
-    },
-    {
-      text: 'Vật dụng trang trí nào nhất định phải có trong phòng ngủ của hai bạn?',
-      options: ['Khung ảnh kỷ niệm ghi dấu ngày cưới hoặc kỷ niệm', 'Đèn ngủ ánh vàng ấm áp tạo cảm giác êm dịu', 'Một chiếc máy phát nhạc đĩa than cổ điển', 'Máy xông tinh dầu tỏa hương lavender thư giãn']
-    },
-    {
-      text: 'Bạn hình dung chuyến đi kỷ niệm 5 năm bên nhau sẽ là chuyến đi thế nào?',
-      options: ['Một resort biệt lập bên bờ biển xanh ngắt', 'Khám phá châu Âu cổ kính lãng mạn', 'Cắm trại trên thảo nguyên hoặc ngọn đồi sương mù', 'Trở lại đúng nơi hai đứa bắt đầu hẹn hò']
-    },
-    {
-      text: 'Khi về già, bạn muốn cùng người ấy sống ở đâu nhất?',
-      options: ['Một ngôi nhà nhỏ ven biển ngắm sóng vỗ', 'Một căn nhà gỗ trên đồi hoa bình yên Đà Lạt', 'Một căn hộ tiện nghi giữa thành phố sôi động', 'Một trang trại nhỏ tự trồng rau và nuôi gà']
-    },
-    {
-      text: 'Thói quen nhỏ nào bạn muốn hai người duy trì mỗi ngày khi về chung một nhà?',
-      options: ['Hôn tạm biệt trước khi đi làm và đón chào lúc về', 'Cùng ngồi ăn cơm tối và kể cho nhau nghe về một ngày', 'Cùng uống cà phê sáng trước khi bắt đầu ngày mới', 'Nắm tay nhau đi dạo buổi tối quanh khu phố']
-    },
-    {
-      text: 'Điều gì bạn nghĩ sẽ là thử thách lớn nhất khi bắt đầu sống chung?',
-      options: ['Điều chỉnh những thói quen sinh hoạt vụn vặt khác nhau', 'Học cách nhường nhịn khi bất đồng quan điểm', 'Cân đối giữa thời gian cho nhau và không gian riêng tư', 'Chia sẻ trách nhiệm tài chính gia đình']
-    },
-    {
-      text: 'Một góc nhỏ bạn muốn dành riêng cho người ấy trong nhà là gì?',
-      options: ['Bàn làm việc yên tĩnh với dàn máy tính xịn', 'Bàn trang điểm lộng lẫy ngập tràn ánh sáng', 'Góc đọc sách thư giãn có sofa bập bênh', 'Khu vườn nhỏ cho người ấy chăm sóc cây cỏ']
-    },
-    {
-      text: 'Khi nghĩ về mái ấm tương lai, cảm xúc nào xuất hiện trong bạn đầu tiên?',
-      options: ['Cảm giác an toàn và được che chở', 'Sự háo hức chờ đón những niềm vui mới', 'Trách nhiệm xây đắp hạnh phúc dài lâu', 'Sự bình yên sâu lắng trong tâm hồn']
-    }
+  "future_home": [
+    [
+      "Góc nghỉ ngơi lý tưởng của {owner} cần gì nhất?",
+      [
+        "Một chỗ nằm êm",
+        "Ánh sáng dễ chịu",
+        "Không gian yên tĩnh",
+        "Chỗ để đồ ăn trong tầm với"
+      ]
+    ],
+    [
+      "Nếu đổi một thứ trong phòng, {partner} sẽ đổi gì trước?",
+      [
+        "Đèn",
+        "Bàn ghế",
+        "Chỗ cất đồ",
+        "Màu sắc hoặc đồ trang trí"
+      ]
+    ],
+    [
+      "Có một khoản tiền rảnh nhỏ, {owner} muốn dùng vào đâu?",
+      [
+        "Để dành",
+        "Học một thứ mới",
+        "Đi chơi một buổi",
+        "Mua món dùng hằng ngày"
+      ]
+    ],
+    [
+      "Trong thời gian tới, {partner} muốn thử hoạt động nào?",
+      [
+        "Nấu một món mới",
+        "Tập một môn vận động",
+        "Học kỹ năng sáng tạo",
+        "Khám phá một chỗ chưa tới"
+      ]
+    ],
+    [
+      "Nếu được nghỉ ba ngày, {owner} thích kế hoạch nào?",
+      [
+        "Đi một nơi gần",
+        "Ở nhà nghỉ thật kỹ",
+        "Gặp những người lâu chưa gặp",
+        "Mỗi ngày làm một việc mình thích"
+      ]
+    ],
+    [
+      "{partner} thích lên kế hoạch trước bao lâu cho chuyến đi ngắn?",
+      [
+        "Vài tuần",
+        "Vài ngày",
+        "Tối hôm trước",
+        "Rảnh là đi nếu thuận tiện"
+      ]
+    ],
+    [
+      "Nếu chọn một món đồ dùng lâu dài, {owner} ưu tiên gì?",
+      [
+        "Bền",
+        "Dễ dùng",
+        "Gọn và tiện cất",
+        "Giá phù hợp"
+      ]
+    ],
+    [
+      "{partner} muốn duy trì thói quen nào nhất?",
+      [
+        "Ngủ đúng giờ hơn",
+        "Vận động đều hơn",
+        "Dành thời gian cho sở thích",
+        "Bớt nhìn màn hình"
+      ]
+    ],
+    [
+      "Nhà hoặc phòng của {owner} có chỗ trống, khả năng cao sẽ thêm gì?",
+      [
+        "Một chậu cây",
+        "Kệ để đồ",
+        "Góc ngồi thư giãn",
+        "Để trống cho thoáng"
+      ]
+    ],
+    [
+      "{partner} thích một ngày nghỉ có lịch trình thế nào?",
+      [
+        "Chốt các việc chính",
+        "Chỉ chốt một hoạt động",
+        "Tùy hứng trong ngày",
+        "Không lịch, xin phép được lười"
+      ]
+    ],
+    [
+      "Nếu học nấu ăn, {owner} muốn biết làm gì trước?",
+      [
+        "Món ăn hằng ngày",
+        "Món thích nhưng hay phải mua",
+        "Món nhanh dưới hai mươi phút",
+        "Món đem mời mọi người"
+      ]
+    ],
+    [
+      "Điều gì khiến {partner} muốn quay lại một nơi từng đến?",
+      [
+        "Đồ ăn ngon",
+        "Không khí dễ chịu",
+        "Có kỷ niệm vui",
+        "Đi lại thuận tiện"
+      ]
+    ],
+    [
+      "Khi đặt một mục tiêu mới, {owner} thường bắt đầu ra sao?",
+      [
+        "Chia thành bước nhỏ",
+        "Tìm người làm cùng",
+        "Tìm hiểu kỹ trước",
+        "Thử luôn một buổi"
+      ]
+    ],
+    [
+      "{partner} muốn dành thêm thời gian cho điều gì?",
+      [
+        "Nghỉ ngơi",
+        "Người thân quen",
+        "Một sở thích đang bỏ dở",
+        "Học điều có ích"
+      ]
+    ],
+    [
+      "Nếu có thêm một giờ rảnh mỗi ngày, {owner} sẽ dùng làm gì?",
+      [
+        "Ngủ thêm",
+        "Đi bộ hoặc tập nhẹ",
+        "Xem hoặc đọc thứ thích",
+        "Làm việc đang trì hoãn"
+      ]
+    ],
+    [
+      "{partner} thích chỗ ở có ưu điểm nào nhất?",
+      [
+        "Gần nơi cần đi",
+        "Yên tĩnh",
+        "Có nhiều ánh sáng",
+        "Gần hàng quán và tiện ích"
+      ]
+    ],
+    [
+      "Món nào {owner} dễ muốn nâng cấp khi có điều kiện?",
+      [
+        "Điện thoại hoặc máy tính",
+        "Giường và gối",
+        "Dụng cụ cho sở thích",
+        "Đồ phục vụ việc đi lại"
+      ]
+    ],
+    [
+      "{partner} thích cách theo dõi mục tiêu nào?",
+      [
+        "Đánh dấu mỗi ngày",
+        "Nhìn kết quả theo tuần",
+        "Nhờ một người nhắc nhẹ",
+        "Không ghi, thấy tiến bộ là được"
+      ]
+    ],
+    [
+      "Nếu tự thưởng sau một tháng cố gắng, {owner} sẽ chọn gì?",
+      [
+        "Một bữa ăn ngon",
+        "Mua món đã ngắm lâu",
+        "Một buổi không phải làm gì",
+        "Đi đâu đó đổi gió"
+      ]
+    ],
+    [
+      "Trong một kế hoạch đi chơi, {partner} muốn chốt điều gì trước?",
+      [
+        "Chi phí",
+        "Ngày giờ",
+        "Đi với ai",
+        "Đến đó có gì ăn"
+      ]
+    ],
+    [
+      "Nếu thiết kế một phòng khách trong mơ, {owner} muốn ưu tiên món đồ nào nhất?",
+      [
+        "Chiếc sofa êm ái cực rộng nằm xem phim",
+        "Dàn loa và TV màn hình lớn sắc nét",
+        "Giá sách lớn từ sàn tới trần",
+        "Cửa kính lớn nhìn ra ban công đầy cây xanh"
+      ]
+    ],
+    [
+      "{partner} thích phong cách thiết kế nội thất nào cho không gian sống?",
+      [
+        "Tối giản hiện đại ít đồ cho thoáng",
+        "Ấm cúng nhiều gỗ phong cách Nhật hoặc Bắc Âu",
+        "Cổ điển sang trọng tinh tế",
+        "Tự do, miễn là tiện dụng và thoải mái"
+      ]
+    ],
+    [
+      "{owner} muốn nuôi con vật gì nhất trong ngôi nhà tương lai?",
+      [
+        "Một chú chó trung thành lăng xăng",
+        "Một bạn mèo lười thích nằm cuộn tròn",
+        "Một bể cá cảnh ngắm cho thư giãn",
+        "Không nuôi gì cả, chăm mình còn chưa xong"
+      ]
+    ],
+    [
+      "Trong căn bếp tương lai, thiết bị nào {partner} muốn có nhất?",
+      [
+        "Máy rửa bát để giải phóng đôi bàn tay",
+        "Nồi chiên không dầu và lò nướng xịn",
+        "Máy pha cà phê tự động tại nhà",
+        "Tủ lạnh hai cánh siêu to chứa cả thế giới đồ ăn"
+      ]
+    ],
+    [
+      "{owner} thích ngôi nhà tương lai nằm ở khu vực nào?",
+      [
+        "Trung tâm thành phố nhộn nhịp, bước xuống là có đồ ăn",
+        "Khu đô thị ven đô yên tĩnh, nhiều cây xanh",
+        "Một căn nhà nhìn ra bờ biển thoáng đãng",
+        "Một ngôi nhà nhỏ trên đồi không khí mát lành"
+      ]
+    ],
+    [
+      "Nếu có một khu ban công rộng, {partner} sẽ biến nó thành gì?",
+      [
+        "Góc cà phê thư giãn ngắm phố",
+        "Vườn rau xanh và hoa lá mini",
+        "Nơi tập thể dục hoặc yoga đón nắng",
+        "Chỗ giặt phơi và để đồ tiện ích"
+      ]
+    ],
+    [
+      "{owner} muốn dành khoản ngân sách đầu tư lớn nhất cho căn phòng nào?",
+      [
+        "Phòng ngủ để có giấc ngủ trọn vẹn nhất",
+        "Phòng khách để tiếp đón bạn bè",
+        "Căn bếp để nấu những bữa ăn ngon",
+        "Phòng làm việc và giải trí cá nhân"
+      ]
+    ],
+    [
+      "{partner} nhìn nhận thế nào về việc phân chia việc nhà trong tương lai?",
+      [
+        "Chia đều theo danh sách rõ ràng, việc ai nấy làm",
+        "Ai rảnh hoặc thấy việc trước thì tự giác làm",
+        "Thuê dịch vụ hoặc dùng máy móc hỗ trợ tối đa",
+        "Một người nấu cơm thì người kia rửa bát"
+      ]
+    ],
+    [
+      "{owner} mơ ước một chuyến du lịch xa trong vài năm tới ở đâu?",
+      [
+        "Khám phá cảnh sắc tuyết trắng hoặc mùa thu châu Âu",
+        "Trải nghiệm ẩm thực và phố xá Nhật Bản hoặc Hàn Quốc",
+        "Một chuyến trekking khám phá thiên nhiên hoang dã",
+        "Nghỉ dưỡng tại resort biển sang trọng"
+      ]
+    ],
+    [
+      "{partner} muốn căn nhà tương lai sử dụng hệ thống nhà thông minh ở mức độ nào?",
+      [
+        "Tự động hóa toàn bộ bằng giọng nói và cảm biến",
+        "Chỉ cần khóa cửa vân tay và robot hút bụi",
+        "Thích công tắc cơ học truyền thống cho bền",
+        "Có cũng được, không có cũng chẳng sao"
+      ]
+    ],
+    [
+      "Khi nghĩ về việc mua sắm đồ nội thất lớn, {owner} ưu tiên điều gì nhất?",
+      [
+        "Độ bền dùng được lâu dài nhiều năm",
+        "Thẩm mỹ đẹp và hợp tông màu nhà",
+        "Tiện ích đa năng, gập mở tiết kiệm diện tích",
+        "Giá cả hợp lý vừa túi tiền"
+      ]
+    ],
+    [
+      "{partner} muốn dành buổi tối cuối tuần tại nhà để làm gì nhiều nhất?",
+      [
+        "Nấu một bữa ăn cầu kỳ rồi cùng nhau thưởng thức",
+        "Nằm dài cày một bộ phim dài tập",
+        "Mời bạn bè thân thiết về nhà tụ tập ăn uống",
+        "Mỗi người một góc làm việc riêng trong yên bình"
+      ]
+    ],
+    [
+      "{owner} mong muốn có một góc riêng trong nhà dành cho sở thích gì?",
+      [
+        "Góc chơi game hoặc xem phim màn hình lớn",
+        "Góc đọc sách và viết lách yên tĩnh",
+        "Góc tập gym hoặc thể thao nhỏ gọn",
+        "Góc chăm sóc cây cảnh và hoa lá"
+      ]
+    ],
+    [
+      "Nếu nhà có một phòng ngủ phụ còn trống, {partner} muốn tận dụng làm gì?",
+      [
+        "Phòng để quần áo và trang điểm riêng",
+        "Phòng ngủ dành riêng cho khách hoặc người thân ghé chơi",
+        "Phòng làm việc và đọc sách riêng biệt",
+        "Phòng chứa đồ đạc đa năng"
+      ]
+    ],
+    [
+      "{owner} nghĩ sao về việc tự tay sơn tường hoặc tự đóng đồ trang trí cho nhà?",
+      [
+        "Rất hào hứng muốn tự làm trải nghiệm",
+        "Mua sẵn hoặc thuê thợ cho chuẩn đẹp",
+        "Làm mấy đồ nhỏ nhỏ thì được, việc nặng xin kiếu",
+        "Chỉ nhận chân giám sát và cổ vũ tinh thần"
+      ]
+    ],
+    [
+      "{partner} thích mùi hương nào thoang thoảng trong không gian sống nhất?",
+      [
+        "Tinh dầu sả chanh hoặc bạc hà tươi mát",
+        "Mùi gỗ trầm ấm hoặc quế dịu nhẹ",
+        "Mùi hoa cỏ dịu ngọt tự nhiên",
+        "Không mùi gì cả, nhà cửa thông thoáng sạch sẽ là được"
+      ]
+    ],
+    [
+      "{owner} muốn quản lý chi tiêu tài chính chung trong tương lai theo cách nào?",
+      [
+        "Lập một quỹ chung cho các chi phí lớn, còn lại tự do",
+        "Công khai toàn bộ và cùng lên kế hoạch chi tiết",
+        "Phân chia người lo khoản này, người lo khoản kia",
+        "Cứ chi tiêu hợp lý, cuối tháng tổng kết một lần"
+      ]
+    ],
+    [
+      "Điều gì khiến {partner} cảm thấy một căn nhà thực sự trở thành tổ ấm?",
+      [
+        "Bếp luôn đỏ lửa và có đồ ăn nóng",
+        "Cảm giác bước chân vào cửa là rũ bỏ được hết mệt mỏi",
+        "Đầy ắp tiếng cười và những câu chuyện vụn vặt",
+        "Có đủ những món đồ thân thuộc gắn liền với kỷ niệm"
+      ]
+    ],
+    [
+      "{owner} muốn tổ chức một bữa tiệc tân gia theo phong cách nào?",
+      [
+        "Bữa tiệc ấm cúng chỉ có vài người bạn cực kỳ thân thiết",
+        "Mở tiệc nướng BBQ rôm rả ngoài trời",
+        "Đặt đồ ăn về nhà quây quần nhẹ nhàng",
+        "Rủ nhau đi ăn quán cho đỡ phải dọn dẹp bãi chiến trường"
+      ]
+    ],
+    [
+      "Trong 5 năm tới, mục tiêu nào {partner} muốn ưu tiên hoàn thành trước?",
+      [
+        "Ổn định công việc và tích lũy một khoản tài chính vững vàng",
+        "Đi du lịch đến ít nhất 3 vùng đất mới",
+        "Nâng cao sức khỏe và duy trì lối sống lành mạnh",
+        "Tự thưởng cho mình một tài sản giá trị lớn"
+      ]
+    ]
   ],
-
-  funny: [
-    {
-      text: 'Khi đi lạc đường trong lúc đang đi chơi, ai sẽ là người nhận lỗi trước?',
-      options: ['Người cầm lái nhận tội: "Anh/Em nhìn nhầm biển báo"', 'Người chỉ đường cãi cùn: "Tại Google Maps nó bảo thế!"', 'Cả hai cùng cười trừ rồi ghé vào quán nước gần đó', 'Đổ lỗi cho nhau hài hước rồi lại cùng vui vẻ']
-    },
-    {
-      text: 'Khi đối phương bảo "Ăn gì cũng được", bạn hiểu câu đó có nghĩa là gì?',
-      options: ['"Nghĩ ra món đúng ý tôi đi, đoán sai là biết tay!"', ['Ăn gì thật cũng được, miễn là được ăn cùng bạn'], ['"Tôi đang đói lả rồi, quyết nhanh giùm cái!"'], ['"Tôi muốn ăn món quen nhưng đợi bạn gợi ý"']]
-    },
-    {
-      text: 'Nếu bất ngờ trúng số độc đắc 10 tỷ, điều điên rồ đầu tiên hai bạn làm là gì?',
-      options: ['Nộp đơn xin nghỉ việc ngay trong ngày rồi đi du lịch vòng quanh thế giới', 'Mua ngay căn hộ trong mơ và sắm đồ đạc không nhìn giá', 'Gửi tiết kiệm 9 tỷ, 1 tỷ còn lại đi ăn sạch hàng quán yêu thích', 'Bao trọn một nhà hàng sang trọng chỉ để ăn món vỉa hè yêu thích']
-    },
-    {
-      text: 'Khi người ấy hát karaoke lệch tông một cách nhiệt tình, bạn sẽ làm gì?',
-      options: ['Hát bè lệch tông theo cho vui cả đôi', 'Quay lén video làm bằng chứng dìm hàng sau này', 'Vỗ tay nhiệt liệt như fan cuồng số một', 'Cười nghiêng ngả không kìm được']
-    },
-    {
-      text: 'Tình huống nào sau đây khiến cả hai xấu hổ nhất nhưng giờ nghĩ lại cười bò?',
-      options: ['Vẫy tay nhiệt tình chào nhầm người lạ trước mặt người ấy', 'Bị trượt chân ngã ngố tàu lúc đang cố tạo dáng ngầu', 'Bụng sôi ùng ục giữa khoảnh khắc lãng mạn tĩnh lặng', 'Quên mang ví lúc thanh toán bữa ăn hẹn hò']
-    },
-    {
-      text: 'Nếu bị biến thành một loài động vật trong 24 giờ, bạn nghĩ người ấy sẽ là con gì?',
-      options: ['Con mèo chảnh chọe lúc thích thì nũng nịu, lúc ghét thì cào', 'Chú cún ngơ ngác trung thành luôn vẫy đuôi chờ bạn', 'Chú gấu trúc tròn xoe chỉ thích ăn với ngủ', 'Chú sóc lăng xăng nghịch ngợm không chịu ngồi yên']
-    },
-    {
-      text: 'Ai là người dễ bị "dụ dỗ" mua đồ không cần thiết nhất khi đi mua sắm?',
-      options: ['Chính bạn - thấy đồ xinh là mủi lòng rút ví', 'Người ấy - hay bị nhân viên tư vấn thuyết phục', 'Cả hai người cùng đồng lòng mua đồ vô tri', 'Không ai cả, hai bạn đều là bậc thầy kiềm chế']
-    },
-    {
-      text: 'Khi chụp ảnh chung, điều gì thường xảy ra nhất?',
-      options: ['Chụp 100 tấm mới chọn được 1 tấm ưng ý', 'Một người luôn tạo dáng nghiêm túc, người kia làm mặt xấu', 'Cả hai cười phá lên không chụp tử tế được tấm nào', 'Chụp tấm nào đẹp ngay tấm đó vì quá đẹp đôi']
-    },
-    {
-      text: 'Nếu người ấy lỡ làm cháy nồi đồ ăn khi cố gắng nấu cho bạn, bạn sẽ?',
-      options: ['Ăn hết phần chưa cháy và khen lấy khen để nỗ lực', 'Chụp ảnh lại trêu chọc rồi đặt đồ ăn ngoài về ăn chung', 'Lao vào dọn dẹp và cùng nấu lại món mới', 'Cười ôm người ấy vỗ về: "Lần sau để anh/em nấu!"']
-    },
-    {
-      text: 'Ai là người hay ngủ ngáy hoặc nói mớ hài hước hơn?',
-      options: ['Bạn - thỉnh thoảng có những câu nói mớ không ai hiểu nổi', 'Người ấy - ngáy ro ro như máy bay phản lực', 'Cả hai cùng nhau hòa tấu bản giao hưởng đêm khuya', 'Cả hai đều ngủ ngoan như thiên thần']
-    },
-    {
-      text: 'Khi đối phương diện một bộ đồ hơi "kỳ cục", bạn sẽ phản ứng thế nào?',
-      options: ['Góp ý thẳng thắn nhưng khéo léo để người ấy đổi đồ', 'Khen hài hước: "Trông độc lạ đấy, rất phong cách!"', 'Nhịn cười và âm thầm nhìn ngắm sự đáng yêu đó', 'Mặc đồ cùng phong cách kỳ lạ cho đồng bộ']
-    },
-    {
-      text: 'Trận chiến tranh giành đồ ăn cuối cùng trên đĩa thường kết thúc ra sao?',
-      options: ['Một người nhanh tay gắp bỏ vào miệng người kia', 'Chia đôi miếng ăn một cách công bằng tuyệt đối', 'Một người giả vờ nhường nhưng ánh mắt đầy luyến tiếc', 'Dùng trò oẳn tù tì để phân định thắng thua']
-    }
+  "funny": [
+    [
+      "Biết mình sẽ trễ hẹn mười lăm phút, {owner} thường làm gì?",
+      [
+        "Báo ngay giờ đến mới",
+        "Gọi xin lỗi rồi đi tiếp",
+        "Nhờ người kia gọi món trước",
+        "Nhắn đang tới với tốc độ rất hối lỗi"
+      ]
+    ],
+    [
+      "Gọi nhầm món nhưng món đã lên, {partner} dễ xử lý thế nào?",
+      [
+        "Thử ăn nếu phù hợp",
+        "Hỏi quán có đổi được không",
+        "Đổi với người đồng ý",
+        "Gọi thêm món khác"
+      ]
+    ],
+    [
+      "Đi nhầm đường, {owner} sẽ làm gì trước?",
+      [
+        "Dừng xem bản đồ",
+        "Hỏi người gần đó",
+        "Quay lại chỗ vừa rẽ",
+        "Coi như được tham quan thêm một đoạn"
+      ]
+    ],
+    [
+      "Gửi nhầm ảnh vào cuộc trò chuyện, {partner} phản ứng thế nào?",
+      [
+        "Thu hồi rồi giải thích",
+        "Nhắn xin lỗi ngay",
+        "Kiểm tra xem ai đã đọc",
+        "Đứng hình vài giây rồi mới xử lý"
+      ]
+    ],
+    [
+      "Chụp ảnh chung có người nhắm mắt, {owner} dễ chọn gì?",
+      [
+        "Chụp lại",
+        "Chọn tấm khác",
+        "Giữ làm ảnh hậu trường",
+        "Hỏi mọi người có thấy ổn không"
+      ]
+    ],
+    [
+      "Đang ra ngoài thì trời đổ mưa, {partner} thường làm gì?",
+      [
+        "Tìm chỗ trú gần nhất",
+        "Lấy áo mưa hoặc ô",
+        "Đợi bớt mưa rồi đi",
+        "Tìm quán nước tiện thể ngồi nghỉ"
+      ]
+    ],
+    [
+      "Thấy người giống người quen từ xa, {owner} sẽ làm gì?",
+      [
+        "Nhìn kỹ rồi mới chào",
+        "Gọi tên thử",
+        "Nhắn hỏi đang ở đâu",
+        "Đi ngang để kiểm tra cho chắc"
+      ]
+    ],
+    [
+      "Quên tên người vừa được giới thiệu, {partner} sẽ làm gì?",
+      [
+        "Hỏi lại ngay",
+        "Nhờ người khác nhắc nhỏ",
+        "Chờ nghe ai đó gọi tên",
+        "Nói chuyện tiếp rồi hỏi tên lần nữa"
+      ]
+    ],
+    [
+      "Quán quen hết đúng món định gọi, {owner} sẽ chọn gì?",
+      [
+        "Món gần giống nhất",
+        "Nhờ quán gợi ý",
+        "Đổi sang quán khác",
+        "Đọc lại menu như lần đầu gặp mặt"
+      ]
+    ],
+    [
+      "Một bài nhạc rất quen vang lên, {partner} thường thế nào?",
+      [
+        "Hát theo nhỏ nhỏ",
+        "Gõ nhịp",
+        "Tìm tên bài để lưu",
+        "Tự tin hát, lời tính sau"
+      ]
+    ],
+    [
+      "Lỡ làm đổ nước trên bàn, {owner} làm gì đầu tiên?",
+      [
+        "Lấy khăn lau",
+        "Cứu điện thoại và đồ giấy",
+        "Báo người phục vụ",
+        "Xin lỗi rồi nhờ cùng dọn"
+      ]
+    ],
+    [
+      "Đặt đồ ăn thiếu một món, {partner} thường làm gì?",
+      [
+        "Liên hệ quán",
+        "Kiểm tra lại đơn",
+        "Ăn món có trước rồi xử lý",
+        "Tìm món khác bù vào"
+      ]
+    ],
+    [
+      "Còn miếng cuối trên đĩa chung, {owner} thường làm gì?",
+      [
+        "Hỏi có ai muốn ăn không",
+        "Chia nhỏ ra",
+        "Để người khác lấy",
+        "Nhận nhiệm vụ dọn đĩa nếu ai cũng nhường"
+      ]
+    ],
+    [
+      "Mở camera trước bất ngờ, {partner} dễ phản ứng thế nào?",
+      [
+        "Chỉnh lại tóc",
+        "Đổi góc máy",
+        "Tắt camera rồi mở lại",
+        "Cười vì mặt mình chưa kịp chuẩn bị"
+      ]
+    ],
+    [
+      "Thấy món hàng giảm giá rất mạnh, {owner} làm gì trước?",
+      [
+        "Kiểm tra giá gốc",
+        "Đọc đánh giá",
+        "Xem mình có cần không",
+        "Cho vào giỏ để suy nghĩ tiếp"
+      ]
+    ],
+    [
+      "Xem phim có đoạn đáng sợ, {partner} thường làm gì?",
+      [
+        "Xem tiếp bình thường",
+        "Che mắt một chút",
+        "Giảm tiếng",
+        "Nhìn qua kẽ tay, vẫn đòi biết chuyện"
+      ]
+    ],
+    [
+      "Tìm điện thoại mãi không thấy, {owner} làm gì trước?",
+      [
+        "Nhờ gọi vào máy",
+        "Tìm nơi vừa ngồi",
+        "Kiểm tra túi áo và túi xách",
+        "Đi lại hành trình vừa xong"
+      ]
+    ],
+    [
+      "Đang kể chuyện thì quên ý chính, {partner} sẽ làm gì?",
+      [
+        "Nhờ nhắc đoạn vừa kể",
+        "Dừng nghĩ một chút",
+        "Chuyển chuyện rồi nhớ lại sau",
+        "Tuyên bố để phần hấp dẫn sang tập sau"
+      ]
+    ],
+    [
+      "Nhận cuộc gọi lúc đang ăn, {owner} thường làm gì?",
+      [
+        "Nuốt xong mới nghe",
+        "Nhắn lát gọi lại",
+        "Nghe nếu là chuyện gấp",
+        "Để hết bữa rồi gọi lại"
+      ]
+    ],
+    [
+      "Mua đồ cần tự lắp, {partner} bắt đầu thế nào?",
+      [
+        "Đọc hướng dẫn",
+        "Bày đủ bộ phận ra",
+        "Xem video cách lắp",
+        "Lắp thử rồi quay về đọc hướng dẫn"
+      ]
+    ],
+    [
+      "Đang đi giữa đường đông đúc thì dép bị đứt quai, {owner} sẽ làm gì?",
+      [
+        "Nhảy lò cò vào lề đường tìm chỗ mua dép mới",
+        "Đi chân đất luôn coi như đang tiếp đất tự nhiên",
+        "Tìm sợi thun hoặc dây buộc tạm rồi đi tiếp",
+        "Đứng yên tại chỗ gọi cứu viện gấp"
+      ]
+    ],
+    [
+      "Vào nhà hàng sang trọng nhưng đọc menu không hiểu món nào, {partner} sẽ làm gì?",
+      [
+        "Chỉ vào món có hình ảnh nhìn ngon mắt nhất",
+        "Nhờ bạn nhân viên gợi ý món dễ ăn nhất quán",
+        "Chọn món có mức giá tầm trung cho an toàn",
+        "Giả vờ xem menu rồi bảo người đi cùng gọi hộ"
+      ]
+    ],
+    [
+      "Đang trong cuộc họp nghiêm túc mà bụng reo to tướng một tiếng, {owner} sẽ phản ứng thế nào?",
+      [
+        "Giả vờ ho thật to để át đi tiếng động",
+        "Tỏ vẻ mặt bình thản như thể âm thanh từ người bên cạnh",
+        "Cười xòa nhận luôn bụng đòi ăn trưa rồi",
+        "Cúi gằm mặt xuống sổ ghi chép lia lịa"
+      ]
+    ],
+    [
+      "Vô tình vẫy tay chào nhiệt tình nhưng nhận ra mình nhận nhầm người, {partner} xử lý sao?",
+      [
+        "Tiện tay vuốt tóc hoặc gãi đầu giả vờ không có gì",
+        "Vẫy tiếp về phía sau coi như đang vẫy người khác",
+        "Cười ngượng rồi bước thật nhanh đi chỗ khác",
+        "Đứng hình tại chỗ ước có lỗ nẻ để chui xuống"
+      ]
+    ],
+    [
+      "Được tặng một món quà độc lạ nhưng không hợp gu, {owner} sẽ phản ứng thế nào trước mặt người tặng?",
+      [
+        "Khen nức nở tỏ vẻ thích thú để người tặng vui",
+        "Cảm ơn lịch sự rồi cất kín vào góc tủ",
+        "Cười gượng hỏi sao lại nghĩ ra món độc lạ này",
+        "Thật thà bảo lần sau hỏi gu mình trước nhé"
+      ]
+    ],
+    [
+      "Đi mua sắm mà tiền trong tài khoản thiếu đúng vài nghìn đồng, {partner} sẽ làm gì ở quầy thu ngân?",
+      [
+        "Lục tung các túi tìm vài đồng tiền lẻ",
+        "Bỏ lại món đồ rẻ nhất vừa chọn",
+        "Mở app ngân hàng khác chuyển tiền gấp",
+        "Nhìn người đi cùng với ánh mắt cầu cứu tha thiết"
+      ]
+    ],
+    [
+      "Đang đi bộ mà bị vấp chân suýt ngã giữa phố, {owner} sẽ phản ứng thế nào?",
+      [
+        "Lập tức chạy nhanh vài bước giả vờ đang tập chạy bộ",
+        "Quay lại nhìn mặt đường xem có viên đá nào làm chứng không",
+        "Tự bật cười một mình rồi đi tiếp",
+        "Ngó quanh xem có ai vừa nhìn thấy không"
+      ]
+    ],
+    [
+      "Nhắn tin than thở về ai đó nhưng gửi nhầm thẳng vào người đó, {partner} xử lý sao?",
+      [
+        "Thu hồi trong vòng 1 giây với tốc độ ánh sáng",
+        "Nhắn thêm vài câu bẻ lái sang chủ đề khác",
+        "Tắt nguồn điện thoại coi như vừa biến mất khỏi trái đất",
+        "Thú nhận thẳng thắn và gửi lời xin lỗi chân thành"
+      ]
+    ],
+    [
+      "Cố gắng mở nắp một lọ mứt đóng chặt nhưng không được, {owner} sẽ làm gì?",
+      [
+        "Dùng khăn lót, gõ nắp xuống bàn, áp dụng đủ mẹo vật lý",
+        "Dùng hết sức bình sinh nghiến răng vặn tiếp",
+        "Đưa cho người bên cạnh bảo mở hộ xem nào",
+        "Bỏ cuộc, chuyển sang ăn món khác"
+      ]
+    ],
+    [
+      "Vô tình gặp người quen cũ khi đang mặc bộ đồ luộm thuộm nhất, {partner} sẽ làm gì?",
+      [
+        "Đeo khẩu trang, đội mũ kéo sụp xuống giả vờ không thấy",
+        "Rẽ vội vào một con hẻm hoặc cửa hàng gần nhất",
+        "Ngẩng cao đầu tự tin lướt qua như người xa lạ",
+        "Cười chào một câu thật ngầu rồi đi tiếp"
+      ]
+    ],
+    [
+      "Đang hát say sưa trong phòng tắm thì phát hiện cửa phòng không đóng, {owner} sẽ làm gì?",
+      [
+        "Hát to hơn nữa để thị uy giọng hát",
+        "Lập tức im bặt, ngượng ngùng bước ra khép cửa",
+        "Hỏi vọng ra hát thế có hay bằng ca sĩ không",
+        "Coi như không có chuyện gì xảy ra, hát nốt điệp khúc"
+      ]
+    ],
+    [
+      "Đi ra ngoài mà phát hiện mình mặc áo trái hoặc quên kéo khóa quần, {partner} xử lý ra sao?",
+      [
+        "Lẻn vào nhà vệ sinh chỉnh lại ngay lập tức",
+        "Bình tĩnh khoác thêm áo khoác che lại",
+        "Cầu nguyện nãy giờ không ai để ý",
+        "Tự giác kể cho bạn thân nghe để cùng cười"
+      ]
+    ],
+    [
+      "Bị một con gián bay bất ngờ xông thẳng vào phòng, {owner} sẽ phản ứng thế nào?",
+      [
+        "Hét toáng lên nhảy tót lên ghế hoặc giường",
+        "Cầm chổi hoặc dép truy đuổi diệt tận gốc",
+        "Chạy ra khỏi phòng đóng chặt cửa cầu cứu",
+        "Bình tĩnh thương lượng yêu cầu gián tự bay ra"
+      ]
+    ],
+    [
+      "Đi thử đồ trong shop mà cái áo bị kẹt vào đầu không chui ra được, {partner} sẽ làm gì?",
+      [
+        "Loay hoay tìm cách vùng vẫy trong hoảng loạn",
+        "Đứng thở dốc vài giây bình tĩnh gỡ từng chút",
+        "Gọi nhỏ nhân viên vào phòng thay đồ giải cứu",
+        "Tự hỏi sao cái đầu mình hôm nay to thế"
+      ]
+    ],
+    [
+      "Uống một ngụm canh hoặc trà nóng bị bỏng lưỡi, {owner} sẽ phản ứng thế nào?",
+      [
+        "Thổi phù phù liên tục làm mát miệng",
+        "Vội vàng với ngay cốc nước đá tu ừng ực",
+        "Cố nuốt luôn với vẻ mặt nhăn nhó",
+        "Há miệng phì phò than thở với người đối diện"
+      ]
+    ],
+    [
+      "Đang giả vờ ngủ để trốn làm việc nhà mà có người gọi đúng tên, {partner} sẽ làm gì?",
+      [
+        "Vẫn nhắm tịt mắt, giả vờ ngáy khò khò",
+        "Từ từ mở mắt hỏi ủa ai gọi gì thế",
+        "Tự giác dậy luôn vì biết đã bị phát hiện",
+        "Lăn sang góc khác trùm chăn kín đầu"
+      ]
+    ],
+    [
+      "Thử một trend nhảy trên mạng nhưng kết quả nhìn vụng về kỳ cục, {owner} sẽ làm gì?",
+      [
+        "Xóa ngay lập tức không để lại dấu vết",
+        "Lưu vào mục riêng tư chỉ mình xem để giải trí",
+        "Đăng luôn làm nội dung hài tự dìm bản thân",
+        "Gửi riêng cho đứa bạn thân nhất để cùng cười bò"
+      ]
+    ],
+    [
+      "Vào thang máy đông người mà điện thoại bỗng phát âm thanh lạ, {partner} sẽ làm gì?",
+      [
+        "Vội vàng ấn nút tắt âm thanh với vẻ mặt vô tội",
+        "Nhìn ngó xung quanh như thể chuông của người khác",
+        "Cười trừ bảo âm báo thức của em hơi vui nhộn",
+        "Giả vờ đang có cuộc gọi quan trọng áp máy vào tai"
+      ]
+    ],
+    [
+      "Ăn món nhiều mùi xong phát hiện quên đem theo kẹo thơm miệng, {owner} sẽ làm gì?",
+      [
+        "Tìm ngay quán nước gọi trà đá súc miệng cấp tốc",
+        "Hạn chế nói chuyện, thở nhẹ nhàng hết mức",
+        "Rủ người đối diện ăn cùng cho thơm đều",
+        "Ghé cửa hàng tiện lợi gần nhất mua kẹo"
+      ]
+    ],
+    [
+      "Bị người khác chụp lén lúc đang ngáp ngủ hoặc ăn uống nhồm nhoàm, {partner} sẽ phản ứng thế nào?",
+      [
+        "Đòi giật điện thoại xóa ngay lập tức",
+        "Yêu cầu gửi ảnh qua để làm ảnh dìm hàng",
+        "Canh lúc đối phương sơ hở chụp lại trả thù",
+        "Cười chịu thua vì khoảnh khắc quá khó đỡ"
+      ]
+    ]
   ],
-
-  deep_soul: [
-    {
-      text: 'Khi bạn rơi vào bế tắc và mệt mỏi nhất, điều gì từ người ấy giúp bạn hồi phục?',
-      options: ['Một cái ôm im lặng không cần hỏi han nhiều', 'Sự kiên nhẫn lắng nghe toàn bộ tâm sự của bạn', 'Lời khẳng định: "Dù thế nào anh/em vẫn luôn ở đây"', 'Cùng bạn đi dạo và giúp bạn tạm quên áp lực']
-    },
-    {
-      text: 'Ngôn ngữ tình yêu chính của bạn (điều khiến bạn cảm thấy được yêu nhất)?',
-      options: ['Lời khen ngợi và động viên chân thành (Words of Affirmation)', 'Thời gian chất lượng bên nhau không phân tâm (Quality Time)', 'Những món quà bất ngờ mang nhiều tâm huyết (Receiving Gifts)', 'Sự chăm sóc chu đáo trong từng việc nhỏ (Acts of Service)']
-    },
-    {
-      text: 'Nỗi sợ lớn nhất của bạn trong mối quan hệ tình cảm là gì?',
-      options: ['Sự im lặng và xa cách dần theo thời gian', 'Làm tổn thương người mình yêu thương nhất', 'Không đủ tốt để đem lại hạnh phúc cho người kia', 'Mất đi sự thấu hiểu và kết nối tâm hồn']
-    },
-    {
-      text: 'Điều gì ở người ấy khiến bạn cảm thấy mình được chấp nhận trọn vẹn?',
-      options: ['Bạn có thể bộc lộ điểm yếu mà không sợ bị phán xét', 'Người ấy yêu cả những thói quen kỳ quặc của bạn', 'Người ấy kiên nhẫn khi bạn đang có tâm trạng tồi tệ', 'Bạn được là chính mình chân thật nhất khi ở cạnh']
-    },
-    {
-      text: 'Khi hai bạn có bất đồng sâu sắc, cách bạn thường xử lý cảm xúc là gì?',
-      options: ['Cần một khoảng lặng một mình để bình tĩnh suy nghĩ', 'Muốn nói chuyện thẳng thắn rõ ràng ngay lập tức', 'Cần được ôm hoặc nắm tay trước khi nói chuyện', 'Viết ra những suy nghĩ của mình để người kia đọc']
-    },
-    {
-      text: 'Khoảnh khắc nào bạn cảm nhận tình yêu của hai bạn đã trưởng thành hơn?',
-      options: ['Khi cả hai cùng vượt qua một biến cố khó khăn', 'Khi biết đặt mình vào vị trí của người kia để thấu hiểu', 'Khi học được cách nhường nhịn cái tôi vì nhau', 'Khi cùng nhau lập kế hoạch nghiêm túc cho tương lai']
-    },
-    {
-      text: 'Điều gì bạn thầm biết ơn người ấy nhất kể từ ngày yêu nhau?',
-      options: ['Giúp bạn trở thành một phiên bản tốt đẹp và tích cực hơn', 'Luôn tin tưởng vào ước mơ và năng lực của bạn', 'Đem lại cho bạn cảm giác an toàn mà trước đây chưa từng có', 'Dạy cho bạn cách yêu thương và trân trọng bản thân']
-    },
-    {
-      text: 'Nếu chỉ được nói một câu nhắn nhủ với đối phương ở thì tương lai 20 năm sau, bạn sẽ nói gì?',
-      options: ['"Cảm ơn vì đã cùng anh/em đi qua ngần ấy năm tháng"', '"Tình yêu của anh/em dành cho em/anh vẫn vẹn nguyên như ngày đầu"', '"Chúng ta đã làm rất tốt, phải không em/anh?"', '"Nụ cười của em/anh vẫn là điều đẹp nhất đời anh/em"']
-    },
-    {
-      text: 'Điều gì khiến bạn tin rằng hai bạn là định mệnh của nhau?',
-      options: ['Sự đồng điệu kỳ lạ trong những suy nghĩ không lời', 'Những trùng hợp bất ngờ từ trước khi quen biết', 'Cảm giác thân quen như đã biết nhau từ kiếp trước', 'Sự bình yên sâu lắng mỗi khi ở cạnh nhau']
-    },
-    {
-      text: 'Khi bạn thấy người ấy khóc, cảm xúc trong lòng bạn lúc đó là gì?',
-      options: ['Xót xa tột cùng và chỉ muốn chịu đựng thay người ấy', 'Tự trách mình vì chưa bảo vệ người ấy tốt hơn', 'Muốn ôm chặt và lau khô từng giọt nước mắt', 'Lắng nghe trong im lặng để người ấy trút hết muộn phiền']
-    },
-    {
-      text: 'Nét tính cách nào của người ấy bù đắp hoàn hảo nhất cho khuyết điểm của bạn?',
-      options: ['Sự điềm tĩnh của người ấy cân bằng sự nóng nảy của bạn', 'Sự lạc quan của người ấy xua tan âu lo của bạn', 'Sự quyết đoán của người ấy giúp bạn bớt do dự', 'Sự ấm áp dịu dàng của người ấy làm mềm sự bướng bỉnh']
-    },
-    {
-      text: 'Đối với bạn, định nghĩa về một "tình yêu bền vững" là gì?',
-      options: ['Là cùng nhau vượt qua giông bão mà không buông tay', 'Là sự tha thứ, bao dung và chấp nhận khuyết điểm của nhau', 'Là mỗi ngày đều chọn yêu đối phương một lần nữa', 'Là giữ được sự tôn trọng và tiếng cười qua năm tháng']
-    }
+  "deep_soul": [
+    [
+      "Sau một ngày mệt, {owner} muốn điều gì trước tiên?",
+      [
+        "Yên tĩnh một lúc",
+        "Có người nghe kể",
+        "Ăn uống và nghỉ ngơi",
+        "Làm gì đó để đổi tâm trạng"
+      ]
+    ],
+    [
+      "Khi kể chuyện bực mình, {partner} thường mong nhận được gì?",
+      [
+        "Được nghe cho hết",
+        "Một lời khuyên cụ thể",
+        "Một câu đồng cảm",
+        "Một câu đùa đúng lúc"
+      ]
+    ],
+    [
+      "Muốn góp ý cho {owner}, cách nào dễ được đón nhận nhất?",
+      [
+        "Nói riêng và thẳng ý",
+        "Đưa ví dụ cụ thể",
+        "Hỏi lúc nào tiện nghe",
+        "Nhắn trước để có thời gian nghĩ"
+      ]
+    ],
+    [
+      "Khi chưa trả lời tin nhắn, {partner} muốn người khác hiểu thế nào?",
+      [
+        "Có thể đang bận",
+        "Đang cần nghĩ cách trả lời",
+        "Chưa tiện mở máy",
+        "Có việc gấp thì cứ gọi"
+      ]
+    ],
+    [
+      "{owner} cảm thấy được quan tâm nhất khi ai đó làm gì?",
+      [
+        "Nhớ điều từng kể",
+        "Hỏi trước khi giúp",
+        "Chủ động đỡ một việc",
+        "Dành thời gian lắng nghe"
+      ]
+    ],
+    [
+      "Khi hai người hiểu lầm nhau, {partner} thích bắt đầu bằng cách nào?",
+      [
+        "Nói rõ chuyện đã xảy ra",
+        "Nghe hết ý của nhau",
+        "Nghỉ một chút rồi nói",
+        "Nhắn một câu để mở lời"
+      ]
+    ],
+    [
+      "Một việc đang quá tải, {owner} dễ cần hỗ trợ gì nhất?",
+      [
+        "Chia bớt một phần việc",
+        "Giúp sắp thứ tự ưu tiên",
+        "Cho khoảng yên để làm",
+        "Có người cùng ngồi xử lý"
+      ]
+    ],
+    [
+      "Lúc buồn mà chưa muốn kể, {partner} thích được đối xử thế nào?",
+      [
+        "Cho thời gian riêng",
+        "Ngồi cùng nhưng không hỏi dồn",
+        "Rủ làm việc nhẹ nhàng",
+        "Nhắn sẵn sàng nghe khi muốn nói"
+      ]
+    ],
+    [
+      "{owner} thường nhận ra mình cần nghỉ nhờ dấu hiệu nào?",
+      [
+        "Khó tập trung",
+        "Dễ cáu vì việc nhỏ",
+        "Thấy buồn ngủ",
+        "Không còn hứng làm việc thường thích"
+      ]
+    ],
+    [
+      "Lời xin lỗi nào có ý nghĩa nhất với {partner}?",
+      [
+        "Nói rõ đã sai ở đâu",
+        "Nghe cảm xúc của người kia",
+        "Sửa việc có thể sửa",
+        "Lần sau làm khác đi"
+      ]
+    ],
+    [
+      "Khi quyết định việc khó, {owner} thường cần gì?",
+      [
+        "Thời gian tự nghĩ",
+        "Người nghe để cùng gỡ",
+        "Thông tin rõ hơn",
+        "Thử một bước nhỏ trước"
+      ]
+    ],
+    [
+      "{partner} thích được động viên theo cách nào?",
+      [
+        "Nhắc điều đã làm tốt",
+        "Giúp một việc cụ thể",
+        "Tin tưởng cho tự làm",
+        "Rủ nghỉ một chút rồi tiếp tục"
+      ]
+    ],
+    [
+      "Khi muốn từ chối một lời rủ, {owner} thường nói thế nào?",
+      [
+        "Nói thẳng là không tiện",
+        "Giải thích ngắn lý do",
+        "Đề xuất một dịp khác",
+        "Cần nghĩ một lúc mới trả lời"
+      ]
+    ],
+    [
+      "Để thấy thoải mái trong nhóm mới, {partner} cần gì nhất?",
+      [
+        "Được giới thiệu với mọi người",
+        "Có chủ đề dễ tham gia",
+        "Không bị ép phải nói nhiều",
+        "Có một người quen đi cùng"
+      ]
+    ],
+    [
+      "Sau khi làm xong một việc khó, {owner} muốn gì nhất?",
+      [
+        "Được nghỉ",
+        "Có người ghi nhận",
+        "Kể lại quá trình",
+        "Chuyển sang việc nhẹ hơn"
+      ]
+    ],
+    [
+      "Điều nhỏ nào dễ khiến {partner} mất hứng nhất?",
+      [
+        "Bị ngắt lời liên tục",
+        "Bị đổi hẹn không báo",
+        "Bị trêu đúng điều không thích",
+        "Bị giục khi đang cố làm"
+      ]
+    ],
+    [
+      "Khi {owner} nói cần ở một mình, điều đó thường để làm gì?",
+      [
+        "Nghỉ lấy lại sức",
+        "Sắp xếp suy nghĩ",
+        "Tập trung xong một việc",
+        "Làm sở thích riêng"
+      ]
+    ],
+    [
+      "{partner} thích được hỏi thăm với tần suất nào?",
+      [
+        "Một chút mỗi ngày",
+        "Vài lần mỗi tuần",
+        "Khi có chuyện muốn chia sẻ",
+        "Tùy giai đoạn bận hay rảnh"
+      ]
+    ],
+    [
+      "Nếu cần nhờ giúp, {owner} dễ mở lời bằng cách nào?",
+      [
+        "Nói thẳng việc đang cần",
+        "Hỏi có rảnh không trước",
+        "Tự thử rồi mới nhờ",
+        "Viết tin nhắn rõ từng ý"
+      ]
+    ],
+    [
+      "Khi ý kiến khác nhau, {partner} ưu tiên điều gì?",
+      [
+        "Hiểu vì sao khác nhau",
+        "Tìm phương án cả hai chấp nhận",
+        "Thử từng cách nếu được",
+        "Tạm dừng nếu đang quá căng"
+      ]
+    ],
+    [
+      "Khi {owner} cảm thấy mất phương hướng trong công việc, điều gì giúp lấy lại động lực nhất?",
+      [
+        "Một lời nhắc nhở về những thành tựu mình từng làm được",
+        "Một buổi nói chuyện chân tình không phán xét",
+        "Tạm gác lại mọi thứ nghỉ ngơi một vài ngày",
+        "Lập lại kế hoạch từng bước cụ thể để giải quyết"
+      ]
+    ],
+    [
+      "{partner} thường bộc lộ sự quan tâm bằng hành động thầm lặng nào?",
+      [
+        "Chuẩn bị sẵn những món người kia cần trước khi kịp hỏi",
+        "Lặng lẽ dọn dẹp hoặc làm đỡ việc đang dang dở",
+        "Chú ý đến những thay đổi nhỏ trong nét mặt hoặc giọng nói",
+        "Nhắc nhở nhẹ nhàng về ăn uống, nghỉ ngơi"
+      ]
+    ],
+    [
+      "Điều gì dễ khiến {owner} cảm thấy tổn thương trong một cuộc tranh luận?",
+      [
+        "Bị đối phương lặp lại những lỗi lầm cũ trong quá khứ",
+        "Thái độ thờ ơ, im lặng né tránh vấn đề",
+        "Bị ngắt lời và phủ nhận cảm xúc của mình",
+        "Những lời nói nặng nề lúc mất bình tĩnh"
+      ]
+    ],
+    [
+      "Khi {partner} im lặng không muốn nói chuyện, lý do lớn nhất thường là gì?",
+      [
+        "Cần thời gian riêng để tự xử lý cảm xúc tiêu cực",
+        "Đang sợ nói ra lúc nóng giận sẽ làm tổn thương người khác",
+        "Quá mệt mỏi không còn đủ năng lượng để giải thích",
+        "Đang chờ đối phương nhận ra và chủ động hỏi han"
+      ]
+    ],
+    [
+      "{owner} cảm thấy an tâm nhất khi người đồng hành có phẩm chất nào?",
+      [
+        "Trung thực và luôn rõ ràng trong mọi chuyện",
+        "Điềm tĩnh, biết lắng nghe lúc khó khăn",
+        "Có trách nhiệm và giữ đúng lời hứa",
+        "Tốt bụng và luôn tôn trọng không gian riêng của nhau"
+      ]
+    ],
+    [
+      "Cách tốt nhất để {partner} cảm nhận được tình cảm chân thành là gì?",
+      [
+        "Những hành động chăm sóc nhỏ hằng ngày",
+        "Lời nói ngọt ngào và những cái ôm ấm áp",
+        "Sự ưu tiên về thời gian dành cho nhau",
+        "Cùng nhau đồng hành vượt qua những giai đoạn gian nan"
+      ]
+    ],
+    [
+      "Khi {owner} gặp áp lực về tài chính hoặc công việc, họ muốn người kia đối xử ra sao?",
+      [
+        "Động viên tinh thần và tin tưởng vào khả năng của mình",
+        "Cùng ngồi tính toán và tìm giải pháp thực tế",
+        "Chia sẻ bớt những chi tiêu hằng ngày một cách tế nhị",
+        "Không tạo thêm áp lực hay so sánh với người khác"
+      ]
+    ],
+    [
+      "{partner} thường tha thứ cho một lỗi lầm khi đối phương làm điều gì?",
+      [
+        "Chân thành nhận lỗi và không tái phạm lần sau",
+        "Cho thấy sự thay đổi tích cực qua hành động cụ thể",
+        "Biết lắng nghe cảm xúc tổn thương của mình",
+        "Một lời xin lỗi ấm áp kèm cái ôm giảng hòa"
+      ]
+    ],
+    [
+      "Điều gì khiến {owner} cảm thấy tự hào nhất về bản thân trong những năm gần đây?",
+      [
+        "Đã kiên cường vượt qua những giai đoạn chông chênh",
+        "Học được cách tự chăm sóc và yêu thương chính mình",
+        "Đạt được những cột mốc mục tiêu đã đặt ra",
+        "Luôn giữ được sự chân thành với những người mình yêu quý"
+      ]
+    ],
+    [
+      "Khi {partner} phải đưa ra một quyết định lớn thay đổi cuộc sống, họ dựa vào đâu nhiều nhất?",
+      [
+        "Lý trí và phân tích các mặt lợi hại cẩn thận",
+        "Trực giác và cảm xúc mách bảo",
+        "Lời khuyên từ những người thân tín nhất",
+        "Cân nhắc xem quyết định đó có mang lại bình an lâu dài không"
+      ]
+    ],
+    [
+      "{owner} thường làm gì để tự chữa lành cảm xúc sau một tuần căng thẳng?",
+      [
+        "Ngủ một giấc thật sâu không đặt báo thức",
+        "Ăn những món ngon mình thích và xem phim",
+        "Dành thời gian một mình viết nhật ký hoặc nghe nhạc",
+        "Đi dạo ngoài trời hít thở không khí tự nhiên"
+      ]
+    ],
+    [
+      "{partner} trân trọng điều gì nhất ở một người bạn hoặc người đồng hành lâu năm?",
+      [
+        "Dù có chuyện gì xảy ra vẫn luôn đứng về phía mình",
+        "Hiểu được cả những điều mình chưa kịp nói ra",
+        "Chấp nhận và yêu quý cả những khuyết điểm của nhau",
+        "Cùng nhau cười nhiều hơn là cùng nhau thở dài"
+      ]
+    ],
+    [
+      "Khi {owner} muốn từ bỏ một mục tiêu vì quá mệt, họ mong nhận được lời khuyên nào?",
+      [
+        "Mệt thì nghỉ một chút rồi tính tiếp, đừng vội bỏ",
+        "Nếu đã cố hết sức thì dừng lại cũng không sao cả",
+        "Hãy nhớ lại lý do vì sao ngày trước bắt đầu",
+        "Cứ làm điều khiến bạn thấy thoải mái nhất"
+      ]
+    ],
+    [
+      "{partner} đối diện với nỗi sợ hãi hoặc bất an bằng cách nào?",
+      [
+        "Tìm hiểu thật kỹ về nỗi sợ đó để kiểm soát nó",
+        "Tâm sự với người mình tin tưởng nhất để giải tỏa",
+        "Tập trung vào những việc tích cực khác để quên đi",
+        "Học cách chấp nhận sự không hoàn hảo của cuộc sống"
+      ]
+    ],
+    [
+      "{owner} cảm thấy mối quan hệ gắn kết bền chặt nhất qua điều gì?",
+      [
+        "Cùng nhau trải qua những chuyện buồn vui trong đời",
+        "Những cuộc trò chuyện sâu sắc lúc đêm muộn",
+        "Sự thấu hiểu và tôn trọng lối sống của nhau",
+        "Cảm giác luôn có một nơi chốn an toàn để trở về"
+      ]
+    ],
+    [
+      "Khi có chuyện buồn, {partner} thường tìm đến ai trước tiên?",
+      [
+        "Người yêu hoặc người bạn thân nhất",
+        "Gia đình thân yêu",
+        "Giữ trong lòng tự mình vượt qua",
+        "Viết ra sổ hoặc xả vào một không gian riêng"
+      ]
+    ],
+    [
+      "{owner} định nghĩa sự thành công trong cuộc sống hiện tại là gì?",
+      [
+        "Bình an trong tâm hồn và sức khỏe tốt",
+        "Có công việc mình yêu thích và thu nhập ổn định",
+        "Được ở bên cạnh những người mình yêu thương",
+        "Tự do làm những điều mình mong muốn"
+      ]
+    ],
+    [
+      "Điều gì khiến {partner} dễ xúc động và rơi nước mắt nhất?",
+      [
+        "Những câu chuyện về tình cảm gia đình ấm áp",
+        "Nhìn thấy người thân yêu phải chịu vất vả",
+        "Một cử chỉ ân cần bất ngờ khi mình đang kiệt sức",
+        "Một bộ phim hoặc bản nhạc chạm đúng tâm trạng"
+      ]
+    ],
+    [
+      "Khi {owner} cảm thấy bất đồng quan điểm sâu sắc với người kia, họ sẽ chọn cách nào?",
+      [
+        "Chờ cả hai bình tĩnh rồi ngồi lại nói chuyện thẳng thắn",
+        "Đồng ý rằng cả hai có thể có góc nhìn khác nhau",
+        "Nhường nhịn một bước nếu chuyện không quá nghiêm trọng",
+        "Tìm điểm chung ở giữa để cả hai cùng vui vẻ"
+      ]
+    ],
+    [
+      "Lời động viên nào có sức mạnh lớn nhất đối với {partner} trong những ngày khó khăn?",
+      [
+        "Luôn có mình ở đây bên cạnh bạn",
+        "Bạn đã làm rất tốt rồi, đừng quá khắt khe với bản thân",
+        "Mọi chuyện rồi sẽ ổn thỏa cả thôi",
+        "Tự hào về bạn rất nhiều"
+      ]
+    ]
   ]
 };
 
-/**
- * Lấy danh sách câu hỏi theo chủ đề, ưu tiên các câu chưa xuất hiện trong danh sách đã chơi gần đây.
- */
-export function getTopicQuestions(topicId = 'romance', count = 5, excludeTexts = []) {
-  const pool = QUESTION_POOL[topicId] || QUESTION_POOL.romance;
-  const excludeSet = new Set((excludeTexts || []).map(t => String(t).trim()));
-
-  const unseen = pool.filter(q => !excludeSet.has(q.text.trim()));
-  const seen = pool.filter(q => excludeSet.has(q.text.trim()));
-
-  // Trộn danh sách ngẫu nhiên
-  const shuffledUnseen = [...unseen].sort(() => Math.random() - 0.5);
-  const shuffledSeen = [...seen].sort(() => Math.random() - 0.5);
-
-  const selected = [...shuffledUnseen, ...shuffledSeen].slice(0, count);
-
-  return selected.map((q, idx) => ({
-    id: idx + 1,
-    text: q.text,
-    options: [...q.options],
-    image_path: null
-  }));
+// Replace once: names containing token-like text must remain literal.
+export function formatMatchQuestion(text, ownerName, partnerName) {
+  const names = { owner: ownerName?.trim() || '[Tên người tạo]', partner: partnerName?.trim() || '[Tên người được mời]' };
+  if (names.owner.toLocaleLowerCase('vi') === names.partner.toLocaleLowerCase('vi')) {
+    names.owner += ' (người tạo)';
+    names.partner += ' (người được mời)';
+  }
+  return text.replace(/\{(owner|partner)\}/g, (_, role) => names[role]);
 }
 
-/**
- * Đổi 1 câu hỏi ngẫu nhiên trong chủ đề mà không trùng với các câu đang có trên màn hình.
- */
-export function getRandomReplacement(topicId = 'romance', currentTexts = []) {
-  const pool = QUESTION_POOL[topicId] || QUESTION_POOL.romance;
-  const currentSet = new Set((currentTexts || []).map(t => String(t).trim()));
+export const QUESTION_POOL=Object.fromEntries(Object.entries(packs).map(([id,rows])=>[id,rows.map(([text,options])=>({text,options}))]));
 
-  const candidates = pool.filter(q => !currentSet.has(q.text.trim()));
-  const list = candidates.length > 0 ? candidates : pool;
-  const picked = list[Math.floor(Math.random() * list.length)];
-
-  return {
-    text: picked.text,
-    options: [...picked.options],
-    image_path: null
-  };
+function shuffle(items) {
+  const result=[...items];
+  for(let i=result.length-1;i>0;i--) {
+    const j=Math.floor(Math.random()*(i+1));
+    [result[i],result[j]]=[result[j],result[i]];
+  }
+  return result;
 }
-
-/**
- * Sinh lời bình luận "Mảnh ghép bù trừ" & gợi ý mở đầu câu chuyện cho các câu trả lời khác nhau (mismatch).
- * Biến sự khác biệt thành lý do để hai người trò chuyện, thấu hiểu và gắn kết nhau hơn!
- */
-export function getComplementaryInsight(questionText = '', ownerAnswer = '', partnerAnswer = '', ownerName = 'Bạn', partnerName = 'Người ấy') {
-  const q = String(questionText).toLowerCase();
-
-  if (q.includes('món ăn') || q.includes('ăn gì') || q.includes('bữa tối')) {
-    return {
-      title: 'Mảnh ghép vị giác phong phú',
-      badge: 'Bù trừ ngọt ngào 🍜',
-      advice: `${ownerName} thích "${ownerAnswer}" còn ${partnerName} chọn "${partnerAnswer}". Hai gu ẩm thực phong phú nghĩa là lần hẹn hò tới, cả hai sẽ có lý do gọi gấp đôi món ngon để cùng chia sẻ cho nhau nếm thử!`
-    };
-  }
-
-  if (q.includes('cuối tuần') || q.includes('buổi sáng') || q.includes('chiều chủ nhật')) {
-    return {
-      title: 'Sự cân bằng hoàn hảo',
-      badge: 'Hai nửa nhịp sống ⏳',
-      advice: `Một người thích "${ownerAnswer}", một người hướng về "${partnerAnswer}". Cuối tuần này, hãy thử dành nửa ngày cho sở thích của người này và nửa ngày còn lại chiều theo người kia nhé!`
-    };
-  }
-
-  if (q.includes('ngôi nhà') || q.includes('phòng') || q.includes('không gian') || q.includes('tổ ấm')) {
-    return {
-      title: 'Tổ ấm đa sắc màu',
-      badge: 'Mảnh ghép tương lai 🏡',
-      advice: `Tổ ấm sẽ càng thêm ấm cúng khi kết hợp cả góc "${ownerAnswer}" của ${ownerName} lẫn không gian "${partnerAnswer}" của ${partnerName}. Một ngôi nhà chứa đựng trọn vẹn cá tính của cả hai!`
-    };
-  }
-
-  if (q.includes('giận') || q.includes('làm hòa') || q.includes('tranh cãi') || q.includes('bất đồng')) {
-    return {
-      title: 'Hiểu để thương nhiều hơn',
-      badge: 'Chìa khóa vỗ về 🔑',
-      advice: `${ownerName} cảm thấy ấm lòng với "${ownerAnswer}", trong khi ${partnerName} lại dễ mở lòng hơn khi "${partnerAnswer}". Giờ thì cả hai đã có sẵn "cẩm nang vỗ về" bí mật của đối phương rồi đấy!`
-    };
-  }
-
-  if (q.includes('lạc đường') || q.includes('mua sắm') || q.includes('trúng số') || q.includes('hài hước')) {
-    return {
-      title: 'Bộ đôi siêu quậy',
-      badge: 'Gia vị tiếng cười 🎭',
-      advice: `Cách phản ứng khác biệt này chính là công thức tạo nên những trận cười sảng khoái mỗi khi hai bạn ở cạnh nhau. Hãy chia sẻ xem tại sao lúc đó bạn lại chọn như vậy nhé!`
-    };
-  }
-
-  if (q.includes('mệt mỏi') || q.includes('yêu nhất') || q.includes('ngôn ngữ tình yêu') || q.includes('tâm hồn')) {
-    return {
-      title: 'Góc nhìn sâu lắng',
-      badge: 'Thấu hiểu tâm tư 🌙',
-      advice: `Mỗi người đều có một cách riêng để cảm nhận tình yêu. Sự khác biệt giữa "${ownerAnswer}" và "${partnerAnswer}" là chiếc cầu nối tuyệt vời để hai bạn mở rộng trái tim lắng nghe nhau tối nay.`
-    };
-  }
-
-  // Fallback insight
-  return {
-    title: 'Mảnh ghép bù trừ độc đáo',
-    badge: 'Điểm chạm mới lạ ✨',
-    advice: `Chính sự khác biệt giữa "${ownerAnswer}" và "${partnerAnswer}" làm nên sức hút đặc biệt của hai bạn. Thế giới sẽ thật buồn tẻ nếu ai cũng giống hệt nhau — hãy hỏi nhau lý do đằng sau lựa chọn này nhé!`
-  };
+export function getTopicQuestions(topicId='lifestyle',count=5,excludeTexts=[]) {
+  const pool=QUESTION_POOL[topicId]||QUESTION_POOL.lifestyle, excluded=new Set(excludeTexts);
+  return [...shuffle(pool.filter(q=>!excluded.has(q.text))),...shuffle(pool.filter(q=>excluded.has(q.text)))]
+    .slice(0,count).map((q,i)=>({...q,id:i+1,options:[...q.options],image_path:null}));
 }
-
-const playedHistory = new Map();
-
-export function recordPlayedQuestions(tagUid = 'default', questionTexts = []) {
-  const key = tagUid || 'default';
-  if (!playedHistory.has(key)) {
-    playedHistory.set(key, new Set());
-  }
-  const set = playedHistory.get(key);
-  for (const text of questionTexts) {
-    if (text) set.add(String(text).trim());
-  }
+export function getRandomReplacement(topicId='lifestyle',currentTexts=[]) {
+  return getTopicQuestions(topicId,1,currentTexts)[0];
 }
-
-export function getPlayedQuestions(tagUid = 'default') {
-  const key = tagUid || 'default';
-  return Array.from(playedHistory.get(key) || []);
+export function getComplementaryInsight(questionText='',ownerAnswer='',partnerAnswer='',ownerName='Người tạo',partnerName='Người được mời') {
+  return {title:'Một chuyện để hỏi thêm',badge:'Đoán khác nhau cũng vui 💬',
+    advice:`${ownerName} chọn “${ownerAnswer}”, ${partnerName} chọn “${partnerAnswer}”. Cùng kể lý do nhé. Một câu đoán khác không nói lên mức độ thân thiết!`};
 }
-
+const playedHistory=new Map();
+export function getPlayedQuestions(userId='default') {
+  if(!playedHistory.has(userId)) {
+    try {
+      const saved=JSON.parse(globalThis.localStorage?.getItem(`emoria-match-played:${userId}`)||'[]');
+      playedHistory.set(userId,new Set(Array.isArray(saved)?saved.filter(t=>typeof t==='string'):[]));
+    } catch { playedHistory.set(userId,new Set()); }
+  }
+  return [...playedHistory.get(userId)];
+}
+export function recordPlayedQuestions(userId='default',texts=[]) {
+  const saved=[...new Set([...getPlayedQuestions(userId),...texts.filter(t=>typeof t==='string')])].slice(-500);
+  playedHistory.set(userId,new Set(saved));
+  try { globalThis.localStorage?.setItem(`emoria-match-played:${userId}`,JSON.stringify(saved)); } catch { /* Play works without browser storage. */ }
+}

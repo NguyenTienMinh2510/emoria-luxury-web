@@ -111,17 +111,19 @@ for rid,x,z,w in rooms:
         box('Sofa back',(x,.68,z+.64),(1.65,.18,.65),white,.12)
         for dx in [-.44,.44]:box('Sofa cushion',(x+dx,.27,z+.58),(.77,.58,.16),white,.08)
         cyl('Coffee tabletop',(x,-.70,z+.47),.40,.08,oak)
-        cyl('Coffee table foot',(x,-.70,z+.30),.10,.30,oak)
+        cyl('Coffee table foot',(x,-.70,z+.29),.13,.30,oak)
     elif rid=='first':
         cyl('Dining table',(x,.14,z+.72),.62,.08,oak)
-        cyl('Table pedestal',(x,.14,z+.42),.13,.52,oak)
+        cyl('Table pedestal',(x,.14,z+.41),.15,.54,oak)
         for dx in [-.95,.95]:
             box('Chair seat',(x+dx,.25,z+.46),(.43,.44,.10),oak)
             box('Chair back',(x+dx,.49,z+.74),(.44,.08,.55),oak)
             for lx in [-.15,.15]:box('Chair legs',(x+dx+lx,.25,z+.28),(.055,.3,.32),oak,.01)
     else:
         box('Writing table' if rid=='next-chapter' else 'Low shelf',(x,.57,z+.70),(1.7,.60,.10),oak)
-        for dx in [-.73,.73]:box('Table leg',(x+dx,.57,z+.43),(.09,.49,.5),oak,.015)
+        for dx in [-.73,.73]:
+            for dy in [-.22,.22]:
+                box('Table leg',(x+dx,.57+dy,z+.395),(.12,.12,.51),oak,.015)
         if rid=='little-things':
             box('Shelf base',(x,.57,z+.25),(1.7,.60,.08),oak)
             for dx in [-.25,.25]:box('Shelf divider',(x+dx,.57,z+.47),(.06,.54,.4),oak)

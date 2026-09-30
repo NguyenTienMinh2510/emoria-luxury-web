@@ -22,6 +22,7 @@ import {
 import {
   MATCH_TOPICS,
   QUESTION_POOL,
+  formatMatchQuestion,
   getTopicQuestions,
   getRandomReplacement,
   getComplementaryInsight,
@@ -40,6 +41,8 @@ export default function MemoryMatchStudio({
   onNavigateShop,
   onNavigateMemory,
   onSwitchStudio,
+  onOpenAuth,
+  onMatchChange,
   currentUser
 }) {
   const [matchId, setMatchId] = useState(initialMatchId || null);
@@ -54,11 +57,11 @@ export default function MemoryMatchStudio({
   const [studioMode, setStudioMode] = useState(initialInviteToken ? 'player' : 'editor');
 
   // Draft editing state
-  const [draftTitle, setDraftTitle] = useState('Couple Match: Thấu Hiểu Đôi Lứa');
+  const [draftTitle, setDraftTitle] = useState('Mismatch: Chơi Vui Cùng Nhau');
   const [partnerName, setPartnerName] = useState('');
   const [ownerName, setOwnerName] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState('romance');
-  const [questions, setQuestions] = useState(() => getTopicQuestions('romance', 5));
+  const [selectedTopic, setSelectedTopic] = useState('lifestyle');
+  const [questions, setQuestions] = useState(() => getTopicQuestions('lifestyle', 5));
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isStartingMatch, setIsStartingMatch] = useState(false);
   const [uploadingImageIndex, setUploadingImageIndex] = useState(null);
@@ -66,12 +69,12 @@ export default function MemoryMatchStudio({
   // Handlers for Topic Packs and Question Reroll
   const handleSelectTopic = (topicId) => {
     setSelectedTopic(topicId);
-    const playedTexts = getPlayedQuestions(tagUid);
+    const playedTexts = getPlayedQuestions(currentUser);
     const newQuestions = getTopicQuestions(topicId, 5, playedTexts);
     setQuestions(newQuestions);
     const topicObj = MATCH_TOPICS.find(t => t.id === topicId);
     if (topicObj) {
-      setDraftTitle(`Couple Match: ${topicObj.title}`);
+      setDraftTitle(`Mismatch: ${topicObj.title}`);
     }
     isDirty.current = true;
     setAutosaveState('saving');
@@ -115,7 +118,7 @@ export default function MemoryMatchStudio({
     if(JSON.stringify(payload)===JSON.stringify(draftPayload())&&!draftQueue.current.pending){isDirty.current=false;setAutosaveState('saved');}
     return result;
   }
-  function draftPayload(){const d=latestDraftRef.current;return {questions:d.questions,title:d.title.trim()||'Couple Match',partner_name:d.partnerName.trim()||null,owner_name:d.ownerName.trim()||null};}
+  function draftPayload(){const d=latestDraftRef.current;return {questions:d.questions,title:d.title.trim()||'Mismatch',partner_name:d.partnerName.trim()||null,owner_name:d.ownerName.trim()||null};}
   const latestDraftRef = useRef({
     title: draftTitle,
     partnerName,
@@ -151,6 +154,7 @@ export default function MemoryMatchStudio({
   const loadMatchData = useCallback(async (targetId, tokenToUse) => {
     if (!targetId) return;
     setLoading(true);
+    setViewData(null);
     isInitialLoad.current = true;
     setError('');
     const effectiveToken = tokenToUse !== undefined ? tokenToUse : accessInviteToken;
@@ -204,6 +208,7 @@ export default function MemoryMatchStudio({
 
   // Initial load
   useEffect(() => {
+    if (!currentUser) { setLoading(false); return; }
     if (justCreatedIdRef.current === 'new' && !matchId) {
       justCreatedIdRef.current = null;
       return;
@@ -214,10 +219,10 @@ export default function MemoryMatchStudio({
     }
     if (matchId) {
       loadMatchData(matchId, accessInviteToken);
-    } else if (tagUid && currentUser) {
-      // Check existing matches for this memory space
+    } else if (currentUser) {
+      // Account history includes earlier rounds attached to owned memories.
       setLoading(true);
-      listMatches(tagUid)
+      listMatches()
         .then((list) => {
           setActiveMatchesList(list || []);
           if (list && list.length > 0) {
@@ -245,7 +250,7 @@ export default function MemoryMatchStudio({
       isInitialLoad.current = false;
       return;
     }
-    if (studioMode !== 'editor' || loading || !currentUser) return;
+    if (studioMode !== 'editor' || loading || isStartingMatch || !currentUser) return;
 
     isDirty.current = true;
     setAutosaveState('saving');
@@ -255,7 +260,7 @@ export default function MemoryMatchStudio({
       try {
         const payload = {
           questions: latestDraftRef.current.questions,
-          title: latestDraftRef.current.title.trim() || 'Couple Match',
+          title: latestDraftRef.current.title.trim() || 'Mismatch',
           partner_name: latestDraftRef.current.partnerName.trim() || null,
           owner_name: latestDraftRef.current.ownerName.trim() || null
         };
@@ -273,7 +278,7 @@ export default function MemoryMatchStudio({
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [draftTitle, partnerName, ownerName, questions, studioMode, matchId, loading]);
+  }, [draftTitle, partnerName, ownerName, questions, studioMode, matchId, loading, isStartingMatch, currentUser]);
 
   // Warn before leaving if dirty
   useEffect(() => {
@@ -289,23 +294,23 @@ export default function MemoryMatchStudio({
 
   // Authoritative private broadcasts relayed by our authenticated SSE endpoint.
   useEffect(()=>{
-    if(!matchId||!viewData?.my_submitted||viewData?.both_submitted)return;
+    if(!currentUser||!matchId||viewData?.status!=='active'||viewData?.both_submitted)return;
     let stopped=false,pending=false;
     const refresh=async()=>{if(stopped||pending||document.visibilityState==='hidden')return;pending=true;
-      try{const data=await getMatchView(matchId,{inviteToken: accessInviteToken || undefined});if(!stopped){setViewData(data);if(data.both_submitted)setPartnerNotice('Người ấy đã hoàn thành. Cùng mở kết quả nhé!');}}
+      try{const data=await getMatchView(matchId,{inviteToken: accessInviteToken || undefined});if(!stopped){setViewData(data);if(data.both_submitted)setPartnerNotice('Người cùng chơi đã hoàn thành. Cùng mở kết quả nhé!');}}
       catch(err){if(!stopped)setError(err.message);}finally{pending=false;}};
-    const disconnect=watchMatch(matchId,accessInviteToken,state=>{if(state.both_submitted)refresh();},refresh);
+    const disconnect=watchMatch(matchId,accessInviteToken,()=>refresh(),refresh);
     const timer=setInterval(refresh,15000);
     window.addEventListener('focus',refresh);
     return()=>{stopped=true;disconnect();clearInterval(timer);window.removeEventListener('focus',refresh);};
-  },[matchId,accessInviteToken,viewData?.my_submitted,viewData?.both_submitted]);
+  },[matchId,accessInviteToken,viewData?.status,viewData?.both_submitted,currentUser]);
 
   // Handle creating a brand new match draft
   const handleCreateNewMatch = () => {
     if(creating.current)return creating.current;
     creating.current=(async()=>{
-    if (!tagUid) {
-      setError('Cần mã kỷ vật để tạo thử thách.');
+    if (!currentUser) {
+      setError('Đăng nhập để tạo lượt chơi.');
       return;
     }
     setError('');
@@ -313,19 +318,21 @@ export default function MemoryMatchStudio({
     setAutosaveState('saving');
     try {
       const created = await createMatch({
-        tagUid,
-        title: draftTitle.trim() || 'Couple Match',
+        title: draftTitle.trim() || 'Mismatch',
         partnerName: partnerName.trim() || null,
         ownerName: ownerName.trim() || null
       });
-      justCreatedIdRef.current = created.id;
-      resetQueues(created.id,{draft_revision:0},'');
-      setMatchId(created.id);
+      const createdId = created.match_id;
+      if (!createdId) throw new Error('Máy chủ chưa trả mã lượt chơi. Hãy thử lại.');
+      justCreatedIdRef.current = createdId;
+      resetQueues(createdId,{draft_revision:0},'');
+      setMatchId(createdId);
+      onMatchChange?.(createdId);
       // Save initial questions
       await persistDraft(draftPayload());
       setSuccessMsg('Đã tạo bản nháp thử thách mới!');
       setViewData({status:'draft'});
-      return created.id;
+      return createdId;
     } catch (err) {
       setAutosaveState('error');
       setError(err?.message || 'Lỗi khi tạo lượt chơi.');
@@ -363,7 +370,7 @@ export default function MemoryMatchStudio({
     try {
       await persistDraft({
         questions: qsToSave,
-        title: draftTitle.trim() || 'Couple Match',
+        title: draftTitle.trim() || 'Mismatch',
         partner_name: partnerName.trim() || null,
         owner_name: ownerName.trim() || null
       },true);
@@ -382,6 +389,10 @@ export default function MemoryMatchStudio({
   // Start match & generate invite token (enforces strict 3-7 questions & non-empty options)
   const handleBeginMatch = async () => {
     if(uploadingImageIndex !== null)return;
+    if (!ownerName.trim() || !partnerName.trim()) {
+      setError('Hãy nhập tên của cả hai người để câu hỏi luôn nói rõ đang hỏi về ai.');
+      return;
+    }
     if (questions.length < 3 || questions.length > 7) {
       setError('Số câu hỏi để bắt đầu thử thách phải từ 3 đến 7 câu.');
       return;
@@ -397,7 +408,7 @@ export default function MemoryMatchStudio({
         return;
       }
       for (let j = 0; j < q.options.length; j++) {
-        if (!q.options[j]?.trim()) {
+        if (typeof q.options[j] !== 'string' || !q.options[j].trim()) {
           setError(`Đáp án số ${j + 1} của câu ${i + 1} còn để trống.`);
           return;
         }
@@ -411,17 +422,17 @@ export default function MemoryMatchStudio({
       // Ensure questions are saved first
       await persistDraft({
         questions,
-        title: draftTitle.trim() || 'Couple Match',
+        title: draftTitle.trim() || 'Mismatch',
         partner_name: partnerName.trim() || null,
         owner_name: ownerName.trim() || null
-      });
+      },true);
       if(isDirty.current)throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi bắt đầu lại.');
       const res = await beginMatch(targetId);
-      recordPlayedQuestions(tagUid, questions.map(q => q.text));
+      recordPlayedQuestions(currentUser, questions.map(q => q.text));
       if (res.invite_token) {
         setShareInviteToken(res.invite_token);
       }
-      setSuccessMsg('Lượt chơi đã kích hoạt! Hãy gửi liên kết cho người ấy.');
+      setSuccessMsg('Lượt chơi đã kích hoạt! Hãy gửi liên kết cho người cùng chơi.');
       await loadMatchData(targetId, '');
     } catch (err) {
       setError(err?.message || 'Không thể bắt đầu lượt chơi.');
@@ -432,12 +443,12 @@ export default function MemoryMatchStudio({
 
   // Handle uploading question image
   const handleQuestionImageUpload = async (qIndex, file) => {
-    if (!file || !tagUid) return;
+    if (!file || !currentUser) return;
     const targetId = questions[qIndex]?.id;
     setUploadingImageIndex(qIndex);
     setError('');
     try {
-      const res = await uploadEventPhoto(tagUid, file);
+      const res = await uploadEventPhoto(viewData?.tag_uid || `match_${currentUser}`, file);
       setQuestions((prev) => {
         const next = [...prev];
         const index = next.findIndex(q => q.id === targetId);
@@ -546,8 +557,8 @@ export default function MemoryMatchStudio({
     if (!inviteLink) return;
     if (navigator.share) {
       navigator.share({
-        title: viewData?.title || 'Couple Match - Emoria',
-        text: 'Emoria gửi bạn lời mời tham gia Thử Thách Thấu Hiểu Đôi Lứa!',
+        title: viewData?.title || 'Mismatch - Emoria',
+        text: 'Emoria gửi bạn lời mời tham gia Thử Thách Chơi Vui Cùng Nhau!',
         url: inviteLink
       }).catch(() => {});
     } else {
@@ -599,6 +610,14 @@ export default function MemoryMatchStudio({
     });
   };
 
+  if (!currentUser) return (
+    <section className="max-w-xl mx-auto p-8 space-y-4 text-center">
+      <h1 className="text-3xl font-bold">Mismatch · Chơi cùng người quen</h1>
+      <p>Đăng nhập để tạo hoặc tham gia lượt chơi. Không cần sở hữu Memory Space.</p>
+      <button type="button" onClick={onOpenAuth} className="px-6 py-3 rounded-xl bg-rose-500 text-white font-bold">Đăng nhập để chơi</button>
+    </section>
+  );
+
   // Render Loading
   if (loading) {
     return (
@@ -610,7 +629,7 @@ export default function MemoryMatchStudio({
         >
           <Heart className="w-8 h-8 fill-rose-500/30" />
         </motion.div>
-        <p className="text-slate-300 font-medium">Đang tải không gian Couple Match...</p>
+        <p className="text-slate-300 font-medium">Đang tải không gian Mismatch...</p>
         <span className="sr-only">Đang tải dữ liệu lượt chơi</span>
       </div>
     );
@@ -705,7 +724,7 @@ export default function MemoryMatchStudio({
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-full shrink-0">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Couple Match Studio</span>
+            <span>Mismatch Studio</span>
           </div>
 
           {studioMode === 'editor' && (
@@ -786,16 +805,31 @@ export default function MemoryMatchStudio({
         )}
       </AnimatePresence>
 
+      <p className="mb-5 text-sm text-slate-300 rounded-xl bg-white/5 p-4">
+        {viewData?.role && <span className="block mb-1 text-rose-200">Bạn đang chơi ở vai trò {viewData.role === 'owner' ? 'người tạo' : 'người được mời'}.</span>}
+        Người tạo: <strong>{(studioMode === 'editor' ? ownerName : viewData?.owner_name) || 'Người tạo lượt chơi'}</strong> · Người được mời: <strong>{(studioMode === 'editor' ? partnerName : viewData?.partner_name) || 'Người được mời'}</strong>.
+        {' '}Cả hai trả lời về đúng người được nhắc trong câu hỏi, kể cả khi câu hỏi nói về chính mình.
+      </p>
+      {studioMode === 'player' && viewData?.status === 'active' && (
+        <div role="status" aria-live="polite" className="mb-5 p-4 rounded-xl border border-rose-400/30 text-rose-200">
+          {viewData.other_submitted ? 'Người cùng chơi đã nộp bài.' : viewData.other_answered_count > 0
+            ? `Người cùng chơi đã trả lời ${viewData.other_answered_count}/${viewData.total_questions} câu${viewData.other_answered_count === viewData.total_questions ? ', đang chờ nộp bài' : ''}.`
+            : viewData.other_opened_at ? 'Người cùng chơi đã mở lượt chơi, chưa trả lời câu nào.' : 'Chưa ghi nhận người cùng chơi mở link.'}
+          <p className="text-xs text-slate-400 mt-1">Tiến độ đã lưu; đáp án chỉ mở sau khi cả hai nộp bài.</p>
+        </div>
+      )}
+
       {/* ========================================================================= */}
-      {/* MODE 1: DRAFT EDITOR (Chủ sở hữu soạn thảo câu hỏi)                      */}
+      {/* MODE 1: DRAFT EDITOR (Người tạo soạn thảo câu hỏi)                      */}
       {/* ========================================================================= */}
-      {studioMode === 'editor' && (
-        <section aria-labelledby="draft-editor-title" className="space-y-6">
+      {studioMode === 'editor' && (!matchId || viewData?.status === 'draft') && (
+        <section aria-labelledby="draft-editor-title">
+          <fieldset disabled={isStartingMatch} className="min-w-0 space-y-6">
           <div className="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
             <div className="max-w-xl">
-              <span className="text-xs uppercase tracking-widest text-rose-400 font-bold">Một buổi hẹn, thêm chút thấu hiểu</span>
+              <span className="text-xs uppercase tracking-widest text-rose-400 font-bold">Ai cũng có chuyện để chơi cùng nhau</span>
               <h1 id="draft-editor-title" className="text-2xl sm:text-3xl font-serif font-bold text-white mt-1">
-                Chọn Chủ Đề · Khám Phá Đôi Mình
+                Chọn Chủ Đề · Hiểu Nhau Thêm Chút
               </h1>
               <p className="text-sm text-slate-300 mt-2 leading-relaxed">
                 Chọn một chủ đề, EMORIA chuẩn bị câu hỏi cho hai bạn. Cùng trả lời độc lập và mở kết quả sau khi cả hai hoàn thành.
@@ -815,9 +849,11 @@ export default function MemoryMatchStudio({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Tên của bạn</label>
+                <label htmlFor="match-owner-name" className="block text-xs font-medium text-slate-300 mb-1.5">Tên người tạo lượt chơi</label>
                 <input
+                  id="match-owner-name"
                   type="text"
+                  maxLength={80}
                   value={ownerName}
                   onChange={(e) => setOwnerName(e.target.value)}
                   placeholder="Bạn"
@@ -825,12 +861,14 @@ export default function MemoryMatchStudio({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Tên người ấy</label>
+                <label htmlFor="match-partner-name" className="block text-xs font-medium text-slate-300 mb-1.5">Tên người được mời</label>
                 <input
+                  id="match-partner-name"
                   type="text"
+                  maxLength={80}
                   value={partnerName}
                   onChange={(e) => setPartnerName(e.target.value)}
-                  placeholder="Người thương"
+                  placeholder="Người được mời"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white text-sm focus:border-rose-400 focus:outline-none transition-colors"
                 />
               </div>
@@ -838,8 +876,8 @@ export default function MemoryMatchStudio({
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-lg font-serif text-white">Chọn chủ đề cho buổi hẹn</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="group" aria-label="Chủ đề Couple Match">
+            <h2 className="text-lg font-serif text-white">Chọn chủ đề — chơi cùng ai cũng được</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="group" aria-label="Chủ đề Mismatch">
               {MATCH_TOPICS.map(topic => <button key={topic.id} type="button" onClick={() => handleSelectTopic(topic.id)}
                 disabled={isStartingMatch || uploadingImageIndex !== null} aria-pressed={selectedTopic === topic.id}
                 className={`text-left p-4 rounded-2xl border bg-gradient-to-br ${topic.color} ${selectedTopic === topic.id ? 'ring-2 ring-rose-300' : ''} disabled:opacity-50`}>
@@ -847,11 +885,11 @@ export default function MemoryMatchStudio({
                 <span className="block text-xs text-slate-300 mt-2">{topic.tagline}</span>
               </button>)}
             </div>
-            <p className="text-sm text-slate-300">EMORIA chọn sẵn 5 câu hỏi. Bạn có thể đổi câu khác trong cùng chủ đề hoặc thêm ảnh của đôi mình.</p>
+            <p className="text-sm text-slate-300">EMORIA chọn sẵn 5 câu hỏi. Bạn có thể đổi câu khác trong cùng chủ đề và chơi lại để thử những câu chưa gặp.</p>
             {!selectedTopic && questions.length > 0 && <p className="text-xs text-amber-200">Bộ câu hỏi từ bản nháp trước vẫn được giữ lại. Chọn chủ đề để thay bằng một bộ mới.</p>}
             {questions.map((q, qIndex) => <article key={q.id || qIndex} className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
               <div className="flex items-start justify-between gap-3">
-                <h3 className="font-semibold text-white">{qIndex + 1}. {q.text}</h3>
+                <h3 className="font-semibold text-white">{qIndex + 1}. {formatMatchQuestion(q.text, ownerName, partnerName)}</h3>
                 {selectedTopic && <button type="button" onClick={() => handleRerollQuestion(qIndex)} disabled={isStartingMatch || uploadingImageIndex !== null}
                   className="shrink-0 text-xs text-rose-300 border border-rose-300/30 rounded-full px-3 py-2 disabled:opacity-50">Đổi câu khác</button>}
               </div>
@@ -929,27 +967,28 @@ export default function MemoryMatchStudio({
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-bold text-sm shadow-xl shadow-rose-500/25 transition-all cursor-pointer disabled:opacity-50"
             >
               <Heart className="w-4 h-4 fill-white" />
-              <span>{isStartingMatch ? 'Đang kích hoạt...' : 'Kích Hoạt & Lấy Link Gửi Người Ấy'}</span>
+              <span>{isStartingMatch ? 'Đang kích hoạt...' : 'Kích Hoạt & Lấy Link Gửi Bạn Chơi'}</span>
             </button>
           </div>
+          </fieldset>
         </section>
       )}
 
       {/* ========================================================================= */}
       {/* MODE 2: ACTIVE GAMEPLAY (1 câu hỏi trên mỗi màn hình)                     */}
       {/* ========================================================================= */}
-      {studioMode === 'player' && viewData?.status !== 'completed' && !viewData?.my_submitted && (
+      {studioMode === 'player' && viewData && viewData.status !== 'completed' && !viewData.my_submitted && (
         <section aria-labelledby="active-match-title" className="space-y-6">
           {/* Partner Invite Header Alert (nếu là Owner tạo phòng) */}
-          {inviteLink && !initialInviteToken && (
+          {inviteLink && viewData?.role === 'owner' && (
             <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-300 flex items-center justify-center shrink-0">
                   <Share2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-white">Liên kết gửi cho người ấy</p>
-                  <p className="text-xs text-slate-300">Người ấy sẽ mở link này trên điện thoại để trả lời độc lập.</p>
+                  <p className="text-sm font-bold text-white">Liên kết gửi cho người cùng chơi</p>
+                  <p className="text-xs text-slate-300">Người cùng chơi sẽ mở link này trên điện thoại để trả lời độc lập.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1016,7 +1055,7 @@ export default function MemoryMatchStudio({
                   Câu hỏi {currentQuestionIndex + 1}
                 </span>
                 <h2 id="active-match-title" className="text-xl sm:text-2xl font-serif font-bold text-white mt-2 leading-relaxed">
-                  {currentQ.text}
+                  {formatMatchQuestion(currentQ.text, viewData.owner_name, viewData.partner_name)}
                 </h2>
               </div>
 
@@ -1126,19 +1165,19 @@ export default function MemoryMatchStudio({
               Bạn Đã Hoàn Thành! ✨
             </h2>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Đáp án của bạn đã được niêm phong an toàn. Đang chờ người thương hoàn tất lượt chơi để cùng hé lộ mức độ đồng điệu nhé!
+              Đáp án của bạn đã được niêm phong an toàn. Đang chờ người cùng chơi hoàn tất lượt chơi để cùng hé lộ mức độ đồng điệu nhé!
             </p>
 
             {inviteLink && (
               <div className="mt-6 pt-6 border-t border-white/10 space-y-3">
-                <p className="text-xs text-slate-400">Nếu người ấy chưa nhận được link:</p>
+                <p className="text-xs text-slate-400">Nếu người cùng chơi chưa nhận được link:</p>
                 <button
                   type="button"
                   onClick={handleCopyLink}
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/15 transition-colors cursor-pointer"
                 >
                   {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  <span>{copiedLink ? 'Đã sao chép link mời!' : 'Sao chép liên kết cho người ấy'}</span>
+                  <span>{copiedLink ? 'Đã sao chép link mời!' : 'Sao chép liên kết cho người cùng chơi'}</span>
                 </button>
               </div>
             )}
@@ -1149,7 +1188,7 @@ export default function MemoryMatchStudio({
               className="mt-6 inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white text-dark-950 font-bold text-xs hover:bg-slate-200 transition-all cursor-pointer shadow-lg"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Kiểm tra xem người ấy đã nộp chưa</span>
+              <span>Kiểm tra xem người cùng chơi đã nộp chưa</span>
             </button>
           </div>
         </section>
@@ -1168,11 +1207,11 @@ export default function MemoryMatchStudio({
             <div className="relative z-10 max-w-lg mx-auto space-y-4">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold uppercase tracking-widest">
                 <Trophy className="w-4 h-4" />
-                <span>Kết Quả Thấu Hiểu Đôi Lứa</span>
+                <span>Kết Quả Chơi Vui Cùng Nhau</span>
               </div>
 
               <h2 id="reveal-screen-title" className="text-3xl sm:text-4xl font-serif font-bold text-white">
-                {viewData.title || 'Couple Match'}
+                {viewData.title || 'Mismatch'}
               </h2>
 
               {/* Big Score Display */}
@@ -1184,15 +1223,15 @@ export default function MemoryMatchStudio({
                 </div>
                 <p className="text-lg font-medium text-rose-200 mt-2">
                   {viewData.match_percentage >= 90
-                    ? 'Tâm đầu ý hợp tuyệt đối! Hai tâm hồn sinh ra dành cho nhau 💕'
+                    ? 'Đoán ý quá chuẩn! Có chuyện nào hai người chưa kể nhau nghe không? 🎉'
                     : viewData.match_percentage >= 70
-                    ? 'Đồng điệu tuyệt vời! Rất nhiều thói quen và ước mơ chung ✨'
+                    ? 'Khá hiểu nhau rồi! Xem câu nào vẫn gây bất ngờ nhé ✨'
                     : viewData.match_percentage >= 50
-                    ? 'Sự bù trừ ngọt ngào! Khác biệt để yêu nhau nhiều hơn 🌸'
+                    ? 'Có vài pha đoán trật đáng để hỏi lại đây 😄'
                     : 'Hành trình thú vị để cùng khám phá và thấu hiểu nhau hơn 🌱'}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
-                  Trùng khớp {viewData.match_count || 0} trên tổng số {viewData.total_questions || 0} câu hỏi.
+                  Trùng khớp {viewData.match_count || 0} trên tổng số {viewData.total_questions || 0} câu hỏi. Điểm chỉ để vui, không đánh giá mối quan hệ.
                 </p>
               </div>
 
@@ -1204,21 +1243,30 @@ export default function MemoryMatchStudio({
                   className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white text-dark-950 font-bold text-xs hover:bg-slate-200 transition-colors cursor-pointer shadow-lg"
                 >
                   <Share2 className="w-3.5 h-3.5" />
-                  <span>Chia sẻ khoảnh khắc ngọt ngào</span>
+                  <span>Chia sẻ lượt chơi</span>
                 </button>
-                {currentUser && tagUid && (
+                {currentUser && (
                   <button
                     type="button"
                     onClick={() => {
                       justCreatedIdRef.current = 'new';
+                      draftQueue.current = null;
+                      progressQueue.current = null;
+                      isInitialLoad.current = false;
+                      isDirty.current = false;
+                      setError('');
+                      setSuccessMsg('');
+                      setPartnerNotice('');
+                      setAutosaveState('idle');
                       setViewData(null);
                       setAccessInviteToken('');
                       setShareInviteToken('');
                       setAnswers([]);
                       setCurrentQuestionIndex(0);
                       setMatchId(null);
+                      onMatchChange?.(null);
                       setStudioMode('editor');
-                      handleSelectTopic(selectedTopic || 'romance');
+                      handleSelectTopic(selectedTopic || 'lifestyle');
                     }}
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/15 transition-colors cursor-pointer"
                   >
@@ -1260,12 +1308,12 @@ export default function MemoryMatchStudio({
                       )}
                     </div>
 
-                    <p className="text-base font-semibold text-white mb-4">{item.question_text}</p>
+                    <p className="text-base font-semibold text-white mb-4">{formatMatchQuestion(item.question_text, viewData.owner_name, viewData.partner_name)}</p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-white/5">
                       <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
                         <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                          {viewData.owner_name || 'Chủ sở hữu'}
+                          {viewData.owner_name || 'Người tạo'}
                         </span>
                         <p className="text-sm font-medium text-rose-200">
                           {item.owner_answer_text || 'Chưa trả lời'}
@@ -1274,13 +1322,14 @@ export default function MemoryMatchStudio({
 
                       <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
                         <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                          {viewData.partner_name || 'Người thương'}
+                          {viewData.partner_name || 'Người được mời'}
                         </span>
                         <p className="text-sm font-medium text-pink-200">
                           {item.partner_answer_text || 'Chưa trả lời'}
                         </p>
                       </div>
                     </div>
+                    {!isMatched && <p className="mt-3 text-sm text-slate-300">{getComplementaryInsight(item.question_text,item.owner_answer_text,item.partner_answer_text,viewData.owner_name || 'Người tạo',viewData.partner_name || 'Người được mời').advice}</p>}
                   </div>
                 );
               })}
@@ -1318,7 +1367,7 @@ export default function MemoryMatchStudio({
       {/* Footer Utility: Report Content Button */}
       {matchId && (
         <footer className="mt-12 pt-6 border-t border-white/5 flex items-center justify-between text-xs text-slate-500">
-          <span>EMORIA Couple Match Studio</span>
+          <span>EMORIA Mismatch Studio</span>
           <button
             type="button"
             onClick={() => {

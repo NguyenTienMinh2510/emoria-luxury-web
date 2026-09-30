@@ -3,54 +3,9 @@ import {supabase} from '../lib/supabaseClient.js';
 import {serializeHouseRooms} from './house3d.js';
 import {getAnalyticsConsent} from './analyticsService.js';
 
-/**
- * 7 câu hỏi gợi ý mặc định cho Couple Match Studio (thấu hiểu nhau)
- * 3-7 câu, 2-4 lựa chọn mỗi câu.
- */
-export const DEFAULT_MATCH_QUESTIONS = [
-  {
-    id: 1,
-    text: 'Kỷ niệm hẹn hò nào khiến bạn nhớ nhất?',
-    options: ['Buổi hẹn đầu tiên ngượng ngùng', 'Chuyến đi xa cùng nhau', 'Một tối giản dị dạo phố', 'Khoảnh khắc vượt qua khó khăn cùng nhau'],
-    image_path: null
-  },
-  {
-    id: 2,
-    text: 'Thói quen nhỏ nào của đối phương khiến bạn mỉm cười?',
-    options: ['Cách nói chuyện ngây ngô', 'Cái nắm tay ấm áp bất ngờ', 'Sự chu đáo trong từng việc nhỏ', 'Biểu cảm đáng yêu lúc dỗi hờn'],
-    image_path: null
-  },
-  {
-    id: 3,
-    text: 'Món ăn nào cả hai luôn muốn gọi mỗi khi đi ăn cùng nhau?',
-    options: ['Món ăn đường phố quen thuộc', 'Bữa tối lãng mạn nhẹ nhàng', 'Đồ ngọt và trà sữa', 'Tự nấu ăn ấm cúng tại nhà'],
-    image_path: null
-  },
-  {
-    id: 4,
-    text: 'Nếu có một ngày cuối tuần hoàn hảo, hai bạn sẽ?',
-    options: ['Cùng xem phim và trò chuyện tại nhà', 'Đi cà phê chụp ảnh góc phố quen', 'Khám phá một vùng đất mới', 'Cùng nhau đi mua sắm và ăn uống'],
-    image_path: null
-  },
-  {
-    id: 5,
-    text: 'Giai điệu nào nhắc bạn nhớ về tình yêu của hai đứa?',
-    options: ['Bản tình ca nhẹ nhàng acoustic', 'Một bài hát sôi động lúc đi đường', 'Giai điệu nhạc phim từng xem chung', 'Tiếng mưa rơi yên bình bên nhau'],
-    image_path: null
-  },
-  {
-    id: 6,
-    text: 'Điều gì đối phương làm khiến bạn cảm thấy an tâm nhất?',
-    options: ['Luôn lắng nghe và thấu hiểu', 'Luôn có mặt khi bạn cần', 'Sự kiên nhẫn và dịu dàng', 'Lời động viên chân thành'],
-    image_path: null
-  },
-  {
-    id: 7,
-    text: 'Ước mơ lớn nhất hai bạn muốn cùng nhau thực hiện là gì?',
-    options: ['Xây dựng một tổ ấm nhỏ tràn ngập tiếng cười', 'Cùng đi du lịch khắp thế giới', 'Cùng đạt được mục tiêu sự nghiệp', 'Bình yên bên nhau qua năm tháng'],
-    image_path: null
-  }
-];
+import {getTopicQuestions} from './matchQuestionBank.js';
+
+export const DEFAULT_MATCH_QUESTIONS = getTopicQuestions('lifestyle',7);
 
 /**
  * 5 góc/phòng cố định trong Memory House Studio
@@ -99,13 +54,12 @@ export const HOUSE_THEMES = [
 /**
  * Tạo một lượt chơi Match Studio mới (bản nháp)
  */
-export async function createMatch({ tagUid, tag_uid, title = 'Couple Match', partnerName, partner_name, ownerName, owner_name } = {}) {
+export async function createMatch({ tagUid, tag_uid, title = 'Mismatch', partnerName, partner_name, ownerName, owner_name } = {}) {
   const tag = tagUid || tag_uid;
-  if (!tag) throw new Error('Vui lòng cung cấp mã kỷ vật.');
   return apiRequest('/events/matches', {
     method: 'POST',
     body: {
-      tag_uid: tag,
+      tag_uid: tag || null,
       title,
       partner_name: partnerName || partner_name || null,
       owner_name: ownerName || owner_name || null
@@ -199,8 +153,7 @@ export async function getMatchView(matchId, options = {}) {
  * Lấy danh sách các lượt chơi của một kỷ vật (dành cho Owner xem lịch sử/replay)
  */
 export async function listMatches(tagUid) {
-  if (!tagUid) throw new Error('Vui lòng cung cấp mã kỷ vật.');
-  return apiRequest(`/memories/${encodeURIComponent(tagUid)}/matches`, {
+  return apiRequest(tagUid ? `/memories/${encodeURIComponent(tagUid)}/matches` : '/events/matches', {
     method: 'GET'
   });
 }

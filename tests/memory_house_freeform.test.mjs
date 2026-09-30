@@ -158,7 +158,7 @@ let passed = 0;
 {
   console.log('\n--- Test 5: Xóa vật đỡ an toàn - không để đồ lơ lửng, hỗ trợ chuyển vật đỡ & hủy ---');
 
-  // Case 5a: Refuse to delete when child cannot be on floor and no other support exists
+  // Case 5a: Standing decorations now support the floor as well as tables
   let roomNoOtherTable = createMockRoom('first');
   roomNoOtherTable = addDecorationInstance(roomNoOtherTable, 'album', { position: [0.0, 0.75, 0.0], surface: 'table' });
   const albumAloneId = roomDecorations(roomNoOtherTable)[0].id;
@@ -169,8 +169,8 @@ let passed = 0;
   });
 
   const cancelResult = removeDecorationInstance(roomNoOtherTable, albumAloneId, { action: 'drop_or_cancel' });
-  assert.equal(cancelResult.cancelled, true, 'Hủy xóa khi đồ con không hỗ trợ sàn và phòng không có bàn khác');
-  assert.equal(cancelResult.reason, 'unsupported_floating_children');
+  assert.equal(roomDecorations(cancelResult).length, 1);
+  assert.equal(roomDecorations(cancelResult)[0].surface, 'floor', 'Standing mugs can be moved to the floor');
 
   // Case 5b: Reparent to designated supporting object in room
   let roomWithTarget = createMockRoom('first');
@@ -582,3 +582,4 @@ let passed = 0;
 console.log('\n================================================================');
 console.log(`  HOÀN THÀNH TẤT CẢ ${passed}/${passed} KIỂM THỬ FREEFORM DECORATION PASS!`);
 console.log('================================================================\n');
+import './memory_house_placement.test.mjs';

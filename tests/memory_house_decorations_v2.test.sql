@@ -171,19 +171,33 @@ BEGIN
   EXCEPTION WHEN SQLSTATE '22023' THEN NULL; END;
 
   -- 8. Test Surface Incompatibility:
-  -- candles CANNOT be placed on floor
+  -- candles CANNOT be mounted on a wall
   BEGIN
     UPDATE public.memory_houses
     SET rooms_draft = jsonb_build_array(jsonb_build_object(
       'id', 'beginning',
       'decorations', jsonb_build_array(jsonb_build_object(
-        'id', 'bad_surface', 'item', 'candles', 'surface', 'floor',
+        'id', 'bad_surface', 'item', 'candles', 'surface', 'wall',
         'position', jsonb_build_array(-2.8, 0.15, 0.0)
       ))
     ))
     WHERE id = house_id;
     RAISE EXCEPTION 'FAIL: Unsupported surface accepted';
   EXCEPTION WHEN SQLSTATE '22023' THEN NULL; END;
+
+  -- Every standing model can persist on a real horizontal support, including
+  -- models previously rejected on floors and the bunting stand on a table.
+  FOR payload IN SELECT jsonb_build_array(jsonb_build_object(
+    'id', 'first', 'decorations', jsonb_build_array(jsonb_build_object(
+      'id', 'supported', 'item', item, 'surface', surface,
+      'position', jsonb_build_array(0, 0.15, 0), 'scale', 0.6
+    ))
+  )) FROM unnest(ARRAY['calendar','cat','nameplate','plant','mugs','lamp','vase','album','bunting','frame','birdcage','candles']) AS item
+  CROSS JOIN unnest(ARRAY['floor','table','shelf']) AS surface LOOP
+    UPDATE public.memory_houses SET rooms_draft = payload,
+      published_snapshot = jsonb_build_object('rooms', payload) WHERE id = house_id;
+    PERFORM public.test_assert((SELECT rooms_draft = payload FROM public.memory_houses WHERE id = house_id), 'Supported placement survives reload');
+  END LOOP;
 
   -- 9. Test Self-Parenting Reference:
   BEGIN
@@ -250,7 +264,7 @@ BEGIN
     SET published_snapshot = jsonb_build_object('rooms', jsonb_build_array(jsonb_build_object(
       'id', 'beginning',
       'decorations', jsonb_build_array(jsonb_build_object(
-        'id', 'bad_snapshot_item', 'item', 'candles', 'surface', 'floor', -- Candles on floor in published_snapshot!
+        'id', 'bad_snapshot_item', 'item', 'candles', 'surface', 'wall', -- Invalid wall mounting in published_snapshot
         'position', jsonb_build_array(-2.8, 0.15, 0.0)
       ))
     )))

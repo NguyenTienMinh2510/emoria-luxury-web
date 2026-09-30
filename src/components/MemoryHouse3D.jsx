@@ -2,16 +2,11 @@ import React, { useRef, useState, useEffect } from 'react';
 import {
   DECORATIONS,
   roomDecorations,
-  placeDecoration,
   setDecorationPhoto,
   addDecorationInstance,
   updateDecorationInstance,
   removeDecorationInstance,
-  cloneDecorationInstance,
-  getSupportingObjects,
-  getDefaultPosition,
-  ROOM_BOUNDS,
-  DECOR_SLOTS
+  generateInstanceId
 } from '../services/house3d.js';
 import { createMusicBoxPlayer } from '../services/musicBoxPlayer.js';
 import MemoryHouse2D from './MemoryHouse2D.jsx';
@@ -76,8 +71,9 @@ export default function MemoryHouse3D({
   const [selectedInstanceId, setSelectedInstanceId] = useState(null);
   const [activeTool, setActiveTool] = useState('idle'); // 'idle' | 'place' | 'move'
   const [placingItem, setPlacingItem] = useState(null);
+  const [placingScale, setPlacingScale] = useState(1);
   const [pendingPlacement, setPendingPlacement] = useState(null);
-  const [enableSnapping, setEnableSnapping] = useState(true);
+  const [removing, setRemoving] = useState(false);
   const [editingContent, setEditingContent] = useState(false);
   const [history, setHistory] = useState({ past: [], future: [] });
 
@@ -88,7 +84,7 @@ export default function MemoryHouse3D({
   const [inspectingDecor, setInspectingDecor] = useState(null);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [arrangeNotice, setArrangeNotice] = useState('');
-  const [deleteDialog, setDeleteDialog] = useState(null); // { targetId, children, availableSupports, chosenSupportId }
+  const [deleteDialog, setDeleteDialog] = useState(null);
 
   latest.current = { rooms, title, theme, activeRoomId, onSelectRoom, onPhoto, readOnly };
   const room = rooms.find(r => r.id === activeRoomId) || rooms[0];
@@ -129,20 +125,6 @@ export default function MemoryHouse3D({
     fileInput.current?.click();
   }
 
-  // Soft Snapping Helper
-  function snapCoord(pos, otherDecorations, threshold = 0.2) {
-    if (!Array.isArray(pos) || !enableSnapping) return pos;
-    let [x, y, z] = pos;
-    for (const d of otherDecorations) {
-      if (!Array.isArray(d.position)) continue;
-      if (Math.abs(x - d.position[0]) < threshold) x = d.position[0];
-      if (Math.abs(z - d.position[2]) < threshold) z = d.position[2];
-    }
-    if (Math.abs(x) < 0.1) x = 0;
-    if (Math.abs(z) < 0.1) z = 0;
-    return [Number(x.toFixed(3)), Number(y.toFixed(3)), Number(z.toFixed(3))];
-  }
-
   // History State Handlers (Undo / Redo)
   function commitChange(nextRoom, recordHistory = true) {
     if (readOnly || !room) return;
@@ -171,8 +153,7 @@ export default function MemoryHouse3D({
     onRoomsChange?.(rooms.map(r => r.id === prev.roomId ? { ...r, decorations: prev.decorations, lighting: prev.lighting } : r));
     setSelectedInstanceId(null);
     engine.current?.setSelectionHighlight(null);
-    engine.current?.hideGhost();
-    setActiveTool('idle');
+    cancelPlacement();
   }
 
   function handleRedo() {
@@ -188,30 +169,41 @@ export default function MemoryHouse3D({
     onRoomsChange?.(rooms.map(r => r.id === next.roomId ? { ...r, decorations: next.decorations, lighting: next.lighting } : r));
     setSelectedInstanceId(null);
     engine.current?.setSelectionHighlight(null);
-    engine.current?.hideGhost();
-    setActiveTool('idle');
+    cancelPlacement();
   }
 
   // 3D Engine Setup
   latest.current.placement = placingItem || activeTool === 'move' ? {
     item: placingItem || selectedInstance?.item,
-    scale: placingItem ? 1 : selectedInstance?.scale,
+    scale: placingItem ? placingScale : selectedInstance?.scale,
     rotation: placingItem ? 0 : selectedInstance?.rotation,
     excludeId: placingItem ? null : selectedInstanceId
   } : null;
-  latest.current.onSurfaceTap = surfaceHit => {
-    if (readOnly) return;
-    if (placingItem) {
-      setPendingPlacement(surfaceHit);
-      engine.current?.showGhost(placingItem, surfaceHit.position, surfaceHit.isValid);
-    } else if (activeTool === 'move' && selectedInstanceId) {
-      if (!surfaceHit.isValid) { setArrangeNotice(surfaceHit.reason); return; }
+  latest.current.onPlacementPreview = hit => {
+    if (!readOnly && placingItem) setPendingPlacement(hit);
+  };
+  latest.current.onSurfaceTap = hit => {
+    if (readOnly || !hit?.isValid || hit.roomId !== room?.id) return;
+    if (placingItem) confirmPlacement(hit);
+    else if (activeTool === 'move' && selectedInstanceId) {
       commitChange(updateDecorationInstance(room, selectedInstanceId, {
-        position: surfaceHit.position, surface: surfaceHit.surface, parent_id: surfaceHit.parentId
-      }));
-      engine.current?.setSelectionHighlight(selectedInstanceId);
-      setActiveTool('idle');
-      engine.current?.setInteracting(false);
+        position: hit.position, surface: hit.surface, parent_id: hit.parentId
+      }, { validatedPlacement: true }));
+      cancelPlacement();
+    }
+  };
+  latest.current.onDecorSelect = data => {
+    if (removing) {
+      const targetRoom = rooms.find(r => r.id === data.roomId);
+      if (!targetRoom) return;
+      const updated = removeDecorationInstance(targetRoom, data.id, { action: 'delete_children' });
+      setHistory(h => ({ past: [...h.past.slice(-25), { roomId: targetRoom.id, decorations: roomDecorations(targetRoom), lighting: targetRoom.lighting || 'day' }], future: [] }));
+      onRoomsChange?.(rooms.map(r => r.id === targetRoom.id ? updated : r));
+      setSelectedInstanceId(null);
+    } else {
+      if (data.roomId) onSelectRoom?.(data.roomId);
+      setSelectedInstanceId(data.id);
+      engine.current?.setSelectionHighlight(data.id);
     }
   };
   useEffect(() => {
@@ -222,6 +214,8 @@ export default function MemoryHouse3D({
       try {
         engine.current = createHouseRenderer(host.current, {
           getPlacement: () => latest.current.placement,
+          isEditing: () => !latest.current.readOnly,
+          onPlacementPreview: hit => latest.current.onPlacementPreview?.(hit),
           onRoom: id => {
             latest.current.onSelectRoom?.(id);
             engine.current?.focus(id, true);
@@ -237,10 +231,7 @@ export default function MemoryHouse3D({
                 if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
               }
             } else {
-              if (decorData.roomId) latest.current.onSelectRoom?.(decorData.roomId);
-              const instId = decorData.id || decorData.instanceId;
-              setSelectedInstanceId(instId);
-              engine.current?.setSelectionHighlight(instId);
+              latest.current.onDecorSelect?.(decorData);
               if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
             }
           },
@@ -275,6 +266,20 @@ export default function MemoryHouse3D({
     engine.current?.update({ rooms, title, theme, activeRoomId });
   }, [rooms, title, theme, activeRoomId]);
 
+  useEffect(() => {
+    engine.current?.setInteracting(Boolean(placingItem || activeTool === 'move'));
+  }, [placingItem, activeTool, status]);
+
+  useEffect(() => {
+    cancelPlacement();
+    setSelectedInstanceId(null);
+    setRemoving(false);
+  }, [activeRoomId, readOnly]);
+
+  useEffect(() => {
+    engine.current?.setSelectionHighlight(selectedInstanceId);
+  }, [rooms, selectedInstanceId, status]);
+
   // Guided Tour timer (steps through rooms smoothly every 6.5s)
   useEffect(() => {
     if (!touring || tourPaused) {
@@ -293,7 +298,8 @@ export default function MemoryHouse3D({
 
   // Freeform Placement Flow
   function startPlacement(itemId) {
-    if (readOnly || !room) return;
+    if (readOnly || !room || status !== 'ready' || view !== '3d') return;
+    engine.current?.hideGhost();
     const currentDecor = roomDecorations(room);
     if (currentDecor.length > 35) {
       setArrangeNotice('Phòng đang có nhiều đồ vật. Bạn vẫn có thể tiếp tục đặt thêm thoải mái.');
@@ -306,39 +312,33 @@ export default function MemoryHouse3D({
     setPlacingItem(itemId);
     setActiveTool('place');
 
-    const defPos = getDefaultPosition(room.id, asset.defaultSurface);
-    const initialPlacement = {
-      isValid: true,
-      surface: asset.defaultSurface,
-      position: defPos,
-      parentId: null
-    };
-    setPendingPlacement(initialPlacement);
-    engine.current?.showGhost(itemId, defPos, true);
+    setRemoving(false);
+    setTouring(false);
+    const initialPlacement = engine.current?.findPlacement(room.id, itemId);
+    setPendingPlacement(initialPlacement || null);
+    setPlacingScale(initialPlacement?.scale || 1);
+    if (initialPlacement) engine.current?.showGhost(itemId, initialPlacement.position, true, 0, initialPlacement.scale);
+    else setArrangeNotice('Chưa còn chỗ vừa món này. Hãy gỡ bớt đồ hoặc chọn món nhỏ hơn.');
     engine.current?.focus(room.id, true);
+    host.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
-  function confirmPlacement() {
-    if (readOnly || !placingItem || !pendingPlacement?.isValid || !room) return;
+  function confirmPlacement(hit = pendingPlacement) {
+    if (readOnly || !placingItem || !hit?.isValid || !room) return;
+    const checked = engine.current?.findPlacement(room.id, placingItem, { position: hit.position, scale: placingScale });
+    if (!checked) return;
     const nextRoom = addDecorationInstance(room, placingItem, {
-      position: pendingPlacement.position,
-      surface: pendingPlacement.surface,
-      parent_id: pendingPlacement.parentId
+      position: checked.position, surface: checked.surface, scale: checked.scale, parent_id: checked.parentId
     });
     commitChange(nextRoom, true);
-    engine.current?.hideGhost();
-    const newItems = roomDecorations(nextRoom);
-    const newest = newItems[newItems.length - 1];
-    setPlacingItem(null);
-    setPendingPlacement(null);
-    setActiveTool('idle');
-    if (newest?.id) {
-      setSelectedInstanceId(newest.id);
-      setTimeout(() => engine.current?.setSelectionHighlight(newest.id), 50);
-    }
+    cancelPlacement();
+    const newest = roomDecorations(nextRoom).at(-1);
+    if (newest?.id) setSelectedInstanceId(newest.id);
   }
 
   function cancelPlacement() {
+    latest.current.placement = null;
+    engine.current?.setInteracting(false);
     engine.current?.hideGhost();
     setPlacingItem(null);
     setPendingPlacement(null);
@@ -347,43 +347,44 @@ export default function MemoryHouse3D({
 
   // Selected Instance Actions
   function toggleMoveMode() {
+    if (decorationsList.some(d => d.parent_id === selectedInstanceId)) {
+      setArrangeNotice('Hãy chuyển các món bên trên trước khi di chuyển vật đỡ.');
+      return;
+    }
     if (activeTool === 'move') {
-      setActiveTool('idle');
-      engine.current?.setInteracting(false);
+      cancelPlacement();
     } else {
       setActiveTool('move');
       engine.current?.setInteracting(true); // Lock camera orbit during move
     }
   }
 
-  function rotateSelected(deltaDegrees) {
-    if (!selectedInstanceId || !room) return;
-    const target = roomDecorations(room).find(d => (d.id && d.id === selectedInstanceId) || (d.slot && d.slot === selectedInstanceId));
-    if (!target) return;
-    const currentRot = Array.isArray(target.rotation) ? target.rotation[1] : (Number(target.rotation) || 0);
-    const newRot = (currentRot + deltaDegrees + 360) % 360;
-    const updated = updateDecorationInstance(room, selectedInstanceId, { rotation: newRot });
-    commitChange(updated, true);
-    engine.current?.setSelectionHighlight(selectedInstanceId);
+  function transformSelected(updates) {
+    if (readOnly || !selectedInstance || !room) return;
+    if (decorationsList.some(d => d.parent_id === selectedInstanceId)) {
+      setArrangeNotice('Hãy chuyển các món bên trên trước khi đổi vật đỡ.');
+      return;
+    }
+    const next = { ...selectedInstance, ...updates };
+    const hit = engine.current?.findPlacement(room.id, next.item, { ...next, excludeId: selectedInstanceId });
+    if (!hit) return;
+    commitChange(updateDecorationInstance(room, selectedInstanceId, { ...updates, position: hit.position, surface: hit.surface, parent_id: null }, { validatedPlacement: true }));
   }
 
-  function scaleSelected(newScale) {
-    if (!selectedInstanceId || !room) return;
-    const updated = updateDecorationInstance(room, selectedInstanceId, { scale: newScale });
-    commitChange(updated, true);
-    engine.current?.setSelectionHighlight(selectedInstanceId);
+  function rotateSelected(deltaDegrees) {
+    const yaw = Array.isArray(selectedInstance?.rotation) ? selectedInstance.rotation[1] : (Number(selectedInstance?.rotation) || 0);
+    transformSelected({ rotation: (yaw + deltaDegrees + 360) % 360 });
   }
+
+  function scaleSelected(scale) { transformSelected({ scale }); }
 
   function cloneSelected() {
-    if (!selectedInstanceId || !room) return;
-    const updated = cloneDecorationInstance(room, selectedInstanceId);
-    commitChange(updated, true);
-    const newItems = roomDecorations(updated);
-    const cloned = newItems[newItems.length - 1];
-    if (cloned?.id) {
-      setSelectedInstanceId(cloned.id);
-      setTimeout(() => engine.current?.setSelectionHighlight(cloned.id), 50);
-    }
+    if (readOnly || !selectedInstance || !room) return;
+    const hit = engine.current?.findPlacement(room.id, selectedInstance.item, selectedInstance);
+    if (!hit) { setArrangeNotice('Chưa còn chỗ vừa bản sao. Hãy gỡ bớt đồ trước.'); return; }
+    const clone = { ...selectedInstance, id: generateInstanceId(selectedInstance.item), slot: undefined, parent_id: null, position: hit.position, surface: hit.surface };
+    commitChange({ ...room, decorations: [...decorationsList, clone] });
+    setSelectedInstanceId(clone.id);
   }
 
   function requestDelete(instId) {
@@ -391,12 +392,9 @@ export default function MemoryHouse3D({
     const currentDecor = roomDecorations(room);
     const children = currentDecor.filter(d => d.parent_id === instId);
     if (children.length > 0) {
-      const availableSupports = getSupportingObjects(room, instId);
       setDeleteDialog({
         targetId: instId,
-        children,
-        availableSupports,
-        chosenSupportId: availableSupports[0]?.id || ''
+        children
       });
       return;
     }
@@ -404,11 +402,19 @@ export default function MemoryHouse3D({
   }
 
   function executeDelete(targetId, options) {
-    const updated = removeDecorationInstance(room, targetId, options);
-    if (updated.cancelled) {
-      alert('Không thể xóa vì một số món đồ bên trên không thể đặt trên sàn và phòng không còn mặt bàn nào khác. Vui lòng chuyển đồ sang nơi khác trước.');
-      setDeleteDialog(null);
-      return;
+    if (readOnly || !room) return;
+    let updated = removeDecorationInstance(room, targetId, { action: 'delete_children' });
+    if (options.action !== 'delete_children') {
+      const remainingIds = new Set(roomDecorations(updated).map(d => d.id || d.slot));
+      const displaced = decorationsList.filter(d => !remainingIds.has(d.id || d.slot) && (d.id || d.slot) !== targetId);
+      const excludeIds = [targetId, ...displaced.map(d => d.id || d.slot)];
+      const extra = [];
+      for (const d of displaced) {
+        const hit = engine.current?.findPlacement(room.id, d.item, { ...d, excludeIds, extra });
+        if (!hit) { setArrangeNotice('Chưa đủ chỗ để chuyển các món bên trên. Các món vẫn được giữ nguyên.'); setDeleteDialog(null); return; }
+        extra.push({ ...d, parent_id: null, position: hit.position, surface: hit.surface });
+      }
+      updated = { ...updated, decorations: [...roomDecorations(updated), ...extra] };
     }
     commitChange(updated, true);
     if (selectedInstanceId === targetId) {
@@ -425,25 +431,16 @@ export default function MemoryHouse3D({
 
   // Apply one-touch style package
   function applyStylePackage(pkg) {
-    if (readOnly || !room) return;
+    if (readOnly || !room || status !== 'ready' || view !== '3d') return;
+    cancelPlacement();
     const existingDecor = roomDecorations(room);
-    const nextDecor = [...existingDecor];
-    for (const [sId, itemId] of Object.entries(pkg.slots)) {
-      if (!itemId) continue;
-      const asset = DECORATIONS.find(d => d.id === itemId);
-      if (!asset) continue;
-      const defPos = getDefaultPosition(room.id, asset.defaultSurface, sId);
-      nextDecor.push({
-        id: `${room.id}_${sId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        item: itemId,
-        surface: asset.defaultSurface,
-        position: defPos,
-        rotation: 0,
-        scale: 1.0,
-        photos: [],
-        text: ''
-      });
+    const added = [];
+    for (const itemId of Object.values(pkg.slots)) {
+      const hit = engine.current?.findPlacement(room.id, itemId, { extra: added });
+      if (!hit) { setArrangeNotice('Phòng chưa đủ chỗ cho bộ này. Hãy gỡ bớt đồ trước.'); return; }
+      added.push({ id: generateInstanceId(itemId), item: itemId, position: hit.position, surface: hit.surface, rotation: 0, scale: hit.scale, photos: [], text: '' });
     }
+    const nextDecor = [...existingDecor, ...added];
     const updatedRoom = {
       ...room,
       lighting: pkg.lighting || room.lighting || 'day',
@@ -471,7 +468,8 @@ export default function MemoryHouse3D({
 
   // "✦ Dọn nhà giúp mình" (Auto-arrange available photos into empty slots/instances)
   function autoArrangePhotos() {
-    if (readOnly || !room || !room.memories || room.memories.length === 0) return;
+    if (readOnly || !room || !room.memories || room.memories.length === 0 || status !== 'ready' || view !== '3d') return;
+    cancelPlacement();
     const existingDecor = roomDecorations(room);
 
     let targetDecor = existingDecor.map(d => ({ ...d, photos: Array.isArray(d.photos) ? [...d.photos] : [] }));
@@ -482,11 +480,14 @@ export default function MemoryHouse3D({
 
     // If room currently has no photo-holding decor items, place standard set
     if (totalSlots === 0) {
-      targetDecor = [
-        { id: `${room.id}_frame_${Date.now()}`, surface: 'table', item: 'frame', position: getDefaultPosition(room.id, 'table', 'table'), rotation: 0, photos: [null] },
-        { id: `${room.id}_album_${Date.now()}`, surface: 'table', item: 'album', position: getDefaultPosition(room.id, 'table', 'right'), rotation: 0, photos: [null, null] },
-        { id: `${room.id}_bunting_${Date.now()}`, surface: 'wall', item: 'bunting', position: getDefaultPosition(room.id, 'wall', 'left'), rotation: 0, photos: [null, null, null] }
-      ];
+      const added = [];
+      for (const item of ['frame', 'album', 'bunting']) {
+        const hit = engine.current?.findPlacement(room.id, item, { extra: added });
+        if (!hit) continue;
+        added.push({ id: generateInstanceId(item), item, position: hit.position, surface: hit.surface, rotation: 0, scale: hit.scale, photos: Array(DECORATIONS.find(d => d.id === item).photoCount).fill(null) });
+      }
+      if (!added.length) { setArrangeNotice('Chưa còn chỗ cho khung ảnh. Hãy gỡ bớt đồ trước.'); return; }
+      targetDecor.push(...added);
     }
 
     const usedIds = new Set(targetDecor.flatMap(d => d.photos || []).filter(Boolean));
@@ -710,6 +711,7 @@ export default function MemoryHouse3D({
               </div>
             )}
 
+            {removing && !readOnly && <div className="absolute top-3 left-3 right-3 z-30 p-3 rounded-xl bg-stone-900/95 text-xs text-white flex justify-between gap-3"><span>Chạm món muốn gỡ (kèm đồ bên trên, nếu có). Có thể Hoàn tác.</span><button type="button" className={button} onClick={() => setRemoving(false)}>Xong</button></div>}
             {/* Floating Placement Confirmation Banner */}
             {!readOnly && placingItem && placingAsset && (
               <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between gap-3 p-3 rounded-2xl bg-stone-900/95 border border-amber-400/40 backdrop-blur-xl shadow-2xl animate-scaleUp">
@@ -717,15 +719,15 @@ export default function MemoryHouse3D({
                   <img src={placingAsset.image} alt="" className="w-9 h-9 rounded-xl object-cover border border-amber-300/30" />
                   <div>
                     <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <span>Đang đặt: {placingAsset.name}</span>
+                      <span>Đang đặt: {placingAsset.name} · {placingScale}×</span>
                       <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300">
                         {pendingPlacement?.surface === 'table' ? 'Mặt bàn' : pendingPlacement?.surface === 'wall' ? 'Tường' : 'Sàn phòng'}
                       </span>
                     </h4>
                     <p className="text-[11px] text-stone-300">
                       {pendingPlacement?.isValid
-                        ? '✓ Vị trí hợp lệ. Chạm để đổi chỗ hoặc nhấn xác nhận.'
-                        : `⚠ ${pendingPlacement?.reason || 'Vị trí không phù hợp'}`}
+                        ? 'Giữ và kéo trên mô hình, thả tay để đặt. Vật luôn bám chỗ hợp lệ.'
+                        : 'Chưa còn chỗ vừa món này. Hãy chọn món nhỏ hơn hoặc gỡ bớt đồ.'}
                     </p>
                   </div>
                 </div>
@@ -733,7 +735,7 @@ export default function MemoryHouse3D({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={confirmPlacement}
+                    onClick={() => confirmPlacement()}
                     disabled={!pendingPlacement?.isValid}
                     className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-40"
                   >
@@ -763,7 +765,7 @@ export default function MemoryHouse3D({
                       </span>
                     </h4>
                     <p className="text-[10px] text-stone-400">
-                      {activeTool === 'move' ? 'Chạm vị trí mới trên sàn hoặc bàn để di chuyển' : 'Đang chọn món này'}
+                      {activeTool === 'move' ? 'Giữ và kéo đến chỗ mới, thả tay để đặt' : 'Đang chọn món này'}
                     </p>
                   </div>
                 </div>
@@ -990,7 +992,7 @@ export default function MemoryHouse3D({
         /* 2D Fallback View: Accessible List of Placed Decorations */
         <div className="p-5 space-y-4">
           <MemoryHouse2D rooms={rooms} title={title} theme={theme} activeRoomId={activeRoomId} onSelectRoom={onSelectRoom} onPhoto={onPhoto}/>
-          {!readOnly && placingItem && <div className="flex items-center gap-3 text-sm"><span>Đặt {placingAsset?.name} tại vị trí gợi ý trong {room?.name}</span><button type="button" className={button} onClick={confirmPlacement}>Xác nhận đặt</button><button type="button" className={button} onClick={cancelPlacement}>Hủy</button></div>}
+          {!readOnly && placingItem && <div className="flex items-center gap-3 text-sm"><span>Đặt {placingAsset?.name} tại vị trí gợi ý trong {room?.name}</span><button type="button" className={button} onClick={() => confirmPlacement()}>Xác nhận đặt</button><button type="button" className={button} onClick={cancelPlacement}>Hủy</button></div>}
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-serif font-bold text-white">Danh sách đồ trang trí trong phòng · {room?.name}</h3>
             <span className="text-xs text-amber-300 font-mono">{decorationsList.length} món</span>
@@ -1152,18 +1154,18 @@ export default function MemoryHouse3D({
                   </span>
                 </h3>
                 <p className="text-xs text-stone-400">
-                  Chạm một món đồ bên dưới để xem trước và đặt tự do vào sàn, tường hoặc mặt bàn.
+                  Chọn món rồi giữ và kéo trên ngôi nhà; thả tay để đặt trên sàn, bàn hoặc ghế.
                 </p>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setEnableSnapping(!enableSnapping)}
-                  className={`${button} ${enableSnapping ? 'bg-amber-400/20 text-amber-200 border-amber-400/40' : 'text-stone-400'}`}
-                  title="Tự động căn theo đường thẳng và các đồ vật lân cận"
+                  onClick={() => { cancelPlacement(); setSelectedInstanceId(null); engine.current?.setSelectionHighlight(null); setRemoving(!removing); host.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }); }}
+                  className={`${button} ${removing ? 'bg-amber-400/20 text-amber-200 border-amber-400/40' : 'text-stone-400'}`}
+                  aria-pressed={removing} title="Bật rồi chạm món cần gỡ; dùng Hoàn tác để khôi phục"
                 >
-                  {enableSnapping ? '🧲 Căn chỉnh: Bật' : 'Tự do hoàn toàn'}
+                  {removing ? '✓ Đang gỡ đồ' : 'Gỡ đồ bằng chạm'}
                 </button>
 
                 <label className="text-xs text-stone-300 flex items-center gap-1.5 ml-2">
@@ -1198,6 +1200,7 @@ export default function MemoryHouse3D({
                 <button
                   key={d.id}
                   type="button"
+                  disabled={status !== 'ready' || view !== '3d'}
                   onClick={() => startPlacement(d.id)}
                   className={`text-left rounded-2xl border p-2 transition-all cursor-pointer relative group ${
                     placingItem === d.id
@@ -1324,41 +1327,13 @@ export default function MemoryHouse3D({
               Vui lòng chọn cách xử lý để không làm mất đồ hoặc để đồ lơ lửng:
             </p>
 
-            {deleteDialog.availableSupports.length > 0 && (
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-                <label className="block text-xs font-medium text-amber-100">
-                  Chuyển sang vật đỡ khác trong phòng:
-                </label>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={deleteDialog.chosenSupportId}
-                    onChange={e => setDeleteDialog(d => ({ ...d, chosenSupportId: e.target.value }))}
-                    className="flex-1 rounded-lg border border-white/20 bg-stone-800 p-2 text-xs text-white"
-                  >
-                    {deleteDialog.availableSupports.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {DECORATIONS.find(d => d.id === s.item)?.name || s.item} (#{s.id.slice(-6)})
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => executeDelete(deleteDialog.targetId, { action: 'reparent', targetParentId: deleteDialog.chosenSupportId })}
-                    className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-semibold text-stone-950 hover:bg-amber-300 cursor-pointer"
-                  >
-                    Chuyển & Xóa
-                  </button>
-                </div>
-              </div>
-            )}
-
             <div className="space-y-2 pt-2">
               <button
                 type="button"
                 onClick={() => executeDelete(deleteDialog.targetId, { action: 'drop_or_cancel' })}
                 className="w-full rounded-xl border border-white/20 bg-stone-800 p-2.5 text-xs text-stone-200 hover:bg-stone-700 text-left transition cursor-pointer"
               >
-                🏠 Hạ các món hỗ trợ sàn xuống sàn nhà
+                🏠 Chuyển các món bên trên sang chỗ trống hợp lệ
               </button>
 
               <button

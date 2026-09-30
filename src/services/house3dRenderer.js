@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {roomDecorations, DECORATIONS, ROOM_BOUNDS, getRoomBoundingBox, getDefaultPosition, getRotatedExtents, ASSET_DIMENSIONS} from './house3d.js';
+import {roomDecorations, getDefaultPosition} from './house3d.js';
+import {createPlacementSolver, placementTriangles, transformDecoration} from './housePlacement.js';
 
-export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, getPlacement, onError, onReady}) {
+export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, onPlacementPreview, getPlacement, isEditing, onError, onReady}) {
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
   const compact = window.matchMedia?.('(pointer: coarse)').matches || host.clientWidth < 640;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,compact ? 1 : 1.5));
@@ -14,7 +15,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;
   host.appendChild(renderer.domElement);
   renderer.domElement.setAttribute('aria-label','Ngôi nhà 3D: kéo để xoay, chạm phòng để chọn');
-  renderer.domElement.style.cssText='width:100%;height:100%;display:block;touch-action:pan-y';
+  renderer.domElement.style.cssText='width:100%;height:100%;display:block;touch-action:none';
   const scene=new THREE.Scene();scene.background=new THREE.Color('#e9dfd2');
   const camera=new THREE.PerspectiveCamera(34,1,.1,80);
   const controls=new OrbitControls(camera,renderer.domElement);
@@ -356,7 +357,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
           copy.scale.set(d.scale, d.scale, d.scale);
         }
 
-        const instId = d.id || `${room.id}_${d.slot||d.item}`;
+        const instId = d.id || d.slot;
         copy.userData.instanceId = instId;
         copy.userData.roomId = room.id;
         copy.userData.decorItem = d.item;
@@ -448,62 +449,35 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   const ray=new THREE.Raycaster();let down;
   const ghostMaterials=[];
 
-  function showGhost(item, position, isValid = true, rotation = 0, scale = 1.0) {
-    hideGhost();
-    if (!library || !position) return;
-
-    let template = library.getObjectByName(item);
-    let copy;
-    if (template) {
-      copy = template.clone(true);
-    } else {
-      const geo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
-      copy = new THREE.Mesh(geo);
-    }
-
-    const ghostColor = isValid ? '#10b981' : '#ef4444';
-    const mat = new THREE.MeshStandardMaterial({
-      color: ghostColor,
-      transparent: true,
-      opacity: 0.65,
-      roughness: 0.3,
-      metalness: 0.1,
-      depthWrite: false
-    });
-    ghostMaterials.push(mat);
-
-    copy.traverse(child => {
-      if (child.isMesh) {
-        child.material = mat;
+  let ghostKey = '';
+  function showGhost(item, position, isValid = true, rotation = 0, scale = 1) {
+    if (!library || !position || !isValid) return;
+    const key = JSON.stringify([item, rotation, scale]);
+    if (key !== ghostKey || !ghostMesh) {
+      hideGhost();
+      const template = library.getObjectByName('decor_' + item);
+      if (!template) return;
+      ghostMesh = template.clone(true);
+      ghostMesh.traverse(child => {
+        if (!child.isMesh) return;
+        const cloneMaterial = original => {
+          const mat = original.clone();
+          mat.transparent = true; mat.opacity = .72; mat.depthWrite = false;
+          ghostMaterials.push(mat); return mat;
+        };
+        child.material = Array.isArray(child.material) ? child.material.map(cloneMaterial) : cloneMaterial(child.material);
         child.castShadow = false;
-        child.receiveShadow = false;
-      }
-    });
-
-    copy.position.set(position[0], position[1], position[2]);
-    if (Array.isArray(rotation) && rotation.length === 3) {
-      copy.rotation.set(rotation[0] * Math.PI / 180, rotation[1] * Math.PI / 180, rotation[2] * Math.PI / 180);
-    } else if (Number.isFinite(rotation)) {
-      copy.rotation.set(0, rotation * Math.PI / 180, 0);
+      });
+      ghostGroup.add(ghostMesh); ghostKey = key;
     }
-
-    if (Array.isArray(scale) && scale.length === 3) {
-      copy.scale.set(scale[0], scale[1], scale[2]);
-    } else if (Number.isFinite(scale)) {
-      copy.scale.set(scale, scale, scale);
-    }
-
-    ghostMesh = copy;
-    ghostGroup.add(copy);
+    transformDecoration(ghostMesh, position, rotation, scale);
     render();
   }
 
   function hideGhost() {
-    if (ghostMesh) {
-      ghostGroup.remove(ghostMesh);
-      disposeTree(ghostMesh);
-      ghostMesh = null;
-    }
+    if (ghostMesh) ghostGroup.remove(ghostMesh);
+    // Clones share geometry and textures with the library: only release cloned materials.
+    ghostMesh = null; ghostKey = '';
     for (const m of ghostMaterials) m.dispose();
     ghostMaterials.length = 0;
     render();
@@ -539,240 +513,112 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     controls.enabled = !isInteracting;
   }
 
-  function raycastSurface(clientX, clientY, targetRoomId, itemType, itemScale = 1.0, itemRot = 0, excludeId = null) {
-    if (!house || dead) return null;
-    const activeRoom = targetRoomId || state.activeRoomId || 'beginning';
-    const box = getRoomBoundingBox(activeRoom);
-    const r = renderer.domElement.getBoundingClientRect();
-    if (!r.width || !r.height) return null;
-
-    const ext = getRotatedExtents(itemType, itemScale, itemRot);
-    const halfX = ext.halfX;
-    const halfZ = ext.halfZ;
-    const itemHeight = ext.height;
-
-    const ndc = new THREE.Vector2(
-      ((clientX - r.left) / r.width) * 2 - 1,
-      -((clientY - r.top) / r.height) * 2 + 1
-    );
-    ray.setFromCamera(ndc, camera);
-
-    const intersects = ray.intersectObjects([decorGroup, house], true);
-    let chosenHit = null;
-    let surfaceType = 'floor';
-    let parentId = null;
-    let isValid = true;
-    let reason = '';
-
-    for (const hit of intersects) {
-      if (excludeId && hit.object.userData.instanceId === excludeId) continue;
-      const pt = hit.point;
-      if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y) || !Number.isFinite(pt.z)) continue;
-      const margin = 0.25;
-      if (
-        pt.x >= box.minX - margin && pt.x <= box.maxX + margin &&
-        pt.y >= box.floorY - 0.2 && pt.y <= box.ceilingY + margin &&
-        pt.z >= box.minZ - margin && pt.z <= box.maxZ + margin
-      ) {
-        chosenHit = hit;
-        break;
-      }
+  const roomTriangles = new Map();
+  let houseTriangles;
+  let solverKey = '', solver;
+  function getSolver(roomId, item, scale = 1, rotation = 0, excludeId = null, extra = [], excludeIds = []) {
+    const template = library?.getObjectByName('decor_' + item);
+    const root = roomObjects.get(roomId);
+    if (!template || !root) return null;
+    const key = JSON.stringify([decorKey, roomId, item, scale, rotation, excludeId, extra, excludeIds]);
+    if (key === solverKey) return solver;
+    if (!roomTriangles.has(roomId)) roomTriangles.set(roomId, placementTriangles(root));
+    houseTriangles ||= placementTriangles(house);
+    const obstacles = decorGroup.children.filter(o => o.userData.instanceId !== excludeId && !excludeIds.includes(o.userData.instanceId)).map(o => new THREE.Box3().setFromObject(o, true));
+    for (const d of extra) {
+      const source = library.getObjectByName('decor_' + d.item);
+      if (!source) continue;
+      const copy = source.clone(true);
+      transformDecoration(copy, d.position, d.rotation, d.scale);
+      obstacles.push(new THREE.Box3().setFromObject(copy, true));
     }
-
-    if (chosenHit) {
-      const normal = chosenHit.face ? chosenHit.face.normal.clone() : new THREE.Vector3(0, 1, 0);
-      normal.transformDirection(chosenHit.object.matrixWorld);
-
-      let checkObj = chosenHit.object;
-      while (checkObj && !checkObj.userData.instanceId && checkObj !== decorGroup && checkObj !== house) {
-        checkObj = checkObj.parent;
-      }
-
-      if (checkObj && checkObj.userData && checkObj.userData.instanceId) {
-        const decorItem = checkObj.userData.decorItem;
-        if (['table', 'desk', 'shelf', 'carpet', 'album', 'nameplate'].includes(decorItem)) {
-          if (normal.y < 0.65) {
-            isValid = false;
-            reason = 'Chỉ có thể đặt đồ lên mặt trên của vật đỡ';
-          } else {
-            if (decorItem === 'carpet') {
-              surfaceType = 'floor';
-            } else if (decorItem === 'shelf') {
-              surfaceType = 'shelf';
-            } else {
-              surfaceType = 'table';
-            }
-            parentId = checkObj.userData.instanceId;
-
-            // Verify hit point is within parent supporting area (accounting for parent rotation)
-            const pDim = ASSET_DIMENSIONS[decorItem] || { width: 0.6, depth: 0.5 };
-            const pScale = checkObj.scale?.x || 1.0;
-            const pHalfW = (pDim.width * pScale) / 2.0;
-            const pHalfD = (pDim.depth * pScale) / 2.0;
-            const pRot = checkObj.rotation?.y || 0;
-            const dx = chosenHit.point.x - checkObj.position.x;
-            const dz = chosenHit.point.z - checkObj.position.z;
-            const localDx = dx * Math.cos(-pRot) - dz * Math.sin(-pRot);
-            const localDz = dx * Math.sin(-pRot) + dz * Math.cos(-pRot);
-            if (
-              Math.abs(localDx) > pHalfW + 0.05 ||
-              Math.abs(localDz) > pHalfD + 0.05
-            ) {
-              isValid = false;
-              reason = 'Vị trí này nằm ngoài phạm vi mặt đỡ của vật phẩm';
-            }
-          }
-        } else {
-          isValid = false;
-          reason = 'Món đồ này không thể làm vật đỡ cho món đồ khác';
-        }
-      } else {
-        const meshName = (chosenHit.object.name || '').toLowerCase();
-        const parentName = (chosenHit.object.parent?.name || '').toLowerCase();
-        const isTableMesh = meshName.includes('table') || parentName.includes('table') || meshName.includes('desk') || parentName.includes('desk');
-        const isShelfMesh = meshName.includes('shelf') || parentName.includes('shelf');
-        const isFloorMesh = meshName.includes('floor') || parentName.includes('floor') || (normal.y > 0.8 && chosenHit.point.y <= box.floorY + 0.18);
-        const isWallMesh = meshName.includes('wall') || meshName.includes('wainscot') || meshName.includes('panel') || parentName.includes('wall') || meshName.includes('plaque');
-
-        if (isTableMesh && normal.y > 0.65) {
-          surfaceType = 'table';
-        } else if (isShelfMesh && normal.y > 0.65) {
-          surfaceType = 'shelf';
-        } else if (isFloorMesh && normal.y > 0.7) {
-          surfaceType = 'floor';
-        } else if (isWallMesh && Math.abs(normal.y) < 0.35 && (Math.abs(normal.z) > 0.65 || Math.abs(normal.x) > 0.65)) {
-          surfaceType = 'wall';
-        } else {
-          // Reject non-declared surfaces (sofa, stairs, ceiling, angled rails)
-          isValid = false;
-          reason = 'Vị trí này không phải bề mặt đặt đồ hợp lệ (hãy chọn sàn nhà, mặt bàn hoặc tường)';
-        }
-      }
-
-      // Check if item's scaled/rotated extents would penetrate walls, floor or ceiling
-      const isWallPenetrating =
-        chosenHit.point.x - halfX < box.minX - 0.02 ||
-        chosenHit.point.x + halfX > box.maxX + 0.02 ||
-        chosenHit.point.z - halfZ < box.minZ - 0.02 ||
-        chosenHit.point.z + halfZ > box.maxZ + 0.02 ||
-        chosenHit.point.y < box.floorY - 0.02 ||
-        chosenHit.point.y + itemHeight > box.ceilingY + 0.02;
-
-      if (isWallPenetrating && surfaceType !== 'wall') {
-        isValid = false;
-        reason = 'Kích thước món đồ sau khi xoay/thu phóng vượt quá giới hạn căn phòng (xuyên tường)';
-      }
-
-      // Clamp coordinates using true scaled half-extents to keep preview within room boundaries
-      const posX = Math.max(box.minX + halfX, Math.min(box.maxX - halfX, chosenHit.point.x));
-      const posY = Math.max(box.floorY, Math.min(box.ceilingY - itemHeight, chosenHit.point.y));
-      const posZ = Math.max(box.minZ + halfZ, Math.min(box.maxZ - halfZ, chosenHit.point.z));
-
-      if (!Number.isFinite(posX) || !Number.isFinite(posY) || !Number.isFinite(posZ)) {
-        return null;
-      }
-
-      if (itemType && isValid) {
-        const asset = DECORATIONS.find(d => d.id === itemType);
-        if (asset && asset.supportedSurfaces && !asset.supportedSurfaces.includes(surfaceType)) {
-          isValid = false;
-          reason = `Món này cần đặt trên ${asset.supportedSurfaces.join(' hoặc ')}, không đặt trên ${surfaceType}`;
-        }
-      }
-
-      return {
-        isValid,
-        reason,
-        surface: surfaceType,
-        position: [Number(posX.toFixed(3)), Number(posY.toFixed(3)), Number(posZ.toFixed(3))],
-        normal: [Number(normal.x.toFixed(3)), Number(normal.y.toFixed(3)), Number(normal.z.toFixed(3))],
-        parentId,
-        roomId: activeRoom
-      };
+    solver = createPlacementSolver({ template, roomId, triangles: roomTriangles.get(roomId), collisionTriangles: houseTriangles, obstacles, scale, rotation });
+    solverKey = key;
+    return solver;
+  }
+  function findPlacement(roomId, item, options = {}) {
+    for (const scale of options.scale === undefined ? [1, .8, .6] : [options.scale]) {
+      const hit = getSolver(roomId, item, scale, options.rotation, options.excludeId, options.extra, options.excludeIds)?.find(options.position ? new THREE.Vector3(...options.position) : undefined);
+      if (hit) return hit;
     }
-
-    // Fallback: virtual floor plane at box.floorY
-    const floorY = box.floorY + 0.02;
-    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorY);
-    const planeHit = new THREE.Vector3();
-    if (ray.ray.intersectPlane(floorPlane, planeHit)) {
-      if (!Number.isFinite(planeHit.x) || !Number.isFinite(planeHit.z)) return null;
-      const posX = Math.max(box.minX + halfX, Math.min(box.maxX - halfX, planeHit.x));
-      const posY = floorY;
-      const posZ = Math.max(box.minZ + halfZ, Math.min(box.maxZ - halfZ, planeHit.z));
-
-      let isValidPlane = true;
-      let reasonPlane = '';
-      if (itemType) {
-        const asset = DECORATIONS.find(d => d.id === itemType);
-        if (asset && asset.supportedSurfaces && !asset.supportedSurfaces.includes('floor')) {
-          isValidPlane = false;
-          reasonPlane = `Món này cần đặt trên ${asset.supportedSurfaces.join(' hoặc ')}`;
-        }
-      }
-
-      return {
-        isValid: isValidPlane,
-        reason: reasonPlane,
-        surface: 'floor',
-        position: [Number(posX.toFixed(3)), Number(posY.toFixed(3)), Number(posZ.toFixed(3))],
-        normal: [0, 1, 0],
-        parentId: null,
-        roomId: activeRoom
-      };
-    }
-
     return null;
   }
-
-  function pointerDown(e){
-    down={x:e.clientX,y:e.clientY};
-    resetGyroOffset();
+  function raycastSurface(clientX, clientY, roomId, item, scale = 1, rotation = 0, excludeId = null) {
+    if (!house || dead) return null;
+    const activeRoom = roomId || state.activeRoomId;
+    const resolver = getSolver(activeRoom, item, scale, rotation, excludeId);
+    if (!resolver) return null;
+    const r = renderer.domElement.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    ray.setFromCamera(new THREE.Vector2((clientX-r.left)/r.width*2-1, -(clientY-r.top)/r.height*2+1), camera);
+    const hit = ray.intersectObject(roomObjects.get(activeRoom), true)[0];
+    let point = hit?.point;
+    if (!point) {
+      point = new THREE.Vector3();
+      if (!ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), point)) return null;
+    }
+    return resolver.find(point);
   }
-  function pointerUp(e){
-    if(!down||Math.hypot(e.clientX-down.x,e.clientY-down.y)>6||!house)return;
+  function previewPointer(e) {
     const placement = getPlacement?.();
-    if (placement?.item) {
-      const hit = raycastSurface(e.clientX,e.clientY,state.activeRoomId,placement.item,placement.scale,placement.rotation,placement.excludeId);
-      if (hit) onSurfaceTap?.(hit);
+    if (!placement?.item) return null;
+    const hit = raycastSurface(e.clientX, e.clientY, state.activeRoomId, placement.item, placement.scale, placement.rotation, placement.excludeId);
+    if (hit) {
+      showGhost(placement.item, hit.position, true, placement.rotation, placement.scale);
+      onPlacementPreview?.(hit);
+    }
+    return hit;
+  }
+  function pointerDown(e) {
+    if (down || e.button !== 0 || e.isPrimary === false) return;
+    down = { x: e.clientX, y: e.clientY, id: e.pointerId, placing: Boolean(getPlacement?.()?.item) };
+    resetGyroOffset();
+    if (down.placing) {
+      if(currentTween){cancelAnimationFrame(currentTween.raf);currentTween=null;}
+      controls.enabled = false;
+      renderer.domElement.setPointerCapture(e.pointerId);
+      down.hit = previewPointer(e);
+      e.stopImmediatePropagation();
+    }
+  }
+  function pointerMove(e) {
+    if (down?.id !== e.pointerId || !down.placing) return;
+    down.hit = previewPointer(e) || down.hit;
+  }
+  function pointerCancel(e) {
+    if (down?.id !== e.pointerId) return;
+    down = null;
+    if (renderer.domElement.hasPointerCapture(e.pointerId)) renderer.domElement.releasePointerCapture(e.pointerId);
+    controls.enabled = !getPlacement?.()?.item;
+    hideGhost();
+  }
+  function pointerUp(e) {
+    if (!down || down.id !== e.pointerId) return;
+    const gesture = down; down = null;
+    if (renderer.domElement.hasPointerCapture(e.pointerId)) renderer.domElement.releasePointerCapture(e.pointerId);
+    if (gesture.placing) {
+      const hit = previewPointer(e) || gesture.hit;
+      if (hit && getPlacement?.()?.item) onSurfaceTap?.(hit);
       return;
     }
+    if (Math.hypot(e.clientX-gesture.x,e.clientY-gesture.y)>6 || !house) return;
     const r=renderer.domElement.getBoundingClientRect();
     ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),camera);
     const hit=ray.intersectObjects([house,decorGroup],true)[0];
-    if(hit){
-      if(hit.object.userData.url){
-        onPhoto?.(hit.object.userData.url, hit.object.userData.memory);
-        return;
-      }
-      if(hit.object.userData.decorItem){
-        onDecorItem?.(hit.object.userData.decorItem, {
-          id: hit.object.userData.instanceId,
-          instanceId: hit.object.userData.instanceId,
-          roomId: hit.object.userData.roomId,
-          slot: hit.object.userData.decorSlot,
-          text: hit.object.userData.decorText,
-          photos: hit.object.userData.decorPhotos,
-          surface: hit.object.userData.decorSurface,
-          position: hit.object.userData.decorPosition,
-          rotation: hit.object.userData.decorRotation,
-          scale: hit.object.userData.decorScale,
-          parent_id: hit.object.userData.decorParentId
-        });
-        return;
-      }
-      let o=hit.object;while(o&&!o.userData.roomId)o=o.parent;
-      if(o)onRoom?.(o.userData.roomId);
+    if (!hit) return;
+    if (hit.object.userData.decorItem && (isEditing?.() || !hit.object.userData.url)) {
+      let root = hit.object;
+      while (root.parent && root.parent !== decorGroup) root = root.parent;
+      const data = root.userData;
+      onDecorItem?.(data.decorItem, { id: data.instanceId, roomId: data.roomId, slot: data.decorSlot, text: data.decorText, photos: data.decorPhotos, surface: data.decorSurface, position: data.decorPosition, rotation: data.decorRotation, scale: data.decorScale, parent_id: data.decorParentId });
+      return;
     }
-    if(onSurfaceTap){
-      const surfaceHit = raycastSurface(e.clientX, e.clientY, state.activeRoomId);
-      if(surfaceHit){
-        onSurfaceTap(surfaceHit);
-      }
-    }
+    if (hit.object.userData.url) { onPhoto?.(hit.object.userData.url, hit.object.userData.memory); return; }
+    let o=hit.object;while(o&&!o.userData.roomId)o=o.parent;
+    if(o)onRoom?.(o.userData.roomId);
   }
   function lost(e){e.preventDefault();onError?.('Chế độ 3D tạm dừng. Chuyển sang khung 2D hoặc tải lại mô hình.');}
-  renderer.domElement.addEventListener('pointerdown',pointerDown);renderer.domElement.addEventListener('pointerup',pointerUp);renderer.domElement.addEventListener('webglcontextlost',lost);
+  renderer.domElement.addEventListener('pointerdown',pointerDown,true);renderer.domElement.addEventListener('pointerup',pointerUp);renderer.domElement.addEventListener('pointermove',pointerMove);renderer.domElement.addEventListener('pointercancel',pointerCancel);renderer.domElement.addEventListener('lostpointercapture',pointerCancel);renderer.domElement.addEventListener('webglcontextlost',lost);
 
   function enableGyroscope(enable) {
     if (!enable) {
@@ -851,6 +697,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     },
     enableGyroscope,
     raycastSurface,
+    findPlacement,
     showGhost,
     hideGhost,
     setSelectionHighlight,
@@ -872,7 +719,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
       if(typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityChange);
       if(gyroHandler && typeof window !== 'undefined') window.removeEventListener('deviceorientation', gyroHandler);
       resetGyroOffset();
-      renderer.domElement.removeEventListener('pointerdown',pointerDown);renderer.domElement.removeEventListener('pointerup',pointerUp);renderer.domElement.removeEventListener('webglcontextlost',lost);
+      renderer.domElement.removeEventListener('pointerdown',pointerDown,true);renderer.domElement.removeEventListener('pointerup',pointerUp);renderer.domElement.removeEventListener('pointermove',pointerMove);renderer.domElement.removeEventListener('pointercancel',pointerCancel);renderer.domElement.removeEventListener('lostpointercapture',pointerCancel);renderer.domElement.removeEventListener('webglcontextlost',lost);
       clearDecor();
       for(const t of textures.values())t.dispose();
       titleTexture?.dispose();disposeTree(titleMesh);disposeTree(house);disposeTree(library);

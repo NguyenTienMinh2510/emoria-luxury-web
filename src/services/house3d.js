@@ -23,7 +23,7 @@ export const DECORATIONS = [
   photoCount: { frame: 1, album: 2, bunting: 3 }[id] || 0,
   textLabel: { calendar: 'Ngày / lời nhắn trên lịch', nameplate: 'Chữ trên biển tên' }[id] || null,
   defaultSurface: defaultSurface || 'table',
-  supportedSurfaces: supportedSurfaces || ['table', 'floor']
+  supportedSurfaces: [...new Set(['floor', 'table', 'shelf', ...supportedSurfaces])]
 }));
 
 // Legacy 3 slots for backward compatibility
@@ -296,7 +296,7 @@ export function addDecorationInstance(room, item, options = {}) {
  * Updates an existing decoration instance in a room and propagates transforms
  * to all descendants in the hierarchy (A -> B -> C -> ...) using Three.js conventions.
  */
-export function updateDecorationInstance(room, instanceId, updates = {}) {
+export function updateDecorationInstance(room, instanceId, updates = {}, { validatedPlacement = false } = {}) {
   const current = roomDecorations(room);
   const target = current.find(d => d.id === instanceId || d.slot === instanceId);
   if (!target) return room;
@@ -392,7 +392,10 @@ export function updateDecorationInstance(room, instanceId, updates = {}) {
   }
 
   // Bounds verification: if room has defined bounds, clamp affected items that would penetrate walls
-  if (room?.id && ROOM_BOUNDS[room.id]) {
+  // A renderer-validated transform already includes the GLB's actual bounds and
+  // pivot offset. Approximate catalog dimensions must not move it off its support.
+  const changesTransform = ['position', 'rotation', 'scale'].some(key => key in updates);
+  if (!validatedPlacement && changesTransform && room?.id && ROOM_BOUNDS[room.id]) {
     const box = getRoomBoundingBox(room.id);
     const affectedIds = new Set([instanceId, ...descendantIds]);
     for (const aId of affectedIds) {

@@ -150,6 +150,8 @@ export default function Navbar({
             )}
           </div>
 
+          <button type="button" onClick={() => handleSwitchView('memory-match')} aria-current={currentView === 'memory-match' ? 'page' : undefined} className="hidden xl:block px-3 py-2 rounded-full border border-rose-400/40 text-rose-200 text-xs font-semibold hover:bg-rose-500/15">Mismatch</button>
+
           {/* Right Action Bar: Search, Cart, User Profile */}
           <div className="flex items-center gap-2 sm:gap-3">
 
@@ -298,6 +300,7 @@ export default function Navbar({
                 </button>
               </div>
 
+              <button type="button" onClick={() => handleSwitchView('memory-match')} aria-current={currentView === 'memory-match' ? 'page' : undefined} className="w-full min-h-11 rounded-xl border border-rose-400/40 text-rose-200 font-semibold">Mismatch · {t('Chơi cùng người quen','Play with someone you know')}</button>
               {isAdmin&&<button onClick={()=>handleSwitchView('admin')} className="w-full min-h-11 rounded-xl bg-white text-dark-950 font-semibold">{t("Trang quản trị","Admin dashboard")}</button>}
               {/* Mobile Search */}
               <form onSubmit={handleSearchSubmit} className="relative mb-2">
