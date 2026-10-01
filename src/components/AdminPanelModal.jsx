@@ -15,6 +15,7 @@ import NfcOperations,{OrderGiftSetup} from './NfcOperations';
 import ShipmentEditor from './ShipmentEditor';
 import StoreAdminPanel from './StoreAdminPanel';
 import MarkdownContent from './MarkdownContent';
+import ArticleEditor from './ArticleEditor';
 import { callStore } from '../services/catalogService';
 import { listOrdersForAdmin, updateOrderStatus } from '../services/orderBackendService';
 import {
@@ -614,16 +615,8 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                     />
                   </div>
 
-                  <div>
-                    <label className="text-slate-300 block mb-1">Nội dung bài viết (Hỗ trợ tiêu đề phụ ###, danh sách số 1., 2.):</label>
-                    <textarea
-                      value={articleForm.content}
-                      onChange={(e) => setArticleForm(prev => ({ ...prev, content: e.target.value }))}
-                      rows={8}
-                      placeholder="Nhập toàn bộ nội dung bài viết..."
-                      className="w-full p-3 rounded-xl bg-white/5 border border-white/15 text-white text-xs focus:outline-none leading-relaxed font-mono"
-                    />
-                  </div>
+                  <ArticleEditor value={articleForm.content}
+                    onChange={content => setArticleForm(prev => ({ ...prev, content }))} />
 
                   <div className="flex items-center justify-between pt-3 border-t border-white/10">
                     <label className="flex items-center gap-2 text-slate-300 cursor-pointer">

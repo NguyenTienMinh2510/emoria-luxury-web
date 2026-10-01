@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { loadShowcaseFrames } from '../services/showcaseFrames.js';
+import { prepareShowcaseFrames, SHOWCASE_FRAME_COUNT } from '../services/showcaseFrames.js';
 import {
   Sparkles, ShieldCheck, Cpu, Layers, Disc,
   ChevronDown,
@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 
 // Use every original frame while preserving the existing image stage and layer timing.
-const TOTAL_FRAMES = 300;
+const TOTAL_FRAMES = SHOWCASE_FRAME_COUNT;
+const FRAME_RATE = 72;
 const LAYER_FRAMES = [0, 30, 48, 66, 80, 86, 119];
 
 export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpenNfcDemo }) {
@@ -95,7 +96,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
       const elapsed = previousTime === undefined ? 1000 / 60 : Math.min(32, time - previousTime);
       previousTime = time;
       const direction = Math.sign(target - currentFrameRef.current);
-      const next = currentFrameRef.current + direction * elapsed * 60 / 1000;
+      const next = currentFrameRef.current + direction * elapsed * FRAME_RATE / 1000;
       const frame = direction > 0 ? Math.min(target, next) : Math.max(target, next);
       drawFrame(frame);
       if (frame === target) {
@@ -107,32 +108,23 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
   }, [drawFrame]);
 
   useEffect(() => {
-    let count = 0, successes = 0;
     preparedRef.current = false;
-    const mobile = window.innerWidth < 768;
     reducedMotionRef.current = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false;
-    const loader = loadShowcaseFrames({
-      count: TOTAL_FRAMES,
-      getPath: index => `/assets/animation-optimized/frame-${String(index).padStart(3, '0')}${mobile ? '-640' : ''}.webp?v=3`,
-      getFallbackPath: index => `/assets/animation/ezgif-frame-${String(index + 1).padStart(3, '0')}.jpg?v=2`,
-      onLoad: (index, loaded) => {
-        count++;
-        if (loaded) successes++;
-        if (count % 6 === 0 || index === 0 || count === TOTAL_FRAMES) setLoadedCount(count);
-        if (paintedIndexRef.current < 0 && loaded) drawFrame(0);
-        if (count === TOTAL_FRAMES) {
-          preparedRef.current = successes > 0;
-          setIsLoaded(successes > 0);
-          animateTo(targetFrameRef.current);
-        }
-      },
-    });
-    frameLoaderRef.current = loader;
-    // Download and decode the entire sequence immediately on entry.
-    loader.preload();
+    const sequence = prepareShowcaseFrames();
+    frameLoaderRef.current = sequence.loader;
+    const sync = () => {
+      const { loadedCount, ready } = sequence.getSnapshot();
+      preparedRef.current = ready;
+      setLoadedCount(loadedCount);
+      setIsLoaded(ready);
+      if (paintedIndexRef.current < 0 && loadedCount) drawFrame(0);
+      if (ready) animateTo(targetFrameRef.current);
+    };
+    const unsubscribe = sequence.subscribe(sync);
+    sync();
     return () => {
       preparedRef.current = false;
-      loader.dispose();
+      unsubscribe();
       frameLoaderRef.current = null;
       cancelAnimationFrame(paintFrameRef.current);
       cancelAnimationFrame(playbackRef.current);

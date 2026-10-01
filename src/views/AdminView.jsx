@@ -18,6 +18,7 @@ import PaymentReview from '../components/PaymentReview';
 import ShipmentEditor from '../components/ShipmentEditor';
 import StoreAdminPanel from '../components/StoreAdminPanel';
 import MarkdownContent from '../components/MarkdownContent';
+import ArticleEditor from '../components/ArticleEditor';
 import { callStore } from '../services/catalogService';
 import { listOrdersForAdmin, updateOrderStatus } from '../services/orderBackendService';
 import {
@@ -672,15 +673,8 @@ export default function AdminView({
                           className="store-input"
                         />
                       </div>
-                      <div>
-                        <label className="store-label">{t("Nội dung chi tiết (Markdown)","Content (Markdown)")}</label>
-                        <textarea
-                          rows={8}
-                          value={articleForm.content}
-                          onChange={(e) => setArticleForm({ ...articleForm, content: e.target.value })}
-                          className="store-input font-mono"
-                        />
-                      </div>
+                      <ArticleEditor value={articleForm.content} disabled={savingArticle}
+                        onChange={content => setArticleForm(form => ({ ...form, content }))} />
                     </div>
 
                     <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">

@@ -63,6 +63,14 @@ export function loadShowcaseFrames({ count, getPath, getFallbackPath, onLoad, Im
       }
       pump();
     },
+    retry(index) {
+      if (!active || !settled[index] || ready[index]) return;
+      images[index]?.removeAttribute('src');
+      settled[index] = false;
+      started.delete(index);
+      pending.unshift(index);
+      pump();
+    },
     dispose() {
       active = false;
       pending.length = 0;
@@ -74,4 +82,45 @@ export function loadShowcaseFrames({ count, getPath, getFallbackPath, onLoad, Im
       });
     },
   };
+}
+
+export const SHOWCASE_FRAME_COUNT = 300;
+let showcaseSequence;
+
+// One decoded sequence per visit, shared by the entry screen and home page.
+export function prepareShowcaseFrames() {
+  if (showcaseSequence) return showcaseSequence;
+  const listeners = new Set();
+  let loadedCount = 0, settledCount = 0;
+  let snapshot = { loadedCount: 0, ready: false, failed: false };
+  const publish = () => {
+    snapshot = { loadedCount, ready: loadedCount === SHOWCASE_FRAME_COUNT,
+      failed: settledCount === SHOWCASE_FRAME_COUNT && loadedCount < SHOWCASE_FRAME_COUNT };
+    listeners.forEach(listener => listener());
+  };
+  const mobile = window.innerWidth < 768;
+  const loader = loadShowcaseFrames({
+    count: SHOWCASE_FRAME_COUNT,
+    getPath: index => `/assets/animation-optimized/frame-${String(index).padStart(3, '0')}${mobile ? '-640' : ''}.webp?v=3`,
+    getFallbackPath: index => `/assets/animation/ezgif-frame-${String(index + 1).padStart(3, '0')}.jpg?v=2`,
+    onLoad: (index, loaded) => {
+      settledCount++;
+      if (loaded) loadedCount++;
+      publish();
+    },
+  });
+  showcaseSequence = {
+    loader,
+    getSnapshot: () => snapshot,
+    subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener); },
+    retry() {
+      if (!snapshot.failed) return;
+      const failed = loader.settled.flatMap((settled, index) => settled && !loader.ready[index] ? [index] : []);
+      settledCount -= failed.length;
+      publish();
+      failed.forEach(index => loader.retry(index));
+    },
+  };
+  loader.preload();
+  return showcaseSequence;
 }

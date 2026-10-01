@@ -42,6 +42,25 @@ const {canNavigateView,readStudioRoute}=await compile('src/App.jsx','app-navigat
  console.log('PASS App navigation: cancelled/same/saved/confirmed transitions and fresh/public Studio routes.');
 }
 {
+ const appCode=fs.readFileSync('src/App.jsx','utf8');
+ const authChangeBody=appCode.match(/supabase\.auth\.onAuthStateChange\(\(event, session\) => \{([\s\S]*?)\n      \}\);/)[1];
+ const calls=[],recoveryWindow={location:{search:'?auth=recovery'}};
+ const onAuthChange=new Function('window','setRecovery','setIsAuthOpen','clearTimeout','setTimeout','refreshSessionRole',
+  `let timer;return (event,session)=>{${authChangeBody}};`)(recoveryWindow,value=>calls.push(['recovery',value]),value=>calls.push(['open',value]),()=>{},()=>1,()=>{});
+ for(const [event,session,search,opens] of [
+  ['INITIAL_SESSION',{user:{id:'recovered'}},'?auth=recovery',true],
+  ['INITIAL_SESSION',null,'?auth=recovery',false],
+  ['INITIAL_SESSION',{},'?auth=recovery',false],
+  ['INITIAL_SESSION',{user:{id:'existing'}},'?view=articles',false],
+  ['SIGNED_IN',{user:{id:'existing'}},'?auth=recovery',false],
+  ['PASSWORD_RECOVERY',{user:{id:'recovered'}},'',true],
+ ]) {
+  calls.length=0;recoveryWindow.location.search=search;onAuthChange(event,session);
+  assert.deepEqual(calls,opens?[['recovery',true],['open',true]]:[],`${event} opens password reset only for a real recovery event or authenticated initial recovery link`);
+ }
+ console.log('PASS recovery entry: authenticated reset links survive deferred App mount; empty sessions and normal sign-in never activate the fallback.');
+}
+{
  const authCode=fs.readFileSync('src/components/AuthDialog.jsx','utf8');
  const signOutBody=authCode.match(/const handleSignOut = async \(\) => \{([\s\S]*?)\n  \};/)[1];
  const runSignOut=new Function('supabase','onBeforeSignOut','onLoginSuccess','onClose','setError',`return (async () => {${signOutBody}})();`);

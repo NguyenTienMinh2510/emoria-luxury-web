@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+import MotionEntryGate from './components/MotionEntryGate.jsx';
 import StoreProvider from './components/StoreProvider.jsx';
 import LanguageProvider from './i18n/LanguageProvider.jsx';
 import { Analytics } from '@vercel/analytics/react';
@@ -10,25 +11,27 @@ import './styles/index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <LanguageProvider>
-      <StoreProvider>
-        <App />
-        <Analytics
-          beforeSend={(event) => {
-            if (getAnalyticsConsent() === 'denied') return null;
-            if (event?.url && (event.url.includes('/memory') || event.url.includes('/admin'))) {
-              return null;
-            }
-            return event;
-          }}
-        />
-        <SpeedInsights
-          beforeSend={(data) => {
-            if (getAnalyticsConsent() === 'denied') return null;
-            return data;
-          }}
-        />
-      </StoreProvider>
-    </LanguageProvider>
+    <MotionEntryGate>
+      <LanguageProvider>
+        <StoreProvider>
+          <App />
+          <Analytics
+            beforeSend={(event) => {
+              if (getAnalyticsConsent() === 'denied') return null;
+              if (event?.url && (event.url.includes('/memory') || event.url.includes('/admin'))) {
+                return null;
+              }
+              return event;
+            }}
+          />
+          <SpeedInsights
+            beforeSend={(data) => {
+              if (getAnalyticsConsent() === 'denied') return null;
+              return data;
+            }}
+          />
+        </StoreProvider>
+      </LanguageProvider>
+    </MotionEntryGate>
   </React.StrictMode>,
 );

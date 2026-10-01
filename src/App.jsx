@@ -176,8 +176,12 @@ export default function App() {
   useEffect(() => {
     if (isSupabaseConfigured()) {
       let timer;
-      const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'PASSWORD_RECOVERY') { setRecovery(true); setIsAuthOpen(true); }
+      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        // Entry preload may finish after the recovery event has already fired.
+        if (event === 'PASSWORD_RECOVERY' || (event === 'INITIAL_SESSION' && session?.user &&
+          new URLSearchParams(window.location.search).get('auth') === 'recovery')) {
+          setRecovery(true); setIsAuthOpen(true);
+        }
         clearTimeout(timer);
         timer = setTimeout(refreshSessionRole, 0);
       });

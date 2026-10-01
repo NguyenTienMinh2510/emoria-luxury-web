@@ -133,4 +133,6 @@ try {
 } finally { globalThis.fetch=originalFetch; }
 console.log('PASS performance regression: bounded frame loading and decoding, current-frame priority, original-image and decode fallback, disposal, responsive assets, custom uploads, deduplicated batch signing and safe Storage failure.');
 await import('./showcase_render.test.mjs');
+await import('./motion_entry.test.mjs');
 await import('./article_reading.test.mjs');
+await import('./article_editor.test.mjs');

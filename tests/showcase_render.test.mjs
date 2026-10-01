@@ -46,7 +46,7 @@ Object.assign(globalThis, {
   cancelAnimationFrame: id => raf.delete(id),
 });
 const flush = () => {now+=1000/60;const callbacks=[...raf.values()];raf.clear();callbacks.forEach(fn=>fn(now));};
-const runToEnd = () => {for(let i=0;i<650&&raf.size;i++)flush();assert.equal(raf.size,0,'Playback stops at its endpoint');};
+const runToEnd = () => {let ticks=0;for(;ticks<650&&raf.size;ticks++)flush();assert.equal(raf.size,0,'Playback stops at its endpoint');return ticks;};
 const find = (node,predicate) => {
   if (!node || typeof node!=='object') return;
   if (predicate(node)) return node;
@@ -74,7 +74,8 @@ try {
   assert.equal(ImageFixture.created.length,300,'All original frames are prepared without further input');
   assert.ok(fixture.writes.some(([index,value])=>index===1&&value));
   const beforeWrites=frameWrites().length;
-  runToEnd();
+  const openingTicks=runToEnd();
+  assert.ok(openingTicks<=252,'The full sequence plays in about 4.2 seconds at 60Hz (20% faster rate)');
   assert.ok(draws.at(-1).url.includes('frame-299.webp'));
   assert.ok(frameWrites().length-beforeWrites<=6,'Layer labels update at milestones instead of each animation frame');
   assert.equal(layoutReads,1,'Playback never measures layout');
@@ -107,9 +108,17 @@ try {
   assert.equal(canvas.width,800);assert.equal(canvas.height,700);
   hotspot.onFocus();flush();cleanups.forEach(fn=>fn());
   assert.equal(raf.size,0);assert.equal(listeners.size,0);assert.equal(documentListeners.size,0);
+  const preparedImages=ImageFixture.created.length;
+  fixture.effects=[];fixture.writes=[];fixture.nextState=0;
+  Showcase({});
+  const cachedCleanups=fixture.effects.map(effect=>effect()).filter(fn=>typeof fn==='function');flush();
+  assert.equal(ImageFixture.created.length,preparedImages,'Home remount reuses the decoded sequence without new downloads');
+  assert.ok(fixture.writes.some(([index,value])=>index===1&&value),'Cached-ready home initializes readiness immediately');
+  cachedCleanups.forEach(fn=>fn());
   fixture.effects=[];fixture.writes=[];fixture.nextState=0;ImageFixture.created=[];
   window.innerWidth=390;window.matchMedia=()=>({matches:true});
-  const mobileTree=Showcase({});
+  const {default:MobileShowcase}=await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}#mobile`);
+  const mobileTree=MobileShowcase({});
   const mobileHotspot=find(mobileTree,node=>node.type==='button'&&node.props?.onPointerEnter).props;
   const mobileCleanups=fixture.effects.map(effect=>effect()).filter(fn=>typeof fn==='function');
   assert.ok(ImageFixture.created.every(image=>image.url.includes('-640.webp')),'Phones prepare the lighter full sequence');
@@ -119,7 +128,8 @@ try {
   mobileHotspot.onBlur();flush();assert.ok(draws.at(-1).url.includes('frame-000-640.webp'));
   mobileCleanups.forEach(fn=>fn());
   fixture.effects=[];fixture.writes=[];fixture.nextState=0;ImageFixture.created=[];
-  const missingTree=Showcase({});
+  const {default:MissingShowcase}=await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}#missing`);
+  const missingTree=MissingShowcase({});
   const missingHotspot=find(missingTree,node=>node.type==='button'&&node.props?.onPointerEnter).props;
   const missingCleanups=fixture.effects.map(effect=>effect()).filter(fn=>typeof fn==='function');
   missingHotspot.onFocus();flush();
