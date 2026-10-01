@@ -130,6 +130,8 @@ class QwenTagger:
 
         print(f"Khởi động Qwen3-VL trên GPU: {torch.cuda.get_device_name(0)}...")
         self.processor = AutoProcessor.from_pretrained(MODEL_NAME)
+        # ponytail: 1024 image tokens suit T4; raise the budget after measuring VRAM.
+        self.processor.image_processor.size["longest_edge"] = 1024 * 32 * 32
         quant = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
@@ -255,6 +257,8 @@ class QwenTagger:
         with tempfile.NamedTemporaryFile(suffix=".mp4" if media_type == "video" else ".jpg", delete=False) as tmp:
             tmp_path = Path(tmp.name)
 
+        inputs = generated = None
+        input_tokens = 0
         try:
             if video_url:
                 headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
@@ -307,6 +311,7 @@ class QwenTagger:
                 ).to("cuda:0")
 
             prepared = time.monotonic()
+            input_tokens = int(inputs.input_ids.shape[-1])
             stage = "inference"
             with torch.inference_mode():
                 generated = self.model.generate(
@@ -336,6 +341,7 @@ class QwenTagger:
             labels = unique_labels(parsed["labels"])
             violations = parsed["violations"]
             print(json.dumps({"event": "media_review", "type": media_type,
+                              "input_tokens": input_tokens,
                               "download_s": round(downloaded - started, 2),
                               "preprocess_s": round(prepared - downloaded, 2),
                               "inference_s": round(time.monotonic() - prepared, 2)}))
@@ -349,15 +355,19 @@ class QwenTagger:
             }
 
         except Exception as e:
-            print(json.dumps({"event": "media_review_failed", "stage": stage,
+            print(json.dumps({"event": "media_review_failed", "stage": stage, "type": media_type,
+                              "input_tokens": input_tokens,
                               "error_type": type(e).__name__, "elapsed_s": round(time.monotonic() - started, 2)}))
             return {
                 "success": False,
                 "approved": False,
+                "error_code": "GPU_MEMORY" if isinstance(e, torch.cuda.OutOfMemoryError) else "MEDIA_PROCESSING",
                 "error": str(e),
                 "labels": [],
                 "violations": [],
             }
         finally:
+            inputs = generated = None
+            torch.cuda.empty_cache()
             if tmp_path.exists():
                 tmp_path.unlink()

@@ -83,6 +83,9 @@ export async function labelWithQwen(media, { fetchImpl = fetch, type, url } = {}
     mod = moderationResult(result);
     if (result.approved === false && mod.approved) throw new Error('Conflicting moderation');
   } catch {
+    if (result?.success === false && result.error_code === 'GPU_MEMORY') {
+      throw failure('Hệ thống AI thiếu bộ nhớ khi xử lý. Phương tiện chưa được duyệt; vui lòng thử lại.', 503);
+    }
     throw failure('AI chưa trả đủ kết quả kiểm duyệt. Vui lòng thử lại.', 502);
   }
 
@@ -258,4 +261,3 @@ export async function warmupAi() {
     };
   }
 }
-

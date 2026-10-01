@@ -37,6 +37,7 @@ assert.deepEqual(qwenBody,{url:signedUrl,type:'video'},'No base64 relay for an a
 for(const invalid of [{},{error:'missing input'},{success:false},{success:true,labels:[]},{success:true,labels:[],violations:['unknown']},{success:true,approved:false,labels:[],violations:[]}]){
   await assert.rejects(labelWithQwen(small,{fetchImpl:async()=>Response.json(invalid)}),error=>error.status===502);
 }
+await assert.rejects(labelWithQwen(small,{fetchImpl:async()=>Response.json({success:false,approved:false,error_code:'GPU_MEMORY',error:'private CUDA allocation details',labels:[],violations:[]})}),error=>error.status===503&&error.message.includes('thiếu bộ nhớ')&&!error.message.includes('private CUDA'));
 assert.equal((await labelWithQwen(small,{fetchImpl:async()=>Response.json({success:true,approved:false,labels:[],violations:['GRAPHIC_VIOLENCE']})})).approved,false);
 let googleCalls=[];
 const google=async(url,options)=>{googleCalls.push({url,options});return googleResponse();};
