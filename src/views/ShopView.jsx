@@ -8,6 +8,7 @@ import { useStore } from '../components/StoreProvider';
 import PaymentStatus from '../components/PaymentStatus';
 import { trackOrderSecure } from '../services/orderBackendService';
 import { useLanguage, BilingualText } from '../i18n/LanguageProvider';
+import { productImageProps } from '../services/productImages.js';
 const VirtualTryOnModal=lazy(()=>import('../components/VirtualTryOnModal'));
 
 export default function ShopView({
@@ -304,10 +305,11 @@ export default function ShopView({
                     {/* Product Image Area */}
                     <div className="relative aspect-square w-full overflow-hidden bg-black/40">
                       <img
-                        src={product.image}
+                        {...productImageProps(product.image)}
                         alt={product.name}
                         className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                         loading="lazy"
+                        decoding="async"
                       />
 
                       {/* Tag Badges */}

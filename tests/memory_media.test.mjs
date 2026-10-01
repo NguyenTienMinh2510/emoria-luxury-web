@@ -1,24 +1,32 @@
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import handler from '../api/memory-media.js';
+import restHandler from '../api/v1.js';
 
 process.env.SUPABASE_URL='https://media-fixture.supabase.co';
 process.env.SUPABASE_PUBLISHABLE_KEY='public-key';
 process.env.SUPABASE_SERVICE_ROLE_KEY='server-key';
 const originalFetch=globalThis.fetch;
-let unlocked=true,missingTable=false,brokenImage=false,signs=[],checks=0;
-globalThis.fetch=async(input)=>{
+let unlocked=true,missingTable=false,brokenImage=false,signs=[],checks=0,viewReads=0,signBatches=0;
+globalThis.fetch=async(input,init={})=>{
   const url=String(input);
-  if(url.includes('/rpc/rpc_get_memory_view'))return Response.json({is_unlocked:unlocked,media_gallery:[
+  if(url.includes('/rpc/rpc_get_memory_view')){viewReads++;return Response.json({success:true,is_unlocked:unlocked,letter:unlocked?'Private letter':null,media_gallery:[
     {type:'video',url:'storage://emo-test/ready'},
     {type:'video',url:'storage://emo-test/pending'},
     {type:'video',url:'storage://emo-test/rejected'},
     {type:'image',url:'storage://emo-test/photo'},
     {type:'image',url:'storage://emo-test/disguised-video'},
     {type:'image',url:'storage://other/private'}
-  ],audio_url:'storage://emo-test/song',intro_video_path:'emo-test/intro'});
+  ],audio_url:'storage://emo-test/song',intro_video_path:'emo-test/intro'});}
   if(url.includes('/memory_video_labels')){checks++;return missingTable?Response.json({code:'PGRST205',message:'Missing table'}, {status:404}):Response.json([{path:'emo-test/ready'},{path:'emo-test/photo'}]);}
   if(url.includes('/object/info/'))return Response.json({content_type:url.endsWith('/song')?'audio/mpeg':url.endsWith('/disguised-video')?'video/mp4':'image/jpeg'});
+  if(url.endsWith('/object/sign/emoria-memory')){
+    signBatches++;
+    const {paths,expiresIn}=JSON.parse(init.body);assert.equal(expiresIn,120);
+    assert.equal(new Headers(init.headers).get('authorization'),'Bearer server-key');
+    signs.push(...paths);
+    return Response.json(paths.map(path=>({path,error:brokenImage&&path==='emo-test/photo'?'Missing object':null,signedURL:brokenImage&&path==='emo-test/photo'?null:'/object/sign/emoria-memory/'+path+'?token=fixture'})));
+  }
   if(url.includes('/object/sign/')){
     const path=url.split('/object/sign/emoria-memory/')[1];signs.push(path);
     if(brokenImage&&path==='emo-test/photo')return Response.json({message:'Missing object'}, {status:404});
@@ -32,6 +40,16 @@ async function call(){
   return response;
 }
 try{
+  const open=async()=>{
+    const req=Object.assign(Readable.from([]),{method:'POST',url:'/api/v1/memories/emo-test/access',headers:{'content-type':'application/json'},body:{grant:'fixture-grant'}});
+    let result;await restHandler(req,{setHeader(){},end(value){result={status:this.statusCode,data:JSON.parse(value)};}});return result;
+  };
+  const combined=await open();assert.equal(combined.status,200);assert.equal(viewReads,1);
+  assert.equal(combined.data.letter,'Private letter');assert.equal(signBatches,1);
+  assert.deepEqual(Object.keys(combined.data.media_signing.urls).sort(),['emo-test/photo','emo-test/ready','emo-test/song']);
+  unlocked=false;signs=[];
+  const locked=await open();assert.equal(locked.status,200);assert.equal(locked.data.media_signing,undefined);assert.equal(locked.data.letter,null);assert.equal(signs.length,0);
+  unlocked=true;
   const normal=await call();assert.equal(normal.status,200);
   assert.deepEqual(Object.keys(normal.data.urls).sort(),['emo-test/photo','emo-test/ready','emo-test/song']);
   assert.deepEqual(normal.data.blocked,['emo-test/pending','emo-test/rejected','emo-test/disguised-video','other/private','emo-test/intro']);
@@ -46,5 +64,5 @@ try{
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;signs=[];checks=0;
   const missingKey=await call();assert.equal(missingKey.status,200);assert.deepEqual(missingKey.data.urls,{});assert.ok(missingKey.data.warning);assert.equal(checks,0);assert.equal(signs.length,0);
   unlocked=false;assert.equal((await call()).status,403,'Soft fallback never bypasses the PIN/access check');
-  console.log('PASS memory media: missing key/table degrade safely, pending/rejected/foreign paths never signed, partial media failures, locked memory remains forbidden.');
+  console.log('PASS memory media: one access RPC and one signing batch, locked memory never signed, legacy endpoint retained, missing key/table degrade safely, pending/rejected/foreign paths never signed, partial media failures.');
 }finally{globalThis.fetch=originalFetch;}

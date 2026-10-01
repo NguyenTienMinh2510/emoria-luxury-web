@@ -70,7 +70,7 @@ console.log('PASS render: login/register disappear for authenticated user; chart
 
 // Bundle the provider and components together so they share one React context.
 const localeEntry=path.join(target,'locale-entry.jsx');
-fs.writeFileSync(localeEntry,`import React from 'react';import LanguageProvider,{translate,readLanguage} from '../../src/i18n/LanguageProvider.jsx';import MemoryAccountsAdmin from '../../src/components/MemoryAccountsAdmin.jsx';import NfcOperations from '../../src/components/NfcOperations.jsx';import VideoModerationAdmin from '../../src/components/VideoModerationAdmin.jsx';import Navbar from '../../src/components/Navbar.jsx';export {translate,readLanguage};export default function Fixture(){return <LanguageProvider initialLanguage="en"><Navbar/><MemoryAccountsAdmin/><NfcOperations/><VideoModerationAdmin/></LanguageProvider>;}`);
+fs.writeFileSync(localeEntry,`import React from 'react';import LanguageProvider,{translate,readLanguage,syncGoogleTranslate} from '../../src/i18n/LanguageProvider.jsx';import MemoryAccountsAdmin from '../../src/components/MemoryAccountsAdmin.jsx';import NfcOperations from '../../src/components/NfcOperations.jsx';import VideoModerationAdmin from '../../src/components/VideoModerationAdmin.jsx';import Navbar from '../../src/components/Navbar.jsx';export {translate,readLanguage,syncGoogleTranslate};export default function Fixture(){return <LanguageProvider initialLanguage="en"><Navbar/><MemoryAccountsAdmin/><NfcOperations/><VideoModerationAdmin/></LanguageProvider>;}`);
 const localized=await compile(localeEntry,'locale-render');const english=render(localized.default,{});
 for(const text of ['Memory Spaces &amp; accounts','NFC chips &amp; independent links','Media moderation','Show individual events','Language'])assert.ok(english.includes(text),text);
 assert.equal(localized.translate('en','Xin chào {name}','Hello {name}',{name:'Sam'}),'Hello Sam');
@@ -78,6 +78,19 @@ assert.equal(localized.translate('vi','Xin chào','Hello'),'Xin chào');
 globalThis.localStorage={getItem:()=> 'en'};assert.equal(localized.readLanguage(),'en');
 globalThis.localStorage={getItem:()=>{throw new Error('blocked');}};assert.equal(localized.readLanguage(),'vi');delete globalThis.localStorage;
 console.log('PASS i18n render: shared VI/EN context, admin spaces/chips/media and navigation, stored language and unavailable storage fallback.');
+{
+ const originalInterval=globalThis.setInterval,originalClear=globalThis.clearInterval;
+ let scheduled=0,cleared=0;
+ globalThis.window={location:{hostname:'localhost'}};
+ globalThis.document={cookie:'',body:{style:{}},querySelector:()=>null,querySelectorAll:()=>[]};
+ globalThis.setInterval=()=>++scheduled;globalThis.clearInterval=()=>cleared++;
+ try {
+  localized.syncGoogleTranslate('vi');assert.equal(scheduled,0,'Vietnamese does not poll for an unloaded translator');
+  const cancel=localized.syncGoogleTranslate('en');assert.equal(scheduled,1);
+  assert.equal(typeof cancel,'function');cancel();assert.equal(cleared,1,'Switching languages cancels the previous translation retry');
+ } finally {globalThis.setInterval=originalInterval;globalThis.clearInterval=originalClear;delete globalThis.window;delete globalThis.document;}
+ console.log('PASS translation lifecycle: no initial VI polling and pending EN retry can be cancelled.');
+}
 
 const {default:LuxuryUnboxing}=await compile('src/components/LuxuryUnboxingExperience.jsx','unboxing');
 const unboxHtml=render(LuxuryUnboxing,{hasIntroVideo:true});
@@ -99,6 +112,7 @@ const {default:MemoryMatchStudio}=await compile('src/components/MemoryMatchStudi
 const matchHtml=render(MemoryMatchStudio,{currentUser:'user-owner-a'});
 assert.ok(matchHtml.includes('Mismatch'));
 assert.ok(matchHtml.includes('Chọn Chủ Đề'), 'Match renders the topic picker');
+assert.equal((matchHtml.match(/<article\b/g) || []).length,7,'A new Mismatch draft renders seven question cards');
 assert.ok(matchHtml.includes('Cảm xúc &amp; Kết nối') && matchHtml.includes('Không gian sống &amp; Tương lai') && matchHtml.includes('Tình huống hóc búa'), 'Universal topic cards are visible');
 assert.ok(render(MemoryMatchStudio,{}).includes('Đăng nhập để chơi'));
 assert.ok(!matchHtml.includes('Nhập nội dung câu hỏi') && !matchHtml.includes('Thêm câu hỏi'), 'Old authoring form does not override topic packs');

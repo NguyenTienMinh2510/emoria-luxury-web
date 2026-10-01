@@ -6,6 +6,7 @@ import {analyzeVideo,readVideoLabels,readVideoUploads} from './videoLabels.js';
 import {craftLetter,warmupAi} from './aiService.js';
 import {tryOnConfig} from './tryOn.js';
 import {signEventPaths,enrichMatchQuestionsWithSignedUrls,enrichHouseRoomsWithSignedUrls} from './eventMedia.js';
+import {signMemoryMedia} from './memoryMedia.js';
 import {moderateHousePhotos} from './houseModeration.js';
 const route=(method,path,access,run,status)=>({method,pattern:new RegExp(`^${path}$`),access,run,status});
 const rpc=(c,name,args={})=>isEventRpc(name)?eventRpc(c,name,args):c.db(c.client.rpc(name,args));
@@ -115,7 +116,13 @@ export const routes=[
   route('PUT','/admin/articles/([^/]+)','admin',c=>rpc(c,'rpc_save_article_admin',{p_article_id:c.params[0],p_payload:c.body})),
   route('DELETE','/admin/articles/([^/]+)','admin',c=>rpc(c,'rpc_delete_article_admin',{p_article_id:c.params[0]})),
   route('GET','/me/saved-articles','user',c=>rpc(c,'rpc_saved_articles')),
-  route('POST','/memories/([^/]+)/access','public',c=>rpc(c,'rpc_get_memory_view',{p_tag_uid:c.params[0],p_grant_token:c.body.grant??null})),
+  route('POST','/memories/([^/]+)/access','public',async c=>{
+    const data=await rpc(c,'rpc_get_memory_view',{p_tag_uid:c.params[0],p_grant_token:c.body.grant??null});
+    if(data.is_unlocked&&(data.intro_video_path||data.audio_url?.startsWith('storage://')||data.media_gallery?.some(m=>m.url?.startsWith('storage://')))){
+      data.media_signing=await signMemoryMedia(data,String(c.params[0]).toLowerCase().trim());
+    }
+    return data;
+  }),
   route('POST','/memories/([^/]+)/grants','public',c=>rpc(c,'rpc_verify_memory_pin',{p_tag_uid:c.params[0],p_pin:c.body.pin}),201),
   route('POST','/memories/([^/]+)/claims','user',c=>rpc(c,'rpc_claim_nfc_chip',{p_tag_uid:c.params[0],p_claim_code:c.body.code}),201),
   route('PATCH','/memories/([^/]+)','user',c=>rpc(c,'rpc_update_memory_space',{p_tag_uid:c.params[0],p_payload:c.body})),
@@ -170,6 +177,10 @@ export const routes=[
     const res=await rpc(c,'rpc_match_begin',{p_match_id:c.params[0]});
 
     return res;
+  }),
+  route('POST','/events/matches/([^/]+)/cancel','user',c=>{
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.params[0]))throw Object.assign(new Error('Mã lượt chơi không hợp lệ.'),{status:400});
+    return rpc(c,'rpc_match_cancel',{p_match_id:c.params[0]});
   }),
   route('POST','/events/matches/([^/]+)/progress','public',async c=>{
 

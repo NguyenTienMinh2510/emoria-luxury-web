@@ -15,7 +15,7 @@ export function watchMatch(matchId,inviteToken,onChange,onFallback){
       const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';
       while(!controller.signal.aborted){
         const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});
-        let end;while((end=buffer.indexOf('\n\n'))>=0){const frame=buffer.slice(0,end);buffer=buffer.slice(end+2);if(frame.startsWith('event: denied')){controller.abort();onFallback?.();return;}if(frame.startsWith('data: '))onChange(JSON.parse(frame.slice(6)));}
+        let end;while((end=buffer.indexOf('\n\n'))>=0){const frame=buffer.slice(0,end);buffer=buffer.slice(end+2);if(frame.startsWith('event: cancelled')){controller.abort();onChange({status:'archived'});return;}if(frame.startsWith('event: denied')){controller.abort();onFallback?.();return;}if(frame.startsWith('data: '))onChange(JSON.parse(frame.slice(6)));}
       }
       timer=setTimeout(connect,1000);
     }catch{if(!controller.signal.aborted){onFallback?.();timer=setTimeout(connect,10000);}}

@@ -11,6 +11,7 @@ import {
   createMatch,
   saveMatchQuestions,
   beginMatch,
+  cancelMatch,
   saveMatchProgress,
   submitMatch,
   getMatchView,
@@ -61,16 +62,18 @@ export default function MemoryMatchStudio({
   const [partnerName, setPartnerName] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [selectedTopic, setSelectedTopic] = useState('lifestyle');
-  const [questions, setQuestions] = useState(() => getTopicQuestions('lifestyle', 5));
+  const [questions, setQuestions] = useState(() => getTopicQuestions('lifestyle'));
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isStartingMatch, setIsStartingMatch] = useState(false);
   const [uploadingImageIndex, setUploadingImageIndex] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const cancelDialog = useRef(null);
 
   // Handlers for Topic Packs and Question Reroll
   const handleSelectTopic = (topicId) => {
     setSelectedTopic(topicId);
     const playedTexts = getPlayedQuestions(currentUser);
-    const newQuestions = getTopicQuestions(topicId, 5, playedTexts);
+    const newQuestions = getTopicQuestions(topicId, 7, playedTexts);
     setQuestions(newQuestions);
     const topicObj = MATCH_TOPICS.find(t => t.id === topicId);
     if (topicObj) {
@@ -200,7 +203,8 @@ export default function MemoryMatchStudio({
         }
       }
     } catch (err) {
-      setError(err?.message || 'Không thể tải thông tin lượt chơi.');
+      if (effectiveToken && [403,404,422].includes(err.status)) {setStudioMode('player');setViewData({status:'unavailable', role:'partner'});progressQueue.current=null;isDirty.current=false;}
+      else setError(err?.message || 'Không thể tải thông tin lượt chơi.');
     } finally {
       setLoading(false);
     }
@@ -298,12 +302,51 @@ export default function MemoryMatchStudio({
     let stopped=false,pending=false;
     const refresh=async()=>{if(stopped||pending||document.visibilityState==='hidden')return;pending=true;
       try{const data=await getMatchView(matchId,{inviteToken: accessInviteToken || undefined});if(!stopped){setViewData(data);if(data.both_submitted)setPartnerNotice('Người cùng chơi đã hoàn thành. Cùng mở kết quả nhé!');}}
-      catch(err){if(!stopped)setError(err.message);}finally{pending=false;}};
-    const disconnect=watchMatch(matchId,accessInviteToken,()=>refresh(),refresh);
+      catch(err){if(!stopped){if(accessInviteToken && [403,404,422].includes(err.status)){setViewData(prev=>({...prev,status:'unavailable'}));progressQueue.current=null;isDirty.current=false;}else setError(err.message);}}finally{pending=false;}};
+    const disconnect=watchMatch(matchId,accessInviteToken,signal=>{if(signal.status==='archived'){stopped=true;setViewData(prev=>({...prev,status:'archived'}));progressQueue.current=null;isDirty.current=false;}else refresh();},refresh);
     const timer=setInterval(refresh,15000);
     window.addEventListener('focus',refresh);
     return()=>{stopped=true;disconnect();clearInterval(timer);window.removeEventListener('focus',refresh);};
   },[matchId,accessInviteToken,viewData?.status,viewData?.both_submitted,currentUser]);
+
+  function handleNewRound() {
+    justCreatedIdRef.current = 'new';
+    draftQueue.current = null;
+    progressQueue.current = null;
+    isInitialLoad.current = false;
+    isDirty.current = false;
+    setError('');
+    setSuccessMsg('');
+    setPartnerNotice('');
+    setAutosaveState('idle');
+    setViewData(null);
+    setAccessInviteToken('');
+    setShareInviteToken('');
+    setCopiedLink(false);
+    setAnswers([]);
+    setCurrentQuestionIndex(0);
+    setMatchId(null);
+    onMatchChange?.(null);
+    setStudioMode('editor');
+    handleSelectTopic(selectedTopic || 'lifestyle');
+  }
+
+  async function handleCancelMatch() {
+    if (isCancelling || isSubmitting || viewData?.role !== 'owner' || viewData?.status !== 'active') return;
+    setIsCancelling(true);
+    setError('');
+    try {
+      await cancelMatch(matchId);
+      cancelDialog.current?.close();
+      handleNewRound();
+      setSuccessMsg('Đã hủy lượt cũ. Chọn chủ đề cho lượt mới gồm 7 câu hỏi.');
+    } catch (err) {
+      if (err.status === 409) {cancelDialog.current?.close();await loadMatchData(matchId, accessInviteToken);}
+      setError(err.message || 'Chưa hủy được lượt chơi. Hãy thử lại.');
+    } finally {
+      setIsCancelling(false);
+    }
+  }
 
   // Handle creating a brand new match draft
   const handleCreateNewMatch = () => {
@@ -471,7 +514,7 @@ export default function MemoryMatchStudio({
 
   // Handle question option select
   const handleSelectOption = (optionIndex) => {
-    if(isSubmitting || viewData?.my_submitted)return;
+    if(isSubmitting || isCancelling || viewData?.my_submitted || viewData?.status !== 'active')return;
     const updated = [...answers];
     while (updated.length <= currentQuestionIndex) {
       updated.push(null);
@@ -482,15 +525,16 @@ export default function MemoryMatchStudio({
     // Auto-save progress in background
     if (matchId) {
       setAutosaveState('saving');isDirty.current=true;
-      progressQueue.current?.enqueue({answers:updated}).then(()=>{
-        if(!progressQueue.current.pending){isDirty.current=false;setAutosaveState('saved');}
-      }).catch(err=>{setError(err.message);setAutosaveState('error');});
+      const queue=progressQueue.current;
+      queue?.enqueue({answers:updated}).then(()=>{
+        if(progressQueue.current===queue && !queue.pending){isDirty.current=false;setAutosaveState('saved');}
+      }).catch(err=>{if(progressQueue.current===queue){setError(err.message);setAutosaveState('error');}});
     }
   };
 
   // Submit all answers
   const handleSubmitMatch = async () => {
-    if (!matchId) return;
+    if (!matchId || isCancelling || viewData?.status !== 'active') return;
     const activeQuestions = viewData?.questions || questions;
     const answeredCount = answers.filter((a) => a !== null && a !== undefined).length;
     if (answeredCount < activeQuestions.length) {
@@ -517,9 +561,10 @@ export default function MemoryMatchStudio({
 
   // Keyboard navigation for answering questions
   useEffect(() => {
-    if (studioMode !== 'player' || viewData?.my_submitted || viewData?.status === 'completed') return;
+    if (studioMode !== 'player' || viewData?.my_submitted || viewData?.status !== 'active' || isCancelling) return;
 
     const handleKeyDown = (e) => {
+      if (cancelDialog.current?.open) return;
       const activeQuestions = viewData?.questions || questions;
       const currentQ = activeQuestions[currentQuestionIndex];
       if (!currentQ) return;
@@ -536,11 +581,11 @@ export default function MemoryMatchStudio({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [studioMode, viewData, questions, currentQuestionIndex, answers]);
+  }, [studioMode, viewData, questions, currentQuestionIndex, answers, isCancelling]);
 
   // Copy share invite link
   const activeShareToken = shareInviteToken || viewData?.invite_token || accessInviteToken;
-  const inviteLink = matchId && activeShareToken
+  const inviteLink = matchId && activeShareToken && ['active','completed'].includes(viewData?.status)
     ? `${window.location.origin}/?view=memory-match&match=${matchId}&invite=${activeShareToken}`
     : '';
 
@@ -816,8 +861,21 @@ export default function MemoryMatchStudio({
             ? `Người cùng chơi đã trả lời ${viewData.other_answered_count}/${viewData.total_questions} câu${viewData.other_answered_count === viewData.total_questions ? ', đang chờ nộp bài' : ''}.`
             : viewData.other_opened_at ? 'Người cùng chơi đã mở lượt chơi, chưa trả lời câu nào.' : 'Chưa ghi nhận người cùng chơi mở link.'}
           <p className="text-xs text-slate-400 mt-1">Tiến độ đã lưu; đáp án chỉ mở sau khi cả hai nộp bài.</p>
+          {viewData.role === 'owner' && <button type="button" disabled={isCancelling || isSubmitting}
+            onClick={() => {setError('');cancelDialog.current?.showModal();}}
+            className="mt-4 text-sm font-semibold text-rose-200 underline underline-offset-4 hover:text-white disabled:opacity-50">
+            Hủy lượt này và tạo lượt mới
+          </button>}
         </div>
       )}
+
+      {['archived','unavailable'].includes(viewData?.status) && <section className="p-8 rounded-3xl border border-white/10 bg-white/5 space-y-4" aria-labelledby="cancelled-match-title">
+        <h2 id="cancelled-match-title" className="text-2xl font-serif text-white">{viewData.status === 'archived' ? 'Lượt chơi đã được hủy' : 'Liên kết này không còn khả dụng'}</h2>
+        <p className="text-sm text-slate-300">{viewData.status === 'archived'
+          ? 'Lượt cũ đã dừng và link mời cũ không thể dùng để trả lời. Bạn có thể bắt đầu một lượt mới gồm 7 câu hỏi.'
+          : 'Lượt chơi có thể đã được hủy hoặc quyền truy cập đã thay đổi. Hãy xin link mới từ người tạo hoặc bắt đầu lượt chơi của bạn.'}</p>
+        <button type="button" onClick={handleNewRound} className="px-5 py-3 rounded-xl bg-rose-500 text-white font-semibold">Tạo lượt chơi mới</button>
+      </section>}
 
       {/* ========================================================================= */}
       {/* MODE 1: DRAFT EDITOR (Người tạo soạn thảo câu hỏi)                      */}
@@ -885,7 +943,7 @@ export default function MemoryMatchStudio({
                 <span className="block text-xs text-slate-300 mt-2">{topic.tagline}</span>
               </button>)}
             </div>
-            <p className="text-sm text-slate-300">EMORIA chọn sẵn 5 câu hỏi. Bạn có thể đổi câu khác trong cùng chủ đề và chơi lại để thử những câu chưa gặp.</p>
+            <p className="text-sm text-slate-300">EMORIA chọn sẵn {questions.length} câu hỏi. Bạn có thể đổi câu khác trong cùng chủ đề và chơi lại để thử những câu chưa gặp.</p>
             {!selectedTopic && questions.length > 0 && <p className="text-xs text-amber-200">Bộ câu hỏi từ bản nháp trước vẫn được giữ lại. Chọn chủ đề để thay bằng một bộ mới.</p>}
             {questions.map((q, qIndex) => <article key={q.id || qIndex} className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
               <div className="flex items-start justify-between gap-3">
@@ -977,7 +1035,7 @@ export default function MemoryMatchStudio({
       {/* ========================================================================= */}
       {/* MODE 2: ACTIVE GAMEPLAY (1 câu hỏi trên mỗi màn hình)                     */}
       {/* ========================================================================= */}
-      {studioMode === 'player' && viewData && viewData.status !== 'completed' && !viewData.my_submitted && (
+      {studioMode === 'player' && viewData?.status === 'active' && !viewData.my_submitted && (
         <section aria-labelledby="active-match-title" className="space-y-6">
           {/* Partner Invite Header Alert (nếu là Owner tạo phòng) */}
           {inviteLink && viewData?.role === 'owner' && (
@@ -1150,7 +1208,7 @@ export default function MemoryMatchStudio({
       {/* ========================================================================= */}
       {/* MODE 3: WAITING FOR PARTNER (Người này đã nộp, đợi nửa kia)               */}
       {/* ========================================================================= */}
-      {studioMode === 'player' && viewData?.status !== 'completed' && viewData?.my_submitted && (
+      {studioMode === 'player' && viewData?.status === 'active' && viewData?.my_submitted && (
         <section aria-labelledby="waiting-screen-title" className="text-center py-12 px-6 space-y-6">
           <div className="max-w-md mx-auto bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/10 rounded-3xl p-8 backdrop-blur-2xl shadow-2xl">
             <motion.div
@@ -1248,26 +1306,7 @@ export default function MemoryMatchStudio({
                 {currentUser && (
                   <button
                     type="button"
-                    onClick={() => {
-                      justCreatedIdRef.current = 'new';
-                      draftQueue.current = null;
-                      progressQueue.current = null;
-                      isInitialLoad.current = false;
-                      isDirty.current = false;
-                      setError('');
-                      setSuccessMsg('');
-                      setPartnerNotice('');
-                      setAutosaveState('idle');
-                      setViewData(null);
-                      setAccessInviteToken('');
-                      setShareInviteToken('');
-                      setAnswers([]);
-                      setCurrentQuestionIndex(0);
-                      setMatchId(null);
-                      onMatchChange?.(null);
-                      setStudioMode('editor');
-                      handleSelectTopic(selectedTopic || 'lifestyle');
-                    }}
+                    onClick={handleNewRound}
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/15 transition-colors cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -1381,6 +1420,20 @@ export default function MemoryMatchStudio({
           </button>
         </footer>
       )}
+
+      {viewData?.status === 'active' && <dialog ref={cancelDialog} aria-labelledby="cancel-round-title" aria-describedby="cancel-round-description"
+        onCancel={e => {if(isCancelling)e.preventDefault();}}
+        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-3xl border border-rose-300/20 bg-zinc-950 p-6 text-white backdrop:bg-black/75">
+        <h2 id="cancel-round-title" className="text-xl font-serif">Bắt đầu lại với 7 câu hỏi?</h2>
+        <p id="cancel-round-description" className="mt-3 text-sm text-slate-300 leading-relaxed">Lượt hiện tại sẽ dừng cho cả hai người và link mời cũ sẽ hết hiệu lực. Các câu trả lời đã lưu vẫn được giữ trong lịch sử. Lượt mới sẽ có link mời riêng.</p>
+        {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
+        <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3">
+          <button type="button" autoFocus disabled={isCancelling} onClick={() => cancelDialog.current?.close()}
+            className="rounded-xl border border-white/15 px-4 py-3 text-sm disabled:opacity-50">Giữ lượt hiện tại</button>
+          <button type="button" disabled={isCancelling} onClick={handleCancelMatch}
+            className="rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold disabled:opacity-50">{isCancelling ? 'Đang hủy lượt...' : 'Hủy và tạo lượt mới'}</button>
+        </div>
+      </dialog>}
 
       {/* Content Report Modal */}
       <AnimatePresence>

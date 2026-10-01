@@ -1,10 +1,17 @@
 import {supabase} from '../lib/supabaseClient.js';
 
-export async function apiRequest(path,{method='GET',body,timeoutMs=20000}={}) {
-  const {data,error}=await supabase.auth.getSession();
+export async function apiRequest(path,{method='GET',body,timeoutMs=20000,signal,anonymous=false}={}) {
+  signal?.throwIfAborted();
+  const {data,error}=anonymous ? {data:{session:null}} : await supabase.auth.getSession();
   if(error)throw error;
   const isSendBody = method !== 'GET' && method !== 'HEAD';
   const payload = isSendBody ? (body === undefined ? {} : body) : undefined;
+  const controller = new AbortController();
+  const abort = () => controller.abort(signal.reason);
+  signal?.addEventListener('abort', abort, {once:true});
+  if (signal?.aborted) abort();
+  const timer = setTimeout(() => controller.abort(new DOMException('Yêu cầu quá thời gian chờ.', 'TimeoutError')), timeoutMs);
+  try {
   const response=await fetch(`/api/v1${path}`,{
     method,credentials:'omit',cache:'no-store',
     headers:{
@@ -13,7 +20,7 @@ export async function apiRequest(path,{method='GET',body,timeoutMs=20000}={}) {
       ...(data.session?.access_token?{Authorization:`Bearer ${data.session.access_token}`}:{})
     },
     ...(payload !== undefined ? {body:JSON.stringify(payload)} : {}),
-    signal:AbortSignal.timeout(timeoutMs),
+    signal:controller.signal,
   });
   let result;
   try{result=await response.json();}catch{throw Object.assign(new Error('Máy chủ chưa trả dữ liệu hợp lệ.'),{status:502});}
@@ -25,4 +32,8 @@ export async function apiRequest(path,{method='GET',body,timeoutMs=20000}={}) {
     throw Object.assign(new Error(msg),{status:response.status,code:result.error?.code});
   }
   return result;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', abort);
+  }
 }

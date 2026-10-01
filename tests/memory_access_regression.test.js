@@ -38,6 +38,48 @@ const scenarios = [
     assert.deepEqual(result.data.studio_media.map(item=>item.path),['emo-test/photo','emo-test/video'],'Studio preserves saved media even when playback fails');
     assert.equal(result.data.intro_video_path,'emo-test/video');assert.equal(result.data.audio_path,'storage://emo-test/song');
   `],
+  ['combined media uses one request and preserves saved Studio paths', true, `
+    const {supabase}=await import('./src/lib/supabaseClient.js');
+    const m=await import('./src/services/memoryService.js');
+    supabase.auth.getSession=async()=>({data:{session:null}});
+    let calls=0;
+    globalThis.fetch=async url=>{
+      calls++;assert.equal(url,'/api/v1/memories/emo-test/access');
+      return Response.json({success:true,is_owner:true,is_unlocked:true,letter:'Authorized letter',audio_url:'storage://emo-test/song',media_gallery:[{type:'image',url:'storage://emo-test/photo'},{type:'video',url:'storage://emo-test/pending'}],media_signing:{urls:{'emo-test/photo':'https://signed.example/photo','emo-test/song':'https://signed.example/song'},blocked:['emo-test/pending'],warning:null}});
+    };
+    const result=await m.fetchMemoryView('emo-test');
+    assert.equal(calls,1);assert.equal(result.success,true);assert.equal(result.data.letter,'Authorized letter');
+    assert.equal(result.data.media_gallery.length,1);assert.equal(result.data.media_gallery[0].url,'https://signed.example/photo');
+    assert.deepEqual(result.data.studio_media.map(item=>item.path),['emo-test/photo','emo-test/pending']);
+    assert.equal(result.data.audio_url,'https://signed.example/song');assert.equal(result.data.audio_path,'storage://emo-test/song');
+  `],
+  ['maintenance RPC and REST fallback preserve fail-closed behavior', true, `
+    const {supabase}=await import('./src/lib/supabaseClient.js');
+    const auth=await import('./src/services/authRoleService.js');
+    supabase.auth.getSession=async()=>{throw new Error('Public status must not wait for Auth');};
+    let rpcCalls=0,restCalls=0;
+    supabase.rpc=()=>({abortSignal:async signal=>{rpcCalls++;assert.ok(signal instanceof AbortSignal);return {data:{success:true,is_maintenance_mode:true,maintenance_message:'Planned maintenance'},error:null};}});
+    globalThis.fetch=async()=>{restCalls++;throw new Error('Unexpected REST request');};
+    assert.equal((await auth.fetchSystemStatus()).success,true);assert.equal(restCalls,0);assert.equal(rpcCalls,1);
+    assert.equal(auth.getSystemAvailability().isMaintenanceMode,true);
+    supabase.rpc=()=>({abortSignal:async()=>{throw new Error('RPC unavailable');}});
+    globalThis.fetch=async(url,init)=>{restCalls++;assert.equal(url,'/api/v1/system/status');assert.equal(init.headers.Authorization,undefined);return Response.json({success:true,is_maintenance_mode:false});};
+    assert.equal((await auth.fetchSystemStatus()).success,true);assert.equal(auth.getSystemAvailability().isMaintenanceMode,false);
+    globalThis.fetch=async()=>{throw new Error('Offline');};
+    assert.equal((await auth.fetchSystemStatus()).success,false);
+    assert.equal(auth.getSystemAvailability().isMaintenanceMode,true);assert.equal(auth.getSystemAvailability().vipPasscode,'');
+  `],
+  ['API cancellation and timeout both remain effective', true, `
+    const {apiRequest}=await import('./src/services/apiClient.js');
+    globalThis.fetch=(url,{signal})=>new Promise((resolve,reject)=>{
+      if(signal.aborted)reject(signal.reason);
+      else signal.addEventListener('abort',()=>reject(signal.reason),{once:true});
+    });
+    const controller=new AbortController();
+    const pending=apiRequest('/articles',{anonymous:true,signal:controller.signal});
+    controller.abort();await assert.rejects(pending,{name:'AbortError'});
+    await assert.rejects(apiRequest('/articles',{anonymous:true,timeoutMs:5}),{name:'TimeoutError'});
+  `],
   ['configured server denial and errors never fall back', true, `
     const { supabase } = await import('./src/lib/supabaseClient.js');
     const m = await import('./src/services/memoryService.js');

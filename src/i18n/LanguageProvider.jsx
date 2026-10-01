@@ -59,6 +59,7 @@ export function suppressGoogleTranslateBanner() {
 
 export function syncGoogleTranslate(targetLang) {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  let interval;
   try {
     const val = targetLang === 'en' ? '/vi/en' : '/vi/vi';
     document.cookie = `googtrans=${val}; path=/;`;
@@ -78,9 +79,10 @@ export function syncGoogleTranslate(targetLang) {
       return false;
     };
 
+    if (targetLang === 'vi' && !document.querySelector('.goog-te-combo')) return;
     if (!applyCombo()) {
       let attempts = 0;
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         attempts++;
         if (applyCombo() || attempts > 12) {
           clearInterval(interval);
@@ -92,6 +94,7 @@ export function syncGoogleTranslate(targetLang) {
   } catch (err) {
     /* Safe fallback */
   }
+  return () => clearInterval(interval);
 }
 
 export function clearGoogleTranslateCookies() {
@@ -113,8 +116,20 @@ export default function LanguageProvider({children,initialLanguage}){
   useEffect(()=>{
     document.documentElement.lang=language;
     try{localStorage.setItem('emoria_language',language);}catch{}
-    syncGoogleTranslate(language);
+    let cancelSync;
+    const sync = () => { cancelSync?.(); cancelSync = syncGoogleTranslate(language); };
+    window.addEventListener('emoria:translate-ready', sync);
+    if (language === 'en' && !document.getElementById('emoria-translate-engine')) {
+      const script = document.createElement('script');
+      script.id = 'emoria-translate-engine';
+      script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+      script.async = true;
+      script.onerror = () => script.remove();
+      document.body.appendChild(script);
+    }
+    sync();
     suppressGoogleTranslateBanner();
+    return () => { cancelSync?.(); window.removeEventListener('emoria:translate-ready', sync); };
   },[language]);
   return (
     <LanguageContext.Provider value={{
@@ -132,4 +147,3 @@ export function LanguageSwitcher(){
   const {language,setLanguage,t}=useLanguage();
   return <select aria-label={t('Ngôn ngữ','Language')} value={language} onChange={event=>setLanguage(event.target.value)} className="rounded-lg border border-white/20 bg-dark-950 text-white text-xs min-h-10 px-2 max-w-20"><option value="vi">VI</option><option value="en">EN</option></select>;
 }
-

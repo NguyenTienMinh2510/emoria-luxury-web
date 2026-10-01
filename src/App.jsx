@@ -1,13 +1,9 @@
-import NfcLanding from './components/NfcLanding';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, lazy } from 'react';
+import DeferredContent from './components/DeferredContent';
 import Navbar from './components/Navbar';
 import AnalyticsConsent from './components/AnalyticsConsent';
 import {trackShopEvent} from './services/analyticsService';
 import { useStore } from './components/StoreProvider';
-import ShopView from './views/ShopView';
-import MemorySpaceView from './views/MemorySpaceView';
-import ArticlesView from './views/ArticlesView';
-import ArticleDetailView from './views/ArticleDetailView';
 import ArticlesSection from './components/ArticlesSection';
 import HeroSection from './components/HeroSection';
 import ProductExplodedShowcase from './components/ProductExplodedShowcase';
@@ -15,19 +11,8 @@ import CollectionShowcase from './components/CollectionShowcase';
 import ProductCatalog from './components/ProductCatalog';
 import FeedbackSection from './components/FeedbackSection';
 import AboutSection from './components/AboutSection';
-import AboutView from './views/AboutView';
 import ContactSection from './components/ContactSection';
 import Footer from './components/Footer';
-import NFCDemoModal from './components/NFCDemoModal';
-import MemoryViewer from './components/MemoryViewer';
-import ProductDetailModal from './components/ProductDetailModal';
-import CartDrawer from './components/CartDrawer';
-import AuthModal from './components/AuthModal';
-import CheckoutModal from './components/CheckoutModal';
-import AdminView from './views/AdminView';
-import PrivacyPolicyModal from './components/PrivacyPolicyModal';
-import MemoryMatchStudio from './components/MemoryMatchStudio';
-import MemoryHouseStudio from './components/MemoryHouseStudio';
 import { 
   SmartphoneNfc, Shield, User, Key, Lock, Unlock, 
   Sparkles, CheckCircle2, ChevronUp, ChevronDown, Power, ArrowRight
@@ -42,6 +27,23 @@ import {
   updateSystemAvailability,
   signOutUser
 } from './services/authRoleService';
+
+const NfcLanding = lazy(() => import('./components/NfcLanding'));
+const ShopView = lazy(() => import('./views/ShopView'));
+const MemorySpaceView = lazy(() => import('./views/MemorySpaceView'));
+const ArticlesView = lazy(() => import('./views/ArticlesView'));
+const ArticleDetailView = lazy(() => import('./views/ArticleDetailView'));
+const AboutView = lazy(() => import('./views/AboutView'));
+const AdminView = lazy(() => import('./views/AdminView'));
+const MemoryMatchStudio = lazy(() => import('./components/MemoryMatchStudio'));
+const MemoryHouseStudio = lazy(() => import('./components/MemoryHouseStudio'));
+const NFCDemoModal = lazy(() => import('./components/NFCDemoModal'));
+const MemoryViewer = lazy(() => import('./components/MemoryViewer'));
+const ProductDetailModal = lazy(() => import('./components/ProductDetailModal'));
+const CartDrawer = lazy(() => import('./components/CartDrawer'));
+const AuthModal = lazy(() => import('./components/AuthModal'));
+const CheckoutModal = lazy(() => import('./components/CheckoutModal'));
+const PrivacyPolicyModal = lazy(() => import('./components/PrivacyPolicyModal'));
 
 export default function App() {
   const store = useStore();
@@ -95,6 +97,7 @@ export default function App() {
   const [memoryViewerState, setMemoryViewerState] = useState({ isOpen: false, tagUid: 'emoria-lumen', token: null });
 
   const [hasScrolledPastHero, setHasScrolledPastHero] = useState(false);
+  const sessionSequence = useRef(0);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -107,7 +110,9 @@ export default function App() {
 
   // Refresh Real Session Role
   const refreshSessionRole = async () => {
+    const sequence = ++sessionSequence.current;
     const resolved = await resolveCurrentSessionRole();
+    if (sequence !== sessionSequence.current) return;
     setAuthSession(resolved);
     if (resolved.user) {
       setCurrentUser(resolved.user.fullName || resolved.user.email);
@@ -134,18 +139,21 @@ export default function App() {
 
   // Listen to Supabase Auth State on mount
   useEffect(() => {
-    refreshSessionRole();
-
     if (isSupabaseConfigured()) {
+      let timer;
       const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
         if (event === 'PASSWORD_RECOVERY') { setRecovery(true); setIsAuthOpen(true); }
-        setTimeout(refreshSessionRole, 0);
+        clearTimeout(timer);
+        timer = setTimeout(refreshSessionRole, 0);
       });
 
       return () => {
+        clearTimeout(timer);
+        sessionSequence.current++;
         authListener?.subscription?.unsubscribe();
       };
     }
+    refreshSessionRole();
   }, []);
 
   useEffect(() => {
@@ -358,7 +366,7 @@ export default function App() {
             </button>
           </div>
         </div>
-        <AuthModal isOpen={isAuthOpen} recovery={recovery} onClose={() => setIsAuthOpen(false)} onLoginSuccess={refreshSessionRole} currentUser={currentUser} />
+        {isAuthOpen && <DeferredContent><AuthModal isOpen={isAuthOpen} recovery={recovery} onClose={() => setIsAuthOpen(false)} onLoginSuccess={refreshSessionRole} currentUser={currentUser} /></DeferredContent>}
       </div>
     );
   }
@@ -396,6 +404,7 @@ export default function App() {
       {store.error&&<div role="alert" className="fixed bottom-4 left-4 right-4 z-[70] p-4 bg-dark-900 border border-red-300/30 rounded-xl text-sm">{store.error} <button className="underline ml-3" onClick={store.refresh}>Thử lại</button></div>}
       {/* Main Dynamic View Area */}
       <main>
+        <DeferredContent key={currentView}>
         {/* VIEW 1: TRANG CHỦ & CÂU CHUYỆN THƯƠNG HIỆU (MẶC ĐỊNH) */}
         {currentView === 'home' && (
           <div>
@@ -672,6 +681,7 @@ export default function App() {
             }}
           />
         )}
+        </DeferredContent>
       </main>
 
       {/* Footer */}
@@ -792,12 +802,13 @@ export default function App() {
       )}
 
       {/* NFC Touch Simulation Modal */}
-      <NFCDemoModal
+      <DeferredContent fallback={<div role="status" className="fixed bottom-6 inset-x-6 z-[100] rounded-xl bg-dark-900 p-4 text-center">Đang mở…</div>}>
+      {nfcModalState.isOpen && <NFCDemoModal
         isOpen={nfcModalState.isOpen}
         onClose={handleCloseNfcDemo}
         selectedProductId={nfcModalState.productId}
         onOpenMemoryViewer={handleOpenMemoryViewer}
-      />
+      />}
 
       {/* Legacy Memory Viewer Modal fallback */}
       {memoryViewerState.isOpen && (
@@ -810,16 +821,16 @@ export default function App() {
       )}
 
       {/* Product Detail Modal */}
-      <ProductDetailModal
+      {selectedProductId && <ProductDetailModal
           key={selectedProductId}
         productId={selectedProductId}
         onClose={() => setSelectedProductId(null)}
         onAddToCart={handleAddToCart}
         onOpenNfcDemo={handleOpenNfcDemo}
-      />
+      />}
 
       {/* Cart Drawer */}
-      <CartDrawer
+      {isCartOpen && <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         cartItems={cartItems}
@@ -835,7 +846,7 @@ export default function App() {
           trackShopEvent('begin_checkout', cartItems);
           setIsCheckoutOpen(true);
         }}
-      />
+      />}
 
       {/* Dark Luxury Checkout Modal */}
       {isCheckoutOpen && <CheckoutModal
@@ -851,7 +862,7 @@ export default function App() {
       />}
 
       {/* Auth Modal */}
-      <AuthModal
+      {isAuthOpen && <AuthModal
         recovery={recovery}
         currentUser={currentUser}
         isOpen={isAuthOpen}
@@ -861,13 +872,14 @@ export default function App() {
           setCurrentView('memory');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-      />
+      />}
 
       {/* Privacy Policy Modal (Bảo Mật Emoria) */}
-      <PrivacyPolicyModal
+      {isPrivacyOpen && <PrivacyPolicyModal
         isOpen={isPrivacyOpen}
         onClose={() => setIsPrivacyOpen(false)}
-      />
+      />}
+      </DeferredContent>
 
     </div>
   );

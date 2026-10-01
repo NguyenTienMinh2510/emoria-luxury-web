@@ -13,7 +13,7 @@ const privateKey=value=>createHmac('sha256',serviceKey()).update(String(value)).
 export async function eventRpc(c,name,args={}){
   const client=eventAdmin();
   const identity=privateKey(c.user?.id||c.ip||'local');
-  const write=/save|progress|submit|begin|create|publish|revoke|moderate|reply|report/.test(name);
+  const write=/save|progress|submit|begin|create|cancel|publish|revoke|moderate|reply|report/.test(name);
   const max=name==='house_reply'||name==='rpc_submit_content_report'?5:write?30:60;
   const limit=await client.rpc('rpc_check_rate_limit',{p_key:`${write?'match_progress':'house_public_share'}:${identity}:${name}`,p_max_burst:max,p_window_seconds:60});
   if(limit.error||!limit.data)throw Object.assign(new Error('Chưa kiểm tra được giới hạn truy cập. Hãy thử lại.'),{status:503});
@@ -56,7 +56,13 @@ export async function streamMatch(c){
         if(!closed)res.write(`data: ${JSON.stringify({my_submitted:view.my_submitted,both_submitted:view.both_submitted,other_submitted:view.other_submitted,other_opened_at:view.other_opened_at,other_answered_count:view.other_answered_count,total_questions:view.total_questions})}\n\n`);
       }catch{if(!closed)res.write('event: denied\ndata: {}\n\n');close();}finally{busy=false;}
     };
-    channel.on('broadcast',{event:'changed'},check).subscribe(status=>{if(status==='SUBSCRIBED')check();else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')close();});
+    channel.on('broadcast',{event:'changed'},message=>{
+      // Only the private DB channel can cancel an already-authorized stream.
+      if(message.payload?.cancelled===true){
+        if(!closed)res.write('event: cancelled\ndata: {"status":"archived"}\n\n');
+        close();
+      }else check();
+    }).subscribe(status=>{if(status==='SUBSCRIBED')check();else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')close();});
     timeout=setTimeout(close,25000);res.on('close',close);
   });
   await client.removeChannel(channel);

@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowUpRight, SmartphoneNfc } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { productImageProps } from '../services/productImages.js';
 
 export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
   const { language, t } = useLanguage();
@@ -97,7 +98,9 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
             {/* Main Showcase Image */}
             <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-dark-950/80">
               <img 
-                src="/assets/summer_box.png" 
+                {...productImageProps('/assets/summer_box.png', '(max-width: 1023px) 90vw, 550px')}
+                loading="lazy"
+                decoding="async"
                 alt="Emoria Summer Collection Box"
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
               />

@@ -49,16 +49,24 @@ export default function ArticlesView({ onSelectArticle, onNavigateToShop, isAdmi
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     const fetchArticles = async () => {
       setLoading(true);
       try {
-        const res = savedOnly ? await getSavedArticles() : await getPublishedArticles({
+        const res = savedOnly ? await getSavedArticles({signal:controller.signal}) : await getPublishedArticles({
           category: selectedCategory === 'Tất cả' ? null : selectedCategory,
-          search: searchQuery,
+          search: debouncedQuery,
+          signal: controller.signal,
           limit: 12, offset: page * 12,
         });
         if (active) {
@@ -70,7 +78,7 @@ export default function ArticlesView({ onSelectArticle, onNavigateToShop, isAdmi
             // If DB is empty, provide default curated chronicle articles
             const filtered = DEFAULT_ARTICLES.filter(item => {
               const matchCat = selectedCategory === 'Tất cả' || item.category === selectedCategory;
-              const matchSearch = !searchQuery || item.title.toLowerCase().includes(searchQuery.toLowerCase());
+              const matchSearch = !debouncedQuery || item.title.toLowerCase().includes(debouncedQuery.toLowerCase());
               return matchCat && matchSearch;
             });
             setArticles(filtered);
@@ -86,8 +94,8 @@ export default function ArticlesView({ onSelectArticle, onNavigateToShop, isAdmi
     };
 
     fetchArticles();
-    return () => { active = false; };
-  }, [selectedCategory, searchQuery, page, savedOnly]);
+    return () => { active = false; controller.abort(); };
+  }, [selectedCategory, debouncedQuery, page, savedOnly]);
 
   return (
     <div className="min-h-screen bg-dark-950 text-slate-100 pt-24 pb-20 px-4 sm:px-6 lg:px-8">

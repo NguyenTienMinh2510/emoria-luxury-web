@@ -104,6 +104,11 @@ export async function beginMatch(matchId) {
   });
 }
 
+export async function cancelMatch(matchId) {
+  if (!matchId) throw new Error('Vui lòng cung cấp mã lượt chơi.');
+  return apiRequest(`/events/matches/${encodeURIComponent(matchId)}/cancel`, {method:'POST', body:{}});
+}
+
 /**
  * Lưu tiến độ trả lời (Owner hoặc Partner có inviteToken)
  */

@@ -41,6 +41,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   const [currentTag, setCurrentTag] = useState(initialTag);
   const [memoryData, setMemoryData] = useState(null);
   const [houseData, setHouseData] = useState(null);
+  const [houseLoading, setHouseLoading] = useState(false);
   const [activeHouseRoomIndex, setActiveHouseRoomIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -160,6 +161,8 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
     const sequence=++loadSequence.current;
     setLoading(true);
     setMemoryData(null);
+    setHouseData(null);
+    setHouseLoading(false);
     setErrorMessage('');
     try {
       const res = await fetchMemoryView(tag);
@@ -187,31 +190,20 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
           setShowUnboxing(true);
         }
 
-        // Tải dữ liệu Ngôi Nhà Kỷ Niệm cho chip này
-        setHouseData(null);
-        if (res.data.is_owner) {
-          // Chỉ owner mới được phép gọi getHouseDraft để xem/sửa bản nháp
-          try {
-            const draft = await getHouseDraft(tag);
-            if (draft && Array.isArray(draft.rooms)) {
-              setHouseData({ ...draft, is_owner_draft: true });
-            }
-          } catch {
-            setHouseData(null);
+        // House is optional: it must not hold the authorized letter behind a full-page spinner.
+        setHouseLoading(true);
+        const owner = res.data.is_owner === true;
+        const houseRequest = owner ? getHouseDraft(tag) : getPublicHouseByTag(tag);
+        houseRequest.then(house => {
+          if (sequence !== loadSequence.current) return;
+          if (house && Array.isArray(house.rooms)) {
+            setHouseData({ ...house, ...(owner ? {is_owner_draft:true} : {is_published_snapshot:true}) });
           }
-        } else {
-          // Recipient hoặc Guest: TUYỆT ĐỐI KHÔNG gọi draft endpoint!
-          // Gọi endpoint public lấy published House theo tag_uid
-          try {
-            const pubHouse = await getPublicHouseByTag(tag);
-            if (pubHouse && Array.isArray(pubHouse.rooms)) {
-              setHouseData({ ...pubHouse, is_published_snapshot: true });
-            }
-          } catch {
-            // Chưa publish hoặc ở chế độ riêng tư -> set null để hiển thị empty state
-            setHouseData(null);
-          }
-        }
+        }).catch(() => {
+          if (sequence === loadSequence.current) setHouseData(null);
+        }).finally(() => {
+          if (sequence === loadSequence.current) setHouseLoading(false);
+        });
       } else {
         setErrorMessage(res.message || t("Không thể tải dữ liệu kỷ vật.","Could not load this memory."));
       }
@@ -229,6 +221,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   useEffect(() => {
     setMovieDone(false);
     if(currentTag)loadMemory(currentTag);else setLoading(false);
+    return () => { loadSequence.current++; };
   }, [currentTag,currentUser]);
   useEffect(()=>{setCurrentTag(initialTag);},[initialTag]);
   useEffect(()=>{if(isEditorOpen&&memoryData?.is_owner)callStore('rpc_memory_guestbook',{p_tag:currentTag}).then(res=>setGuestEntries(res||[])).catch(()=>{setGuestEntries((memoryData?.guestbook||[]).map(g=>({...g,author_name:g.author||g.author_name})));});},[isEditorOpen,currentTag,memoryData]);
@@ -942,7 +935,9 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             </div>
 
             {/* Content Logic: Owner vs Recipient/Guest */}
-            {(!houseData || (!memoryData.is_owner && !houseData.is_published_snapshot)) ? (
+            {houseLoading ? (
+              <div role="status" className="py-12 text-center text-sm text-slate-300">{t('Đang mở Ngôi Nhà Kỷ Niệm…', 'Opening the Memory House…')}</div>
+            ) : (!houseData || (!memoryData.is_owner && !houseData.is_published_snapshot)) ? (
               /* EMPTY STATE CHO GUEST HOẶC KHI CHƯA PUBLISH */
               <div className="py-12 border border-dashed border-white/15 rounded-3xl text-center space-y-3 bg-black/20 relative z-10">
                 <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center mx-auto text-amber-300">

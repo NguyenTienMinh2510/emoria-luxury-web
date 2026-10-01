@@ -190,9 +190,14 @@ export async function fetchMemoryView(tagUid, grantToken = null) {
         if(data.is_owner||data.is_admin)data.studio_media=data.media_gallery.map(m=>({...m}));
         data.audio_path=data.audio_url;
         if(data.is_unlocked && (data.intro_video_path || data.audio_url?.startsWith('storage://') || data.media_gallery.some(m=>m.path))){
+          let signed=data.media_signing;
+          // Keep compatibility with an older API during deployment/cache transitions.
+          if(!signed?.urls){
           const session=await supabase.auth.getSession();
-          const response=await fetch('/api/memory-media',{method:'POST',headers:{'Content-Type':'application/json',...(session.data.session?{Authorization:`Bearer ${session.data.session.access_token}`}:{})},body:JSON.stringify({tag:cleanTag,grant:token||null})});
-          const signed=await response.json();if(!response.ok)return {success:false,message:signed.error};
+          const response=await fetch('/api/memory-media',{method:'POST',headers:{'Content-Type':'application/json',...(session.data.session?{Authorization:`Bearer ${session.data.session.access_token}`}:{})},body:JSON.stringify({tag:cleanTag,grant:token||null}),signal:AbortSignal.timeout(20000)});
+          signed=await response.json();if(!response.ok)return {success:false,message:signed.error};
+          }
+          delete data.media_signing;
           data.media_warning=signed.warning||null;
           data.media_gallery=data.media_gallery.filter(m=>!signed.blocked?.includes(m.path)&&(!m.path||signed.urls[m.path])).map(m=>({...m,url:m.path?signed.urls[m.path]:m.url}));
           if(data.audio_url?.startsWith('storage://'))data.audio_url=signed.urls[data.audio_url.slice(10)];

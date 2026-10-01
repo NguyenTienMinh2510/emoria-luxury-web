@@ -1840,7 +1840,7 @@ function shuffle(items) {
   }
   return result;
 }
-export function getTopicQuestions(topicId='lifestyle',count=5,excludeTexts=[]) {
+export function getTopicQuestions(topicId='lifestyle',count=7,excludeTexts=[]) {
   const pool=QUESTION_POOL[topicId]||QUESTION_POOL.lifestyle, excluded=new Set(excludeTexts);
   return [...shuffle(pool.filter(q=>!excluded.has(q.text))),...shuffle(pool.filter(q=>excluded.has(q.text)))]
     .slice(0,count).map((q,i)=>({...q,id:i+1,options:[...q.options],image_path:null}));

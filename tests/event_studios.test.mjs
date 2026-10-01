@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
+import {EventEmitter} from 'node:events';
+import {SupabaseClient} from '@supabase/supabase-js';
 import fs from 'node:fs';
 import handler from '../api/v1.js';
+import {streamMatch} from '../server/eventGateway.js';
+import {watchMatch} from '../src/services/matchStream.js';
+import {supabase} from '../src/lib/supabaseClient.js';
 import * as eventService from '../src/services/eventService.js';
 
 // Setup test environment
@@ -876,6 +881,13 @@ globalThis.fetch = async (input, init = {}) => {
     return Response.json(callerUser);
   }
 
+  if (url.endsWith('/storage/v1/object/sign/emoria-event-media')) {
+    if (token !== 'fixture-service-role-key') {
+      return Response.json({ message: 'Unauthorized storage request' }, { status: 401 });
+    }
+    const { paths } = JSON.parse(init.body);
+    return Response.json(paths.map(path => ({path, error:null, signedURL:`/object/sign/emoria-event-media/${path}?token=verified-mock-signer-token`})));
+  }
   if (url.includes('/storage/v1/object/sign/emoria-event-media/')) {
     if (token !== 'fixture-service-role-key') {
       return Response.json({ message: 'Unauthorized storage request: missing or invalid service_role key' }, { status: 401 });
@@ -1728,6 +1740,65 @@ async function runTests() {
     assert.ok(matchStudioCode.includes("addEventListener('focus'"), 'Có listener window focus để đồng bộ tab');
     assert.ok(matchStudioCode.includes('setInterval('), 'Có smart polling fallback');
     assert.ok(matchStudioCode.includes('Báo cáo nội dung'), 'Match Studio có nút báo cáo nội dung');
+
+    // Exercise the real route, private relay and browser SSE parser; SQL ownership/races have live DB coverage.
+    const fixtureFetch = globalThis.fetch, previousChannel = SupabaseClient.prototype.channel;
+    const previousRemoveChannel = SupabaseClient.prototype.removeChannel, previousSession = supabase.auth.getSession;
+    const previousDocument = globalThis.document;
+    let cancelArgs, cancelBurst, broadcast, removed = false, disconnect, deadline;
+    try {
+      globalThis.fetch = async (input, init = {}) => {
+        const args = init.body ? JSON.parse(init.body) : {};
+        if (String(input).endsWith('/rpc/rpc_check_rate_limit') && args.p_key.includes(':rpc_match_cancel')) cancelBurst = args.p_max_burst;
+        if (String(input).endsWith('/rpc/rpc_event_dispatch') && args.p_action === 'rpc_match_cancel') {
+          cancelArgs = args;
+          return Response.json({success:true, status:'archived', cancelled:true});
+        }
+        return fixtureFetch(input, init);
+      };
+      assert.equal((await apiCall('POST', `/api/v1/events/matches/${matchId}/cancel`, {}, null)).status, 401);
+      assert.equal((await apiCall('POST', '/api/v1/events/matches/not-a-uuid/cancel', {}, 'token-owner-b')).status, 400);
+      assert.equal((await apiCall('POST', `/api/v1/events/matches/${matchId}/cancel`, {}, 'token-owner-b')).status, 200);
+      assert.deepEqual(cancelArgs, {p_action:'rpc_match_cancel', p_args:{p_match_id:matchId}, p_caller:'user-owner-b'});
+      assert.equal(cancelBurst, 30, 'Cancel uses the write limit');
+
+      const streamedMatch = Object.values(state.matches).find(match => !match.is_hidden && match.partner_token_hash);
+      assert.ok(streamedMatch, 'Fixture has a valid partner invitation');
+      SupabaseClient.prototype.channel = function (name, options) {
+        assert.equal(name, `emoria-match:${streamedMatch.id}`);
+        assert.equal(options.config.private, true);
+        return {on(type, filter, listener) {
+          assert.equal(type, 'broadcast');assert.equal(filter.event, 'changed');broadcast = listener;return this;
+        }, subscribe() {queueMicrotask(() => broadcast({payload:{cancelled:true}}));return this;}};
+      };
+      SupabaseClient.prototype.removeChannel = async () => {removed = true;};
+      const frames = [], res = new EventEmitter();let ended = 0;
+      Object.assign(res, {setHeader() {}, flushHeaders() {}, write(frame) {frames.push(frame);}, end() {ended++;}});
+      deadline = setTimeout(() => res.emit('close'), 1000);
+      await streamMatch({params:[streamedMatch.id], body:{invite_token:streamedMatch.partner_token_hash.slice(5)},
+        user:null, ip:'cancel-stream-fixture', res, db:async result => {
+          const {data,error} = await result;assert.ifError(error);return data;
+        }});
+      clearTimeout(deadline);
+      assert.deepEqual(frames, ['event: cancelled\ndata: {"status":"archived"}\n\n'], 'Authorized partner gets only terminal status, never answers');
+      assert.equal(ended, 1);assert.equal(removed, true, 'Cancel closes the response and removes the private channel');
+
+      globalThis.document = {visibilityState:'visible'};
+      supabase.auth.getSession = async () => ({data:{session:null}});
+      let requestSignal, requests = 0, fallbacks = 0;
+      globalThis.fetch = async (url, init) => {requests++;requestSignal = init.signal;return new Response(frames.join(''));};
+      const terminal = await new Promise((resolve, reject) => {
+        deadline = setTimeout(() => reject(new Error('Browser did not handle cancellation SSE')), 1000);
+        disconnect = watchMatch(streamedMatch.id, 'valid-invite', resolve, () => {fallbacks++;});
+      });
+      assert.deepEqual(terminal, {status:'archived'});
+      assert.equal(requestSignal.aborted, true, 'Terminal cancellation aborts reconnection');
+      assert.equal(requests, 1);assert.equal(fallbacks, 0);
+    } finally {
+      clearTimeout(deadline);disconnect?.();globalThis.fetch = fixtureFetch;
+      SupabaseClient.prototype.channel = previousChannel;SupabaseClient.prototype.removeChannel = previousRemoveChannel;
+      supabase.auth.getSession = previousSession;globalThis.document = previousDocument;
+    }
 
     // House Studio: Kiểm tra báo cáo nội dung và event tracking
     assert.ok(houseStudioCode.includes('submitContentReport('), 'House Studio có nút và modal báo cáo nội dung');

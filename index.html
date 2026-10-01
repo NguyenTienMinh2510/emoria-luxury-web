@@ -78,53 +78,12 @@
               includedLanguages: 'en,vi',
               autoDisplay: false
             }, 'google_translate_element');
+            window.dispatchEvent(new Event('emoria:translate-ready'));
           }
         } catch (e) {
           /* fail gracefully if offline or in sandbox */
         }
       }
-    </script>
-    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer></script>
-    <script type="text/javascript">
-      (function() {
-        function suppressBanner() {
-          try {
-            if (document.body && document.body.style.top && document.body.style.top !== '0px') {
-              document.body.style.setProperty('top', '0px', 'important');
-              document.body.style.setProperty('position', 'static', 'important');
-            }
-            var badElements = document.querySelectorAll('.goog-te-banner-frame, iframe.goog-te-banner-frame, iframe[class*="VIpgJd"], iframe[id*=":container"], iframe.skiptranslate, #goog-gt-tt, .goog-te-balloon-frame, .VIpgJd-ZVi9od-ORHb-Oxf9ae');
-            for (var i = 0; i < badElements.length; i++) {
-              badElements[i].style.setProperty('display', 'none', 'important');
-              badElements[i].style.setProperty('visibility', 'hidden', 'important');
-              badElements[i].style.setProperty('height', '0px', 'important');
-              badElements[i].style.setProperty('opacity', '0', 'important');
-              badElements[i].style.setProperty('pointer-events', 'none', 'important');
-              badElements[i].style.setProperty('top', '-99999px', 'important');
-              badElements[i].style.setProperty('position', 'absolute', 'important');
-            }
-          } catch(e) {}
-        }
-        var count = 0;
-        var timer = setInterval(function() {
-          suppressBanner();
-          count++;
-          if (count > 60) clearInterval(timer);
-        }, 100);
-        if (window.MutationObserver) {
-          var obs = new MutationObserver(function() {
-            suppressBanner();
-          });
-          if (document.documentElement) {
-            obs.observe(document.documentElement, {
-              childList: true,
-              subtree: true,
-              attributes: true,
-              attributeFilter: ['style', 'class']
-            });
-          }
-        }
-      })();
     </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>

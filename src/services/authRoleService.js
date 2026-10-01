@@ -33,7 +33,17 @@ let serverSystemAvailability = { ...UNAVAILABLE_SYSTEM };
 export async function fetchSystemStatus() {
   if (!isSupabaseConfigured()) return { success: true, ...getSystemAvailability(), isDemo: true };
   try {
-    const data = await apiRequest('/system/status');
+    let data;
+    try {
+      // This public RPC returns only maintenance status; no Vercel/Auth round trip is needed.
+      const result = await supabase.rpc('rpc_get_system_status').abortSignal(AbortSignal.timeout(8000));
+      if (result.error || result.data?.success !== true || typeof result.data.is_maintenance_mode !== 'boolean') {
+        throw result.error || new Error('Phản hồi máy chủ không hợp lệ.');
+      }
+      data = result.data;
+    } catch {
+      data = await apiRequest('/system/status', { anonymous: true });
+    }
     if (data?.success !== true || typeof data.is_maintenance_mode !== 'boolean') {
       throw new Error(data?.message || 'Phản hồi máy chủ không hợp lệ.');
     }
@@ -44,17 +54,6 @@ export async function fetchSystemStatus() {
     };
     return { success: true, ...serverSystemAvailability };
   } catch (error) {
-    try {
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('rpc_get_system_status');
-      if (!rpcErr && rpcData && rpcData.success === true && typeof rpcData.is_maintenance_mode === 'boolean') {
-        serverSystemAvailability = {
-          isMaintenanceMode: rpcData.is_maintenance_mode,
-          maintenanceMessage: rpcData.maintenance_message || '',
-          vipPasscode: '',
-        };
-        return { success: true, ...serverSystemAvailability };
-      }
-    } catch {}
     serverSystemAvailability = { ...UNAVAILABLE_SYSTEM };
     return { success: false, ...serverSystemAvailability, error: error.message };
   }

@@ -20,8 +20,10 @@ for(const topic of MATCH_TOPICS) {
     for(const option of q.options)assert.ok(typeof option==='string' && option.trim() && option.length<=100);
   }
   const first=getTopicQuestions(topic.id), texts=first.map(q=>q.text);
-  const next=getTopicQuestions(topic.id,5,texts);
-  assert.equal(next.filter(q=>!texts.includes(q.text)).length,Math.min(5,pool.length-first.length),'Unseen questions take priority');
+  assert.equal(first.length,7,'Every default topic round has seven questions');
+  const next=getTopicQuestions(topic.id,7,texts);
+  assert.equal(next.length,7);
+  assert.equal(next.filter(q=>!texts.includes(q.text)).length,Math.min(7,pool.length-first.length),'Unseen questions take priority');
   assert.ok(!texts.includes(getRandomReplacement(topic.id,texts).text));
   first[0].options[0]='Local edit';
   assert.ok(pool.every(q=>!q.options.includes('Local edit')));
@@ -68,7 +70,9 @@ const ok=async promise=>{const r=await promise;assert.ifError(r.error);return r.
 const accounts=[], sessions=[], clients=[], photos=[];let browser;
 async function api(method,route,body,session=sessions[0],status=200) {
   const res=await fetch(`${origin}/api/v1${route}`,{method,headers:{...(session?{Authorization:`Bearer ${session.access_token}`} :{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});
-  const data=await res.json();assert.equal(res.status,status,`${method} ${route}: ${JSON.stringify(data)}`);return data;
+  const data=await res.json();
+  if(status===null)return {status:res.status,data};
+  assert.equal(res.status,status,`${method} ${route}: ${JSON.stringify(data)}`);return data;
 }
 try {
   for(let i=0;i<2;i++) {
@@ -135,6 +139,96 @@ try {
   assert.equal((await api('GET','/events/matches',null,sessions[1])).length,0);
   console.log('PASS real HTTP/Auth/PostgreSQL: accounts without memories, two rounds, login/ownership checks, revisions, link opened, saved count, answer secrecy and reveal.');
 
+  // Cancel preserves a partial round for its owner, while revoking every partner entry point.
+  const cancelled=await api('POST','/events/matches',{title:'Cancel regression'},sessions[0],201);
+  const cancelledRoute=`/events/matches/${cancelled.match_id}`;
+  await api('POST',cancelledRoute+'/cancel',{},sessions[0],422);
+  const cancelledQuestions=getTopicQuestions('lifestyle');
+  await api('PUT',cancelledRoute+'/questions',{questions:cancelledQuestions,owner_name:'Minh',partner_name:'An',expected_revision:0});
+  const cancelledStart=await api('POST',cancelledRoute+'/begin',{});
+  const oldInvite=`?invite=${cancelledStart.invite_token}`;
+  await api('GET',cancelledRoute+'/view'+oldInvite,null,sessions[1]);
+  await api('POST',cancelledRoute+'/submit',{answers:Array(7).fill(0)});
+  await api('POST',cancelledRoute+'/progress',{invite_token:cancelledStart.invite_token,answers:[1,null,2],expected_revision:0},sessions[1]);
+  const beforeCancel=await ok(root.from('memory_matches').select('*').eq('id',cancelled.match_id).single());
+  assert.ok(beforeCancel.partner_opened_at && beforeCancel.owner_submitted_at);
+  await api('POST',cancelledRoute+'/cancel',{invite_token:cancelledStart.invite_token},sessions[1],403);
+  await api('POST',cancelledRoute+'/cancel',{},null,401);
+  assert.equal((await api('POST',cancelledRoute+'/cancel',{})).status,'archived');
+  const afterCancel=await ok(root.from('memory_matches').select('*').eq('id',cancelled.match_id).single());
+  assert.equal(afterCancel.status,'archived');
+  assert.equal(afterCancel.partner_token_hash,null);
+  for(const key of ['questions','owner_answers','partner_answers','owner_submitted_at','partner_submitted_at','partner_opened_at','created_at','started_at','completed_at','score','draft_revision','owner_revision','partner_revision']) {
+    assert.deepEqual(afterCancel[key],beforeCancel[key],`Cancellation preserves ${key}`);
+  }
+  await api('POST',cancelledRoute+'/cancel',{});
+  assert.deepEqual(await ok(root.from('memory_matches').select('*').eq('id',cancelled.match_id).single()),afterCancel,'Repeated cancellation is a no-op');
+  assert.equal((await api('GET',cancelledRoute+'/view')).status,'archived');
+  assert.ok((await api('GET','/events/matches')).some(match=>match.id===cancelled.match_id && match.status==='archived'),'Archived round stays in owner history');
+  await api('GET',cancelledRoute+'/view'+oldInvite,null,sessions[1],403);
+  await api('POST',cancelledRoute+'/view',{invite_token:cancelledStart.invite_token},sessions[1],403);
+  await api('POST',cancelledRoute+'/progress',{invite_token:cancelledStart.invite_token,answers:[0],expected_revision:afterCancel.partner_revision},sessions[1],403);
+  await api('POST',cancelledRoute+'/submit',{invite_token:cancelledStart.invite_token,answers:Array(7).fill(1)},sessions[1],403);
+  await api('PUT',cancelledRoute+'/questions',{questions:cancelledQuestions,expected_revision:afterCancel.draft_revision},sessions[1],403);
+  await api('POST',cancelledRoute+'/begin',{},sessions[1],403);
+  await api('POST',cancelledRoute+'/cancel',{},sessions[1],403);
+  await api('PUT',cancelledRoute+'/questions',{questions:cancelledQuestions,expected_revision:afterCancel.draft_revision},sessions[0],422);
+  await api('POST',cancelledRoute+'/begin',{},sessions[0],422);
+  await api('POST',cancelledRoute+'/progress',{answers:[0],expected_revision:afterCancel.owner_revision},sessions[0],422);
+  await api('POST',cancelledRoute+'/submit',{answers:Array(7).fill(1)},sessions[0],422);
+  assert.deepEqual(await ok(root.from('memory_matches').select('*').eq('id',cancelled.match_id).single()),afterCancel,'Rejected old links and writes leave the archived round unchanged');
+
+  const freshQuestions=getTopicQuestions('lifestyle',7,cancelledQuestions.map(question=>question.text));
+  assert.equal(freshQuestions.length,7);
+  assert.ok(freshQuestions.every(question=>!cancelledQuestions.some(old=>old.text===question.text)),'Replay prioritizes seven unseen questions');
+  const fresh=await api('POST','/events/matches',{title:'New round after cancellation'},sessions[0],201);
+  assert.notEqual(fresh.match_id,cancelled.match_id);
+  const freshRoute=`/events/matches/${fresh.match_id}`;
+  await api('PUT',freshRoute+'/questions',{questions:freshQuestions,owner_name:'Minh',partner_name:'Bình',expected_revision:0});
+  const freshStart=await api('POST',freshRoute+'/begin',{});
+  assert.notEqual(freshStart.invite_token,cancelledStart.invite_token);
+  assert.equal((await api('GET',freshRoute+'/view')).total_questions,7);
+  await api('GET',freshRoute+'/view'+oldInvite,null,sessions[1],403);
+  assert.equal((await api('GET',freshRoute+'/view?invite='+freshStart.invite_token,null,sessions[1])).role,'partner');
+
+  // Completed rounds cannot be archived, and cancellation/final submission must have one winner.
+  const completedBefore=await ok(root.from('memory_matches').select('*').eq('id',rounds[0]).single());
+  const completedCancel=await api('POST',`/events/matches/${rounds[0]}/cancel`,{},sessions[0],409);
+  assert.match(completedCancel.error.message,/^MATCH_COMPLETED:/);
+  assert.deepEqual(await ok(root.from('memory_matches').select('*').eq('id',rounds[0]).single()),completedBefore,'Completed result survives a rejected cancel');
+  for(let attempt=0;attempt<3;attempt++) {
+    const racing=await api('POST','/events/matches',{title:'Cancel-submit race'},sessions[0],201);
+    const racingRoute=`/events/matches/${racing.match_id}`;
+    await api('PUT',racingRoute+'/questions',{questions:getTopicQuestions('lifestyle'),owner_name:'Minh',partner_name:'An',expected_revision:0});
+    const started=await api('POST',racingRoute+'/begin',{});
+    await api('POST',racingRoute+'/submit',{answers:Array(7).fill(0)});
+    const beforeRace=await ok(root.from('memory_matches').select('*').eq('id',racing.match_id).single());
+    const cancel=()=>api('POST',racingRoute+'/cancel',{},sessions[0],null);
+    const submit=()=>api('POST',racingRoute+'/submit',{invite_token:started.invite_token,answers:Array(7).fill(0)},sessions[1],null);
+    const results=await Promise.all(attempt%2 ? [submit(),cancel()] : [cancel(),submit()]);
+    const [cancelResult,submitResult]=attempt%2 ? results.reverse() : results;
+    const settled=await ok(root.from('memory_matches').select('*').eq('id',racing.match_id).single());
+    assert.equal(settled.owner_submitted_at,beforeRace.owner_submitted_at);
+    assert.deepEqual(settled.owner_answers,beforeRace.owner_answers);
+    if(settled.status==='archived') {
+      assert.equal(cancelResult.status,200,JSON.stringify(cancelResult));
+      assert.equal(submitResult.status,403,JSON.stringify(submitResult));
+      assert.equal(settled.partner_token_hash,null);
+      assert.equal(settled.partner_submitted_at,null);
+      assert.deepEqual(settled.partner_answers,beforeRace.partner_answers);
+      assert.equal(settled.score,beforeRace.score);
+    } else {
+      assert.equal(settled.status,'completed');
+      assert.equal(cancelResult.status,409,JSON.stringify(cancelResult));
+      assert.match(cancelResult.data.error.message,/^MATCH_COMPLETED:/);
+      assert.equal(submitResult.status,200,JSON.stringify(submitResult));
+      assert.ok(settled.partner_submitted_at && settled.partner_token_hash);
+      assert.deepEqual(settled.partner_answers,Array(7).fill(0));
+      assert.equal(settled.score,7);
+    }
+  }
+  console.log('PASS cancellation: owner only, token revoked, all partner entry points denied, partial answers/history preserved, idempotent archive, seven-question replay and atomic cancel/submit race.');
+
   if(process.argv.includes('--browser')) {
     const {chromium}=await import(process.env.PLAYWRIGHT_MODULE?pathToFileURL(process.env.PLAYWRIGHT_MODULE).href:'playwright');
     const entry=path.join(folder,'entry.jsx');
@@ -175,12 +269,12 @@ try {
     await partner.getByRole('radio').first().click();
     await partner.waitForResponse(r=>r.url().endsWith('/progress') && r.status()===200);
     await owner.evaluate(()=>window.dispatchEvent(new Event('focus')));
-    await owner.getByText(/Người cùng chơi đã trả lời 1\/5 câu/).waitFor();
+    await owner.getByText(/Người cùng chơi đã trả lời 1\/7 câu/).waitFor();
     // Complete both sides and replay immediately, before the autosave debounce.
     for(const page of pages) {
-      for(let i=0;i<5;i++) {
+      for(let i=0;i<7;i++) {
         await page.getByRole('radio').first().click();
-        if(i<4)await page.getByRole('button',{name:/Câu tiếp|Tiếp theo/}).click();
+        if(i<6)await page.getByRole('button',{name:/Câu tiếp|Tiếp theo/}).click();
       }
       await page.getByRole('button',{name:/Nộp|Hoàn Thành/}).click();
     }

@@ -7,6 +7,7 @@ import {
 import { categories } from '../data/products';
 import { useStore } from './StoreProvider';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { productImageProps } from '../services/productImages.js';
 
 const VirtualTryOnModal = lazy(() => import('./VirtualTryOnModal'));
 
@@ -260,8 +261,10 @@ export default function ProductCatalog({
                       
                       {/* Product Image */}
                       <img
-                        src={product.image}
+                        {...productImageProps(product.image)}
                         alt={product.name}
+                        loading="lazy"
+                        decoding="async"
                         draggable="false"
                         className="w-full h-full object-cover object-center group-hover:scale-108 transition-transform duration-500 select-none"
                       />

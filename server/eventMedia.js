@@ -8,7 +8,7 @@ import { createClient } from '@supabase/supabase-js';
  */
 export async function signEventPaths(paths, expiresIn = 3600) {
   if (!Array.isArray(paths) || paths.length === 0) return {};
-  const validPaths = paths.filter(p => typeof p === 'string' && p.trim().length > 0);
+  const validPaths = [...new Set(paths.filter(p => typeof p === 'string' && p.trim().length > 0).map(p => p.trim()))];
   if (validPaths.length === 0) return {};
 
   const base = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -29,21 +29,18 @@ export async function signEventPaths(paths, expiresIn = 3600) {
   });
 
   const result = {};
-  await Promise.all(
-    validPaths.map(async (path) => {
-      const cleanPath = path.trim();
-      try {
-        const { data, error } = await admin.storage
-          .from('emoria-event-media')
-          .createSignedUrl(cleanPath, expiresIn);
-        if (!error && (data?.signedUrl || data?.signedURL)) {
-          result[cleanPath] = data.signedUrl || data.signedURL;
+  try {
+    const { data, error } = await admin.storage.from('emoria-event-media').createSignedUrls(validPaths, expiresIn);
+    if (!error) {
+      for (const row of data || []) {
+        if (!row.error && validPaths.includes(row.path) && (row.signedUrl || row.signedURL)) {
+          result[row.path] = row.signedUrl || row.signedURL;
         }
-      } catch {
-        // Lỗi storage: không tạo fallback token giả, để trống URL cho path này
       }
-    })
-  );
+    }
+  } catch {
+    // Storage failure must never create a fake token or expose an unsigned path.
+  }
 
   return result;
 }

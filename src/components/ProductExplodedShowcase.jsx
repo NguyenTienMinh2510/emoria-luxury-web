@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { loadShowcaseFrames } from '../services/showcaseFrames.js';
 import {
   Sparkles, ShieldCheck, Cpu, Layers, Disc,
   ChevronDown, ArrowDown, Play, Pause, RotateCcw,
@@ -21,6 +22,7 @@ export default function ProductExplodedShowcase({
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const imagesRef = useRef([]);
+  const frameLoaderRef = useRef(null);
   
   const [loadedCount, setLoadedCount] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -47,7 +49,7 @@ export default function ProductExplodedShowcase({
   }, [currentFrame]);
 
   // Ánh xạ 120 frames đều từ 300 file ảnh gốc + cachebuster tránh lưu ảnh cũ
-  const getFramePath = (index) => {
+  const getFallbackFramePath = (index) => {
     const originalIndex = Math.min(
       SOURCE_TOTAL_FRAMES, 
       Math.max(1, Math.round(index * (SOURCE_TOTAL_FRAMES - 1) / (TOTAL_FRAMES - 1)) + 1)
@@ -58,6 +60,7 @@ export default function ProductExplodedShowcase({
 
   // Draw a specific frame onto Canvas with high-DPI, aspect-ratio contain, and zero-watermark guarantee
   const drawFrame = useCallback((frameIndex) => {
+    frameLoaderRef.current?.request(frameIndex);
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -65,16 +68,16 @@ export default function ProductExplodedShowcase({
 
     // Find requested frame or closest loaded frame
     let img = imagesRef.current[frameIndex];
-    if (!img || !img.complete) {
+    if (!img || !img.complete || !img.naturalWidth) {
       for (let i = frameIndex - 1; i >= 0; i--) {
-        if (imagesRef.current[i] && imagesRef.current[i].complete) {
+        if (imagesRef.current[i]?.complete && imagesRef.current[i].naturalWidth) {
           img = imagesRef.current[i];
           break;
         }
       }
     }
 
-    if (!img || !img.complete) return;
+    if (!img || !img.complete || !img.naturalWidth) return;
 
     // Set canvas dimensions to match display container
     const rect = canvas.getBoundingClientRect();
@@ -124,56 +127,43 @@ export default function ProductExplodedShowcase({
     // Bảo vệ watermark 2 lớp: xóa triệt để vùng watermark góc dưới bên phải trên canvas
     if (frameIndex < 80) {
       const scale = drawW / img.width;
-      const wmX = drawX + 1680 * scale;
-      const wmY = drawY + 840 * scale;
-      const wmW = 120 * scale;
-      const wmH = 120 * scale;
+      const wmX = drawX + img.width * (1680 / 1920) * scale;
+      const wmY = drawY + img.height * (840 / 1080) * scale;
+      const wmW = img.width * (120 / 1920) * scale;
+      const wmH = img.height * (120 / 1080) * scale;
       ctx.fillStyle = '#060608';
       ctx.fillRect(wmX, wmY, wmW, wmH);
     }
   }, []);
 
-  // Preload 150 frames
+  // First frame immediately; remaining frames load after the page gets a chance to paint.
   useEffect(() => {
-    let isMounted = true;
-    const images = new Array(TOTAL_FRAMES);
     let count = 0;
-
-    // Load first frame immediately
-    const firstImg = new Image();
-    firstImg.src = getFramePath(0);
-    firstImg.onload = () => {
-      if (!isMounted) return;
-      images[0] = firstImg;
-      count++;
-      setLoadedCount(count);
-      drawFrame(0);
-    };
-
-    // Preload rest of 150 frames
-    for (let i = 1; i < TOTAL_FRAMES; i++) {
-      const img = new Image();
-      img.src = getFramePath(i);
-      img.onload = () => {
-        if (!isMounted) return;
-        images[i] = img;
+    const loader = loadShowcaseFrames({
+      count: TOTAL_FRAMES,
+      getPath: index => `/assets/animation-optimized/frame-${String(index).padStart(3, '0')}.webp`,
+      getFallbackPath: getFallbackFramePath,
+      onLoad: (index, loaded) => {
         count++;
-        setLoadedCount(count);
-        if (count >= 20) {
-          setIsLoaded(true);
+        if (loaded) setIsLoaded(true);
+        if (count % 6 === 0 || index === 0 || count === TOTAL_FRAMES) setLoadedCount(count);
+        if (index === currentFrameRef.current || !imagesRef.current[currentFrameRef.current]?.naturalWidth) {
+          drawFrame(currentFrameRef.current);
         }
-      };
-      img.onerror = () => {
-        if (!isMounted) return;
-        count++;
-        setLoadedCount(count);
-      };
-    }
-
-    imagesRef.current = images;
-
+      },
+    });
+    imagesRef.current = loader.images;
+    frameLoaderRef.current = loader;
+    loader.request(0);
+    const idle = typeof window.requestIdleCallback === 'function';
+    const schedule = idle
+      ? window.requestIdleCallback(() => loader.preload(), { timeout: 1500 })
+      : window.setTimeout(() => loader.preload(), 300);
     return () => {
-      isMounted = false;
+      if (idle) window.cancelIdleCallback(schedule); else window.clearTimeout(schedule);
+      loader.dispose();
+      frameLoaderRef.current = null;
+      imagesRef.current = [];
     };
   }, [drawFrame]);
 
