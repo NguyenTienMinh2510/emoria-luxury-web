@@ -1,7 +1,7 @@
 import {useLanguage} from '../i18n/LanguageProvider';
 import React,{useEffect,useRef,useState} from 'react';
 import { motion } from 'framer-motion';
-import { Volume2, VolumeX, Sparkles, Film, ArrowRight } from 'lucide-react';
+import { Volume2, VolumeX, Film, ArrowRight } from 'lucide-react';
 
 export default function MemoryCinema({url,title,recipient,onComplete,onRefresh}) {
   const {t}=useLanguage();
@@ -10,37 +10,49 @@ export default function MemoryCinema({url,title,recipient,onComplete,onRefresh})
   const [isPlaying,setIsPlaying]=useState(false);
   const ref=useRef(null);
   const containerRef=useRef(null);
+  const completeRef=useRef(onComplete);
+  completeRef.current=onComplete;
 
-  // Tự động cuộn và zoom vào video intro ngay khi hiển thị để người dùng không cần lướt xuống
   useEffect(()=>{
+    const previousFocus=document.activeElement, overflow=document.body.style.overflow;
+    document.body.style.overflow='hidden';
     window.scrollTo({top:0,behavior:'instant'});
-    const timer=setTimeout(()=>{
-      ref.current?.scrollIntoView({behavior:'smooth',block:'center'});
-    },100);
-    return ()=>clearTimeout(timer);
+    containerRef.current?.focus();
+    const key=event=>{
+      if(event.key==='Escape')completeRef.current();
+      if(event.key==='Tab'){
+        const controls=[...containerRef.current.querySelectorAll('button, video[controls]')], first=controls[0], last=controls.at(-1);
+        if(event.shiftKey && (document.activeElement===first || document.activeElement===containerRef.current)){event.preventDefault();last?.focus();}
+        else if(!event.shiftKey && (document.activeElement===last || document.activeElement===containerRef.current)){event.preventDefault();first?.focus();}
+      }
+    };
+    document.addEventListener('keydown',key);
+    return ()=>{
+      document.body.style.overflow=overflow;
+      document.removeEventListener('keydown',key);
+      previousFocus?.focus();
+    };
   },[]);
 
   useEffect(()=>{
+    const video=ref.current;
+    if(!video)return;
+    let active=true;
     setFailed(false);
-    if(!ref.current)return;
-    // Attempt unmuted autoplay; fallback to muted autoplay if browser blocks
-    const attemptPlay = () => {
-      const p = ref.current?.play();
-      if(p !== undefined){
-        p.then(()=>{
-          setIsPlaying(true);
-        }).catch(()=>{
-          if(ref.current){
-            ref.current.muted = true;
-            setIsMuted(true);
-            ref.current.play().then(()=>{
-              setIsPlaying(true);
-            }).catch(()=>setFailed(true));
-          }
-        });
+    setIsMuted(false);
+    video.muted=false;
+    const attemptPlay = async () => {
+      try { await video.play(); }
+      catch {
+        if(!active)return;
+        video.muted=true;
+        setIsMuted(true);
+        try { await video.play(); } catch { if(active)setFailed(true); }
       }
+      if(active)setIsPlaying(!video.paused);
     };
     attemptPlay();
+    return ()=>{active=false;video.pause();};
   },[url]);
 
   const toggleSound = () => {
@@ -52,17 +64,20 @@ export default function MemoryCinema({url,title,recipient,onComplete,onRefresh})
   return (
     <section 
       ref={containerRef}
-      className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 text-center space-y-4 animate-fadeIn" 
+      role="dialog"
+      aria-modal="true"
+      tabIndex={-1}
+      className="fixed inset-0 z-[120] h-[100dvh] bg-black text-white overflow-hidden focus:outline-none"
       aria-label={t("Video mở quà","Opening video")}
     >
-      {/* Sleek, compact Cinema Header - Giữ video luôn nằm trọn trong màn hình đầu tiên */}
-      <div className="space-y-1.5 max-w-2xl mx-auto">
+      <div className="absolute top-0 inset-x-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-6 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+      <div className="space-y-1.5 min-w-0">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-200 text-[11px] tracking-wider uppercase">
           <Film className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-          <span>{t("Khoảnh khắc mở quà đặc biệt","Special unboxing cinema")}</span>
+          <span className="hidden sm:inline">{t("Khoảnh khắc mở quà đặc biệt","Special unboxing cinema")}</span>
           {recipient && (
             <span className="text-white/80 font-normal">
-              · {t("Dành riêng cho","For")} <strong className="text-amber-200">{recipient}</strong>
+              <span className="hidden sm:inline">· </span>{t("Dành riêng cho","For")} <strong className="text-amber-200">{recipient}</strong>
             </span>
           )}
         </div>
@@ -73,13 +88,22 @@ export default function MemoryCinema({url,title,recipient,onComplete,onRefresh})
           </h1>
         )}
       </div>
+        <button
+          type="button"
+          onClick={()=>{ref.current?.pause();onComplete();}}
+          className="shrink-0 min-h-11 px-4 rounded-full border border-white/30 bg-black/60 text-xs flex items-center gap-2 pointer-events-auto hover:bg-white/15"
+        >
+          <span>{t("Bỏ qua video", "Skip video")}</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
 
       {/* Cinematic Centerpiece Video Player with Zoom Entrance Effect */}
       <motion.div 
-        initial={{ opacity: 0, scale: 0.93, y: 15 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
-        className="relative group rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-amber-400/40 shadow-[0_0_60px_rgba(251,191,36,0.22),0_25px_60px_rgba(0,0,0,0.95)] bg-black max-w-4xl mx-auto"
+        className="absolute inset-0 bg-black"
       >
         <video
           ref={ref}
@@ -88,52 +112,36 @@ export default function MemoryCinema({url,title,recipient,onComplete,onRefresh})
           playsInline
           controls
           preload="auto"
+          aria-label={title || t("Phim kỷ niệm", "Memory film")}
           onPlay={()=>setIsPlaying(true)}
           onPause={()=>setIsPlaying(false)}
+          onVolumeChange={event=>setIsMuted(event.currentTarget.muted)}
           onEnded={onComplete}
           onError={()=>setFailed(true)}
-          className="w-full max-h-[72vh] sm:max-h-[76vh] object-contain bg-black"
+          className="w-full h-full object-cover sm:object-contain bg-black"
         />
 
-        {/* Floating Unmute Helper if muted by browser */}
-        {isMuted && isPlaying && (
+        {isPlaying && (
           <button
             type="button"
             onClick={toggleSound}
-            className="absolute top-4 right-4 z-20 px-3.5 py-2 rounded-full bg-amber-400/90 text-dark-950 font-bold text-xs flex items-center gap-2 shadow-lg backdrop-blur-md hover:bg-amber-300 transition-all cursor-pointer animate-bounce"
+            aria-pressed={!isMuted}
+            className="absolute bottom-20 right-4 sm:right-6 z-20 min-h-11 px-4 rounded-full bg-amber-400/90 text-dark-950 font-bold text-xs flex items-center gap-2 shadow-lg backdrop-blur-md hover:bg-amber-300"
           >
-            <VolumeX className="w-4 h-4 text-dark-950" />
-            <span>{t("Bật tiếng video ✦","Turn sound on ✦")}</span>
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            <span>{isMuted ? t("Bật tiếng video", "Turn sound on") : t("Tắt tiếng video", "Mute video")}</span>
           </button>
         )}
 
-        {/* Bottom Cinema Subtitle Bar */}
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-3 sm:p-4 flex items-center justify-between text-xs text-slate-300 pointer-events-none">
-          <span className="flex items-center gap-1.5 text-amber-200">
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            {isPlaying ? t("Đang phát phim kỷ niệm","Now playing memory film") : t("Tạm dừng","Paused")}
-          </span>
-          <span className="text-[11px] text-amber-300/80 tracking-widest uppercase font-mono">EMORIA MEMORY CINEMA</span>
-        </div>
       </motion.div>
 
       {failed && (
-        <div role="alert" className="text-amber-200 space-y-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 max-w-md mx-auto">
+        <div role="alert" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-[calc(100%-2rem)] max-w-md text-center text-amber-200 space-y-3 p-5 rounded-2xl bg-black/90 border border-amber-500/20">
           <p>{t("Chưa phát được video. Liên kết có thể đã hết hạn hoặc định dạng chưa được hỗ trợ.","Unable to play the video. Its link may have expired or the format may not be supported.")}</p>
           <button className="store-button" onClick={onRefresh}>{t("Tải lại video","Reload video")}</button>
         </div>
       )}
 
-      <div className="pt-1 flex flex-col sm:flex-row items-center justify-center gap-4">
-        <button
-          type="button"
-          onClick={()=>{ref.current?.pause();onComplete();}}
-          className="cta-luxury-gold !py-2.5 !px-6 text-xs flex items-center gap-2 cursor-pointer"
-        >
-          <span>{t("Xem trọn vẹn thư tay & lời chúc","Read full letter & wishes")}</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
     </section>
   );
 }

@@ -26,6 +26,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
   const preparedRef = useRef(false);
   const reducedMotionRef = useRef(false);
   const touchBoundsRef = useRef(null);
+  const activeTouchRef = useRef(null);
 
   const [loadedCount, setLoadedCount] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -142,7 +143,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const width = Math.round(rect.width * dpr), height = Math.round(rect.height * dpr);
-      const scale = window.innerWidth < 768 ? 1.05 : window.innerWidth < 1024 ? 1.18 : 1.28;
+      const scale = window.innerWidth < 768 ? 1.4 : window.innerWidth < 1024 ? 1.18 : 1.28;
       if (!width || !height) return;
       if (canvas.width !== width || canvas.height !== height || canvasSizeRef.current?.scale !== scale) {
         canvas.width = width;
@@ -164,20 +165,50 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
 
   const collapse = useCallback(() => {
     touchBoundsRef.current = null;
+    activeTouchRef.current = null;
     animateTo(0);
+  }, [animateTo]);
+
+  const updateTouch = useCallback(() => {
+    const touch = activeTouchRef.current;
+    if (!touch) return;
+    const bounds = touch.element.getBoundingClientRect();
+    const inside = touch.clientX >= bounds.left && touch.clientX <= bounds.right &&
+      touch.clientY >= bounds.top && touch.clientY <= bounds.bottom;
+    animateTo(inside ? TOTAL_FRAMES - 1 : 0);
   }, [animateTo]);
 
   useEffect(() => {
     const hide = () => { if (document.hidden) collapse(); };
-    window.addEventListener('scroll', collapse, { passive: true });
+    const scroll = () => { if (activeTouchRef.current) updateTouch(); else collapse(); };
+    const moveTouch = (event) => {
+      const active = activeTouchRef.current;
+      const touch = active && Array.from(event.touches).find(touch => touch.identifier === active.identifier);
+      if (!touch) return;
+      active.clientX = touch.clientX;
+      active.clientY = touch.clientY;
+      updateTouch();
+    };
+    const endTouch = (event) => {
+      const active = activeTouchRef.current;
+      if (active && !Array.from(event.touches).some(touch => touch.identifier === active.identifier)) collapse();
+    };
+    window.addEventListener('scroll', scroll, { passive: true });
+    // Native scrolling cancels pointer events; touch events track the actual finger until release.
+    window.addEventListener('touchmove', moveTouch, { passive: true });
+    window.addEventListener('touchend', endTouch, { passive: true });
+    window.addEventListener('touchcancel', endTouch, { passive: true });
     window.addEventListener('blur', collapse);
     document.addEventListener('visibilitychange', hide);
     return () => {
-      window.removeEventListener('scroll', collapse);
+      window.removeEventListener('scroll', scroll);
+      window.removeEventListener('touchmove', moveTouch);
+      window.removeEventListener('touchend', endTouch);
+      window.removeEventListener('touchcancel', endTouch);
       window.removeEventListener('blur', collapse);
       document.removeEventListener('visibilitychange', hide);
     };
-  }, [collapse]);
+  }, [collapse, updateTouch]);
 
   useEffect(() => { if (isMobileDrawerOpen) collapse(); }, [isMobileDrawerOpen, collapse]);
 
@@ -190,14 +221,14 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
   };
 
   const handlePointerDown = (event) => {
-    if (!event.isPrimary || event.button !== 0) return;
+    if (!event.isPrimary || event.button !== 0 || event.pointerType === 'touch') return;
     touchBoundsRef.current = event.currentTarget.getBoundingClientRect();
     animateTo(TOTAL_FRAMES - 1);
   };
 
   const handlePointerMove = (event) => {
     const bounds = touchBoundsRef.current;
-    if (!event.isPrimary || !bounds || event.pointerType === 'mouse') return;
+    if (!event.isPrimary || !bounds || event.pointerType !== 'pen') return;
     const inside = event.clientX >= bounds.left && event.clientX <= bounds.right &&
       event.clientY >= bounds.top && event.clientY <= bounds.bottom;
     animateTo(inside ? TOTAL_FRAMES - 1 : 0);
@@ -266,7 +297,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
     <section
       id="product-exploded-showcase"
       ref={containerRef}
-      className="relative h-[100dvh] min-h-[500px] w-full bg-black text-white selection:bg-silver/20 select-none overflow-hidden flex flex-col justify-between items-center"
+      className="relative min-h-[100svh] md:h-[100dvh] md:min-h-[500px] w-full bg-black text-white selection:bg-silver/20 select-none overflow-hidden flex flex-col justify-between items-center"
     >
       {/* LUXURY ATELIER AMBIENT LIGHTING & DIAMOND PATTERN TEXTURE */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(255,255,255,0.06),transparent_75%)] pointer-events-none z-0" />
@@ -359,7 +390,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
       </div>
 
       {/* 2. MAIN CENTER CANVAS (FULL VIEWPORT WIDTH - ABSOLUTE TRUE CENTER) */}
-      <div className="relative w-full flex-1 min-h-0 flex items-center justify-center">
+      <div className="relative w-full flex-1 min-h-[clamp(320px,50svh,560px)] md:min-h-0 flex items-center justify-center">
 
         {/* CỘT THÔNG SỐ BÊN TRÁI (Desktop / Tablet) */}
         <div className="absolute left-3 sm:left-6 lg:left-8 xl:left-12 top-[40%] -translate-y-1/2 z-30 space-y-2 max-w-[240px] lg:max-w-[280px] xl:max-w-[310px] hidden md:block pointer-events-auto">
@@ -408,7 +439,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
 
         {/* RESPONSIVE CANVAS STAGE (Đảm bảo dây chuyền nằm đúng tuyệt đối chính tâm màn hình) */}
         <div
-          className="relative w-full h-full flex items-center justify-center min-h-0 overflow-hidden"
+          className="relative w-full h-full min-h-[clamp(320px,50svh,560px)] md:min-h-0 flex items-center justify-center overflow-hidden"
           style={{
             maskImage: 'linear-gradient(to bottom, transparent 0%, black 2%, black 98%, transparent 100%)',
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 2%, black 98%, transparent 100%)'
@@ -417,7 +448,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
           <canvas
             ref={canvasRef}
             style={{ width: '100%', height: '100%' }}
-            className="w-full h-full block pointer-events-none"
+            className="absolute inset-0 w-full h-full block pointer-events-none"
           />
 
           <button
@@ -429,11 +460,19 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
             onPointerEnter={event => { if (event.pointerType === 'mouse') animateTo(TOTAL_FRAMES - 1); }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
-            onPointerLeave={event => { if (event.isPrimary) collapse(); }}
-            onPointerUp={event => { if (event.isPrimary) collapse(); }}
-            onPointerCancel={event => { if (event.isPrimary) collapse(); }}
-            onFocus={() => animateTo(TOTAL_FRAMES - 1)}
-            onBlur={collapse}
+            onPointerLeave={event => { if (event.isPrimary && event.pointerType !== 'touch') collapse(); }}
+            onPointerUp={event => { if (event.isPrimary && event.pointerType !== 'touch') collapse(); }}
+            onPointerCancel={event => { if (event.isPrimary && event.pointerType !== 'touch') collapse(); }}
+            onTouchStart={event => {
+              if (activeTouchRef.current) return;
+              const touch = event.changedTouches[0];
+              if (!touch) return;
+              activeTouchRef.current = { identifier: touch.identifier, clientX: touch.clientX,
+                clientY: touch.clientY, element: event.currentTarget };
+              animateTo(TOTAL_FRAMES - 1);
+            }}
+            onFocus={event => { if (event.currentTarget.matches(':focus-visible')) animateTo(TOTAL_FRAMES - 1); }}
+            onBlur={() => { if (!activeTouchRef.current) collapse(); }}
             onClick={event => { if (event.detail === 0) animateTo(TOTAL_FRAMES - 1); }}
             onKeyDown={event => {
               if (event.key === 'Escape') collapse();
@@ -442,7 +481,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth, onOpe
                 animateTo(TOTAL_FRAMES - 1);
               }
             }}
-            className="absolute left-[20%] right-[20%] md:left-[32%] md:right-[32%] top-[8%] bottom-[5%] z-10 rounded-3xl bg-transparent cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/60"
+            className="absolute inset-0 md:left-[32%] md:right-[32%] md:top-[8%] md:bottom-[5%] z-10 rounded-3xl bg-transparent cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/60"
             style={{ touchAction: 'pan-y' }}
           />
           <p id="showcase-loading-status" role="status" aria-live="polite"

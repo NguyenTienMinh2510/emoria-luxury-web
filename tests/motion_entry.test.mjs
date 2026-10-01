@@ -25,11 +25,18 @@ class GateImage {
 }
 const originalWindow=globalThis.window,originalImage=globalThis.Image;
 const text=node=>node&&typeof node==='object'?(node.children||[]).map(text).join(''):String(node??'');
+const find=(node,type)=>node?.type===type?node:(node?.children||[]).map(child=>find(child,type)).find(Boolean);
 globalThis.window={innerWidth:390};globalThis.Image=GateImage;
 try {
   const {Gate,prepareShowcaseFrames}=await import(moduleUrl);
   const waiting=Gate({children:'WEBSITE'});
   assert.equal(waiting.type,'main');
+  assert.equal(waiting.props['aria-busy'],true);
+  assert.ok(text(waiting).includes('Đang chuẩn bị không gian trải nghiệm'));
+  assert.ok(!/chuyển động|tải ảnh/i.test(text(waiting)),'Entry copy explains preparation without exposing animation loading');
+  assert.equal(find(waiting,'progress').props.value,0);
+  assert.equal(find(waiting,'progress').props.max,300);
+  assert.equal(find(waiting,'progress').props['aria-describedby'],'entry-status');
   assert.ok(!JSON.stringify(waiting).includes('WEBSITE'),'Website cannot mount behind the loading screen');
   assert.equal(GateImage.created.length,3,'Entry starts the bounded full preload');
   const sequence=prepareShowcaseFrames();
@@ -57,8 +64,15 @@ try {
   GateImage.created[299].onerror();GateImage.created[299].onerror();
   const failedSequence=failure.prepareShowcaseFrames();
   assert.deepEqual(failedSequence.getSnapshot(),{loadedCount:299,ready:false,failed:true});
-  assert.ok(JSON.stringify(failure.Gate({children:'WEBSITE'})).includes('Thử lại'));
-  failedSequence.retry();
+  const failedGate=failure.Gate({children:'WEBSITE'});
+  assert.equal(failedGate.props['aria-busy'],false);
+  assert.ok(text(failedGate).includes('Kết nối chưa hoàn tất. Vui lòng thử lại.'));
+  assert.ok(!/chuyển động|tải ảnh/i.test(text(failedGate)));
+  assert.equal(find(failedGate,'progress').props.value,299,'Failure preserves real progress');
+  const retry=find(failedGate,'button');
+  assert.equal(text(retry),'Thử lại');
+  retry.props.onClick();
+  assert.equal(failure.Gate({children:'WEBSITE'}).props['aria-busy'],true);
   assert.equal(GateImage.created.length,301,'Retry reloads only the failed frame, retaining all decoded frames');
   assert.equal(failedSequence.getSnapshot().ready,false);
   await GateImage.created[300].finish();

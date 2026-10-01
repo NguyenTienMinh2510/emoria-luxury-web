@@ -97,39 +97,10 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
 
   const [isPlaying,setIsPlaying]=useState(false),[audioError,setAudioError]=useState('');
   const audioRef=useRef(null);
-  const letterVideoRef=useRef(null);
   const letterSectionRef=useRef(null);
-  const letterVideoContainerRef=useRef(null);
 
   // Letter Reveal State
   const [isLetterOpen, setIsLetterOpen] = useState(false);
-
-  // Tự động cuộn zoom vào video intro & phát video tâm sự ngay khi mở thư
-  useEffect(() => {
-    if (isLetterOpen) {
-      const scrollTimer = setTimeout(() => {
-        if (letterVideoContainerRef.current) {
-          letterVideoContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else if (letterSectionRef.current) {
-          letterSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 160);
-
-      if (letterVideoRef.current) {
-        const playPromise = letterVideoRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            if (letterVideoRef.current) {
-              letterVideoRef.current.muted = true;
-              letterVideoRef.current.play().catch(() => {});
-            }
-          });
-        }
-      }
-
-      return () => clearTimeout(scrollTimer);
-    }
-  }, [isLetterOpen, memoryData?.intro_video_url]);
 
   // Lightbox Media Preview
   const [fullScreenImage, setFullScreenImage] = useState(null);
@@ -185,10 +156,9 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         setEditPinHint(res.data.pin_hint || '');
 
         // Trigger unboxing ceremony for recipient/guest if not yet unboxed in this session
-        const alreadyUnboxed = (typeof sessionStorage !== 'undefined') && sessionStorage.getItem('emoria_unboxed_' + tag);
-        if (!res.data.is_owner && !alreadyUnboxed && !res.data.is_protected) {
-          setShowUnboxing(true);
-        }
+        let alreadyUnboxed = false;
+        try { alreadyUnboxed = sessionStorage.getItem('emoria_unboxed_' + tag); } catch {}
+        setShowUnboxing(!res.data.is_owner && !alreadyUnboxed && res.data.is_unlocked && !res.data.intro_video_url);
 
         // House is optional: it must not hold the authorized letter behind a full-page spinner.
         setHouseLoading(true);
@@ -239,7 +209,6 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         // Sau khi đúng PIN -> Fetch lại dữ liệu với Grant Token để nhận nội dung thư thật
         await loadMemory(currentTag);
         setPinInput('');
-        setShowUnboxing(true);
       } else {
         setPinError(result.message || t("Mã PIN bảo mật không chính xác.","Incorrect PIN."));
       }
@@ -416,6 +385,20 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   const isTimedLock = memoryData.availability?.status === 'timed_lock';
   const isSuspended = memoryData.availability?.status === 'suspended';
   const isLockedByPin = memoryData.is_protected && !memoryData.is_unlocked;
+
+  if (memoryData.is_unlocked && !isLockedByPin && !isSuspended && (!isTimedLock || memoryData.is_owner || memoryData.is_admin) && memoryData.intro_video_url && !movieDone && !isEditorOpen) {
+    return <MemoryCinema
+      url={memoryData.intro_video_url}
+      title={memoryData.title}
+      recipient={memoryData.recipient}
+      onComplete={() => {
+        setMovieDone(true);
+        setShowUnboxing(false);
+        window.scrollTo({top:0, behavior:'instant'});
+      }}
+      onRefresh={() => loadMemory(currentTag)}
+    />;
+  }
 
   return (
     <div className="w-full min-h-screen bg-dark-950 text-slate-100 pt-24 pb-24 selection:bg-white/20">
@@ -664,22 +647,6 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
             )}
           </motion.div>
         </div>
-      ) : memoryData.intro_video_url && !movieDone ? (
-        <MemoryCinema
-          url={memoryData.intro_video_url}
-          title={memoryData.title}
-          recipient={memoryData.recipient}
-          onComplete={() => {
-            setMovieDone(true);
-            setIsLetterOpen(true);
-            setTimeout(() => {
-              if (letterSectionRef.current) {
-                letterSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            }, 220);
-          }}
-          onRefresh={() => loadMemory(currentTag)}
-        />
       ) : (
         /* 4. MAIN MEMORY SPACE (Đã mở khóa hoặc công khai) */
         <div className="max-w-4xl mx-auto px-4 sm:px-6 space-y-10">
@@ -772,10 +739,9 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden space-y-6"
                   >
-                    {/* Video Tâm Sự - Spotlight Centerpiece tự động zoom vào màn hình khi mở thư */}
+                    {/* The intro can be replayed deliberately after the opening cinema. */}
                     {memoryData.intro_video_url && (
                       <motion.div 
-                        ref={letterVideoContainerRef}
                         initial={{ opacity: 0, scale: 0.88, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
@@ -802,16 +768,14 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                               <span>{t("Phóng to rạp chiếu", "Cinema view")}</span>
                             </button>
                             <span className="text-[10px] uppercase tracking-widest text-amber-300 font-semibold px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30">
-                              {t("Tự động phát", "Auto Playing")}
+                              {t("Xem lại", "Replay")}
                             </span>
                           </div>
                         </div>
                         <div className="relative aspect-video w-full bg-black">
                           <video
-                            ref={letterVideoRef}
                             key={`letter-video-${memoryData.intro_video_url}`}
                             src={memoryData.intro_video_url}
-                            autoPlay
                             playsInline
                             controls
                             preload="auto"
