@@ -109,17 +109,61 @@ assert.ok(matchHtml.includes('Chuyển sang House Studio'), 'Match Studio header
 const {default:MemoryHouseStudio}=await compile('src/components/MemoryHouseStudio.jsx','memory-house-studio');
 const houseHtml=render(MemoryHouseStudio,{tagUid:'emo-heart',currentUser:'user-owner-a'});
 assert.ok(houseHtml.includes('Ngôi Nhà Kỷ Niệm'));
-assert.ok(houseHtml.includes('Trang chủ'), 'House Studio header có nút Trang chủ');
-assert.ok(houseHtml.includes('Quay lại kỷ vật'), 'House Studio header có nút Quay lại kỷ vật');
-assert.ok(houseHtml.includes('Chuyển sang Match Studio'), 'House Studio header có nút Chuyển sang Match Studio');
-assert.ok(houseHtml.includes('LIVE PREVIEW'), 'House Studio luôn render Live Preview trong edit mode');
-assert.ok(houseHtml.includes('Khung Ngôi Nhà (5 Phòng)'), 'House Studio có khung ngôi nhà rõ ràng');
+assert.ok(houseHtml.includes('Quay lại kỷ vật'), 'House keeps a single return action');
+assert.equal((houseHtml.match(/aria-label="Chọn phòng trong nhà 3D"/g) || []).length, 1, 'House has one room selector');
+assert.ok(!houseHtml.includes('LIVE PREVIEW') && !houseHtml.includes('Chuyển sang Match Studio'), 'House removes duplicate preview and unrelated navigation');
+assert.ok(houseHtml.includes('Thêm ảnh kỷ niệm') && houseHtml.includes('Xuất Bản Ngôi Nhà'), 'Core photo and publish actions remain available');
+assert.ok(houseHtml.includes('Tên ngôi nhà &amp; tông màu') && houseHtml.includes('Lời nhắn của khách &amp; quyền riêng tư'), 'Optional settings remain accessible');
+assert.ok(!/<details[^>]*\bopen(?:[ =>])/.test(houseHtml), 'Optional settings are collapsed initially');
 assert.ok(houseHtml.includes('Ngày bắt đầu'), 'Preview có phòng beginning (Ngày bắt đầu)');
 assert.ok(houseHtml.includes('Lần đầu của đôi mình'), 'Preview có phòng first (Lần đầu của đôi mình)');
 assert.ok(houseHtml.includes('Điều nhỏ xíu'), 'Preview có phòng little-things (Điều nhỏ xíu)');
 assert.ok(houseHtml.includes('Miền ký ức'), 'Preview có phòng memories (Miền ký ức)');
 assert.ok(houseHtml.includes('Chương tiếp theo'), 'Preview có phòng next-chapter (Chương tiếp theo)');
-assert.ok(houseHtml.includes('Chưa có ảnh'), 'Phòng chưa có ảnh có empty state rõ ràng');
+assert.ok(houseHtml.includes('Chưa có bức ảnh'), 'Phòng chưa có ảnh có empty state rõ ràng');
 assert.ok(!houseHtml.includes('via.placeholder.com'), 'Không dùng placeholder giả');
-assert.ok(houseHtml.includes('Ghi chú: Ngày bắt đầu'), 'Preview hiển thị ghi chú phòng hiện tại');
-console.log('PASS event studios render: MemoryMatchStudio and MemoryHouseStudio static render without client crash, complete with navigation and live preview.');
+console.log('PASS event studios render: MemoryMatchStudio and MemoryHouseStudio static render without client crash, with a single room selector and core editing actions.');
+
+// 2D furniture must be drawn; only the owner's memories may be raster images.
+{
+ const {DECORATIONS}=await import('../src/services/house3d.js');
+ const {default:House2D}=await compile('src/components/MemoryHouse2D.jsx','memory-house-2d');
+ const {default:Decor2D}=await compile('src/components/MemoryHouseDecor2D.jsx','memory-house-decor-2d');
+ const renderDecor=props=>renderToStaticMarkup(React.createElement('svg',null,React.createElement(Decor2D,props)));
+ const memories=Array.from({length:6},(_,i)=>({id:`photo-${i}`,photo_url:`https://signed.example/memory-${i}.jpg`,caption:`Kỷ niệm ${i}`}));
+ const attachments={calendar:['photo-0'],nameplate:['photo-0'],frame:['deleted-photo'],album:['photo-0','photo-1'],bunting:['photo-2','photo-3','photo-4']};
+ const rooms=[{id:'beginning',name:'Ngày bắt đầu',memories:[...memories,{id:'unsigned'}],decorations:[
+  ...DECORATIONS.map(asset=>({id:asset.id,item:asset.id,surface:asset.defaultSurface,photos:attachments[asset.id],scale:asset.id==='cat'?.8:1})),
+  {id:'second-cat',item:'cat',surface:'floor',scale:[.3,1.1,3]},
+  {slot:'right',item:'plant'},
+ ]}];
+ const before=JSON.stringify(rooms);
+ const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}};
+ freeze(rooms);
+ const props={rooms,activeRoomId:'beginning',onSelectRoom:()=>{},onPhoto:()=>{}};
+ const html=render(House2D,props),images=[...html.matchAll(/<image\b[^>]*href="([^"]+)"/g)].map(match=>match[1]);
+ assert.ok(!/NaN|Infinity/.test(html),'Both responsive views have finite coordinates and scales');
+ assert.equal(render(House2D,props),html,'Missing positions must not make the illustrated layout random');
+ assert.equal(JSON.stringify(rooms),before,'Illustrating rooms must not change saved data');
+ assert.ok(images.length>0&&images.every(url=>memories.some(memory=>memory.photo_url===url)),'Only memory URLs appear as SVG images');
+ for(const asset of DECORATIONS){
+  assert.ok(html.includes(`data-decoration="${asset.id}"`),`${asset.id} is illustrated in the room`);
+  assert.ok(!html.includes(asset.image)&&!html.includes(asset.reference),'Object thumbnails and references must not be pasted into 2D');
+  const drawing=renderDecor({item:asset.id});
+  assert.ok(drawing.includes('<path')&&!drawing.includes('<image'),`${asset.id} has a vector drawing without memory photos`);
+ }
+ assert.equal((html.match(/data-decoration="cat"/g)||[]).length,4,'Both responsive views retain duplicate instances');
+ for(const surface of ['wall','table','floor'])assert.ok(html.includes(`data-surface="${surface}"`));
+ const scalarRooms=JSON.parse(before);scalarRooms[0].decorations.find(d=>d.id==='second-cat').scale=1.1;
+ assert.equal(render(House2D,{...props,rooms:scalarRooms}),html,'Vector scale uses the same illustrated height as its numeric counterpart');
+ for(const [item,photos,count] of [['album',memories.slice(0,2),2],['bunting',memories.slice(2,5),3],['bunting',[memories[0],undefined,{}],1],['frame',[],0]]){
+  const drawing=renderDecor({item,photos,onPhoto:()=>{}});
+  assert.equal((drawing.match(/<image\b/g)||[]).length,count,`${item} keeps all valid slots and leaves missing photos as drawn placeholders`);
+  assert.equal([...drawing.matchAll(/<g clip-path="url\(#[^)]+\)">([\s\S]*?)<\/g>/g)].filter(match=>match[1].includes('<image')).length,count,'Decoration photos are clipped inside the illustrated frames');
+ }
+ assert.ok(!html.includes('deleted-photo'),'Deleted photo attachments do not create an image');
+ const clips=[...html.matchAll(/<clipPath\b[^>]*id="([^"]+)"/g)].map(match=>match[1]);
+ assert.equal(new Set(clips).size,clips.length,'Clip IDs are unique across desktop and mobile scenes');
+ for(const [,id] of html.matchAll(/clip-path="url\(#([^)]*)\)"/g))assert.ok(clips.includes(id),'Every memory image clipping reference resolves');
+ console.log('PASS House 2D render: 12 vector assets, framed memory slots, immutable deterministic layout, duplicates, numeric/vector scale and unique responsive clip IDs.');
+}

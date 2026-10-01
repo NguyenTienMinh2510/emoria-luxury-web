@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useCallback, useId, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {createPortal} from 'react-dom';
 import MemoryHouse3D from './MemoryHouse3D.jsx';
 import {createDraftQueue} from '../services/draftQueue.js';
 import {setDecorationPhoto} from '../services/house3d.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Heart, Sparkles, ArrowLeft, ArrowRight, Upload,
-  Trash2, Share2, Copy, Check, Eye, Lock, Globe, RefreshCw,
-  AlertCircle, CheckCircle2, Image as ImageIcon, Edit3, X,
-  Maximize2, BookOpen, Compass, ShoppingBag, LayoutGrid,
+  Copy, Check, Eye, Globe, RefreshCw,
+  AlertCircle, CheckCircle2, Image as ImageIcon, X,
+  Maximize2,
   Loader2, GripVertical, ChevronLeft, ChevronRight,
-  Mail, MessageSquare, Send, Download, QrCode, Flag
+  Mail, MessageSquare, Send, Flag
 } from 'lucide-react';
 import {
   renderPostcardCanvas,
@@ -115,9 +116,7 @@ export default function MemoryHouseStudio({
   shareId: initialShareId,
   onBack,
   onNavigateHome,
-  onNavigateShop,
   onNavigateMemory,
-  onSwitchStudio,
   currentUser
 }) {
   const [canEdit, setCanEdit] = useState(Boolean(currentUser) && !initialShareId);
@@ -170,7 +169,18 @@ export default function MemoryHouseStudio({
 
   // UI Action States
   const [isSaving, setIsSaving] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishStage, setPublishStage] = useState('');
+  const [publishElapsed, setPublishElapsed] = useState(0);
+  const isPublishing = Boolean(publishStage);
+  const publishDialogRef = useRef(null);
+  useEffect(() => {
+    if (!isPublishing) { publishDialogRef.current?.close(); return; }
+    publishDialogRef.current?.showModal();
+    setPublishElapsed(0);
+    const started = Date.now();
+    const timer = setInterval(() => setPublishElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [isPublishing]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [uploadingRoomId, setUploadingRoomId] = useState(null);
   const [lightboxData, setLightboxData] = useState(null);
@@ -200,6 +210,13 @@ export default function MemoryHouseStudio({
   const captureHouse3DRef = useRef(null);
   const postcardCanvasRef = useRef(null);
   const [isPostcardModalOpen, setIsPostcardModalOpen] = useState(false);
+  const postcardTriggerRef = useRef(null);
+  useEffect(() => {
+    if (!isPostcardModalOpen) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = overflow; postcardTriggerRef.current?.focus(); };
+  }, [isPostcardModalOpen]);
   const [postcardTemplate, setPostcardTemplate] = useState('polaroid');
   const [postcardFormat, setPostcardFormat] = useState('square');
   const [postcardTheme, setPostcardTheme] = useState('dark');
@@ -357,12 +374,16 @@ export default function MemoryHouseStudio({
 
   // Publish House
   const handlePublish = async () => {
-    if (!tagUid || isPublicVisitor) return;
-    setIsPublishing(true);
+    if (!tagUid || isPublicVisitor || isPublishing) return;
+    setPublishStage('saving');
     setError('');
+    setSuccessMsg('');
     try {
-      await persistHouse(latestHouse.current,{retry:true});
-      if(isDirty.current)throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi xuất bản lại.');
+      const payload = latestHouse.current;
+      await persistHouse(payload,{retry:true});
+      await saveQueue.current.flush();
+      if(JSON.stringify(payload)!==JSON.stringify(latestHouse.current))throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi xuất bản lại.');
+      setPublishStage('reviewing');
       const res = await publishHouse(tagUid);
       setIsPublished(true);
       if (res.share_id) {
@@ -372,7 +393,7 @@ export default function MemoryHouseStudio({
     } catch (err) {
       setError(err?.message || 'Không thể xuất bản ngôi nhà.');
     } finally {
-      setIsPublishing(false);
+      setPublishStage('');
     }
   };
 
@@ -449,20 +470,6 @@ export default function MemoryHouseStudio({
       setError(err?.message || 'Không thể tải ảnh lên phòng.');
     } finally {
       setUploadingRoomId(null);
-    }
-  };
-
-  // Reorder Storytelling Rooms
-  const handleMoveRoom = (fromIndex, toIndex) => {
-    if (fromIndex === toIndex || toIndex < 0 || toIndex >= rooms.length) return;
-    const currentId = rooms[activeRoomIndex]?.id;
-    const next = [...rooms];
-    const [moved] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, moved);
-    setRooms(next);
-    if (currentId) {
-      const newActiveIdx = next.findIndex((r) => r.id === currentId);
-      if (newActiveIdx >= 0) setActiveRoomIndex(newActiveIdx);
     }
   };
 
@@ -584,6 +591,7 @@ export default function MemoryHouseStudio({
       setError('Ngôi nhà này hiện đang ở chế độ riêng tư, chưa thể tạo thiệp chia sẻ.');
       return;
     }
+    postcardTriggerRef.current = document.activeElement;
 
     const currentRoomPhotos = currentRoom?.memories || [];
     const allPhotos = rooms.flatMap((r) => r.memories || []);
@@ -689,15 +697,6 @@ export default function MemoryHouseStudio({
     trackEventAction('house_postcard_download', 'house', tagUid || currentShareId || 'house', null, { template: postcardTemplate, format: postcardFormat });
   };
 
-  const handleGoHome = () => {
-    if(isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
-    if (onNavigateHome) {
-      onNavigateHome();
-    } else if (typeof window !== 'undefined') {
-      window.location.href = '/?view=home';
-    }
-  };
-
   const handleBackToMemory = () => {
     if(isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
     if (onNavigateMemory) {
@@ -708,15 +707,6 @@ export default function MemoryHouseStudio({
       window.history.back();
     } else if (onNavigateHome) {
       onNavigateHome();
-    }
-  };
-
-  const handleSwitchToMatch = () => {
-    if(isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
-    if (onSwitchStudio) {
-      onSwitchStudio('match');
-    } else if (typeof window !== 'undefined') {
-      window.location.href = `/?view=memory-match${tagUid ? `&tag=${encodeURIComponent(tagUid)}` : ''}`;
     }
   };
 
@@ -883,60 +873,24 @@ export default function MemoryHouseStudio({
 
   return (
     <div className={`w-full min-h-screen bg-gradient-to-b ${themeStyle.bg} text-slate-100 px-4 pt-24 sm:pt-28 pb-16 transition-colors duration-500`}>
+      <dialog ref={publishDialogRef} onCancel={e => e.preventDefault()} aria-labelledby="house-publish-title" aria-describedby="house-publish-description" aria-busy={isPublishing}
+        className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-sm rounded-3xl border border-amber-400/30 bg-stone-950 p-6 text-center text-slate-100 shadow-2xl backdrop:bg-black/75 backdrop:backdrop-blur-sm">
+        <Loader2 className="mx-auto mb-4 h-9 w-9 animate-spin text-amber-300" aria-hidden="true" />
+        <h2 id="house-publish-title" className="font-serif text-xl font-bold">{publishStage === 'saving' ? 'Đang lưu ngôi nhà' : 'AI đang duyệt ảnh'}</h2>
+        <p id="house-publish-description" role="status" className="mt-3 text-sm leading-relaxed text-slate-300">
+          {publishStage === 'saving' ? 'Đang lưu những thay đổi mới nhất trước khi xuất bản.' : 'Hệ thống đang kiểm tra ảnh trước khi chia sẻ công khai. Lần đầu có thể lâu hơn vì AI cần khởi động.'}
+        </p>
+        {/* ponytail: broad estimate; use measured per-image timings when available. */}
+        <p className="mt-3 text-sm text-amber-200">{publishStage === 'saving' ? 'Ước tính: vài giây.' : 'Ước tính: khoảng 30 giây–3 phút, tùy số ảnh và thời gian khởi động AI.'}</p>
+        <p className="mt-2 text-xs tabular-nums text-slate-400">Đã chờ {publishElapsed} giây</p>
+        <p className="mt-3 text-xs text-amber-200">Vui lòng giữ trang này mở. Kết quả sẽ hiển thị khi hoàn tất.</p>
+      </dialog>
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* Top Navigation Bar with Multi-Page Navigation */}
-        <header className="sticky top-20 sm:top-24 z-30 bg-stone-950/95 backdrop-blur-md rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-white/10 shadow-xl" aria-label="Điều hướng studio">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleGoHome}
-              type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
-              title="Về Trang Chủ Emoria"
-            >
-              <Home className="w-3.5 h-3.5" />
-              <span>Trang chủ</span>
-            </button>
+        {/* Studio navigation and secondary export */}
+        <header className="sticky top-20 sm:top-24 z-30 bg-stone-950/95 backdrop-blur-md rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 min-w-0 border border-white/10 shadow-xl" aria-label="Điều hướng studio">
+          <button type="button" onClick={handleBackToMemory} className="text-sm text-slate-300 hover:text-white underline underline-offset-4">← Quay lại kỷ vật</button>
 
-            <button
-              onClick={handleBackToMemory}
-              type="button"
-              aria-label="Quay lại kỷ vật"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
-              title="Quay lại không gian kỷ niệm"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Quay lại kỷ vật</span>
-            </button>
-
-            <button
-              onClick={handleSwitchToMatch}
-              type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-medium transition-colors cursor-pointer shrink-0"
-              title="Chuyển sang Couple Match Studio"
-            >
-              <Heart className="w-3.5 h-3.5 fill-rose-300/30" />
-              <span>Chuyển sang Match Studio</span>
-            </button>
-
-            {onNavigateShop && (
-              <button
-                onClick={() => {if(!isDirty.current||window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))onNavigateShop();}}
-                type="button"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0"
-                title="Xem Cửa Hàng & Bộ Sưu Tập"
-              >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                <span>Cửa hàng</span>
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white/10 border border-white/10 text-amber-300 flex items-center gap-1.5 shrink-0">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Memory House Studio</span>
-            </span>
-
+          <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
             {!isPublicVisitor && activeTab === 'edit' && (
               <div className="shrink-0">
                 {autosaveState === 'saving' && (
@@ -972,42 +926,18 @@ export default function MemoryHouseStudio({
               </span>
             )}
 
-            {!isPublicVisitor && (
-              <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-full border border-white/10 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('edit')}
-                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                    activeTab === 'edit'
-                      ? 'bg-white text-dark-950 shadow'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Chỉnh sửa
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('preview')}
-                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                    activeTab === 'preview'
-                      ? 'bg-white text-dark-950 shadow'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Dạo xem
-                </button>
-              </div>
-            )}
+            {!isPublicVisitor && activeTab === 'preview' && <button type="button" onClick={() => setActiveTab('edit')} className="text-sm text-slate-300 underline underline-offset-4">Quay lại chỉnh sửa</button>}
 
             {(!isPublicVisitor || isPublished) && (
               <button
                 type="button"
                 onClick={openPostcardModal}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400/20 to-rose-400/20 hover:from-amber-400/30 hover:to-rose-400/30 text-amber-200 border border-amber-400/30 text-xs font-bold transition-all cursor-pointer shadow-sm shrink-0"
+                aria-label="Xuất Postcard"
+                className="group relative flex min-w-0 items-center justify-between gap-4 rounded-xl border border-amber-200/40 bg-gradient-to-br from-amber-100 to-amber-300 px-4 py-2 text-left text-stone-950 shadow-[0_4px_18px_rgba(251,191,36,0.14)] transition hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(251,191,36,0.25)]"
                 title="Tạo thiệp bưu thiếp kỷ niệm để chia sẻ lên mạng xã hội"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>Xuất Postcard</span>
+                <span className="border-r border-dashed border-stone-700/30 pr-4"><span className="block text-[9px] uppercase tracking-[0.16em]">Gói lại một kỷ niệm</span><span className="block font-serif text-sm font-bold">Xuất Postcard</span></span>
+                <span aria-hidden="true" className="text-xl transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5">↗</span>
               </button>
             )}
           </div>
@@ -1061,7 +991,7 @@ export default function MemoryHouseStudio({
                 <p className="text-[11px] text-slate-300 truncate max-w-xs sm:max-w-md">{shareUrl}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={handleCopyShareLink}
@@ -1070,15 +1000,7 @@ export default function MemoryHouseStudio({
                 {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copiedLink ? 'Đã sao chép' : 'Sao chép link'}</span>
               </button>
-              <button
-                type="button"
-                onClick={openPostcardModal}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/30 text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Tạo Postcard</span>
-              </button>
-              <button
+              <details className="relative text-xs text-slate-300"><summary className="cursor-pointer p-2">Quản lý liên kết</summary><div className="flex flex-wrap gap-2 mt-2">              <button
                 type="button"
                 onClick={() => setIsRevokeModalOpen(true)}
                 className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
@@ -1092,264 +1014,27 @@ export default function MemoryHouseStudio({
                 className="px-3 py-1.5 rounded-xl hover:bg-red-500/20 text-red-400 text-xs font-medium transition-colors cursor-pointer"
               >
                 Gỡ công khai
-              </button>
+              </button></div></details>
             </div>
           </div>
         )}
 
-        {/* 5 Rooms Switcher Tabs */}
-        <div className="overflow-x-auto pb-2 scrollbar-none">
-          <div role="tablist" aria-label="5 phòng của ngôi nhà kỷ niệm" className="flex items-center gap-2 min-w-max">
-            {rooms.map((room, idx) => {
-              const isSelected = activeRoomIndex === idx;
-              const photoCount = room.memories?.length || 0;
-              return (
-                <button
-                  key={room.id}
-                  role="tab"
-                  id={`room-tab-${room.id}`}
-                  aria-selected={isSelected}
-                  aria-controls={`room-panel-${room.id}`}
-                  onClick={() => setActiveRoomIndex(idx)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-white text-dark-950 border-white shadow-lg'
-                      : 'bg-black/30 border-white/10 text-slate-300 hover:border-white/25 hover:bg-white/5'
-                  }`}
-                >
-                  <span>{room.name}</span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      isSelected ? 'bg-black/15 text-dark-950' : 'bg-white/10 text-slate-400'
-                    }`}
-                  >
-                    {photoCount}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         {/* ===================================================================== */}
         {/* TAB 1: EDIT MODE (Chủ sở hữu chỉnh sửa nội dung và tải ảnh)             */}
         {/* ===================================================================== */}
+        {!isPublicVisitor && activeTab === 'edit' && <p className="text-sm text-slate-400">Chọn một phòng bên dưới, thêm ảnh và lời nhắn, rồi xuất bản để chia sẻ. Mọi thay đổi được tự động lưu.</p>}
         <MemoryHouse3D
           rooms={rooms} title={houseTitle} theme={selectedTheme}
           activeRoomId={currentRoom.id}
           onSelectRoom={id=>{const index=rooms.findIndex(r=>r.id===id);if(index>=0)setActiveRoomIndex(index);}}
           onRoomsChange={setRooms} onPhoto={handleOpenLightbox}
           onUploadPhoto={handlePhotoUpload} uploading={Boolean(uploadingRoomId)}
-          onSave={()=>handleSaveDraft()} saving={isSaving}
           readOnly={isPublicVisitor || activeTab !== 'edit'}
           onRegisterCapture={(fn) => { captureHouse3DRef.current = fn; }}
         />
         {activeTab === 'edit' && !isPublicVisitor && (
-          <section id={`room-panel-${currentRoom.id}`} role="tabpanel" aria-labelledby={`room-tab-${currentRoom.id}`}>
-            {/* Desktop 2-column layout: Trái là Live Preview khung ngôi nhà, Phải là form chỉnh sửa. Mobile: Live Preview nằm trên. */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
-              {/* CỘT TRÁI: KHUNG NGÔI NHÀ LIVE PREVIEW (Desktop: lg:col-span-5 sticky, Mobile: trên) */}
-              <div className="lg:col-span-5 lg:sticky lg:top-6 space-y-4">
-                <div className={`p-5 sm:p-6 rounded-3xl border ${themeStyle.card} bg-gradient-to-br from-black/85 via-black/70 to-black/90 backdrop-blur-2xl shadow-2xl relative overflow-hidden space-y-4 transition-all duration-300`}>
-                  <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
-                  <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
-
-                  {/* Header / Plaque Khung Ngôi Nhà */}
-                  <div className="relative z-10 flex flex-col border-b border-white/10 pb-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-amber-300 font-mono">
-                          LIVE PREVIEW
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {(currentRoom.memories?.length || 0) < 10 && (
-                          <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 text-dark-950 text-[11px] font-bold transition-all cursor-pointer shadow-sm">
-                            <Upload className="w-3 h-3" />
-                            <span>+ Thêm ảnh</span>
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/png,image/webp"
-                              className="sr-only"
-                              disabled={uploadingRoomId === currentRoom.id}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handlePhotoUpload(currentRoom.id, file);
-                              }}
-                            />
-                          </label>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('preview')}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-[11px] font-bold transition-all cursor-pointer shadow-sm group"
-                        >
-                          <Eye className="w-3 h-3 text-amber-300 group-hover:text-dark-950 transition-colors" />
-                          <span>Dạo xem</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Architectural Frame Header */}
-                    <div className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10">
-                      <div className="flex items-center gap-2 text-xs text-amber-300 font-serif">
-                        <Home className="w-4 h-4 text-amber-400 shrink-0" />
-                        <span className="font-bold">Khung Ngôi Nhà (5 Phòng)</span>
-                      </div>
-                      <span className="text-[11px] text-slate-300 font-medium">
-                        {rooms.filter(r => (r.memories?.length || 0) > 0).length}/5 có ảnh
-                      </span>
-                    </div>
-
-                    {/* Tên ngôi nhà & Theme */}
-                    <div className="space-y-1 text-left pt-1">
-                      <h3 className="font-serif text-lg sm:text-xl font-bold text-white tracking-wide transition-all line-clamp-1">
-                        {houseTitle.trim() || 'Ngôi Nhà Kỷ Niệm Của Đôi Mình'}
-                      </h3>
-                      <p className="text-xs text-slate-400 font-light flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span>Tông màu: <strong className={themeStyle.accent}>{themeStyle.name}</strong></span>
-                        <span>·</span>
-                        <span>Đã có ảnh: <strong className="text-white font-medium">{rooms.filter(r => (r.memories?.length || 0) > 0).length}/5 phòng</strong></span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* 5 Rooms Architecture Grid (beginning, first, little-things, memories, next-chapter) */}
-                  <div className="space-y-2 relative z-10">
-                    <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <span>5 căn phòng (Nhấp phòng để sửa):</span>
-                      <span className="text-amber-300/80 italic font-serif text-[10px]">Cập nhật tức thì ✦</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-2.5">
-                      {rooms.map((room, idx) => {
-                        const isSelected = activeRoomIndex === idx;
-                        const photoCount = room.memories?.length || 0;
-                        const firstPhoto = photoCount > 0 ? room.memories[0].photo_url : null;
-
-                        return (
-                          <div
-                            key={room.id}
-                            onClick={() => setActiveRoomIndex(idx)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setActiveRoomIndex(idx); e.preventDefault(); } }}
-                            className={`group relative rounded-2xl p-2.5 border transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden text-left ${
-                              isSelected
-                                ? 'bg-white/[0.09] border-amber-400 ring-2 ring-amber-400/30 shadow-lg scale-[1.01]'
-                                : 'bg-black/40 border-white/10 hover:border-white/30 hover:bg-white/[0.04]'
-                            }`}
-                          >
-                            {/* Room Header Badge */}
-                            <div className="flex items-center justify-between gap-1 mb-1.5">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                isSelected
-                                  ? 'bg-amber-400 text-dark-950'
-                                  : 'bg-white/10 text-slate-300'
-                              }`}>
-                                Phòng {idx + 1}
-                              </span>
-                              {photoCount > 0 ? (
-                                <span className="text-[10px] text-emerald-300 font-medium flex items-center gap-0.5">
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>{photoCount} ảnh</span>
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-slate-500 italic">Trống</span>
-                              )}
-                            </div>
-
-                            {/* Thumbnail or Clean Empty State (NO fake placeholders) */}
-                            <div className="relative aspect-4/3 w-full rounded-xl overflow-hidden bg-white/5 border border-white/10 mb-1.5 flex items-center justify-center">
-                              {firstPhoto ? (
-                                <>
-                                  <img
-                                    src={firstPhoto}
-                                    alt={room.name}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                  />
-                                  {photoCount > 1 && (
-                                    <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/75 text-[9px] font-mono text-white border border-white/20">
-                                      +{photoCount - 1}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <div className="text-center p-2">
-                                  <ImageIcon className="w-5 h-5 text-slate-600 mx-auto mb-1 group-hover:text-amber-300/60 transition-colors" />
-                                  <span className="text-[9px] text-slate-500 block leading-tight">Chưa có ảnh</span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Room Name */}
-                            <p className={`text-xs font-bold truncate ${isSelected ? 'text-amber-300' : 'text-slate-200'}`}>
-                              {room.name}
-                            </p>
-
-                            {/* Selected Indicator */}
-                            {isSelected && (
-                              <div className="mt-1 pt-1 border-t border-amber-400/30 flex items-center justify-between text-[10px] text-amber-300 font-semibold">
-                                <span>✦ Đang sửa</span>
-                                <Edit3 className="w-2.5 h-2.5" />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Ghi chú phòng hiện tại */}
-                  <div className="p-3.5 rounded-2xl bg-black/50 border border-white/10 text-xs space-y-1 relative z-10">
-                    <div className="flex items-center justify-between text-[11px] text-amber-300 font-semibold">
-                      <span className="flex items-center gap-1.5">
-                        <Edit3 className="w-3 h-3 text-amber-400" />
-                        <span>Ghi chú: {currentRoom.name}</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">Phòng {activeRoomIndex + 1}/5</span>
-                    </div>
-                    <p className="text-slate-300 italic line-clamp-3 text-[11px] leading-relaxed">
-                      {currentRoom.note?.trim() ? `“${currentRoom.note}”` : 'Chưa có ghi chú cho căn phòng này.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* CỘT PHẢI: FORM CHỈNH SỬA (Settings + Room Editor + Bottom Actions) */}
-              <div className="lg:col-span-7 space-y-6">
-                {/* House Title & Theme Settings */}
-                <div className="bg-black/40 border border-white/10 rounded-3xl p-6 backdrop-blur-xl space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1.5">Tên ngôi nhà của bạn</label>
-                      <input
-                        type="text"
-                        value={houseTitle}
-                        onChange={(e) => setHouseTitle(e.target.value)}
-                        placeholder="Ví dụ: Tổ Ấm Của Minh & Thảo"
-                        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1.5">Tông màu chủ đạo (Theme)</label>
-                      <select
-                        value={selectedTheme}
-                        onChange={(e) => setSelectedTheme(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-xl bg-dark-900 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors cursor-pointer"
-                      >
-                        {HOUSE_THEMES.map((themeKey) => (
-                          <option key={themeKey} value={themeKey} className="bg-dark-950 text-white">
-                            {THEME_STYLES[themeKey]?.name || themeKey}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
+          <section aria-label={`Ảnh và lời nhắn · ${currentRoom.name}`}>
+            <div className="space-y-5">
                 {/* Current Room Editor Card */}
                 <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
@@ -1360,33 +1045,6 @@ export default function MemoryHouseStudio({
                         {HOUSE_ROOMS_SPEC.find((s) => s.id === currentRoom.id)?.description}
                       </p>
 
-                      {/* Storytelling Room Order Controls */}
-                      <div className="flex items-center gap-2 mt-2.5">
-                        <span className="text-[11px] text-slate-400 font-medium">Thứ tự kể chuyện:</span>
-                        <div className="inline-flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
-                          <button
-                            type="button"
-                            onClick={() => handleMoveRoom(activeRoomIndex, activeRoomIndex - 1)}
-                            disabled={activeRoomIndex === 0}
-                            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 disabled:opacity-25 disabled:pointer-events-none text-[11px] font-semibold transition-colors cursor-pointer"
-                            title="Di chuyển phòng này lên trước trong mạch truyện"
-                          >
-                            ← Trước
-                          </button>
-                          <span className="px-2 text-[11px] text-amber-300 font-mono font-bold">
-                            {activeRoomIndex + 1}/{rooms.length}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleMoveRoom(activeRoomIndex, activeRoomIndex + 1)}
-                            disabled={activeRoomIndex === rooms.length - 1}
-                            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 disabled:opacity-25 disabled:pointer-events-none text-[11px] font-semibold transition-colors cursor-pointer"
-                            title="Di chuyển phòng này về sau trong mạch truyện"
-                          >
-                            Sau →
-                          </button>
-                        </div>
-                      </div>
                     </div>
 
                     {/* Upload Button */}
@@ -1522,7 +1180,8 @@ export default function MemoryHouseStudio({
 
                   {/* Journey's End Love Letter Editor (Chặng C) */}
                   {currentRoom.id === 'next-chapter' && (
-                    <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/[0.06] border border-amber-400/25 space-y-4">
+                    <details className="p-4 sm:p-5 rounded-2xl bg-amber-500/[0.06] border border-amber-400/25 space-y-4">
+                      <summary className="cursor-pointer text-sm text-amber-200">Thêm phong thư gửi tương lai (tùy chọn)</summary>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xl">💌</span>
@@ -1615,11 +1274,43 @@ export default function MemoryHouseStudio({
                           </span>
                         </label>
                       </div>
-                    </div>
+                    </details>
                   )}
                 </div>
 
-                <section className="rounded-2xl border border-white/10 p-4 space-y-3">
+                {/* House Title & Theme Settings */}
+                <details className="bg-black/40 border border-white/10 rounded-2xl p-4 space-y-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-300">Tên ngôi nhà & tông màu</summary>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1.5">Tên ngôi nhà của bạn</label>
+                      <input
+                        type="text"
+                        value={houseTitle}
+                        onChange={(e) => setHouseTitle(e.target.value)}
+                        placeholder="Ví dụ: Tổ Ấm Của Minh & Thảo"
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1.5">Tông màu chủ đạo (Theme)</label>
+                      <select
+                        value={selectedTheme}
+                        onChange={(e) => setSelectedTheme(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl bg-dark-900 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors cursor-pointer"
+                      >
+                        {HOUSE_THEMES.map((themeKey) => (
+                          <option key={themeKey} value={themeKey} className="bg-dark-950 text-white">
+                            {THEME_STYLES[themeKey]?.name || themeKey}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </details>
+
+                <details className="rounded-2xl border border-white/10 p-4 space-y-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-300">Lời nhắn của khách & quyền riêng tư</summary>
                   <label className="block text-sm">Ai có thể gửi lời nhắn khi ghé nhà?
                     <select className="block mt-2 bg-stone-900 p-2 rounded-lg" value={rooms.find(r=>r.id==='beginning')?.reply_policy||'off'} onChange={e=>setRooms(prev=>prev.map(r=>r.id==='beginning'?{...r,reply_policy:e.target.value}:r))}>
                       <option value="off">Tắt lời nhắn</option><option value="visitors">Người có liên kết nhà</option><option value="signed_in">Người đã đăng nhập</option>
@@ -1627,18 +1318,25 @@ export default function MemoryHouseStudio({
                   </label><p className="text-xs text-stone-400">Thay đổi có hiệu lực với khách sau khi xuất bản. Chỉ bạn xem được lời hồi đáp.</p>
                   <button type="button" onClick={()=>getHouseReplies(tagUid).then(setGuestEntries).catch(e=>setError(e.message))} className="text-sm text-amber-200">Làm mới lời hồi đáp</button>
                   {guestEntries.map(entry=><article key={entry.id} className="border-t border-white/10 py-2 text-sm"><strong>{entry.name}</strong><p>{entry.is_hidden?'Lời nhắn đã được ẩn':entry.kind==='heart'?'♥':entry.message}</p><button type="button" className="text-xs text-rose-300" onClick={()=>submitContentReport('guestbook',entry.id,'other','Chủ nhà báo cáo lời nhắn').then(()=>setSuccessMsg('Đã gửi báo cáo')).catch(e=>setError(e.message))}>Báo cáo lời nhắn</button></article>)}
-                </section>
+                </details>
                 {/* Bottom Actions Bar */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10">
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <button
+                <div className="space-y-3 pt-4 border-t border-white/10">
+                {(isPublishing || error || successMsg) && (
+                  <p role={error ? 'alert' : 'status'} className={`text-sm ${error ? 'text-red-300' : 'text-emerald-300'}`}>
+                    {isPublishing ? 'Đang lưu và kiểm tra ảnh để xuất bản. Vui lòng chờ…' : error || successMsg}
+                  </p>
+                )}
+                {isPublished && shareUrl && <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="inline-flex text-sm text-amber-200 underline">Mở liên kết ngôi nhà đã xuất bản ↗</a>}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                    {autosaveState === 'error' && <button
                       type="button"
                       onClick={() => handleSaveDraft()}
                       disabled={isSaving}
                       className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm border border-white/15 transition-all cursor-pointer disabled:opacity-50"
                     >
-                      {isSaving ? 'Đang lưu...' : 'Lưu bản nháp'}
-                    </button>
+                      {isSaving ? 'Đang lưu...' : 'Thử lưu lại'}
+                    </button>}
                     {autosaveState === 'saved' && (
                       <span className="text-xs text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1653,11 +1351,11 @@ export default function MemoryHouseStudio({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={() => setActiveTab('preview')}
-                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-semibold text-sm border border-white/10 transition-all cursor-pointer"
+                      className="inline-flex items-center justify-center gap-2 px-3 py-3 text-slate-300 hover:text-white font-semibold text-sm underline underline-offset-4 transition-colors cursor-pointer"
                     >
                       <Eye className="w-4 h-4" />
                       <span>Xem thử</span>
@@ -1667,14 +1365,15 @@ export default function MemoryHouseStudio({
                       type="button"
                       onClick={handlePublish}
                       disabled={isPublishing}
-                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-dark-950 font-bold text-sm shadow-xl shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+                      aria-label={isPublishing ? 'Đang xuất bản' : isPublished ? 'Cập nhật xuất bản' : 'Xuất Bản Ngôi Nhà'}
+                      className="group flex-1 sm:flex-none min-w-0 inline-flex items-center justify-between gap-5 px-5 py-3 rounded-2xl bg-gradient-to-br from-amber-100 via-amber-300 to-amber-500 hover:from-white hover:to-amber-300 text-stone-950 border border-amber-100/50 shadow-[0_8px_28px_rgba(245,158,11,0.22)] transition-all cursor-pointer disabled:opacity-50"
                     >
-                      <Globe className="w-4 h-4" />
-                      <span>{isPublishing ? 'Đang xuất bản...' : isPublished ? 'Cập Nhật Xuất Bản' : 'Xuất Bản Ngôi Nhà'}</span>
+                      <span className="text-left"><span className="block text-[9px] font-semibold uppercase tracking-[0.16em]">Mở cửa đón người thương</span><span className="block font-serif font-bold text-base">{isPublishing ? 'Đang xuất bản...' : isPublished ? 'Cập nhật xuất bản' : 'Xuất bản ngôi nhà'}</span></span>
+                      <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-stone-900/20 text-xl transition-transform group-hover:translate-x-1">→</span>
                     </button>
                   </div>
                 </div>
-              </div>
+                </div>
             </div>
           </section>
         )}
@@ -2154,18 +1853,26 @@ export default function MemoryHouseStudio({
         </AnimatePresence>
 
         {/* Postcard & Social Share Card Modal (Chặng D) */}
-        <AnimatePresence>
-          {isPostcardModalOpen && (
-            <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          {isPostcardModalOpen && createPortal(
+            <div className="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-6">
               <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="w-full max-w-4xl bg-dark-900 border border-white/15 rounded-3xl p-5 sm:p-7 shadow-2xl relative flex flex-col my-auto max-h-[95vh] overflow-hidden"
+                role="dialog" aria-modal="true" aria-label="Tạo thiệp kỷ niệm"
+                onKeyDown={e => {
+                  if (e.key === 'Escape') setIsPostcardModalOpen(false);
+                  if (e.key !== 'Tab') return;
+                  const controls = [...e.currentTarget.querySelectorAll('button, input, textarea')].filter(el => !el.disabled);
+                  const first = controls[0], last = controls.at(-1);
+                  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+                  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+                }}
+                className="w-full min-w-0 max-w-4xl bg-dark-900 border border-white/15 rounded-3xl p-3 sm:p-7 shadow-2xl relative flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-3rem)] overflow-hidden"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4 shrink-0">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex min-w-0 items-center gap-2.5">
                     <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400/20 to-rose-400/20 text-amber-300 flex items-center justify-center border border-amber-400/30">
                       <Sparkles className="w-5 h-5" />
                     </div>
@@ -2173,7 +1880,7 @@ export default function MemoryHouseStudio({
                       <h3 className="text-base font-bold text-white font-serif">
                         Tạo Thiệp Kỷ Niệm (Postcard Social)
                       </h3>
-                      <p className="text-[11px] text-slate-400">
+                      <p className="hidden sm:block text-[11px] text-slate-400">
                         Xuất ảnh chất lượng cao 1080p sẵn sàng đăng Story, Feed hoặc gửi cho người thương
                       </p>
                     </div>
@@ -2181,16 +1888,17 @@ export default function MemoryHouseStudio({
                   <button
                     type="button"
                     onClick={() => setIsPostcardModalOpen(false)}
-                    className="p-1.5 rounded-full text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    aria-label="Đóng thiệp kỷ niệm" autoFocus
+                    className="shrink-0 p-2.5 rounded-full text-slate-400 hover:text-white transition-colors cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
                 {/* Body: 2 Columns */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto flex-1 pr-1 scrollbar-thin">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 min-w-0 overflow-y-auto overscroll-contain flex-1 pr-1 scrollbar-thin">
                   {/* Left Column: Live Canvas Preview */}
-                  <div className="lg:col-span-6 flex flex-col items-center justify-center bg-black/50 p-4 rounded-2xl border border-white/10 relative min-h-[320px]">
+                  <div className="lg:col-span-6 min-w-0 flex flex-col items-center justify-center bg-black/50 p-3 rounded-2xl border border-white/10 relative">
                     {isRenderingPostcard && (
                       <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-10 rounded-2xl">
                         <Loader2 className="w-7 h-7 text-amber-400 animate-spin" />
@@ -2198,7 +1906,7 @@ export default function MemoryHouseStudio({
                     )}
                     <canvas
                       ref={postcardCanvasRef}
-                      className="max-h-[50vh] sm:max-h-[55vh] w-auto max-w-full rounded-xl shadow-2xl border border-white/10 object-contain"
+                      className="max-h-[40dvh] sm:max-h-[55dvh] w-full min-w-0 max-w-full rounded-xl shadow-2xl border border-white/10 object-contain"
                     />
                     <p className="text-[10px] text-slate-500 mt-2 font-mono">
                       Kích thước xuất: {POSTCARD_FORMATS[postcardFormat]?.width} × {POSTCARD_FORMATS[postcardFormat]?.height} px
@@ -2206,7 +1914,7 @@ export default function MemoryHouseStudio({
                   </div>
 
                   {/* Right Column: Controls */}
-                  <div className="lg:col-span-6 space-y-4 text-xs">
+                  <div className="lg:col-span-6 min-w-0 space-y-4 text-xs">
                     {/* Template Picker */}
                     <div>
                       <label className="block text-slate-400 font-semibold mb-1.5">Mẫu thiệp</label>
@@ -2393,36 +2101,35 @@ export default function MemoryHouseStudio({
                 </div>
 
                 {/* Footer Actions */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10 mt-4 shrink-0">
-                  <p className="text-[11px] text-slate-400 italic text-center sm:text-left">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-white/10 mt-3 shrink-0 pb-[env(safe-area-inset-bottom)]">
+                  <p className="hidden sm:block text-[11px] text-slate-400 italic text-center sm:text-left">
                     Lưu ý: Tệp ảnh sau khi bạn tải xuống hoặc chia sẻ sẽ được lưu trên thiết bị của bạn.
                   </p>
 
-                  <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                  <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:shrink-0">
                     <button
                       type="button"
                       onClick={handleDownloadPostcard}
-                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/15 transition-all cursor-pointer"
+                      className="min-w-0 flex flex-col justify-center items-start px-3 py-2.5 rounded-xl bg-stone-100 hover:bg-white text-stone-900 border border-white/30 transition-colors cursor-pointer text-left"
                     >
-                      <Download className="w-4 h-4 text-amber-300" />
-                      <span>Tải ảnh PNG</span>
+                      <span className="text-[9px] uppercase tracking-wider">Giữ một bản cho mình</span>
+                      <span className="font-serif text-sm font-bold">Tải ảnh PNG ↓</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={handleSharePostcard}
                       disabled={postcardShareStatus === 'sharing'}
-                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-dark-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+                      className="min-w-0 flex flex-col justify-center items-start px-3 py-2.5 rounded-xl bg-gradient-to-br from-amber-100 to-amber-400 hover:from-white hover:to-amber-300 text-stone-950 border border-amber-100/40 shadow-lg shadow-amber-500/15 transition-all cursor-pointer disabled:opacity-50 text-left"
                     >
-                      <Share2 className="w-4 h-4" />
-                      <span>{postcardShareStatus === 'sharing' ? 'Đang chia sẻ...' : 'Chia sẻ ngay'}</span>
+                      <span className="text-[9px] uppercase tracking-wider">Gửi đến người thương</span>
+                      <span className="font-serif text-sm font-bold">{postcardShareStatus === 'sharing' ? 'Đang chia sẻ...' : 'Chia sẻ thiệp ↗'}</span>
                     </button>
                   </div>
                 </div>
               </motion.div>
             </div>
-          )}
-        </AnimatePresence>
+          , document.body)}
 
         {/* Visitor Content Report Entrypoint */}
         {(isPublicVisitor || !canEdit) && (

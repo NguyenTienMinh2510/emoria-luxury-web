@@ -195,7 +195,9 @@ export async function publishHouse(tagUid) {
   if (!tagUid) throw new Error('Vui lòng cung cấp mã kỷ vật.');
   return apiRequest(`/memories/${encodeURIComponent(tagUid)}/house/publish`, {
     method: 'POST',
-    body: {}
+    body: {},
+    // Publishing waits for photo moderation; match the server's 180s budget.
+    timeoutMs: 180000
   });
 }
 

@@ -1420,8 +1420,8 @@ async function runTests() {
     const houseStudioCode = fs.readFileSync('src/components/MemoryHouseStudio.jsx', 'utf8');
     assert.ok(!houseStudioCode.includes('localStorage'), 'MemoryHouseStudio không được dùng localStorage');
     assert.ok(!houseStudioCode.includes('sessionStorage'), 'MemoryHouseStudio không được dùng sessionStorage');
-    assert.ok(houseStudioCode.includes('role="tablist"'), 'MemoryHouseStudio có ARIA tablist');
-    assert.ok(houseStudioCode.includes('role="tab"'), 'MemoryHouseStudio có ARIA tab');
+    const house3DCode = fs.readFileSync('src/components/MemoryHouse3D.jsx', 'utf8');
+    assert.ok(house3DCode.includes('aria-label="Chọn phòng trong nhà 3D"') && house3DCode.includes('aria-pressed={r.id === room?.id}'), 'Room selector exposes its label and selected state');
     console.log('  [PASS] Test 19: UI Components sạch, không lưu storage riêng tư, tuân thủ accessibility.');
 
     // --------------------------------------------------------------------------
@@ -1499,16 +1499,12 @@ async function runTests() {
     assert.ok(matchStudioCode.includes('Quay lại kỷ vật'), 'Match Studio có nút Quay lại kỷ vật');
     assert.ok(matchStudioCode.includes('Chuyển sang House Studio'), 'Match Studio có nút Chuyển sang House Studio');
 
-    assert.ok(houseStudioCode.includes('Trang chủ'), 'House Studio có nút Trang chủ');
-    assert.ok(houseStudioCode.includes('Quay lại kỷ vật'), 'House Studio có nút Quay lại kỷ vật');
-    assert.ok(houseStudioCode.includes('Chuyển sang Match Studio'), 'House Studio có nút Chuyển sang Match Studio');
-
-    assert.ok(houseStudioCode.includes('LIVE PREVIEW'), 'House Studio có LIVE PREVIEW');
-    assert.ok(houseStudioCode.includes('Khung Ngôi Nhà'), 'House Studio có Khung Ngôi Nhà');
-    assert.ok(houseStudioCode.includes('Chưa có ảnh'), 'House Studio có empty state Chưa có ảnh rõ ràng');
+    assert.ok(houseStudioCode.includes('Quay lại kỷ vật'), 'House keeps return navigation');
+    assert.ok(!houseStudioCode.includes('LIVE PREVIEW'), 'Duplicate preview is removed');
+    assert.ok(houseStudioCode.includes('Chưa có bức ảnh'), 'Empty room explains how to start');
     assert.ok(!houseStudioCode.includes('via.placeholder.com'), 'Không dùng ảnh placeholder giả');
     assert.ok(!houseStudioCode.includes('placeholder.png'), 'Không dùng ảnh placeholder giả');
-    console.log('  [PASS] Test 22: Navigation và Live Preview 5 phòng đầy đủ, rõ ràng và không dùng placeholder giả.');
+    console.log('  [PASS] Test 22: House navigation is simplified and rooms keep a clear empty state.');
 
     // --------------------------------------------------------------------------
     // Test 23: Chặng A - Autosave, Draft Questions vs Begin Match, Reordering ---
@@ -1523,7 +1519,6 @@ async function runTests() {
 
     assert.ok(houseStudioCode.includes('autosaveState'), 'House Studio có state autosaveState');
     assert.ok(houseStudioCode.includes('mapOrderedRooms'), 'House Studio có hàm giữ thứ tự mapOrderedRooms');
-    assert.ok(houseStudioCode.includes('handleMoveRoom'), 'House Studio có hàm đổi thứ tự phòng handleMoveRoom');
     assert.ok(houseStudioCode.includes('handleMovePhoto'), 'House Studio có hàm đổi thứ tự ảnh handleMovePhoto');
     assert.ok(houseStudioCode.includes('GripVertical'), 'House Studio có icon kéo thả GripVertical');
 

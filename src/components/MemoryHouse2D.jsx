@@ -1,67 +1,138 @@
 import React, {useId} from 'react';
-import {DECORATIONS, ROOM_BOUNDS, roomDecorations, getDefaultPosition} from '../services/house3d.js';
+import {DECORATIONS, roomDecorations} from '../services/house3d.js';
+import MemoryHouseDecor2D from './MemoryHouseDecor2D.jsx';
 
-// The same room data drives both views; 2D also works without WebGL or model downloads.
-export default function MemoryHouse2D({rooms, title, theme, activeRoomId, onSelectRoom, onPhoto}) {
+const activate = (event, callback) => {
+  if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); callback(); }
+};
+
+function RoomScene({room, x=0, y=0, width=340, height=270, active, accent, onSelectRoom, onPhoto}) {
   const uid = useId().replace(/:/g, '');
-  const rose = theme === 'rose_romance';
-  const accent = rose ? '#b8697d' : '#987344';
-  const activate = (event, callback) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); callback(); } };
-  return <div className="bg-[#f7eee6] p-3 sm:p-6 text-stone-800" data-testid="memory-house-2d">
-    <p className="text-center font-serif text-lg mb-2">{title || 'Ngôi nhà của đôi mình'}</p>
-    <svg viewBox="0 0 900 660" className="w-full" aria-label="Ngôi nhà kỷ niệm 2D, chọn phòng hoặc ảnh để xem">
-      <defs>
-        <linearGradient id={`${uid}-wall`} x2="0" y2="1"><stop stopColor="#fff9ed"/><stop offset="1" stopColor={rose ? '#edc9c4' : '#e4cfac'}/></linearGradient>
-        <linearGradient id={`${uid}-roof`} x2="0" y2="1"><stop stopColor={accent}/><stop offset="1" stopColor="#67443e"/></linearGradient>
-      </defs>
-      <ellipse cx="450" cy="622" rx="410" ry="22" fill="#604639" opacity=".12"/>
-      <path d="M55 215 L450 25 L845 215 L825 230 L450 60 L75 230Z" fill={`url(#${uid}-roof)`}/>
-      <path d="M94 210 L450 58 L806 210V603H94Z" fill="#ead7c4" stroke="#c2a17f" strokeWidth="10"/>
-      <path d="M432 124 C410 98 390 135 432 153 C474 135 454 98 432 124Z" fill={accent} transform="translate(18 0)"/>
-      {rooms.map((room, index) => {
-        const upper = index >= 3;
-        const x = upper ? 108 + (index - 3) * 345 : 108 + index * 230;
-        const y = upper ? 202 : 401, width = upper ? 332 : 217, height = 184;
-        const bounds = ROOM_BOUNDS[room.id] || ROOM_BOUNDS.beginning;
-        const night = room.lighting === 'night';
-        const clip = `${uid}-room-${index}`;
-        return <g key={room.id}>
-          <defs><clipPath id={clip}><rect x={x+3} y={y+3} width={width-6} height={height-6} rx="4"/></clipPath></defs>
-          <rect x={x} y={y} width={width} height={height} rx="5" fill={night ? '#665363' : `url(#${uid}-wall)`} stroke={activeRoomId === room.id ? accent : '#ccb399'} strokeWidth={activeRoomId === room.id ? 5 : 2}
-            role="button" tabIndex="0" aria-label={`Vào phòng ${room.name}`} onClick={() => onSelectRoom?.(room.id)} onKeyDown={e => activate(e, () => onSelectRoom?.(room.id))} style={{cursor:'pointer'}}/>
-          <g clipPath={`url(#${clip})`}>
-            <path d={`M${x} ${y+140}h${width}v44h-${width}Z`} fill="#c3a183" pointerEvents="none"/>
-            {[1,2,3].map(n => <path key={n} d={`M${x} ${y+140+n*11}h${width}`} stroke="#b38e70" opacity=".6" pointerEvents="none"/>)}
-            <text x={x+width/2} y={y+23} textAnchor="middle" fill={night?'#fff3da':'#694b40'} fontSize="13" fontFamily="serif" pointerEvents="none">{room.name}</text>
-            {(room.memories || []).slice(0,3).map((memory, photoIndex, photos) => {
-              const px = x+width/2+(photoIndex-(photos.length-1)/2)*58-25, py = y+39;
-              return <g key={memory.id} role="button" tabIndex="0" aria-label={memory.caption || 'Mở ảnh kỷ niệm'} style={{cursor:'pointer'}}
-                onClick={() => memory.photo_url && onPhoto?.(memory.photo_url,memory)} onKeyDown={e => activate(e, () => memory.photo_url && onPhoto?.(memory.photo_url,memory))}>
-                <rect x={px} y={py} width="50" height="61" rx="2" fill="#fffcf6" stroke="#c9ab7d"/>
-                {memory.photo_url ? <image href={memory.photo_url} x={px+4} y={py+4} width="42" height="43" preserveAspectRatio="xMidYMid slice"/> : <text x={px+25} y={py+32} textAnchor="middle" fill={accent}>♥</text>}
-                <text x={px+25} y={py+56} textAnchor="middle" fontSize="6" fill="#745c53">{(memory.caption || 'Đôi mình').slice(0,14)}</text>
-              </g>;
-            })}
-            {roomDecorations(room).map((decor, di) => {
-              const asset = DECORATIONS.find(a => a.id === decor.item);
-              const p = decor.position || getDefaultPosition(room.id,decor.surface,decor.slot);
-              const dx = x+22+Math.max(0,Math.min(1,(p[0]-bounds.x)/bounds.width+.5))*(width-44);
-              const dy = y+164-Math.max(0,Math.min(1,(p[1]-bounds.y)/bounds.height))*110;
-              const size = Math.min(62, 40*(Number(decor.scale)||1));
-              const photo = room.memories?.find(m => m.id === decor.photos?.[0]);
-              return <g key={decor.id || decor.slot || di}>
-                <title>{asset?.name}{decor.text ? `: ${decor.text}` : ''}</title>
-                <image href={asset?.image} x={dx-size/2} y={dy-size} width={size} height={size} preserveAspectRatio="xMidYMid meet" pointerEvents="none"/>
-                {photo?.photo_url && <image href={photo.photo_url} x={dx-12} y={dy-size+9} width="24" height="20" preserveAspectRatio="xMidYMid slice" role="button" tabIndex="0" aria-label={photo.caption || 'Xem ảnh trên đồ vật'} style={{cursor:'pointer'}} onClick={() => onPhoto?.(photo.photo_url,photo)} onKeyDown={e => activate(e, () => onPhoto?.(photo.photo_url,photo))}/>}
-                {decor.text && <text x={dx} y={dy+9} textAnchor="middle" fontSize="8" fill={night?'#fff3da':'#694b40'} pointerEvents="none">{decor.text.slice(0,26)}</text>}
-              </g>;
-            })}
-          </g>
+  const night = room.lighting === 'night';
+  const sunset = room.lighting === 'sunset';
+  const ink = night ? '#eee2ce' : '#705449';
+  const floor = height-65, desk = height-73;
+  const decor = roomDecorations(room);
+  const lanes = {wall:[], table:[], floor:[]};
+  for (const item of decor) {
+    const asset = DECORATIONS.find(d => d.id === item.item);
+    const surface = item.surface || asset.defaultSurface;
+    lanes[surface === 'wall' || surface === 'ceiling' ? 'wall' : surface === 'table' || surface === 'shelf' ? 'table' : 'floor'].push(item);
+  }
+  // The illustration arranges each surface neatly; saved 3D coordinates remain untouched.
+  for (const lane of Object.values(lanes)) lane.sort((a,b) => {
+    const original = item => room.decorations?.find(d => d.id ? d.id === item.id : d.slot === item.slot);
+    return (original(a)?.position?.[0] || 0) - (original(b)?.position?.[0] || 0);
+  });
+  const attached = new Set(decor.flatMap(d => d.photos || []));
+  const photos = (room.memories || []).filter(m => !attached.has(m.id)).slice(0,3);
+  const wallStart=100, wallWidth=width-wallStart-16;
+  const wallCount=photos.length+lanes.wall.length;
+  const wallCell=wallWidth/Math.max(1,wallCount);
+  return <g transform={`translate(${x} ${y})`}>
+    <defs>
+      <clipPath id={`${uid}-room`}><rect x="4" y="4" width={width-8} height={height-8} rx="6"/></clipPath>
+      <linearGradient id={`${uid}-wall`} x2="0" y2="1"><stop stopColor={night ? '#55515e' : '#fffaf0'}/><stop offset="1" stopColor={night ? '#77717c' : sunset ? '#f2d5be' : '#eee2cf'}/></linearGradient>
+    </defs>
+    <rect width={width} height={height} rx="8" fill={`url(#${uid}-wall)`} stroke={active ? accent : '#cbb89f'} strokeWidth={active ? 4 : 2}
+      role="button" tabIndex="0" aria-label={`Vào phòng ${room.name}`} aria-pressed={active} onClick={() => onSelectRoom?.(room.id)} onKeyDown={e => activate(e, () => onSelectRoom?.(room.id))} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-700" style={{cursor:'pointer'}}/>
+    <g clipPath={`url(#${uid}-room)`} pointerEvents="none">
+      {Array.from({length:Math.ceil(width/22)},(_,i) => <path key={i} d={`M${i*22} 38V${floor}`} stroke={night ? '#b0a6ac' : '#ccb99d'} strokeOpacity=".14"/>)}
+      <path d={`M0 ${floor}H${width}V${height}H0Z`} fill={night ? '#8d7770' : '#cbb194'}/>
+      {[16,34,53].map(n => <path key={n} d={`M0 ${floor+n}H${width}`} stroke="#95795f" opacity=".26"/>)}
+      {[.12,.38,.65,.88].map((n,i) => <path key={n} d={`M${width*n} ${floor+(i%2)*34}v${i%2 ? 31 : 34}`} stroke="#95795f" opacity=".25"/>)}
+      <path d={`M0 ${floor}H${width}`} stroke="#ae9273" strokeWidth="5"/>
+      <rect x="14" y="14" width={width-28} height="25" rx="4" fill={night ? '#49444f' : '#fffcf5'} opacity=".95"/>
+      <text x="25" y="31" fontFamily="Georgia,serif" fontSize="13" fontWeight="600" fill={ink}>{room.name}</text>
+      <text x={width-24} y="31" textAnchor="end" fontSize="10" fill={ink} opacity=".7">{room.memories?.length || 0} ảnh</text>
+
+      {/* A recessed window and curtains give the room depth without pasted furniture. */}
+      <g stroke="#a48a70" strokeWidth="1.5">
+        <rect x="22" y="54" width="60" height="78" rx="27" fill={night ? '#384757' : sunset ? '#efd4c1' : '#c8dfdd'}/>
+        {night ? <path d="M64 65a10 10 0 1 0 6 16 11 11 0 0 1-6-16" fill="#fff1c3" stroke="none"/> : <circle cx="65" cy="72" r="9" fill="#f8e6ba" stroke="none"/>}
+        <path d="M23 106Q42 90 58 110T81 105V131H23Z" fill={night ? '#617678' : '#a9b9a1'} stroke="none"/>
+        <path d="M52 54V132M23 96H81" fill="none" stroke="#fff6e7" strokeWidth="3"/>
+        <path d="M18 51Q29 47 36 52L29 137H17ZM68 52Q80 47 87 51L87 137H76Z" fill={night ? '#a69899' : '#e7c5b3'}/>
+        <rect x="15" y="133" width="74" height="5" rx="2" fill="#a48a70"/>
+      </g>
+
+      {/* Actual memories live inside a drawn gallery frame. */}
+      {photos.map((memory,i) => {
+        const scale=Math.min(1,wallCell*.88/52);
+        const px=wallStart+wallCell*(i+.5)-26*scale, py=120-60*scale;
+        const clip=`${uid}-photo-${i}`;
+        const open = () => memory.photo_url && onPhoto?.(memory.photo_url,memory);
+        return <g key={memory.id || i} transform={`translate(${px} ${py}) scale(${scale})`}>
+          <defs><clipPath id={clip}><rect x="5" y="5" width="42" height="43" rx="1"/></clipPath></defs>
+          <rect x="2" y="3" width="52" height="60" rx="3" fill="#755d4a" opacity=".12"/>
+          <rect width="52" height="60" rx="2" fill="#fff9ef" stroke="#b59a76" strokeWidth="2"/>
+          {memory.photo_url ? <g pointerEvents="auto" role="button" tabIndex="0" aria-label={memory.caption || 'Mở ảnh kỷ niệm'} onClick={open} onKeyDown={e => activate(e,open)} style={{cursor:'pointer'}}>
+            <image href={memory.photo_url} x="5" y="5" width="42" height="43" clipPath={`url(#${clip})`} preserveAspectRatio="xMidYMid slice"/>
+            <rect width="52" height="60" fill="transparent"/>
+          </g> : <path d="M26 21c-12-13-23 7 0 19 23-12 12-32 0-19" fill={accent} opacity=".5"/>}
+          <path d="M15 54h22" stroke="#bea88e" strokeWidth="1.5"/>
         </g>;
       })}
-      <rect x="80" y="595" width="740" height="15" rx="5" fill="#b99a7c"/>
-      <text x="450" y="650" textAnchor="middle" fill={accent} fontSize="13" letterSpacing="4">EMORIA · NHÀ LÀ NƠI CÓ NHAU</text>
+
+      {/* Illustrated joinery: one shelf, a credenza and a woven rug. */}
+      <rect x={wallStart} y="120" width={wallWidth} height="5" rx="2" fill="#b29472"/>
+      <path d={`M${wallStart+16} 125v8M${width-32} 125v8`} stroke="#957255" strokeWidth="3"/>
+      <ellipse cx={width/2} cy={height-28} rx={width*.28} ry="17" fill={night ? '#aa8984' : '#e6c3ad'} stroke="#b89b83"/>
+      <ellipse cx={width/2} cy={height-28} rx={width*.25} ry="13" fill="none" stroke="#f4ded0" strokeWidth="2"/>
+      <g fill={night ? '#a48b76' : '#bd9c78'} stroke="#947358" strokeWidth="1.5">
+        <rect x={width*.24} y={desk+5} width={width*.56} height="30" rx="3"/>
+        <path d={`M${width*.25} ${desk+35}v15M${width*.78} ${desk+35}v15M${width*.52} ${desk+6}v27`} fill="none" strokeWidth="4"/>
+        <rect x={width*.22} y={desk} width={width*.60} height="6" rx="2" fill="#dac2a3"/>
+        <path d={`M${width*.35} ${desk+20}h15M${width*.65} ${desk+20}h15`} stroke="#f8e6ca" strokeWidth="2"/>
+      </g>
+      {!lanes.floor.length && <g transform={`translate(28 ${height-64})`} stroke="#a98c74" strokeWidth="1.5"><path d="M1 13Q3 0 17 0H59Q71 0 72 13V32H1Z" fill="#d7b4a4"/><rect x="1" y="20" width="72" height="17" rx="6" fill="#e6cbbc"/><path d="M8 36v9M65 36v9" strokeWidth="4"/><path d="M36 3v17"/><rect x="8" y="7" width="20" height="14" rx="5" fill="#e7daca"/></g>}
+
+      {Object.entries(lanes).map(([surface,items]) => items.map((item,i) => {
+        const asset=DECORATIONS.find(d => d.id === item.item);
+        const scale=Array.isArray(item.scale) ? item.scale[1] : item.scale;
+        const area=surface === 'table' ? width*.54 : surface === 'wall' ? wallWidth : width-36;
+        const size=Math.min(surface === 'wall' ? 67 : 76, surface === 'wall' ? wallCell*.88 : area/Math.max(1,items.length), 64*Math.max(.55,Math.min(1.4,Number(scale)||1)));
+        const cx=surface === 'wall' ? wallStart+wallCell*(photos.length+i+.5) : surface === 'floor' && items.length <= 2 ? (i === 0 ? 48 : width-48) : (width-area)/2+area*(i+.5)/items.length;
+        const baseline=surface === 'wall' ? 120 : surface === 'table' ? desk+1 : height-12;
+        const memories=(item.photos || []).map(id => room.memories?.find(m => m.id === id));
+        return <g key={item.id || item.slot || i} data-decoration={item.item} data-surface={surface} transform={`translate(${cx-size/2} ${baseline-size*.9}) scale(${size/100})`}>
+          <title>{`${asset.name}${item.text ? `: ${item.text}` : ''}`}</title>
+          <MemoryHouseDecor2D item={item.item} photos={memories} text={item.text} accent={accent} onPhoto={onPhoto}/>
+        </g>;
+      }))}
+    </g>
+  </g>;
+}
+
+// Both views share saved room data. All furniture is drawn SVG, with no WebGL dependency.
+export default function MemoryHouse2D({rooms=[], title, theme, activeRoomId, onSelectRoom, onPhoto}) {
+  const uid=useId().replace(/:/g,'');
+  const accent=theme === 'rose_romance' ? '#b57780' : '#9c7350';
+  const current=rooms.find(r => r.id === activeRoomId) || rooms[0];
+  const props={accent,onSelectRoom,onPhoto};
+  return <div className="overflow-hidden rounded-2xl bg-[#f7f1e8] p-3 sm:p-5 text-stone-800" data-testid="memory-house-2d">
+    <div className="mb-3 text-center"><p className="text-[9px] uppercase tracking-[.24em] text-stone-500">Một góc bình yên</p><p className="mt-1 font-serif text-lg sm:text-xl">{title || 'Ngôi nhà của đôi mình'}</p></div>
+    <svg viewBox="0 0 1160 880" className="hidden w-full md:block" aria-label="Ngôi nhà kỷ niệm 2D, chọn phòng hoặc ảnh để xem">
+      <defs><linearGradient id={`${uid}-roof`} x2="0" y2="1"><stop stopColor="#bb8d78"/><stop offset="1" stopColor="#94695a"/></linearGradient></defs>
+      <g pointerEvents="none" strokeLinejoin="round">
+        <ellipse cx="580" cy="826" rx="538" ry="20" fill="#6b5142" opacity=".10"/>
+        <rect x="930" y="99" width="55" height="97" rx="3" fill="#d1af96" stroke="#a7846f" strokeWidth="3"/>
+        <path d="M922 99h72v14h-72Z" fill="#b39078"/>
+        <path d="M36 251L580 40l544 211-13 24L580 72 49 275Z" fill={`url(#${uid}-roof)`} stroke="#81594d" strokeWidth="3"/>
+        {[0,1,2,3].map(i => <path key={i} d={`M${135+i*100} ${215-i*40}L580 ${83+i*31}l${445-i*100} ${132-i*9}`} fill="none" stroke="#dfb4a1" strokeWidth="2" opacity=".5"/>)}
+        <path d="M59 256L580 75l521 181V810H59Z" fill="#d8c2a6" stroke="#b89b7b" strokeWidth="7"/>
+        <path d="M72 254L580 89l508 165" fill="#eee3d1" stroke="#c7ac8c" strokeWidth="3"/>
+        <circle cx="580" cy="181" r="38" fill="#f8f1e5" stroke="#c6a787" strokeWidth="5"/>
+        <path d="M580 170c-22-25-43 14 0 35 43-21 22-60 0-35" fill={accent} opacity=".8"/>
+        <path d="M68 532h1024M68 801h1024" stroke="#b09372" strokeWidth="14"/>
+        <rect x="45" y="803" width="1070" height="18" rx="6" fill="#b79979"/>
+        <path d="M23 801Q24 718 39 679M1137 801Q1136 718 1121 679" fill="none" stroke="#9fa889" strokeWidth="3"/>
+        {[0,1,2].map(i => <g key={i} fill="#a8b395"><ellipse cx={25+i*5} cy={773-i*30} rx="8" ry="18" transform={`rotate(-35 ${25+i*5} ${773-i*30})`}/><ellipse cx={1135-i*5} cy={773-i*30} rx="8" ry="18" transform={`rotate(35 ${1135-i*5} ${773-i*30})`}/></g>)}
+      </g>
+      {rooms.slice(0,5).map((room,index) => <RoomScene key={room.id} room={room} x={index < 3 ? 76+index*341 : 76+(index-3)*513} y={index < 3 ? 545 : 270} width={index < 3 ? 326 : 497} height={250} active={room.id === current?.id} {...props}/>)}
+      <text x="580" y="862" textAnchor="middle" fill={accent} fontSize="12" letterSpacing="4">EMORIA · NHÀ LÀ NƠI CÓ NHAU</text>
     </svg>
-    <p className="text-center text-xs text-stone-600">Chạm vào phòng để chọn · Chạm ảnh để mở kỷ niệm</p>
+    {current && <svg viewBox="-8 -8 376 294" className="w-full md:hidden" aria-label={`Cận cảnh phòng ${current.name} trong ngôi nhà 2D`}><RoomScene room={current} width={360} height={278} active {...props}/></svg>}
+    <p className="mt-3 text-center text-xs text-stone-600">Chạm ảnh trong khung để mở kỷ niệm<span className="hidden md:inline"> · Chạm phòng để ghé thăm</span></p>
   </div>;
 }

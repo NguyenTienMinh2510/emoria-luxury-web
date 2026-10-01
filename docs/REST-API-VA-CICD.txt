@@ -124,7 +124,9 @@ CI và CD
    vercel.json và không ghi đè Build Command bỏ bước test.
 
 Chạy local
-npm run dev                 Vite và API dùng cùng origin /api/v1
+npm run sandbox             lần đầu: bật stack Docker, cấu hình và seed local
+npm run dev:sandbox         khi stack Docker đã chạy: Vite + API dùng DB local
+npm run dev                 chế độ development theo .env/.env.local (có thể trỏ cloud)
 npm run test:ci             unit/API/render mocks (không ghi cloud)
 npm run build              production bundle
 npm run test:rest-db        opt-in Docker local http://127.0.0.1:55321
@@ -132,7 +134,11 @@ npm run test:rest-db        opt-in Docker local http://127.0.0.1:55321
                            test tự khôi phục cấu hình và xóa fixture riêng
                            không đưa các file credential vào Git
 Vite preview chỉ phục vụ static dist, không chạy serverless API; dùng npm run
-dev để test cả hai lớp hoặc deployment Vercel.
+dev:sandbox để test cả hai lớp với Docker local, hoặc deployment Vercel.
+Docker chạy không tự chuyển npm run dev sang sandbox. Nếu House/Match báo
+“Dịch vụ sự kiện chưa được cấu hình”, dừng Vite và chạy npm run dev:sandbox.
+Tài khoản local xem tại .local/TAI-KHOAN-THU-NGHIEM.md; House emoria-lumen
+thuộc owner@emoria.test. Quyền admin không thay thế quyền sở hữu kỷ vật.
 
 Kết quả kiểm thử trước bàn giao
 - API: tất cả route cần user/admin từ chối đúng quyền; không dùng service-role;

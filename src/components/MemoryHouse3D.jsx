@@ -10,6 +10,7 @@ import {
 } from '../services/house3d.js';
 import { createMusicBoxPlayer, MUSIC_TRACKS } from '../services/musicBoxPlayer.js';
 import MemoryHouse2D from './MemoryHouse2D.jsx';
+import MemoryHouseDecor2D from './MemoryHouseDecor2D.jsx';
 
 // Style Packages (Gói phong cách một chạm)
 export const STYLE_PACKAGES = [
@@ -52,10 +53,8 @@ export default function MemoryHouse3D({
   onSelectRoom,
   onRoomsChange,
   onPhoto,
-  onSave,
   onUploadPhoto,
   uploading = false,
-  saving,
   readOnly = false,
   onRegisterCapture
 }) {
@@ -73,7 +72,6 @@ export default function MemoryHouse3D({
   const [placingItem, setPlacingItem] = useState(null);
   const [placingScale, setPlacingScale] = useState(1);
   const [pendingPlacement, setPendingPlacement] = useState(null);
-  const [removing, setRemoving] = useState(false);
 
   const [history, setHistory] = useState({ past: [], future: [] });
 
@@ -163,8 +161,24 @@ export default function MemoryHouse3D({
   latest.current.onPlacementPreview = hit => {
     if (!readOnly && placingItem) setPendingPlacement(hit);
   };
-  latest.current.onSurfaceTap = hit => {
-    if (readOnly || !hit?.isValid || hit.roomId !== room?.id) return;
+  latest.current.getDragPlacement = data => {
+    const targetRoom = rooms.find(r => r.id === data.roomId);
+    if (readOnly || !targetRoom || roomDecorations(targetRoom).some(d => d.parent_id === data.instanceId)) return null;
+    return {item: data.decorItem, roomId: data.roomId, excludeId: data.instanceId, scale: data.decorScale, rotation: data.decorRotation};
+  };
+  latest.current.onSurfaceTap = (hit, draggedId) => {
+    if (readOnly || !hit?.isValid) return;
+    if (draggedId) {
+      const targetRoom = rooms.find(r => r.id === hit.roomId);
+      if (!targetRoom || roomDecorations(targetRoom).some(d => d.parent_id === draggedId)) return;
+      commitRooms(rooms.map(r => r.id === hit.roomId ? updateDecorationInstance(r, draggedId, {
+        position: hit.position, surface: hit.surface, parent_id: hit.parentId
+      }, {validatedPlacement: true}) : r));
+      onSelectRoom?.(hit.roomId);
+      setSelectedInstanceId(draggedId);
+      return;
+    }
+    if (hit.roomId !== room?.id) return;
     if (placingItem) confirmPlacement(hit);
     else if (activeTool === 'move' && selectedInstanceId) {
       commitChange(updateDecorationInstance(room, selectedInstanceId, {
@@ -174,17 +188,9 @@ export default function MemoryHouse3D({
     }
   };
   latest.current.onDecorSelect = data => {
-    if (removing) {
-      const targetRoom = rooms.find(r => r.id === data.roomId);
-      if (!targetRoom) return;
-      const updated = removeDecorationInstance(targetRoom, data.id, { action: 'delete_children' });
-      commitRooms(rooms.map(r => r.id === targetRoom.id ? updated : r));
-      setSelectedInstanceId(null);
-    } else {
-      if (data.roomId) onSelectRoom?.(data.roomId);
-      setSelectedInstanceId(data.id);
-      engine.current?.setSelectionHighlight(data.id);
-    }
+    if (data.roomId) onSelectRoom?.(data.roomId);
+    setSelectedInstanceId(data.id);
+    engine.current?.setSelectionHighlight(data.id);
   };
   useEffect(() => {
     if (view !== '3d' || !host.current) return;
@@ -194,6 +200,7 @@ export default function MemoryHouse3D({
       try {
         engine.current = createHouseRenderer(host.current, {
           getPlacement: () => latest.current.placement,
+          getDragPlacement: data => latest.current.getDragPlacement?.(data),
           isEditing: () => !latest.current.readOnly,
           onGyroChange: (enabled, message) => { setIsGyroEnabled(enabled); setGyroNotice(message); },
           onPlacementPreview: hit => latest.current.onPlacementPreview?.(hit),
@@ -216,7 +223,7 @@ export default function MemoryHouse3D({
               if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
             }
           },
-          onSurfaceTap: hit => latest.current.onSurfaceTap?.(hit),
+          onSurfaceTap: (hit, draggedId) => latest.current.onSurfaceTap?.(hit, draggedId),
           onReady: () => { if (!cancelled) setStatus('ready'); },
           onError: message => { if (!cancelled) { setError(message); setStatus('error'); } }
         });
@@ -254,7 +261,6 @@ export default function MemoryHouse3D({
   useEffect(() => {
     cancelPlacement();
     if (!roomDecorations(room).some(d => (d.id || d.slot) === selectedInstanceId)) setSelectedInstanceId(null);
-    setRemoving(false);
   }, [activeRoomId, readOnly]);
 
   useEffect(() => {
@@ -293,7 +299,6 @@ export default function MemoryHouse3D({
     setPlacingItem(itemId);
     setActiveTool('place');
 
-    setRemoving(false);
     setTouring(false);
     const initialPlacement = engine.current?.findPlacement(room.id, itemId);
     setPendingPlacement(initialPlacement || null);
@@ -562,19 +567,12 @@ export default function MemoryHouse3D({
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-white/10">
         <div>
           <div className="flex items-center gap-2">
-            <p className="text-[11px] uppercase tracking-wider text-amber-200/90 font-bold">Mô hình 3D thực tế</p>
+            <p className="text-[11px] uppercase tracking-wider text-amber-200/90 font-bold">Ngôi nhà của bạn</p>
           </div>
           <h2 className="font-serif text-lg text-white font-bold">{title || 'Ngôi nhà kỷ niệm'}</h2>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={toggleMusic} className={button} aria-pressed={isMusicPlaying}>
-            🎵 {isMusicPlaying ? 'Dừng nhạc' : 'Bật nhạc'}
-          </button>
-          <button type="button" onClick={toggleGyro} disabled={status !== 'ready' || view !== '3d'} className={button} aria-pressed={isGyroEnabled}>
-            📱 {isGyroEnabled ? 'Tắt nghiêng' : 'Nghiêng máy'}
-          </button>
-
           {/* Undo / Redo Buttons */}
           {!readOnly && (
             <div className="flex items-center gap-1 bg-black/30 p-1 rounded-xl border border-white/10">
@@ -599,15 +597,25 @@ export default function MemoryHouse3D({
             </div>
           )}
 
+
+        </div>
+      </div>
+
+      <details className="border-b border-white/10 px-3 py-2 sm:px-4">
+        <summary className="cursor-pointer py-2 text-sm font-semibold text-amber-200">Khung nhìn, ánh sáng & âm nhạc</summary>
+        <div className="flex flex-wrap gap-2 pb-3">
+          <button type="button" onClick={toggleMusic} className={button} aria-pressed={isMusicPlaying}>
+            🎵 {isMusicPlaying ? 'Dừng nhạc' : 'Bật nhạc'}
+          </button>
+          <button type="button" onClick={toggleGyro} disabled={status !== 'ready' || view !== '3d'} className={button} aria-pressed={isGyroEnabled}>
+            📱 {isGyroEnabled ? 'Tắt nghiêng' : 'Nghiêng máy'}
+          </button>
+
           <div className="flex rounded-xl bg-black/30 p-1 border border-white/10" role="group" aria-label="Chế độ hiển thị">
             <button type="button" className={`${button} ${view === '3d' ? 'bg-white/20 font-bold' : ''}`} onClick={() => setView('3d')}>Khung 3D</button>
             <button type="button" className={`${button} ${view === '2d' ? 'bg-white/20 font-bold' : ''}`} onClick={() => { cancelPlacement(); setView('2d'); }}>Ngôi nhà 2D</button>
           </div>
         </div>
-      </div>
-
-      <details className="border-b border-white/10 px-3 py-2 sm:px-4">
-        <summary className="cursor-pointer py-2 text-sm font-semibold text-amber-200">Không khí & âm nhạc của ngôi nhà</summary>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-3 text-sm">
           <label className="space-y-1"><span>Ánh sáng toàn bộ nhà</span>
             <select aria-label="Ánh sáng toàn bộ nhà" disabled={readOnly} value={houseLighting(rooms)} onChange={e => commitRooms(withHouseLighting(rooms, e.target.value))} className="block w-full min-h-11 rounded-xl bg-stone-900 border border-white/20 px-3 text-base sm:text-sm">
@@ -628,6 +636,24 @@ export default function MemoryHouse3D({
         {isGyroEnabled && <div className="flex flex-wrap gap-3 items-center pb-3 text-sm"><button type="button" className={button} onClick={() => engine.current?.calibrateGyroscope()}>Lấy lại tâm nhìn</button><label className="flex items-center gap-2">Độ nhạy<input type="range" aria-label="Độ nhạy nghiêng máy" min="0.2" max="1.5" step="0.1" value={gyroSensitivity} onChange={e => { const value = Number(e.target.value); setGyroSensitivity(value); engine.current?.setGyroSensitivity(value); }} /></label></div>}
         {gyroNotice && <p role="status" className="pb-3 text-xs text-amber-200">{gyroNotice}</p>}
       </details>
+
+      {/* Rooms selector pills */}
+      <div className="px-3 py-3 flex gap-2 overflow-x-auto whitespace-nowrap border-t border-white/5" role="group" aria-label="Chọn phòng trong nhà 3D">
+        {rooms.map(r => (
+          <button
+            key={r.id}
+            type="button"
+            className={`${button} shrink-0 ${r.id === room?.id ? 'bg-amber-200 text-stone-950 font-bold shadow-md' : 'text-stone-300'}`}
+            aria-pressed={r.id === room?.id}
+            onClick={() => {
+              onSelectRoom?.(r.id);
+              engine.current?.focus(r.id, true);
+            }}
+          >
+            {r.name}
+          </button>
+        ))}
+      </div>
 
       {/* 3D Canvas Container */}
       {view === '3d' ? (
@@ -681,7 +707,6 @@ export default function MemoryHouse3D({
               </div>
             )}
 
-            {removing && !readOnly && <div className="absolute top-3 left-3 right-3 z-30 p-3 rounded-xl bg-stone-900/95 text-xs text-white flex justify-between gap-3"><span>Chạm món muốn gỡ (kèm đồ bên trên, nếu có). Có thể Hoàn tác.</span><button type="button" className={button} onClick={() => setRemoving(false)}>Xong</button></div>}
             {/* Floating Placement Confirmation Banner */}
             {!readOnly && placingItem && placingAsset && (
               <div className="absolute top-2 left-2 right-2 sm:top-3 sm:left-3 sm:right-3 z-30 flex flex-wrap items-center justify-between gap-2 p-2 sm:p-3 rounded-2xl bg-stone-900/95 border border-amber-400/40 backdrop-blur-xl shadow-2xl animate-scaleUp">
@@ -735,7 +760,7 @@ export default function MemoryHouse3D({
                       </span>
                     </h4>
                     <p className="text-[10px] text-stone-400">
-                      {activeTool === 'move' ? 'Giữ và kéo đến chỗ mới, thả tay để đặt' : 'Đang chọn món này'}
+                      {activeTool === 'move' ? 'Rê chuột để xem vị trí, bấm để đặt; trên điện thoại giữ và kéo' : 'Kéo trực tiếp món đồ bằng chuột, hoặc chọn Di chuyển'}
                     </p>
                   </div>
                 </div>
@@ -840,7 +865,7 @@ export default function MemoryHouse3D({
               >
                 Ghé phòng này
               </button>
-              <button
+              {readOnly && <button
                 type="button"
                 className={`${button} ${touring ? 'bg-amber-300 text-stone-950 font-bold' : 'bg-black/60 backdrop-blur-md text-amber-200 border-amber-300/30'}`}
                 disabled={status !== 'ready'}
@@ -857,7 +882,7 @@ export default function MemoryHouse3D({
                 title="Dạo bước tự động qua từng căn phòng"
               >
                 {touring ? 'Đang dạo bước' : 'Dạo bước'}
-              </button>
+              </button>}
             </div>
 
             {/* Visitor Decor Inspection Modal */}
@@ -960,7 +985,7 @@ export default function MemoryHouse3D({
         </>
       ) : (
         /* 2D Fallback View: Accessible List of Placed Decorations */
-        <div className="p-5 space-y-4">
+        <div className="p-2 sm:p-5 space-y-4">
           <MemoryHouse2D rooms={rooms} title={title} theme={theme} activeRoomId={activeRoomId} onSelectRoom={onSelectRoom} onPhoto={onPhoto}/>
           {!readOnly && placingItem && <div className="flex items-center gap-3 text-sm"><span>Đặt {placingAsset?.name} tại vị trí gợi ý trong {room?.name}</span><button type="button" className={button} onClick={() => confirmPlacement()}>Xác nhận đặt</button><button type="button" className={button} onClick={cancelPlacement}>Hủy</button></div>}
           <div className="flex items-center justify-between">
@@ -978,7 +1003,7 @@ export default function MemoryHouse3D({
                 return (
                   <div key={instId} className="p-3 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <img src={asset?.image} alt="" className="w-10 h-10 rounded-xl object-cover border border-white/15" />
+                      <svg viewBox="0 0 100 100" className="w-12 h-12 shrink-0 rounded-xl bg-[#f7f1e8]" aria-hidden="true"><MemoryHouseDecor2D item={d.item}/></svg>
                       <div>
                         <h4 className="text-xs font-bold text-white">{asset?.name || d.item}</h4>
                         <span className="text-[10px] text-amber-200/80">
@@ -1096,108 +1121,26 @@ export default function MemoryHouse3D({
                 })}
               </div>
             )}
-      {/* Rooms selector pills */}
-      <div className="px-3 py-3 flex gap-2 overflow-x-auto whitespace-nowrap border-t border-white/5" role="group" aria-label="Chọn phòng trong nhà 3D">
-        {rooms.map(r => (
-          <button
-            key={r.id}
-            type="button"
-            className={`${button} ${r.id === room?.id ? 'bg-amber-200 text-stone-950 font-bold shadow-md' : 'text-stone-300'}`}
-            aria-pressed={r.id === room?.id}
-            onClick={() => {
-              onSelectRoom?.(r.id);
-              engine.current?.focus(r.id, true);
-            }}
-          >
-            {r.name}
-          </button>
-        ))}
-      </div>
-
       {room?.note && <p className="px-5 pb-4 text-sm italic text-amber-100/80">“{room.note}”</p>}
 
       {!readOnly && room && (
         <div className="border-t border-white/10 p-4 sm:p-5 space-y-6">
-          {/* Gói phong cách một chạm (Style Packages) & Dọn nhà giúp mình */}
-          <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h3 className="font-serif text-sm font-bold text-amber-300 flex items-center gap-1.5">
-                  <span>Gói phong cách một chạm · {room.name}</span>
-                </h3>
-                <p className="text-[11px] text-stone-400">
-                  Áp dụng bộ trang trí có sẵn để bắt đầu nhanh, sau đó bạn có thể tự do di chuyển, xoay, thêm món tùy ý.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {(room.memories?.length || 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={autoArrangePhotos}
-                    className="px-3 py-1.5 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/30 text-xs font-semibold cursor-pointer"
-                    title="Tự động gắn ảnh trong phòng vào các khung, album và dây ảnh còn trống"
-                  >
-                    ✦ Dọn nhà giúp mình
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className={button}
-                  disabled={history.past.length === 0}
-                  onClick={handleUndo}
-                  title="Khôi phục trạng thái trang trí trước đó"
-                >
-                  Hoàn tác
-                </button>
-              </div>
+          {arrangeNotice && <p role="status" className="p-3 rounded-xl bg-amber-400/10 text-amber-200 text-sm">{arrangeNotice}<button type="button" onClick={() => setArrangeNotice('')} aria-label="Đóng thông báo trang trí" className="ml-3">×</button></p>}
+          <details className="rounded-2xl border border-white/10 p-3">
+            <summary className="cursor-pointer text-sm text-stone-300">Bài trí nhanh (tùy chọn)</summary>
+            <p className="mt-3 text-xs text-stone-400">Thêm một bộ đồ có sẵn vào phòng đang chọn. Có thể hoàn tác.</p>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {STYLE_PACKAGES.filter(pkg => !pkg.isPendingAsset).map(pkg => <button key={pkg.id} type="button" disabled={status !== 'ready' || view !== '3d'} onClick={() => applyStylePackage(pkg)} className="rounded-xl border border-white/15 bg-white/5 p-3 text-left disabled:opacity-40 hover:border-amber-300/50"><span className="block text-xs font-bold">{pkg.name}</span><span className="block mt-1 text-xs text-stone-400">{pkg.desc}</span></button>)}
             </div>
-
-            {arrangeNotice && (
-              <div className="p-3 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-200 text-xs flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-amber-400 font-bold">✦</span>
-                  <span>{arrangeNotice}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setArrangeNotice('')}
-                  className="text-stone-400 hover:text-white text-xs px-2 py-0.5 rounded cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
-              {STYLE_PACKAGES.map(pkg => (
-                <button
-                  key={pkg.id}
-                  type="button"
-                  onClick={() => { if (!pkg.isPendingAsset) applyStylePackage(pkg); }}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    pkg.isPendingAsset
-                      ? 'border-white/10 bg-white/[0.01] opacity-60'
-                      : 'border-white/15 bg-white/5 hover:border-amber-300/50 hover:bg-white/10'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">{pkg.name}</span>
-                    {pkg.isPendingAsset && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Chờ asset 3D</span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-stone-400 mt-1 line-clamp-2 leading-relaxed">{pkg.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
+            {(room.memories?.length || 0) > 0 && <button type="button" onClick={autoArrangePhotos} className={`${button} mt-3`}>Tự gắn ảnh vào đồ trang trí</button>}
+          </details>
 
           {/* Freeform Decoration Library & Placement */}
           <div className="space-y-4">
             <div className="flex flex-wrap gap-3 justify-between items-center">
               <div>
                 <h3 className="font-serif text-base font-bold text-white flex items-center gap-2">
-                  <span>Trang trí tự do · {room.name}</span>
+                  <span>Thêm đồ trang trí</span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-mono">
                     {decorationsList.length} món
                   </span>
@@ -1207,50 +1150,28 @@ export default function MemoryHouse3D({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => { cancelPlacement(); setSelectedInstanceId(null); engine.current?.setSelectionHighlight(null); setRemoving(!removing); host.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }); }}
-                  className={`${button} ${removing ? 'bg-amber-400/20 text-amber-200 border-amber-400/40' : 'text-stone-400'}`}
-                  aria-pressed={removing} title="Bật rồi chạm món cần gỡ; dùng Hoàn tác để khôi phục"
-                >
-                  {removing ? '✓ Đang gỡ đồ' : 'Gỡ đồ bằng chạm'}
-                </button>
-
-
-                {onSave && (
-                  <button
-                    type="button"
-                    className={`${button} bg-amber-200 text-stone-950 font-bold`}
-                    disabled={saving}
-                    onClick={() => onSave()}
-                  >
-                    {saving ? 'Đang lưu…' : 'Lưu trang trí'}
-                  </button>
-                )}
-              </div>
             </div>
 
             {/* Library Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
+            <div className="flex gap-2.5 overflow-x-auto pb-2">
               {DECORATIONS.map(d => (
                 <button
                   key={d.id}
                   type="button"
                   disabled={status !== 'ready' || view !== '3d'}
                   onClick={() => startPlacement(d.id)}
-                  className={`text-left rounded-2xl border p-2 transition-all cursor-pointer relative group ${
+                  className={`w-28 shrink-0 text-left rounded-2xl border p-2 transition-all cursor-pointer relative group ${
                     placingItem === d.id
                       ? 'border-amber-400 bg-amber-400/15 ring-2 ring-amber-400/30'
                       : 'border-white/10 hover:border-amber-300/40 bg-white/[0.02] hover:bg-white/[0.06]'
                   }`}
                 >
-                  <img
+                  {view === '2d' ? <svg viewBox="0 0 100 100" className="w-full aspect-[4/3] rounded-xl bg-[#f7f1e8]" aria-hidden="true"><MemoryHouseDecor2D item={d.id}/></svg> : <img
                     loading="lazy"
                     src={d.image}
                     alt=""
                     className="w-full aspect-[4/3] object-cover rounded-xl"
-                  />
+                  />}
                   <div className="pt-2 px-1">
                     <span className="block text-xs font-medium text-white truncate">{d.name}</span>
                     <div className="flex items-center justify-between mt-1 text-[10px]">

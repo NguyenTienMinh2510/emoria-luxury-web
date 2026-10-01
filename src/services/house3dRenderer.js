@@ -4,7 +4,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {roomDecorations, getDefaultPosition, houseLighting, gyroTilt} from './house3d.js';
 import {createPlacementSolver, placementTriangles, transformDecoration} from './housePlacement.js';
 
-export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, onPlacementPreview, getPlacement, isEditing, onGyroChange, onError, onReady}) {
+export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, onPlacementPreview, getPlacement, getDragPlacement, isEditing, onGyroChange, onError, onReady}) {
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
   const compact = window.matchMedia?.('(pointer: coarse)').matches || host.clientWidth < 640;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,compact ? 1 : 1.5));
@@ -14,7 +14,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   // Shadows change with furniture, not with the camera or floating dust.
   renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;
   host.appendChild(renderer.domElement);
-  renderer.domElement.setAttribute('aria-label','Ngôi nhà 3D: kéo để xoay, chạm phòng để chọn');
+  renderer.domElement.setAttribute('aria-label','Ngôi nhà 3D: kéo nền để xoay, kéo đồ vật bằng chuột để di chuyển, chạm phòng để chọn');
   renderer.domElement.style.cssText='width:100%;height:100%;display:block;touch-action:none';
   const scene=new THREE.Scene();scene.background=new THREE.Color('#e9dfd2');
   const camera=new THREE.PerspectiveCamera(34,1,.1,80);
@@ -577,10 +577,15 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     }
     return resolver.find(point);
   }
-  function previewPointer(e) {
-    const placement = getPlacement?.();
+  function pick(clientX, clientY) {
+    if (!house) return null;
+    const r = renderer.domElement.getBoundingClientRect();
+    ray.setFromCamera(new THREE.Vector2((clientX-r.left)/r.width*2-1, -(clientY-r.top)/r.height*2+1), camera);
+    return ray.intersectObjects([house, decorGroup], true)[0];
+  }
+  function previewPointer(e, placement = getPlacement?.()) {
     if (!placement?.item) return null;
-    const hit = raycastSurface(e.clientX, e.clientY, state.activeRoomId, placement.item, placement.scale, placement.rotation, placement.excludeId);
+    const hit = raycastSurface(e.clientX, e.clientY, placement.roomId || state.activeRoomId, placement.item, placement.scale, placement.rotation, placement.excludeId);
     if (hit) {
       showGhost(placement.item, hit.position, true, placement.rotation, placement.scale);
       onPlacementPreview?.(hit);
@@ -590,18 +595,32 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   function pointerDown(e) {
     if (down || e.button !== 0 || e.isPrimary === false) return;
     down = { x: e.clientX, y: e.clientY, id: e.pointerId, placing: Boolean(getPlacement?.()?.item) };
+    if (!down.placing && e.pointerType === 'mouse' && isEditing?.()) {
+      const hit = pick(e.clientX, e.clientY);
+      if (hit?.object.userData.decorItem) {
+        let root = hit.object;
+        while (root.parent && root.parent !== decorGroup) root = root.parent;
+        down.drag = getDragPlacement?.(root.userData);
+      }
+    }
     resetGyroOffset();
-    if (down.placing) {
+    if (down.placing || down.drag) {
       if(currentTween){cancelAnimationFrame(currentTween.raf);currentTween=null;}
       controls.enabled = false;
       renderer.domElement.setPointerCapture(e.pointerId);
-      down.hit = previewPointer(e);
+      if (down.placing) down.hit = previewPointer(e);
       e.stopImmediatePropagation();
     }
   }
   function pointerMove(e) {
-    if (down?.id !== e.pointerId || !down.placing) return;
-    down.hit = previewPointer(e) || down.hit;
+    if (!down) {
+      if (e.pointerType === 'mouse' && !e.buttons) previewPointer(e);
+      return;
+    }
+    if (down.id !== e.pointerId || (!down.placing && !down.drag)) return;
+    if (down.drag && Math.hypot(e.clientX-down.x, e.clientY-down.y) <= 6 && !down.moved) return;
+    down.moved = true;
+    down.hit = previewPointer(e, down.drag || getPlacement?.()) || down.hit;
   }
   function pointerCancel(e) {
     if (down?.id !== e.pointerId) return;
@@ -614,15 +633,22 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     if (!down || down.id !== e.pointerId) return;
     const gesture = down; down = null;
     if (renderer.domElement.hasPointerCapture(e.pointerId)) renderer.domElement.releasePointerCapture(e.pointerId);
+    if (gesture.drag) {
+      controls.enabled = !getPlacement?.()?.item;
+      hideGhost();
+      if (gesture.moved) {
+        const hit = raycastSurface(e.clientX, e.clientY, gesture.drag.roomId, gesture.drag.item, gesture.drag.scale, gesture.drag.rotation, gesture.drag.excludeId) || gesture.hit;
+        if (hit && isEditing?.()) onSurfaceTap?.(hit, gesture.drag.excludeId);
+        return;
+      }
+    }
     if (gesture.placing) {
       const hit = previewPointer(e) || gesture.hit;
       if (hit && getPlacement?.()?.item) onSurfaceTap?.(hit);
       return;
     }
     if (Math.hypot(e.clientX-gesture.x,e.clientY-gesture.y)>6 || !house) return;
-    const r=renderer.domElement.getBoundingClientRect();
-    ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),camera);
-    const hit=ray.intersectObjects([house,decorGroup],true)[0];
+    const hit=pick(e.clientX, e.clientY);
     if (!hit) return;
     if (hit.object.userData.decorItem && (isEditing?.() || !hit.object.userData.url)) {
       let root = hit.object;
