@@ -10,7 +10,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,compact ? 1 : 1.5));
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
-  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;
   // Shadows change with furniture, not with the camera or floating dust.
   renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;
   host.appendChild(renderer.domElement);
