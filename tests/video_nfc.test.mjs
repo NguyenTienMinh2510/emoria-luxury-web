@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
+import {isDeepStrictEqual} from 'node:util';
 import handler from '../api/v1.js';
 import {labelVideo} from '../server/geminiVideo.js';
 import {labelWithQwen} from '../server/aiService.js';
@@ -90,9 +91,17 @@ globalThis.fetch=async(input,options={})=>{
   }
   throw new Error('Unexpected test URL '+url);
 };
-async function call(action,body={},token='owner'){
+async function call(action,body={},token='owner',expectedLogs){
   const req=Readable.from([]);Object.assign(req,{url:'/api/v1/memories/emo-test/video-labels/'+action,method:'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},body});
-  let response;await handler(req,{setHeader(){},end(data){response={status:this.statusCode,data:JSON.parse(data)};}});return response;
+  let response;
+  const logs=[], originalError=console.error, originalWarn=console.warn;
+  if(expectedLogs){
+    console.error=(...args)=>{logs.push(['error',...args]);if(!expectedLogs.some(log=>isDeepStrictEqual(log,['error',...args])))originalError(...args);};
+    console.warn=(...args)=>{logs.push(['warn',...args]);if(!expectedLogs.some(log=>isDeepStrictEqual(log,['warn',...args])))originalWarn(...args);};
+  }
+  try{await handler(req,{setHeader(){},end(data){response={status:this.statusCode,data:JSON.parse(data)};}});}finally{console.error=originalError;console.warn=originalWarn;}
+  if(expectedLogs)assert.deepEqual(logs,expectedLogs,'Only the simulated media rejection is captured');
+  return response;
 }
 try{
   const body={path:'emo-test/file',consent:true};
@@ -106,9 +115,10 @@ try{
   isAdmin=true;assert.deepEqual((await call('read',{})).data.labels,{'emo-test/file':['Biển']});isAdmin=false;
   owner=true;const fresh=await call('analyze',body);assert.equal(fresh.status,200);assert.deepEqual(fresh.data,{approved:true,reason:null});assert.equal(modelCalls,1);assert.equal(storedLabels.status,'ready');assert.deepEqual(storedLabels.labels,['Biển','Du lịch']);
   cached=true;const cacheResult=await call('analyze',{...body,include_labels:true});assert.equal(cacheResult.status,200);assert.deepEqual(cacheResult.data,{approved:true,reason:null});assert.equal(modelCalls,1);
-  reserveError=true;cached=false;const failed=await call('analyze',body);assert.ok(failed.status>=400);assert.equal(modelCalls,1,'Failed reservation must never bypass quota to call Google');
+  reserveError=true;cached=false;const failed=await call('analyze',body,'owner',[['error','[API Database Error]',undefined,'quota unavailable']]);assert.equal(failed.status,503);assert.equal(modelCalls,1,'Failed reservation must never bypass quota to call Google');
   reserveError=false;malformedQwen=true;
-  assert.equal((await call('analyze',body)).status,502);
+  assert.equal((await call('analyze',body,'owner',[['warn','[Media review failed]',{name:'Error',status:502}]])).status,502);
   assert.equal(storedLabels.status,'failed','Malformed Qwen output must never mark a video ready');
+  console.log('PASS video/NFC expected rejections: unavailable quota (503) and malformed moderation (502); no quota bypass or ready status, exact server diagnostics verified.');
 }finally{globalThis.fetch=originalFetch;}
 console.log('PASS video/NFC: owner-only consent, private labels, model response validation, cache, Google cleanup, safe NFC URL parsing and open-domain label normalization. Hardware and live Gemini are separate checks.');

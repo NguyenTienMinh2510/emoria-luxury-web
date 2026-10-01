@@ -18,7 +18,15 @@ export default defineConfig(({mode}) => {
     server.middlewares.use('/api/analytics',analyticsHandler);
     server.middlewares.use('/api/memory-media',memoryMediaHandler);
   }}],
-  build: {rollupOptions:{input:{main:'index.html',arPreview:'ar-preview.html',lumenPreview:'lumen-preview.html'}}},
+  build: {rollupOptions:{
+    input:{main:'index.html',arPreview:'ar-preview.html',lumenPreview:'lumen-preview.html'},
+    output:{manualChunks(id){
+      if(id.includes('/node_modules/three/build/')) return id.endsWith('/three.core.js')?'three-core':'three-renderer';
+      if(/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
+      if(id.includes('/node_modules/@supabase/')) return 'supabase';
+      if(/\/node_modules\/(framer-motion|motion-dom|motion-utils)\//.test(id)) return 'motion';
+    }}
+  }},
   server: {
     port: 3000,
     host: '127.0.0.1',

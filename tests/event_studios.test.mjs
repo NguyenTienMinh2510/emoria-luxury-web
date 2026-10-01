@@ -15,6 +15,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY = 'fixture-anon-key';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fixture-service-role-key';
 
 const originalFetch = globalThis.fetch;
+let expectedDbLogs = [];
 
 // Helper to make API requests to handler (simulating Vite / Vercel API routing)
 async function apiCall(method, path, body, token, options = {}) {
@@ -39,7 +40,15 @@ async function apiCall(method, path, body, token, options = {}) {
       result = { status: this.statusCode, body: raw ? JSON.parse(raw) : null, headers };
     }
   };
-  await handler(req, res);
+  const logs = [], originalError = console.error;
+  expectedDbLogs = [];
+  console.error = (...args) => {
+    logs.push(args);
+    if (!expectedDbLogs.some(log => log.length === args.length && log.every((value, index) => value === args[index]))) originalError(...args);
+  };
+  try { await handler(req, res); } finally { console.error = originalError; }
+  assert.deepEqual(logs, expectedDbLogs, 'Only simulated RPC rejections are captured; unexpected diagnostics fail the request');
+  if (expectedDbLogs.length) assert.ok(result.status >= 400, 'A simulated RPC rejection must not return success');
   return result;
 }
 
@@ -902,7 +911,10 @@ globalThis.fetch = async (input, init = {}) => {
     const rpcName = url.split('/rpc/')[1].split('?')[0];
     const body = init.body ? JSON.parse(init.body) : {};
     const res = runSimulatedRpc(rpcName, body, callerUser?.id || null);
-    if (res.error) return Response.json(res.error, { status: 400 });
+    if (res.error) {
+      expectedDbLogs.push(['[API Database Error]', res.error.code, res.error.message]);
+      return Response.json(res.error, { status: 400 });
+    }
     return Response.json(res.data);
   }
 
@@ -1958,6 +1970,7 @@ async function runTests() {
 
     console.log('  [PASS] Test 28: Freeform House V2 HTTP API draft, reload, publish và toàn bộ validation được kiểm chứng hoàn hảo.');
 
+    console.log('  [PASS] Expected RPC rejections: permission, validation, missing resource and revision conflicts; exact server diagnostics verified.');
     console.log('\n================================================================');
     console.log('  TẤT CẢ 28/28 BEHAVIOR, SECURITY & UI ASSERTIONS ĐẠT KẾT QUẢ PASS');
     console.log('================================================================');

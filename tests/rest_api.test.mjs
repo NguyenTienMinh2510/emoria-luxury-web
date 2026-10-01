@@ -21,7 +21,14 @@ async function request(method,path,body,token,options={}){
   Object.assign(req,{method,url:path,headers:{...(body===undefined&&options.raw===undefined?{}:{'content-type':'application/json'}),...(token?{authorization:`Bearer ${token}`}:{})},...(body===undefined?{}:{body})});
   const headers={};let result;
   const res={setHeader(k,v){headers[k]=v;},end(raw){result={status:this.statusCode,body:JSON.parse(raw),headers};}};
-  await handler(req,res);return result;
+  const expectedError=dbError, errors=[], originalError=console.error;
+  if(expectedError)console.error=(...args)=>{
+    errors.push(args);
+    if(args.length!==3||args[0]!=='[API Database Error]'||args[1]!==expectedError.code||args[2]!==expectedError.message)originalError(...args);
+  };
+  try{await handler(req,res);}finally{console.error=originalError;}
+  if(expectedError)assert.deepEqual(errors,[['[API Database Error]',expectedError.code,expectedError.message]],'Only the simulated database rejection is captured');
+  return result;
 }
 try{
   assert.equal((await request('GET','/api/v1/no-such-resource')).status,404);
@@ -83,5 +90,6 @@ try{
   assert.equal(aiLetter.status,200);
   assert.ok(aiLetter.body?.letter?.includes('Taylor')&&aiLetter.body?.letter?.includes('Alex'));
   assert.equal(r.headers['Cache-Control'],'no-store');
+  console.log('PASS REST API expected rejections: stock conflict (409), private database failure (503), permission denial (403); exact server diagnostics verified.');
   console.log('PASS REST API: all protected routes, caller JWT/RLS, idempotency payload, server pricing, tracking errors, shipping, private grants, rewrite routing, AI letter craft');
 }finally{globalThis.fetch=originalFetch;}
