@@ -30,7 +30,7 @@ import {
   getShowcaseMemoriesList 
 } from '../services/memoryService';
 
-export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToHome, onNavigateToShop, currentUser, onOpenAuth, onSelectTag, onOpenPrivacy, onOpenHouseStudio }) {
+export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigateToHome, onNavigateToShop, currentUser, onOpenAuth, onSelectTag, onOpenPrivacy, onOpenHouseStudio, onOpenMatchStudio }) {
   const {t, tBilingual, language}=useLanguage();
   const {settings}=useStore();
   const [editMedia,setEditMedia]=useState([]);
@@ -510,7 +510,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                   setStudioStep(1);
                   setIsEditorOpen(true);
                 }}
-                className="px-3.5 py-1.5 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
+                className="h-9 px-3.5 rounded-xl bg-white text-dark-950 font-semibold text-xs tracking-wider uppercase hover:bg-slate-100 transition-all flex items-center gap-1.5 cursor-pointer shadow-silver-glow"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>{t("Chỉnh Sửa (Studio)","Edit in Studio")}</span>
@@ -519,18 +519,30 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 <button
                   type="button"
                   onClick={() => onOpenHouseStudio(currentTag)}
-                  className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all"
+                  className="h-9 px-3.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 hover:text-white border border-white/10 hover:border-white/20 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-all"
                   title={t("Mở Memory House Studio","Open Memory House Studio")}
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Home className="w-3.5 h-3.5 text-slate-300" />
                   <span className="hidden md:inline">House Studio</span>
+                </button>
+              )}
+              {onOpenMatchStudio && (
+                <button
+                  type="button"
+                  onClick={() => onOpenMatchStudio(currentTag)}
+                  className="h-9 px-3.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 hover:text-white border border-white/10 hover:border-white/20 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-all"
+                  title={t("Mở Match Studio","Open Match Studio")}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-slate-300" />
+                  <span className="hidden md:inline">Match Studio</span>
                 </button>
               )}
             </>
             ) : !memoryData.is_recipient && (
               <button
+                type="button"
                 onClick={() => currentUser?setIsClaimModalOpen(true):onOpenAuth?.()}
-                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
+                className="h-9 px-3.5 rounded-xl bg-white/10 hover:bg-white text-white hover:text-dark-950 border border-white/20 text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
                 title={t("Đăng ký quyền sở hữu chiếc trang sức này","Claim this memory")}
               >
                 <Key className="w-3.5 h-3.5" />
@@ -626,7 +638,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
               <button
                 type="submit"
                 disabled={isVerifyingPin}
-                className="w-full py-3 rounded-xl bg-white text-dark-950 font-bold text-xs uppercase tracking-wider hover:bg-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-silver-glow disabled:opacity-50"
+                className="w-full min-h-[44px] py-2.5 rounded-xl bg-white text-dark-950 font-semibold text-xs uppercase tracking-wider hover:bg-slate-100 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-silver-glow disabled:opacity-50"
               >
                 {isVerifyingPin ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

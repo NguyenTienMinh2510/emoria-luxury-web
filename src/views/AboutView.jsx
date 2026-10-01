@@ -75,7 +75,7 @@ export default function AboutView({
             <div className="flex flex-wrap items-center justify-center gap-4">
               <button
                 onClick={onNavigateToShop}
-                className="cta-luxury-gold !px-8 !py-3.5 shadow-[0_0_30px_rgba(250,204,21,0.6)]"
+                className="cta-luxury-gold !px-8 !py-3.5"
               >
                 <span>{isEn ? "Khám Phá Cửa Hàng · Explore Shop" : "Khám Phá Cửa Hàng"}</span>
                 <ArrowRight className="w-4 h-4" />
@@ -492,7 +492,7 @@ export default function AboutView({
               <button
                 type="button"
                 onClick={onOpenPrivacy}
-                className="cta-luxury-gold !py-2.5 !px-5 !text-xs !tracking-wider flex items-center gap-2 shrink-0 cursor-pointer whitespace-nowrap shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+                className="cta-luxury-gold !py-2.5 !px-5 !text-xs !tracking-wider flex items-center gap-2 shrink-0 cursor-pointer whitespace-nowrap"
               >
                 <span>Xem Toàn Văn Chính Sách</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -573,7 +573,7 @@ export default function AboutView({
                     href="https://www.google.com/maps/search/?api=1&query=28+Trang+Tien+Hoan+Kiem+Ha+Noi"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="cta-luxury-gold !py-2.5 !px-4 !text-xs !tracking-wider flex-1 flex items-center justify-center gap-1.5 shadow-[0_0_20px_rgba(250,204,21,0.55)]"
+                    className="cta-luxury-gold !py-2.5 !px-4 !text-xs !tracking-wider flex-1 flex items-center justify-center gap-1.5"
                   >
                     <Navigation className="w-3.5 h-3.5" />
                     <span>Chỉ đường Maps</span>
@@ -733,7 +733,7 @@ export default function AboutView({
                     href="https://www.google.com/maps/dir/?api=1&destination=28+Trang+Tien+Hoan+Kiem+Ha+Noi"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="cta-luxury-gold !py-2.5 !px-5 !text-xs !tracking-wider flex items-center gap-2 shadow-[0_0_25px_rgba(250,204,21,0.65)]"
+                    className="cta-luxury-gold !py-2.5 !px-5 !text-xs !tracking-wider flex items-center gap-2"
                   >
                     <Navigation className="w-3.5 h-3.5" />
                     <span>Chỉ đường tới Atelier</span>
@@ -760,7 +760,7 @@ export default function AboutView({
             <div className="flex items-center gap-3 shrink-0">
               <a
                 href="tel:19006868"
-                className="cta-luxury-gold !py-3 !px-6 !text-xs sm:!text-sm flex items-center gap-2 shadow-[0_0_25px_rgba(250,204,21,0.55)]"
+                className="cta-luxury-gold !py-3 !px-6 !text-xs sm:!text-sm flex items-center gap-2"
               >
                 <Phone className="w-4 h-4" />
                 <span>Hotline 1900 6868</span>
@@ -787,7 +787,7 @@ export default function AboutView({
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
             <button
               onClick={onNavigateToShop}
-              className="cta-luxury-gold !px-8 !py-4 !text-sm shadow-[0_0_35px_rgba(250,204,21,0.65)]"
+              className="cta-luxury-gold !px-8 !py-4 !text-sm"
             >
               <span>Khám Phá Toàn Bộ Cửa Hàng</span>
               <ArrowRight className="w-4 h-4" />

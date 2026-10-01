@@ -9,7 +9,7 @@ class FakeImage {
   constructor() { FakeImage.created.push(this); }
   set src(value) { this.url = value; }
   removeAttribute() { this.cancelled = true; }
-  finish() { this.naturalWidth = 1280; this.onload(); }
+  finish() { this.naturalWidth = 1280; return this.onload(); }
 }
 let loaded = 0;
 const frames = loadShowcaseFrames({count:120, getPath:i=>`webp-${i}`, getFallbackPath:i=>`jpg-${i}`, onLoad:()=>loaded++, ImageClass:FakeImage});
@@ -19,6 +19,7 @@ frames.preload();
 assert.equal(FakeImage.created.length,3,'Background preload never starts 120 simultaneous requests');
 frames.request(119);
 FakeImage.created[0].finish();
+assert.equal(frames.ready[0],true,'Browsers without decode can still mark a loaded frame ready');
 assert.equal(FakeImage.created[3].url,'webp-119','Skipping to the end prioritizes the requested frame');
 FakeImage.created[3].onerror();
 assert.equal(FakeImage.created[3].url,'jpg-119','An unavailable optimized frame falls back to the original');
@@ -28,7 +29,84 @@ assert.ok(FakeImage.created.every(i=>i.cancelled && i.onload===null && i.onerror
 frames.preload();frames.request(5);
 assert.equal(FakeImage.created.length,5,'Unmount cannot start another frame request');
 assert.equal(loaded,2);
-for (let i=0;i<120;i++) assert.ok(fs.existsSync(`public/assets/animation-optimized/frame-${String(i).padStart(3,'0')}.webp`));
+
+class DecodingImage extends FakeImage {
+  decode() { return new Promise((resolve,reject)=>{this.resolveDecode=resolve;this.rejectDecode=reject;}); }
+}
+const firstDecodingIndex=FakeImage.created.length;
+const decodedLoads=[];
+const decodingFrames=loadShowcaseFrames({count:4,getPath:i=>`webp-${i}`,getFallbackPath:i=>`jpg-${i}`,onLoad:(i,success)=>decodedLoads.push([i,success]),ImageClass:DecodingImage});
+decodingFrames.preload();
+const firstImage=FakeImage.created[firstDecodingIndex];
+const firstDecode=firstImage.finish();
+decodingFrames.request(3);
+assert.equal(decodingFrames.ready[0],false,'Network completion alone does not make a frame drawable');
+assert.equal(decodingFrames.settled[0],false,'An image remains pending while decoding');
+assert.equal(decodedLoads.length,0);
+assert.equal(FakeImage.created.length,firstDecodingIndex+3,'Decoding keeps its slot in the three-frame concurrency limit');
+firstImage.resolveDecode();
+await firstDecode;
+assert.equal(decodingFrames.ready[0],true);
+assert.deepEqual(decodedLoads,[[0,true]]);
+const priorityImage=FakeImage.created[firstDecodingIndex+3];
+assert.equal(priorityImage.url,'webp-3','A waiting current frame starts only after another frame finishes decoding');
+const failedDecode=priorityImage.finish();
+priorityImage.rejectDecode(new Error('Invalid optimized image'));
+await failedDecode;
+assert.equal(priorityImage.url,'jpg-3','Decode failure retries the original image');
+assert.equal(decodingFrames.ready[3],false);
+assert.equal(decodedLoads.length,1);
+const fallbackDecode=priorityImage.finish();
+priorityImage.resolveDecode();
+await fallbackDecode;
+assert.equal(decodingFrames.ready[3],true);
+assert.deepEqual(decodedLoads,[[0,true],[3,true]]);
+const failedImage=FakeImage.created[firstDecodingIndex+1];
+const failedOptimized=failedImage.finish();
+failedImage.rejectDecode(new Error('Invalid optimized image'));
+await failedOptimized;
+const failedOriginal=failedImage.finish();
+failedImage.rejectDecode(new Error('Invalid original image'));
+await failedOriginal;
+assert.equal(decodingFrames.ready[1],false);
+assert.equal(decodingFrames.settled[1],true,'A failed optimized image and fallback settle without becoming drawable');
+assert.deepEqual(decodedLoads.at(-1),[1,false],'Two decode failures complete with a non-drawable frame');
+const disposedImage=FakeImage.created[firstDecodingIndex+2];
+const disposedDecode=disposedImage.finish();
+decodingFrames.dispose();
+disposedImage.resolveDecode();
+await disposedDecode;
+assert.ok(decodingFrames.ready.every(ready=>!ready),'Disposal clears decoded readiness');
+assert.ok(decodingFrames.settled.every(settled=>!settled),'Disposal clears terminal frame status');
+assert.equal(decodedLoads.length,3,'Decoding after disposal cannot deliver a callback');
+assert.ok(FakeImage.created.slice(firstDecodingIndex).every(i=>i.cancelled&&i.onload===null&&i.onerror===null));
+const nearbyStart=FakeImage.created.length;
+const nearbyFrames=loadShowcaseFrames({count:120,getPath:i=>`nearby-${i}`,onLoad:()=>{},ImageClass:FakeImage});
+nearbyFrames.preload(0,13);
+for(let i=nearbyStart;i<FakeImage.created.length;i++) FakeImage.created[i].finish();
+assert.equal(FakeImage.created.length-nearbyStart,13,'Initial prefetch prepares only the nearby frames');
+nearbyFrames.preload(10,23);
+for(let i=nearbyStart+13;i<FakeImage.created.length;i++) FakeImage.created[i].finish();
+assert.equal(FakeImage.created.length-nearbyStart,23,'Moving the prefetch window reuses overlapping decoded frames');
+nearbyFrames.dispose();
+const missingStart=FakeImage.created.length;
+const missingLoads=[];
+const missingFrames=loadShowcaseFrames({count:4,getPath:i=>`missing-webp-${i}`,getFallbackPath:i=>`missing-jpg-${i}`,onLoad:(i,success)=>missingLoads.push([i,success]),ImageClass:FakeImage});
+missingFrames.preload();
+for(let i=missingStart;i<FakeImage.created.length;i++) {
+  FakeImage.created[i].onerror();
+  FakeImage.created[i].onerror();
+}
+assert.equal(missingLoads.length,4);
+assert.ok(missingLoads.every(([,success])=>success===false),'Missing images are never reported as successful loads');
+assert.ok(missingFrames.ready.every(ready=>!ready),'All missing images remain non-drawable');
+assert.ok(missingFrames.settled.every(Boolean),'All missing images settle so autoplay can advance');
+missingFrames.dispose();
+for (let i=0;i<300;i++) {
+  const frame=String(i).padStart(3,'0');
+  assert.ok(fs.existsSync(`public/assets/animation-optimized/frame-${frame}.webp`));
+  assert.ok(fs.existsSync(`public/assets/animation-optimized/frame-${frame}-640.webp`));
+}
 for (const name of ['echo','faith','halo','horizon','lumen','orbit','pulse','sen']) {
   const props=productImageProps(`/assets/catalog/emoria-${name}.png`);
   assert.ok(props.srcSet.includes('320w') && props.srcSet.includes('960w'));
@@ -53,4 +131,6 @@ try {
   globalThis.fetch=async()=>{throw new Error('Storage unavailable');};
   assert.deepEqual(await signEventPaths(['emo-test/good']),{});
 } finally { globalThis.fetch=originalFetch; }
-console.log('PASS performance regression: bounded frame loading, current-frame priority, original-image fallback, disposal, responsive assets, custom uploads, deduplicated batch signing and safe Storage failure.');
+console.log('PASS performance regression: bounded frame loading and decoding, current-frame priority, original-image and decode fallback, disposal, responsive assets, custom uploads, deduplicated batch signing and safe Storage failure.');
+await import('./showcase_render.test.mjs');
+await import('./article_reading.test.mjs');

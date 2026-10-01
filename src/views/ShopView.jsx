@@ -413,7 +413,7 @@ export default function ShopView({
                           onClick={() => {
                             onAddToCart(product, 1);
                           }}
-                          className="cta-luxury-buy !px-4 !py-2 shadow-[0_0_18px_rgba(250,204,21,0.55)]"
+                          className="cta-luxury-buy !px-4 !py-2"
                           title="Thêm vào giỏ hàng"
                         >
                           <ShoppingBag className="w-3.5 h-3.5" />

@@ -45,10 +45,32 @@ const AuthModal = lazy(() => import('./components/AuthModal'));
 const CheckoutModal = lazy(() => import('./components/CheckoutModal'));
 const PrivacyPolicyModal = lazy(() => import('./components/PrivacyPolicyModal'));
 
+export function canNavigateView(current, target, dirty, confirm, sameContext = true) {
+  return (current === target && sameContext) || !dirty || confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?');
+}
+
+export function readStudioRoute(search) {
+  const q = new URLSearchParams(search);
+  const view = q.get('view') === 'memory-match' || q.get('match') || q.get('invite')
+    ? 'memory-match'
+    : q.get('view') === 'memory-house' || q.get('share') ? 'memory-house' : null;
+  return {
+    view,
+    matchId: view === 'memory-match' ? q.get('match') : null,
+    inviteToken: view === 'memory-match' ? q.get('invite') : null,
+    shareId: view === 'memory-house' ? q.get('share') : null,
+    tag: q.get('tag') || '',
+  };
+}
+
 export default function App() {
   const store = useStore();
   // Navigation View: Mặc định là 'home' (Trang chủ & Câu chuyện thương hiệu)
   const [currentView, setCurrentView] = useState('home');
+  const currentViewRef = useRef(currentView);
+  currentViewRef.current = currentView;
+  const navigationDirtyRef = useRef(null);
+  const currentRouteRef = useRef(window.location.href);
   const [trackingRequest,setTrackingRequest]=useState(null);
   const [recovery, setRecovery] = useState(false);
   const [routeReady, setRouteReady] = useState(false);
@@ -57,6 +79,7 @@ export default function App() {
   const [currentTag, setCurrentTag] = useState('');
   const [selectedArticleSlug, setSelectedArticleSlug] = useState('nghe-thuat-che-tac-da-quy-emoria');
   const [activeMatchId, setActiveMatchId] = useState(null);
+  const [matchRouteVersion, setMatchRouteVersion] = useState(0);
   const [matchInviteToken, setMatchInviteToken] = useState(null);
   const [houseShareId, setHouseShareId] = useState(null);
   const [activeSection, setActiveSection] = useState('collection');
@@ -98,6 +121,18 @@ export default function App() {
 
   const [hasScrolledPastHero, setHasScrolledPastHero] = useState(false);
   const sessionSequence = useRef(0);
+
+  const navigateTo = (view) => {
+    if (!canNavigateView(currentViewRef.current, view, navigationDirtyRef.current?.current, message => window.confirm(message))) return false;
+    if (view !== currentViewRef.current) {
+      setActiveMatchId(null);
+      setMatchInviteToken(null);
+      setHouseShareId(null);
+    }
+    setCurrentView(view);
+    return true;
+  };
+  const confirmSignOut = () => canNavigateView(currentViewRef.current, 'signed-out', navigationDirtyRef.current?.current, message => window.confirm(message));
 
   useEffect(() => {
     const handleScroll = () => {
@@ -159,7 +194,17 @@ export default function App() {
   useEffect(() => {
     const readRoute = () => {
       const q=new URLSearchParams(window.location.search);
-      setHouseShareId(q.get('share') || null);
+      const studioRoute=readStudioRoute(q);
+      const targetView=studioRoute.view || (q.get('payment') && q.get('orderId') ? 'shop' : q.get('article') ? 'article-detail' : q.get('chip') ? 'nfc' : q.get('tag') || q.get('memory') ? 'memory' : ['home','shop','memory','articles','about','admin'].includes(q.get('view')) ? q.get('view') : 'home');
+      const sameContext=JSON.stringify(readStudioRoute(new URL(currentRouteRef.current).search))===JSON.stringify(studioRoute);
+      if (!canNavigateView(currentViewRef.current, targetView, navigationDirtyRef.current?.current, message => window.confirm(message), sameContext)) {
+        window.history.pushState({}, '', currentRouteRef.current);
+        return;
+      }
+      if (currentViewRef.current === 'memory-match' && studioRoute.view === 'memory-match' && !sameContext) setMatchRouteVersion(version => version + 1);
+      setActiveMatchId(studioRoute.matchId);
+      setMatchInviteToken(studioRoute.inviteToken);
+      setHouseShareId(studioRoute.shareId);
       const payment=q.get('payment');
       const orderId=q.get('orderId');
       const token=q.get('token');
@@ -168,13 +213,11 @@ export default function App() {
       if (policy === 'privacy' || privacy === 'true' || window.location.hash === '#privacy') {
         setIsPrivacyOpen(true);
       }
-      if (q.get('view') === 'memory-match' || q.get('match') || q.get('invite')) {
-        if (q.get('match')) setActiveMatchId(q.get('match'));
-        if (q.get('invite')) setMatchInviteToken(q.get('invite'));
-        if (q.get('tag')) setCurrentTag(q.get('tag'));
+      if (studioRoute.view === 'memory-match') {
+        setCurrentTag(studioRoute.tag);
         setCurrentView('memory-match');
-      } else if (q.get('view') === 'memory-house' || q.get('share')) {
-        setCurrentTag(q.get('tag') || '');
+      } else if (studioRoute.view === 'memory-house') {
+        setCurrentTag(studioRoute.tag);
         setCurrentView('memory-house');
       } else if (payment && orderId) {
         if (payment === 'success') {
@@ -191,6 +234,7 @@ export default function App() {
         if(q.get('view')==='memory')setCurrentTag('');
       }
       setRouteReady(true);
+      currentRouteRef.current=window.location.href;
     };
     const handleHashChange = () => {
       if (window.location.hash === '#privacy') {
@@ -225,6 +269,7 @@ export default function App() {
     }
     else if(currentView!=='home')url.searchParams.set('view',currentView);
     if(url.href!==window.location.href)window.history.pushState({},'',url);
+    currentRouteRef.current=url.href;
   },[currentView,currentTag,chipId,selectedArticleSlug,activeMatchId,matchInviteToken,houseShareId,routeReady]);
 
   // Cart Handlers
@@ -286,8 +331,8 @@ export default function App() {
   };
 
   const handleOpenMemoryViewer = (tagUid = 'emoria-lumen') => {
+    if (!navigateTo('memory')) return;
     setCurrentTag(tagUid);
-    setCurrentView('memory');
     setNfcModalState({ isOpen: false, productId: 'emoria-pulse' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -300,7 +345,7 @@ export default function App() {
   };
 
   const handleExploreClick = () => {
-    setCurrentView('shop');
+    if (!navigateTo('shop')) return;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -386,16 +431,15 @@ export default function App() {
         onOpenCart={() => setIsCartOpen(true)}
         currentView={currentView}
         onSelectView={(view) => {
-          setCurrentView(view);
-          if(view==='memory-match' && currentView!=='memory-match'){setActiveMatchId(null);setMatchInviteToken(null);}
+          if (!navigateTo(view)) return;
           if(view==='memory')setCurrentTag('');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onSearch={(query) => {
-          setSearchQuery(query);
           if (currentView !== 'shop') {
-            setCurrentView('shop');
+            if (!navigateTo('shop')) return;
           }
+          setSearchQuery(query);
         }}
       />
 
@@ -427,19 +471,19 @@ export default function App() {
               onAddToCart={handleAddToCart}
               onOpenNfcDemo={handleOpenNfcDemo}
               onNavigateToShop={() => {
-                setCurrentView('shop');
+                if (!navigateTo('shop')) return;
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
             <ArticlesSection
               isAdmin={authSession.isAdmin}
               onSelectArticle={(slug) => {
+                if (!navigateTo('article-detail')) return;
                 setSelectedArticleSlug(slug);
-                setCurrentView('article-detail');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onNavigateToArticles={() => {
-                setCurrentView('articles');
+                if (!navigateTo('articles')) return;
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
@@ -461,7 +505,7 @@ export default function App() {
                 </div>
                 <button
                   onClick={() => {
-                    setCurrentView('about');
+                    if (!navigateTo('about')) return;
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className="cta-luxury-primary shrink-0 !px-8 !py-4 relative z-10"
@@ -488,7 +532,7 @@ export default function App() {
         )}
 
         {/* VIEW 3: DEDICATED MEMORY SPACE VAULT SHOWCASE */}
-        {currentView==='nfc'&&<NfcLanding chipId={chipId} onResolved={handleOpenMemoryViewer} onMyMemories={()=>{setCurrentTag('');setCurrentView('memory');}}/>}
+        {currentView==='nfc'&&<NfcLanding chipId={chipId} onResolved={handleOpenMemoryViewer} onMyMemories={()=>{if (!navigateTo('memory')) return;setCurrentTag('');}}/>}
         {(currentView === 'memory' || (currentView === 'memory-house' && !currentTag && !houseShareId)) && (
           <MemorySpaceView
             key={authSession.user?.id || 'guest'}
@@ -498,17 +542,21 @@ export default function App() {
             initialTag={currentTag}
             onOpenPrivacy={() => setIsPrivacyOpen(true)}
             onNavigateToHome={() => {
-              setCurrentView('home');
+              if (!navigateTo('home')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateToShop={() => {
-              setCurrentView('shop');
+              if (!navigateTo('shop')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onOpenHouseStudio={(tag) => {
-              setHouseShareId(null);
+              if (!navigateTo('memory-house')) return;
               if (tag) setCurrentTag(tag);
-              setCurrentView('memory-house');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenMatchStudio={(tag) => {
+              if (!navigateTo('memory-match')) return;
+              if (tag) setCurrentTag(tag);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
@@ -519,12 +567,12 @@ export default function App() {
           <ArticlesView
             isAdmin={authSession.isAdmin}
             onSelectArticle={(slug) => {
+              if (!navigateTo('article-detail')) return;
               setSelectedArticleSlug(slug);
-              setCurrentView('article-detail');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateToShop={() => {
-              setCurrentView('shop');
+              if (!navigateTo('shop')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
@@ -536,7 +584,7 @@ export default function App() {
             slug={selectedArticleSlug}
             isAdmin={authSession.isAdmin}
             onBack={() => {
-              setCurrentView('articles');
+              if (!navigateTo('articles')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onSelectProduct={(id) => setSelectedProductId(id)}
@@ -549,11 +597,11 @@ export default function App() {
         {currentView === 'about' && (
           <AboutView
             onNavigateToShop={() => {
-              setCurrentView('shop');
+              if (!navigateTo('shop')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateToMemory={() => {
-              setCurrentView('memory');
+              if (!navigateTo('memory')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onOpenNfcDemo={handleOpenNfcDemo}
@@ -568,7 +616,7 @@ export default function App() {
             isAdmin={authSession.isAdmin}
             onOpenAuth={() => setIsAuthOpen(true)}
             onNavigateToHome={() => {
-              setCurrentView('home');
+              if (!navigateTo('home')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onRefresh={() => {
@@ -581,6 +629,8 @@ export default function App() {
         {/* VIEW 8: COUPLE MATCH STUDIO */}
         {currentView === 'memory-match' && (
           <MemoryMatchStudio
+            key={matchRouteVersion}
+            navigationDirtyRef={navigationDirtyRef}
             tagUid={currentTag || null}
             onOpenAuth={() => setIsAuthOpen(true)}
             onMatchChange={(id) => {setActiveMatchId(id);setMatchInviteToken(null);}}
@@ -588,44 +638,24 @@ export default function App() {
             inviteToken={matchInviteToken}
             currentUser={authSession.user?.id || null}
             onBack={() => {
-              setActiveMatchId(null);
-              setMatchInviteToken(null);
-              setHouseShareId(null);
-              setCurrentView('memory');
+              if (!navigateTo('memory')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateHome={() => {
-              setActiveMatchId(null);
-              setMatchInviteToken(null);
-              setHouseShareId(null);
-              setCurrentView('home');
+              if (!navigateTo('home')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateShop={() => {
-              setActiveMatchId(null);
-              setMatchInviteToken(null);
-              setHouseShareId(null);
-              setCurrentView('shop');
+              if (!navigateTo('shop')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateMemory={(tag) => {
-              setActiveMatchId(null);
-              setMatchInviteToken(null);
-              setHouseShareId(null);
+              if (!navigateTo('memory')) return;
               if (tag) setCurrentTag(tag);
-              setCurrentView('memory');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onSwitchStudio={(target) => {
-              if (target === 'house') {
-                setActiveMatchId(null);
-                setMatchInviteToken(null);
-                setHouseShareId(null);
-                setCurrentView('memory-house');
-              } else {
-                setHouseShareId(null);
-                setCurrentView('memory-match');
-              }
+              if (!navigateTo(target === 'house' ? 'memory-house' : 'memory-match')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
@@ -634,49 +664,30 @@ export default function App() {
         {/* VIEW 9: MEMORY HOUSE STUDIO */}
         {currentView === 'memory-house' && (currentTag || houseShareId) && (
           <MemoryHouseStudio
+            navigationDirtyRef={navigationDirtyRef}
             key={`${authSession.user?.id || 'guest'}:${currentTag}:${houseShareId || ''}`}
             tagUid={currentTag || null}
             shareId={houseShareId}
             currentUser={authSession.user?.id || null}
             onBack={() => {
-              setActiveMatchId(null);
-              setMatchInviteToken(null);
-              setHouseShareId(null);
-              setCurrentView('memory');
+              if (!navigateTo('memory')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateHome={() => {
-              setActiveMatchId(null);
-              setMatchInviteToken(null);
-              setHouseShareId(null);
-              setCurrentView('home');
+              if (!navigateTo('home')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateShop={() => {
-              setActiveMatchId(null);
-              setMatchInviteToken(null);
-              setHouseShareId(null);
-              setCurrentView('shop');
+              if (!navigateTo('shop')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateMemory={(tag) => {
-              setActiveMatchId(null);
-              setMatchInviteToken(null);
-              setHouseShareId(null);
+              if (!navigateTo('memory')) return;
               if (tag) setCurrentTag(tag);
-              setCurrentView('memory');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onSwitchStudio={(target) => {
-              if (target === 'match') {
-                setHouseShareId(null);
-                setCurrentView('memory-match');
-              } else {
-                setActiveMatchId(null);
-                setMatchInviteToken(null);
-                setHouseShareId(null);
-                setCurrentView('memory-house');
-              }
+              if (!navigateTo(target === 'match' ? 'memory-match' : 'memory-house')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
@@ -688,7 +699,7 @@ export default function App() {
       {['home', 'shop', 'articles', 'about'].includes(currentView) && (
         <Footer 
           onSelectView={(view) => {
-            setCurrentView(view);
+            if (!navigateTo(view)) return;
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           onOpenPrivacy={() => setIsPrivacyOpen(true)}
@@ -732,7 +743,7 @@ export default function App() {
                 {authSession.isAdmin ? (
                   <button
                     onClick={() => {
-                      setCurrentView('admin');
+                      if (!navigateTo('admin')) return;
                       setIsSessionInfoOpen(false);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
@@ -757,6 +768,7 @@ export default function App() {
                 {currentUser && (
                   <button
                     onClick={async () => {
+                      if (!confirmSignOut()) return;
                       await signOutUser();
                       await refreshSessionRole();
                       setIsSessionInfoOpen(false);
@@ -791,8 +803,8 @@ export default function App() {
       {currentView !== 'memory' && (currentView !== 'home' || hasScrolledPastHero) && (
         <button
           onClick={() => {
+            if (!navigateTo('memory')) return;
             setCurrentTag('');
-            setCurrentView('memory');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           className="fixed bottom-6 right-6 z-40 px-4 py-2.5 rounded-full bg-white text-dark-950 font-bold text-xs shadow-silver-glow hover:scale-105 transition-all duration-300 cursor-pointer"
@@ -856,20 +868,21 @@ export default function App() {
         onClose={() => setIsCheckoutOpen(false)}
         cartItems={cartItems}
         onOrderComplete={handleClearCart}
-        onTrack={order=>{setTrackingRequest({id:order.id,token:order.lookupToken});setIsCheckoutOpen(false);setIsCartOpen(false);setCurrentView("shop");window.scrollTo({top:0});}}
+        onTrack={order=>{if (!navigateTo('shop')) return;setTrackingRequest({id:order.id,token:order.lookupToken});setIsCheckoutOpen(false);setIsCartOpen(false);window.scrollTo({top:0});}}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenPrivacy={() => setIsPrivacyOpen(true)}
       />}
 
       {/* Auth Modal */}
       {isAuthOpen && <AuthModal
+        onBeforeSignOut={confirmSignOut}
         recovery={recovery}
         currentUser={currentUser}
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onNavigateToMemory={() => {
+          if (!navigateTo('memory')) return;
           setIsAuthOpen(false);
-          setCurrentView('memory');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
       />}

@@ -25,6 +25,7 @@ export default function AuthDialog({
   isOpen, 
   onClose, 
   onLoginSuccess, 
+  onBeforeSignOut,
   currentUser, 
   recovery = false, 
   initialMode = 'login',
@@ -194,6 +195,7 @@ export default function AuthDialog({
   // Handle Sign Out
   const handleSignOut = async () => {
     try {
+      if (onBeforeSignOut && !onBeforeSignOut()) return;
       const { error: signErr } = await supabase.auth.signOut();
       if (signErr) throw signErr;
       onLoginSuccess?.(null);

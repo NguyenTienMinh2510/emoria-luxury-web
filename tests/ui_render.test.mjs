@@ -13,6 +13,50 @@ async function compile(file,name){
  await build({entryPoints:[file],outfile,bundle:true,platform:'node',format:'esm',packages:'external',define:{'import.meta.env':'{}'},logLevel:'silent'});
  return import(pathToFileURL(outfile).href+'?'+Date.now());
 }
+const {canNavigateView,readStudioRoute}=await compile('src/App.jsx','app-navigation');
+{
+ const appCode=fs.readFileSync('src/App.jsx','utf8');
+ assert.equal((appCode.match(/setMatchRouteVersion\(/g)||[]).length,1,'Only route parsing may remount a Match; autosave changes keep the mounted editor');
+ assert.ok(appCode.slice(appCode.indexOf('const readRoute ='),appCode.indexOf('const handleHashChange')).includes('setMatchRouteVersion'), 'The Match remount counter belongs to confirmed route parsing');
+ let prompts=0;
+ const cancel=()=>{prompts++;return false;};
+ assert.equal(canNavigateView('memory-house','memory-match',true,cancel),false,'Cancelling preserves the mounted dirty studio');
+ assert.equal(prompts,1);
+ assert.equal(canNavigateView('memory-match','memory-match',true,cancel),true,'Selecting the current studio does not prompt');
+ assert.equal(canNavigateView('memory-match','shop',false,cancel),true,'Saved drafts navigate without a prompt');
+ assert.equal(prompts,1);
+ assert.equal(canNavigateView('memory-match','shop',true,()=>true),true,'Confirmed navigation is allowed');
+ const before=readStudioRoute('?view=memory-match&match=round-a&invite=invite-a&tag=tag-a');
+ for(const next of ['?view=memory-match&match=round-b&invite=invite-b&tag=tag-a','?view=memory-match&match=round-a&invite=invite-a&tag=tag-b']) {
+  const sameContext=JSON.stringify(before)===JSON.stringify(readStudioRoute(next));
+  assert.equal(canNavigateView('memory-match','memory-match',true,cancel,sameContext),false,'Back navigation to a different round, invite or tag confirms before replacing unsaved data');
+ }
+ const oldHouse=readStudioRoute('?view=memory-house&tag=tag-a');
+ const newHouse=readStudioRoute('?view=memory-house&tag=tag-b');
+ assert.equal(canNavigateView('memory-house','memory-house',true,cancel,JSON.stringify(oldHouse)===JSON.stringify(newHouse)),false,'Another House tag is a different editing context');
+ assert.equal(canNavigateView('memory-match','memory-match',true,cancel,JSON.stringify(before)===JSON.stringify(readStudioRoute('?tag=tag-a&invite=invite-a&match=round-a&view=memory-match'))),true,'Reordered URL parameters retain the same page without a prompt');
+ assert.deepEqual(readStudioRoute('?view=memory-match&match=round-a&invite=invite-a&tag=tag-a'),{view:'memory-match',matchId:'round-a',inviteToken:'invite-a',shareId:null,tag:'tag-a'});
+ assert.deepEqual(readStudioRoute('?view=memory-match'),{view:'memory-match',matchId:null,inviteToken:null,shareId:null,tag:''},'A fresh Match route clears the previous round, invite and tag');
+ assert.deepEqual(readStudioRoute('?share=public-a'),{view:'memory-house',matchId:null,inviteToken:null,shareId:'public-a',tag:''},'A public House route carries no stale Match access or tag');
+ assert.deepEqual(readStudioRoute('?view=shop'),{view:null,matchId:null,inviteToken:null,shareId:null,tag:''},'Leaving Studio routes clears all Studio-specific access');
+ console.log('PASS App navigation: cancelled/same/saved/confirmed transitions and fresh/public Studio routes.');
+}
+{
+ const authCode=fs.readFileSync('src/components/AuthDialog.jsx','utf8');
+ const signOutBody=authCode.match(/const handleSignOut = async \(\) => \{([\s\S]*?)\n  \};/)[1];
+ const runSignOut=new Function('supabase','onBeforeSignOut','onLoginSuccess','onClose','setError',`return (async () => {${signOutBody}})();`);
+ const calls=[];
+ const fakeAuth={auth:{signOut:async()=>{calls.push('signOut');return {error:null};}}};
+ const updated=()=>calls.push('updated'),closed=()=>calls.push('closed'),error=message=>calls.push(message);
+ await runSignOut(fakeAuth,()=>false,updated,closed,error);
+ assert.deepEqual(calls,[],'Cancelling modal signout keeps the session, modal and dirty Studio intact');
+ await runSignOut(fakeAuth,()=>true,updated,closed,error);
+ assert.deepEqual(calls,['signOut','updated','closed'],'Confirmed signout keeps the existing Supabase and callback behavior');
+ calls.length=0;
+ await runSignOut(fakeAuth,undefined,updated,closed,error);
+ assert.deepEqual(calls,['signOut','updated','closed'],'Standalone AuthDialog signout remains supported without a guard');
+ console.log('PASS AuthDialog: cancelled signout has no effects; confirmed and standalone signout preserve callbacks.');
+}
 const {default:Hero}=await compile('src/components/HeroSection.jsx','hero');
 const guest=render(Hero,{onOpenAuth:()=>{}}),signed=render(Hero,{currentUser:'Người thử nghiệm',onOpenAuth:()=>{}});
 assert.ok(guest.includes('>Đăng nhập<')&&guest.includes('>Đăng ký<'));
@@ -117,15 +161,29 @@ assert.ok(matchHtml.includes('Cảm xúc &amp; Kết nối') && matchHtml.includ
 assert.ok(render(MemoryMatchStudio,{}).includes('Đăng nhập để chơi'));
 assert.ok(!matchHtml.includes('Nhập nội dung câu hỏi') && !matchHtml.includes('Thêm câu hỏi'), 'Old authoring form does not override topic packs');
 assert.ok(matchHtml.includes('Trang chủ'), 'Match Studio header có nút Trang chủ');
+assert.match(matchHtml, /<header[^>]*class="[^"]*md:flex-wrap[^\"]*"/, 'Match toolbar can wrap when the three action groups do not fit');
 assert.ok(matchHtml.includes('Quay lại kỷ vật'), 'Match Studio header có nút Quay lại kỷ vật');
-assert.ok(matchHtml.includes('Chuyển sang House Studio'), 'Match Studio header có nút Chuyển sang House Studio');
+assert.match(matchHtml, /<button[^>]*title="Chuyển sang Memory House Studio[^\"]*"[^>]*>[\s\S]*?<span>House Studio<\/span><\/button>/, 'Match header keeps the House navigation action');
+assert.ok(matchHtml.includes('role="group" aria-label="Chuyển đổi Studio"'), 'Match switcher exposes its navigation group');
+const matchCurrentButtons=[...matchHtml.matchAll(/<button\b[^>]*aria-current="page"[^>]*>(.*?)<\/button>/gs)];
+assert.equal(matchCurrentButtons.length, 1, 'Exactly one Match studio navigation button is current');
+assert.ok(matchCurrentButtons[0][1].includes('<span>Match Studio</span>'), 'Match is the selected studio destination');
+assert.ok(!matchHtml.includes('role="tab"') && !matchHtml.includes('role="tablist"'), 'Studio navigation does not impersonate a tab panel');
+assert.ok(matchHtml.includes('Kích Hoạt &amp; Lấy Link Mời'), 'The revised activation label remains available');
 
 const {default:MemoryHouseStudio}=await compile('src/components/MemoryHouseStudio.jsx','memory-house-studio');
 const houseHtml=render(MemoryHouseStudio,{tagUid:'emo-heart',currentUser:'user-owner-a'});
 assert.ok(houseHtml.includes('Ngôi Nhà Kỷ Niệm'));
-assert.ok(houseHtml.includes('Quay lại kỷ vật'), 'House keeps a single return action');
+assert.match(houseHtml, /<header[^>]*class="[^"]*md:flex-wrap[^\"]*"/, 'House toolbar can wrap on narrower screens');
+assert.match(houseHtml, /<button[^>]*aria-label="Quay lại kỷ vật"[^>]*>[\s\S]*?<span>Kỷ vật<\/span><\/button>/, 'House return button keeps its accessible label and compact visible text');
 assert.equal((houseHtml.match(/aria-label="Chọn phòng trong nhà 3D"/g) || []).length, 1, 'House has one room selector');
-assert.ok(!houseHtml.includes('LIVE PREVIEW') && !houseHtml.includes('Chuyển sang Match Studio'), 'House removes duplicate preview and unrelated navigation');
+assert.ok(!houseHtml.includes('LIVE PREVIEW'), 'House removes duplicate preview');
+assert.match(houseHtml, /<button[^>]*title="Chuyển sang Couple Match Studio"[^>]*>[\s\S]*?<span>Match Studio<\/span><\/button>/, 'House header includes the requested Match navigation action');
+assert.ok(houseHtml.includes('role="group" aria-label="Chuyển đổi Studio"'), 'House switcher exposes its navigation group');
+const houseCurrentButtons=[...houseHtml.matchAll(/<button\b[^>]*aria-current="page"[^>]*>(.*?)<\/button>/gs)];
+assert.equal(houseCurrentButtons.length, 1, 'Exactly one House studio navigation button is current');
+assert.ok(houseCurrentButtons[0][1].includes('<span>House Studio</span>'), 'House is the selected studio destination');
+assert.ok(!houseHtml.includes('role="tab"') && !houseHtml.includes('role="tablist"'), 'House studio navigation uses native buttons');
 assert.ok(houseHtml.includes('Thêm ảnh kỷ niệm') && houseHtml.includes('Xuất Bản Ngôi Nhà'), 'Core photo and publish actions remain available');
 assert.ok(houseHtml.includes('Tên ngôi nhà &amp; tông màu') && houseHtml.includes('Lời nhắn của khách &amp; quyền riêng tư'), 'Optional settings remain accessible');
 assert.ok(!/<details[^>]*\bopen(?:[ =>])/.test(houseHtml), 'Optional settings are collapsed initially');

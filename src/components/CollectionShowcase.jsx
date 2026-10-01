@@ -68,7 +68,7 @@ export default function CollectionShowcase({ onSelectProduct, onOpenNfcDemo }) {
           <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full">
             <a
               href="#products"
-              className="cta-luxury-gold !h-12 !px-8 text-xs sm:text-sm !w-full sm:!w-auto flex items-center justify-center gap-2.5 shadow-[0_0_30px_rgba(250,204,21,0.6)]"
+              className="cta-luxury-gold !h-12 !px-8 text-xs sm:text-sm !w-full sm:!w-auto flex items-center justify-center gap-2.5"
             >
               <span>{isEn ? "Xem Sản Phẩm · View Collection" : "Xem Sản Phẩm"}</span>
               <ArrowUpRight className="w-4 h-4" />

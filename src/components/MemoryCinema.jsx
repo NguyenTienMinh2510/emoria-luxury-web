@@ -128,7 +128,7 @@ export default function MemoryCinema({url,title,recipient,onComplete,onRefresh})
         <button
           type="button"
           onClick={()=>{ref.current?.pause();onComplete();}}
-          className="cta-luxury-gold !py-2.5 !px-6 text-xs flex items-center gap-2 shadow-[0_0_20px_rgba(250,204,21,0.4)] cursor-pointer"
+          className="cta-luxury-gold !py-2.5 !px-6 text-xs flex items-center gap-2 cursor-pointer"
         >
           <span>{t("Xem trọn vẹn thư tay & lời chúc","Read full letter & wishes")}</span>
           <ArrowRight className="w-3.5 h-3.5" />

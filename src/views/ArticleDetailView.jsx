@@ -12,67 +12,6 @@ import MarkdownContent from '../components/MarkdownContent';
 import { useLanguage, BilingualText } from '../i18n/LanguageProvider';
 import { getLuxuryArticleTranslation } from '../services/aiTranslationService';
 
-const FALLBACK_ARTICLE_DATA = {
-  'nghe-thuat-che-tac-da-quy-emoria': {
-    id: 'art-fallback-1',
-    slug: 'nghe-thuat-che-tac-da-quy-emoria',
-    title: 'Nghệ Thuật Chế Tác Đá Quý & Kim Hoàn EMORIA',
-    excerpt: 'Hành trình kỳ công kết hợp giữa bí truyền đẽo gọt đá quý thiên nhiên và vi mạch công nghệ NFC trường tồn.',
-    content: `# Nghệ Thuật Chế Tác Đá Quý & Kim Hoàn EMORIA
-
-Mỗi tuyệt phẩm trang sức tại **EMORIA** không đơn thuần là một món trang sức, mà là một chiếc rương thiêng liêng lưu giữ tình yêu và những lời hẹn ước qua thời gian.
-
----
-
-### 1. Bí Truyền Chế Tác Kim Hoàn
-Từ việc tuyển chọn phôi Bạc S925 tinh khiết đến khai thác đá quý tự nhiên, từng viên đá đều trải qua bàn tay mài dũa chuẩn xác của các nghệ nhân bậc thầy. Hơn 48 giờ đánh bóng vi mô tạo nên khúc xạ ánh sáng lộng lẫy.
-
-### 2. Vi Mạch NFC Tàng Hình
-Ẩn sâu dưới lòng viên đá là vi mạch ăng-ten **NFC chuẩn chống nước IP68**, được cách ly hoàn toàn khỏi tác động của sóng điện từ, phản hồi tức thì với một chạm nhẹ từ điện thoại thông minh.
-
-### 3. Không Gian Kỷ Niệm Bảo Mật
-Khi người nhận chạm trang sức vào điện thoại, chiếc rương **Memory Space** sẽ bừng sáng:
-- Bức thư tay niêm phong bằng mã PIN riêng tư.
-- Video kỷ niệm độ nét cao và giai điệu tuyển chọn.
-- Kiến trúc Zero-Leak bảo đảm chỉ người giữ khóa mới có thể mở.
-`,
-    cover_image: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=1200&q=80',
-    category: 'Chế tác & Nghệ thuật',
-    author_name: 'EMORIA Master Atelier',
-    published_at: '2026-03-15T00:00:00Z',
-    likes_count: 128,
-    view_count: 1420,
-    allow_comments: true
-  },
-  'bi-mat-cong-nghe-nfc-2026': {
-    id: 'art-fallback-2',
-    slug: 'bi-mat-cong-nghe-nfc-2026',
-    title: 'Bí Mật Công Nghệ NFC Thế Hệ Mới Trong Trang Sức',
-    excerpt: 'Giải mã giải pháp truyền dẫn sóng qua kim loại bạc S925 chuẩn IP68 mà không cần pin sạc.',
-    content: `# Bí Mật Công Nghệ NFC Thế Hệ Mới Trong Trang Sức
-
-Làm thế nào để kim loại quý và sóng vô tuyến NFC có thể hòa quyện hoàn hảo?
-
----
-
-### 1. Thách Thức Sóng Điện Từ
-Kim loại tự nhiên cản trở sóng RF. Đội ngũ kỹ sư EMORIA đã nghiên cứu lớp cách ly điện môi vi mô giúp dẫn truyền trường điện từ quanh vành bạc S925 mượt mà đến đầu đọc của điện thoại.
-
-### 2. Bền Bỉ Trọn Đời
-- Đúc kín chống nước và bụi hoàn toàn theo chuẩn quốc tế IP68.
-- Hoạt động không cần pin: năng lượng được cấp cảm ứng tức thì khi chạm điện thoại.
-- Tuổi thọ vi mạch lưu giữ ký ức lên đến hơn 50 năm.
-`,
-    cover_image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=1200&q=80',
-    category: 'Công nghệ & NFC',
-    author_name: 'EMORIA Tech Lab',
-    published_at: '2026-03-10T00:00:00Z',
-    likes_count: 95,
-    view_count: 980,
-    allow_comments: true
-  }
-};
-
 export default function ArticleDetailView({ 
   slug, 
   onBack, 
@@ -87,6 +26,8 @@ export default function ArticleDetailView({
   const [article, setArticle] = useState(null);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const [likeCount, setLikeCount] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -105,37 +46,32 @@ export default function ArticleDetailView({
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+    setArticle(null);setComments([]);setError('');
     const fetchDetail = async () => {
       setLoading(true);
-      setArticle(null);setComments([]);
       try {
-        const res = await getArticleDetail(slug);
+        const res = await getArticleDetail(slug, {signal: controller.signal});
         if (active && res.success && res.article) {
           setArticle(res.article);
           setComments(res.comments || []);
           setLikeCount(res.article.likes_count || 0);
           setIsLiked(Boolean(res.article.is_liked));
           setIsBookmarked(Boolean(res.article.is_bookmarked));
-        } else if (active && (FALLBACK_ARTICLE_DATA[slug] || slug)) {
-          const fallback = FALLBACK_ARTICLE_DATA[slug] || FALLBACK_ARTICLE_DATA['nghe-thuat-che-tac-da-quy-emoria'];
-          setArticle(fallback);
-          setLikeCount(fallback.likes_count || 0);
+        } else if (active) {
+          setError(res.message || 'Không thể tải bài viết. Vui lòng thử lại.');
         }
       } catch (err) {
-        console.error('Lỗi tải chi tiết bài viết:', err);
-        if (active && (FALLBACK_ARTICLE_DATA[slug] || slug)) {
-          const fallback = FALLBACK_ARTICLE_DATA[slug] || FALLBACK_ARTICLE_DATA['nghe-thuat-che-tac-da-quy-emoria'];
-          setArticle(fallback);
-          setLikeCount(fallback.likes_count || 0);
-        }
+        if (active) setError(err.message || 'Không thể tải bài viết. Vui lòng thử lại.');
       } finally {
         if (active) setLoading(false);
       }
     };
 
     if (slug) fetchDetail();
-    return () => { active = false; };
-  }, [slug,currentUser]);
+    else {setLoading(false);setError('Không có đường dẫn bài viết.');}
+    return () => { active = false; controller.abort(); };
+  }, [slug,currentUser?.id,retryCount]);
 
   useEffect(() => {
     if (!article || window.location.hash !== '#comments') return;
@@ -241,8 +177,9 @@ export default function ArticleDetailView({
     return (
       <div className="min-h-screen bg-dark-950 text-slate-100 pt-28 pb-20 px-4 text-center">
         <AlertCircle className="w-12 h-12 text-rose-400 mx-auto mb-4" />
-        <h2 className="font-serif text-2xl text-white mb-2">Không tìm thấy bài viết</h2>
-        <p className="text-slate-400 mb-6">Bài viết có thể đã bị gỡ bỏ hoặc tạm thời không khả dụng.</p>
+        <h2 className="font-serif text-2xl text-white mb-2">Không thể mở bài viết</h2>
+        <p role="alert" className="text-slate-400 mb-6">{error || 'Bài viết có thể đã bị gỡ bỏ hoặc tạm thời không khả dụng.'}</p>
+        {slug && <button type="button" onClick={() => setRetryCount(count => count + 1)} className="store-button mr-3">Thử lại</button>}
         <button
           onClick={onBack}
           className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-medium text-xs tracking-wider uppercase transition-colors"

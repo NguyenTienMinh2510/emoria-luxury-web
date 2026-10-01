@@ -546,7 +546,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                   onClick={() => {
                     if (onOpenAuth) onOpenAuth();
                   }}
-                  className="cta-luxury-gold !w-full !h-13 !text-sm !tracking-wider shadow-[0_0_30px_rgba(250,204,21,0.45)]"
+                  className="cta-luxury-gold !w-full !h-12 !text-xs !tracking-[0.14em]"
                 >
                   <span>Đăng Nhập Để Đặt Hàng · {formattedTotal}</span>
                   <ArrowRight className="w-4 h-4" />
@@ -555,7 +555,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onOrderCompl
                 <button
                   type="submit"
                   disabled={isSubmitting || !settings?.sales_enabled || !cartItems.length || (paymentMethod === 'cod' ? !settings?.cod_enabled : !settings?.transfer_enabled)}
-                  className="cta-luxury-gold !w-full !h-13 !text-sm !tracking-wider shadow-[0_0_35px_rgba(250,204,21,0.65)] disabled:opacity-50"
+                  className="cta-luxury-gold !w-full !h-12 !text-xs !tracking-[0.14em] disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <div className="w-5 h-5 border-2 border-dark-950 border-t-transparent rounded-full animate-spin" />

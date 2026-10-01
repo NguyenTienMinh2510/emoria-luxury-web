@@ -247,14 +247,14 @@ try {
     await owner.goto(`${origin}/?user=${accounts[0].id}&match=${rounds[1]}`);
     await owner.getByRole('button',{name:'Tạo lượt chơi mới'}).click();
     await owner.getByRole('button',{name:/Tình huống hóc búa/}).click();
-    await owner.getByRole('button',{name:'Kích Hoạt & Lấy Link Gửi Bạn Chơi'}).click();
+    await owner.getByRole('button',{name:'Kích Hoạt & Lấy Link Mời'}).click();
     await owner.getByText('Hãy nhập tên của cả hai người để câu hỏi luôn nói rõ đang hỏi về ai.').waitFor();
     await owner.getByLabel('Tên người tạo lượt chơi',{exact:true}).fill('Tên cũ');
     await owner.getByLabel('Tên người được mời',{exact:true}).fill('An');
     await owner.getByLabel('Tên người tạo lượt chơi',{exact:true}).fill('Minh');
     assert.ok((await owner.locator('article h3').allTextContents()).every(t=>/Minh|An/.test(t)&&!t.includes('{')));
     const begun=owner.waitForResponse(r=>r.url().endsWith('/begin')&&r.request().method()==='POST');
-    await owner.getByRole('button',{name:'Kích Hoạt & Lấy Link Gửi Bạn Chơi'}).click();
+    await owner.getByRole('button',{name:'Kích Hoạt & Lấy Link Mời'}).click();
     const active=await (await begun).json();assert.ok(active.invite_token);
     await owner.getByText('Chưa ghi nhận người cùng chơi mở link.').waitFor();
     await partner.goto(`${origin}/?user=${accounts[1].id}&match=${active.match_id}&invite=${active.invite_token}`);
@@ -284,7 +284,7 @@ try {
     await owner.getByLabel('Tên người tạo lượt chơi',{exact:true}).fill('Minh');
     await owner.getByLabel('Tên người được mời',{exact:true}).fill('Bình');
     const again=owner.waitForResponse(r=>r.url().endsWith('/begin')&&r.request().method()==='POST');
-    await owner.getByRole('button',{name:'Kích Hoạt & Lấy Link Gửi Bạn Chơi'}).click();
+    await owner.getByRole('button',{name:'Kích Hoạt & Lấy Link Mời'}).click();
     assert.ok((await (await again).json()).invite_token);
     assert.deepEqual(errors,[]);
     console.log('PASS Chromium mobile: completed → replay → choose topic → create link twice; two players see opened/progress/result without reloading.');

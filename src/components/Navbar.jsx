@@ -150,7 +150,19 @@ export default function Navbar({
             )}
           </div>
 
-          <button type="button" onClick={() => handleSwitchView('memory-match')} aria-current={currentView === 'memory-match' ? 'page' : undefined} className="hidden xl:block px-3 py-2 rounded-full border border-rose-400/40 text-rose-200 text-xs font-semibold hover:bg-rose-500/15">Mismatch</button>
+          <button
+            type="button"
+            onClick={() => handleSwitchView('memory-match')}
+            aria-current={currentView === 'memory-match' ? 'page' : undefined}
+            className={`hidden xl:inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 cursor-pointer ${
+              currentView === 'memory-match'
+                ? 'bg-white text-dark-950 shadow-silver-glow'
+                : 'text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10'
+            }`}
+          >
+            <Sparkles className="w-3 h-3 text-amber-300/80" />
+            <span>Match Studio</span>
+          </button>
 
           {/* Right Action Bar: Search, Cart, User Profile */}
           <div className="flex items-center gap-2 sm:gap-3">
@@ -300,8 +312,35 @@ export default function Navbar({
                 </button>
               </div>
 
-              <button type="button" onClick={() => handleSwitchView('memory-match')} aria-current={currentView === 'memory-match' ? 'page' : undefined} className="w-full min-h-11 rounded-xl border border-rose-400/40 text-rose-200 font-semibold">Mismatch · {t('Chơi cùng người quen','Play with someone you know')}</button>
-              {isAdmin&&<button onClick={()=>handleSwitchView('admin')} className="w-full min-h-11 rounded-xl bg-white text-dark-950 font-semibold">{t("Trang quản trị","Admin dashboard")}</button>}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleSwitchView('memory-match');
+                }}
+                aria-current={currentView === 'memory-match' ? 'page' : undefined}
+                className={`w-full min-h-[44px] px-4 rounded-xl text-xs font-semibold tracking-wider uppercase flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  currentView === 'memory-match'
+                    ? 'bg-white text-dark-950 shadow-silver-glow'
+                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 border border-white/15'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>Match Studio · {t('Trắc nghiệm đôi','Couple Quiz')}</span>
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleSwitchView('admin');
+                  }}
+                  className="w-full min-h-[44px] rounded-xl bg-white text-dark-950 text-xs font-semibold tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer shadow-silver-glow"
+                >
+                  <Shield className="w-3.5 h-3.5 text-dark-950" />
+                  <span>{t("Trang quản trị","Admin dashboard")}</span>
+                </button>
+              )}
               {/* Mobile Search */}
               <form onSubmit={handleSearchSubmit} className="relative mb-2">
                 <input

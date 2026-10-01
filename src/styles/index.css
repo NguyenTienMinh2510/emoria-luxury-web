@@ -163,71 +163,90 @@
 @layer components {
  .store-input { @apply block w-full mt-2 rounded-xl bg-black/40 border border-white/20 px-3 py-3 text-sm text-white focus:outline-none focus:border-white/60; }
  .store-label { @apply block text-sm text-slate-300; }
- .store-button { @apply px-5 py-3 rounded-xl bg-white text-slate-950 font-semibold text-sm hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed; }
+  .store-button {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] rounded-xl bg-white text-slate-950 font-medium text-sm tracking-wide transition-all duration-200 hover:bg-slate-200 hover:shadow-sm active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950 disabled:opacity-40 disabled:cursor-not-allowed select-none;
+  }
 
-  /* High-Impact Dark Luxury CTA Buttons - Extreme Contrast & Radiance */
+  /* Original silver and gold CTA palette. */
   .cta-luxury-primary {
-    @apply relative inline-flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 rounded-full font-sans font-extrabold text-xs sm:text-sm uppercase tracking-[0.18em] text-black transition-all duration-300 cursor-pointer overflow-hidden select-none;
+    @apply relative inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3 min-h-[44px] rounded-xl font-sans font-semibold text-xs sm:text-sm uppercase tracking-[0.12em] text-black transition-all duration-200 cursor-pointer overflow-hidden select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950 disabled:opacity-40 disabled:cursor-not-allowed;
     background: linear-gradient(135deg, #ffffff 0%, #f8fafc 40%, #e2e8f0 75%, #cbd5e1 100%);
     box-shadow: 0 0 30px rgba(255, 255, 255, 0.75), 0 0 65px rgba(255, 255, 255, 0.3), 0 4px 18px rgba(0, 0, 0, 0.85), inset 0 1px 2px #ffffff;
     border: 1.5px solid #ffffff;
   }
-  .cta-luxury-primary:hover {
-    transform: translateY(-2px) scale(1.03);
+  .cta-luxury-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
     background: linear-gradient(135deg, #ffffff 0%, #ffffff 60%, #f1f5f9 100%);
     box-shadow: 0 0 45px rgba(255, 255, 255, 0.95), 0 0 80px rgba(255, 255, 255, 0.45), 0 6px 24px rgba(0, 0, 0, 0.9);
   }
-  .cta-luxury-primary:active {
-    transform: translateY(0) scale(0.98);
+  .cta-luxury-primary:active:not(:disabled) {
+    transform: translateY(0);
   }
 
   .cta-luxury-gold {
-    @apply relative inline-flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 rounded-full font-sans font-extrabold text-xs sm:text-sm uppercase tracking-[0.18em] text-dark-950 transition-all duration-300 cursor-pointer overflow-hidden select-none;
+    @apply relative inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3 min-h-[44px] rounded-xl font-sans font-semibold text-xs sm:text-sm uppercase tracking-[0.12em] text-dark-950 transition-all duration-200 cursor-pointer overflow-hidden select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/50 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950 disabled:opacity-40 disabled:cursor-not-allowed;
     background: linear-gradient(135deg, #fffbeb 0%, #fef08a 25%, #facc15 55%, #eab308 80%, #ca8a04 100%);
     box-shadow: 0 0 28px rgba(250, 204, 21, 0.65), 0 0 60px rgba(234, 179, 8, 0.35), 0 4px 18px rgba(0, 0, 0, 0.85), inset 0 1px 2px rgba(255, 255, 255, 0.9);
     border: 1.5px solid rgba(254, 240, 138, 0.95);
   }
-  .cta-luxury-gold:hover {
-    transform: translateY(-2px) scale(1.03);
+  .cta-luxury-gold:hover:not(:disabled) {
+    transform: translateY(-1px);
     background: linear-gradient(135deg, #ffffff 0%, #fef9c3 30%, #fde047 60%, #eab308 100%);
     box-shadow: 0 0 45px rgba(250, 204, 21, 0.9), 0 0 85px rgba(234, 179, 8, 0.5), 0 6px 24px rgba(0, 0, 0, 0.9);
   }
-  .cta-luxury-gold:active {
-    transform: translateY(0) scale(0.98);
+  .cta-luxury-gold:active:not(:disabled) {
+    transform: translateY(0);
   }
 
+  /* Compact Commerce Buy Action */
   .cta-luxury-buy {
-    @apply relative inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-sans font-extrabold text-xs uppercase tracking-[0.12em] text-dark-950 transition-all duration-300 cursor-pointer overflow-hidden select-none;
+    @apply relative inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[38px] rounded-lg font-sans font-semibold text-xs tracking-wider text-dark-950 transition-all duration-200 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/50 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950 disabled:opacity-40 disabled:cursor-not-allowed;
     background: linear-gradient(135deg, #fffbeb 0%, #fef08a 30%, #facc15 65%, #d97706 100%);
     box-shadow: 0 0 22px rgba(250, 204, 21, 0.6), 0 3px 12px rgba(0, 0, 0, 0.75), inset 0 1px 2px rgba(255, 255, 255, 0.85);
     border: 1px solid rgba(254, 240, 138, 0.9);
   }
-  .cta-luxury-buy:hover {
-    transform: translateY(-1px) scale(1.04);
-    box-shadow: 0 0 32px rgba(250, 204, 21, 0.85), 0 4px 16px rgba(0, 0, 0, 0.85);
+  .cta-luxury-buy:hover:not(:disabled) {
+    transform: translateY(-1px);
     background: linear-gradient(135deg, #ffffff 0%, #fde047 50%, #eab308 100%);
+    box-shadow: 0 0 32px rgba(250, 204, 21, 0.85), 0 4px 16px rgba(0, 0, 0, 0.85);
   }
-  .cta-luxury-buy:active {
-    transform: translateY(0) scale(0.97);
+  .cta-luxury-buy:active:not(:disabled) {
+    transform: translateY(0);
   }
 
+  /* Translucent Dark Glass Secondary CTA */
   .cta-luxury-secondary {
-    @apply relative inline-flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3 rounded-full font-sans font-bold text-xs sm:text-sm uppercase tracking-[0.18em] text-white transition-all duration-300 cursor-pointer select-none;
+    @apply relative inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3 min-h-[44px] rounded-xl font-sans font-medium text-xs sm:text-sm tracking-[0.1em] uppercase text-white transition-all duration-200 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950 disabled:opacity-40 disabled:cursor-not-allowed;
     background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1.5px solid rgba(255, 255, 255, 0.5);
     box-shadow: 0 0 22px rgba(255, 255, 255, 0.18);
   }
-  .cta-luxury-secondary:hover {
-    transform: translateY(-2px) scale(1.03);
+  .cta-luxury-secondary:hover:not(:disabled) {
+    transform: translateY(-1px);
     background: rgba(255, 255, 255, 0.22);
     border-color: #ffffff;
     color: #ffffff;
     box-shadow: 0 0 35px rgba(255, 255, 255, 0.45);
   }
-  .cta-luxury-secondary:active {
-    transform: translateY(0) scale(0.98);
+  .cta-luxury-secondary:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  /* Tertiary / Ghost Action */
+  .btn-luxury-tertiary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[38px] rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  /* Destructive Action */
+  .btn-luxury-destructive {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[38px] rounded-lg text-xs font-medium text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/40 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  /* Studio Switcher Segment */
+  .btn-studio-segment {
+    @apply inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium tracking-wide transition-all duration-200 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30;
   }
 }
 
@@ -307,4 +326,3 @@ html {
 [translate="no"] {
   -webkit-transform: translateZ(0);
 }
-

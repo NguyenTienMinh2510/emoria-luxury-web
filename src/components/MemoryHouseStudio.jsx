@@ -10,7 +10,7 @@ import {
   AlertCircle, CheckCircle2, Image as ImageIcon, X,
   Maximize2,
   Loader2, GripVertical, ChevronLeft, ChevronRight,
-  Mail, MessageSquare, Send, Flag
+  Mail, MessageSquare, Send, Flag, ShoppingBag
 } from 'lucide-react';
 import {
   renderPostcardCanvas,
@@ -116,7 +116,10 @@ export default function MemoryHouseStudio({
   shareId: initialShareId,
   onBack,
   onNavigateHome,
+  onNavigateShop,
   onNavigateMemory,
+  onSwitchStudio,
+  navigationDirtyRef,
   currentUser
 }) {
   const [canEdit, setCanEdit] = useState(Boolean(currentUser) && !initialShareId);
@@ -150,6 +153,11 @@ export default function MemoryHouseStudio({
   // Autosave & Concurrency States
   const [autosaveState, setAutosaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const isDirty = useRef(false);
+  useEffect(() => {
+    if (!navigationDirtyRef) return;
+    navigationDirtyRef.current = isDirty;
+    return () => { if (navigationDirtyRef.current === isDirty) navigationDirtyRef.current = null; };
+  }, [navigationDirtyRef]);
   const saveRevision = useRef(0);
   const saveQueue = useRef(null);
   const latestHouse = useRef(null);
@@ -698,7 +706,7 @@ export default function MemoryHouseStudio({
   };
 
   const handleBackToMemory = () => {
-    if(isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
+    if(!navigationDirtyRef&&isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
     if (onNavigateMemory) {
       onNavigateMemory(tagUid);
     } else if (onBack) {
@@ -707,6 +715,24 @@ export default function MemoryHouseStudio({
       window.history.back();
     } else if (onNavigateHome) {
       onNavigateHome();
+    }
+  };
+
+  const handleSwitchToMatch = () => {
+    if(!navigationDirtyRef&&isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
+    if (onSwitchStudio) {
+      onSwitchStudio('match');
+    } else if (typeof window !== 'undefined') {
+      window.location.href = `/?view=memory-match${tagUid ? `&tag=${encodeURIComponent(tagUid)}` : ''}`;
+    }
+  };
+
+  const handleGoHome = () => {
+    if(!navigationDirtyRef&&isDirty.current&&!window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))return;
+    if (onNavigateHome) {
+      onNavigateHome();
+    } else if (typeof window !== 'undefined') {
+      window.location.href = '/';
     }
   };
 
@@ -886,21 +912,77 @@ export default function MemoryHouseStudio({
         <p className="mt-3 text-xs text-amber-200">Vui lòng giữ trang này mở. Kết quả sẽ hiển thị khi hoàn tất.</p>
       </dialog>
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* Studio navigation and secondary export */}
-        <header className="sticky top-20 sm:top-24 z-30 bg-stone-950/95 backdrop-blur-md rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 min-w-0 border border-white/10 shadow-xl" aria-label="Điều hướng studio">
-          <button type="button" onClick={handleBackToMemory} className="text-sm text-slate-300 hover:text-white underline underline-offset-4">← Quay lại kỷ vật</button>
+        {/* Top Header Bar with Multi-Page Navigation & Studio Switcher */}
+        <header className="sticky top-20 sm:top-24 z-30 bg-stone-950/95 backdrop-blur-md rounded-2xl p-3 sm:p-3.5 flex flex-col md:flex-row md:flex-wrap md:items-center justify-between gap-3 min-w-0 border border-white/10 shadow-lg" aria-label="Điều hướng studio">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBackToMemory}
+              aria-label="Quay lại kỷ vật"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg bg-white/[0.04] hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+              title="Quay lại không gian kỷ niệm"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Kỷ vật</span>
+            </button>
 
-          <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
+            <button
+              type="button"
+              onClick={handleGoHome}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg bg-white/[0.04] hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+              title="Về Trang Chủ Emoria"
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>Trang chủ</span>
+            </button>
+
+            {onNavigateShop && (
+              <button
+                type="button"
+                onClick={() => {if(navigationDirtyRef||!isDirty.current||window.confirm('Thay đổi chưa lưu xong. Bạn vẫn muốn rời studio?'))onNavigateShop();}}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg bg-white/[0.04] hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-medium transition-all cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+                title="Xem Cửa Hàng & Bộ Sưu Tập"
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>Cửa hàng</span>
+              </button>
+            )}
+          </div>
+
+          {/* Central Segmented Studio Control */}
+          <div className="inline-flex items-center p-0.5 rounded-xl bg-black/50 border border-white/10 backdrop-blur-md self-start md:self-center" role="group" aria-label="Chuyển đổi Studio">
+            <button
+              type="button"
+              onClick={handleSwitchToMatch}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.05] text-xs font-medium tracking-wide transition-all cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30"
+              title="Chuyển sang Couple Match Studio"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-rose-300" />
+              <span>Match Studio</span>
+            </button>
+
+            <button
+              type="button"
+              aria-current="page"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white/15 text-white font-medium text-xs tracking-wide shadow-sm border border-white/20 select-none cursor-default"
+              title="Đang ở Memory House Studio (Không gian 3D)"
+            >
+              <Home className="w-3.5 h-3.5 text-amber-300" />
+              <span>House Studio</span>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             {!isPublicVisitor && activeTab === 'edit' && (
               <div className="shrink-0">
                 {autosaveState === 'saving' && (
-                  <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" />
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] text-slate-300 border border-white/10 text-[11px] font-medium">
+                    <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
                     <span>Đang lưu...</span>
                   </span>
                 )}
                 {autosaveState === 'saved' && (
-                  <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[11px] font-medium">
                     <CheckCircle2 className="w-3 h-3" />
                     <span>Đã lưu</span>
                   </span>
@@ -909,7 +991,7 @@ export default function MemoryHouseStudio({
                   <button
                     type="button"
                     onClick={() => handleSaveDraft()}
-                    className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-300 hover:text-rose-200 border border-rose-500/30 flex items-center gap-1 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-medium transition-colors cursor-pointer"
                     title="Bấm để thử lưu lại"
                   >
                     <AlertCircle className="w-3 h-3" />
@@ -920,24 +1002,33 @@ export default function MemoryHouseStudio({
             )}
 
             {isPublished && (
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shrink-0">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[11px] font-medium shrink-0">
                 <Globe className="w-3 h-3" />
                 <span>Công khai</span>
               </span>
             )}
 
-            {!isPublicVisitor && activeTab === 'preview' && <button type="button" onClick={() => setActiveTab('edit')} className="text-sm text-slate-300 underline underline-offset-4">Quay lại chỉnh sửa</button>}
+            {!isPublicVisitor && activeTab === 'preview' && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('edit')}
+                className="inline-flex items-center px-3 py-1.5 min-h-[36px] rounded-lg bg-white/[0.04] hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-300 hover:text-white transition-all cursor-pointer"
+              >
+                Quay lại chỉnh sửa
+              </button>
+            )}
 
             {(!isPublicVisitor || isPublished) && (
               <button
                 type="button"
                 onClick={openPostcardModal}
                 aria-label="Xuất Postcard"
-                className="group relative flex min-w-0 items-center justify-between gap-4 rounded-xl border border-amber-200/40 bg-gradient-to-br from-amber-100 to-amber-300 px-4 py-2 text-left text-stone-950 shadow-[0_4px_18px_rgba(251,191,36,0.14)] transition hover:-translate-y-0.5 hover:shadow-[0_6px_24px_rgba(251,191,36,0.25)]"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 min-h-[36px] rounded-lg bg-amber-400/15 hover:bg-amber-400/25 border border-amber-300/30 text-amber-200 hover:text-white text-xs font-medium transition-all cursor-pointer shadow-sm select-none"
                 title="Tạo thiệp bưu thiếp kỷ niệm để chia sẻ lên mạng xã hội"
               >
-                <span className="border-r border-dashed border-stone-700/30 pr-4"><span className="block text-[9px] uppercase tracking-[0.16em]">Gói lại một kỷ niệm</span><span className="block font-serif text-sm font-bold">Xuất Postcard</span></span>
-                <span aria-hidden="true" className="text-xl transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5">↗</span>
+                <Mail className="w-3.5 h-3.5 text-amber-300" />
+                <span>Xuất Postcard</span>
+                <span aria-hidden="true" className="text-xs text-amber-400/80">↗</span>
               </button>
             )}
           </div>

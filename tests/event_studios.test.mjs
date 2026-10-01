@@ -1509,7 +1509,12 @@ async function runTests() {
     console.log('--- Test 22: Navigation & Live Preview UI Code Structure ---');
     assert.ok(matchStudioCode.includes('Trang chủ'), 'Match Studio có nút Trang chủ');
     assert.ok(matchStudioCode.includes('Quay lại kỷ vật'), 'Match Studio có nút Quay lại kỷ vật');
-    assert.ok(matchStudioCode.includes('Chuyển sang House Studio'), 'Match Studio có nút Chuyển sang House Studio');
+    assert.ok(matchStudioCode.includes('onClick={handleSwitchToHouse}') && matchStudioCode.includes('<span>House Studio</span>'), 'Match Studio keeps the House navigation handler and visible label');
+    for (const code of [matchStudioCode, houseStudioCode]) {
+      assert.ok(code.includes('role="group" aria-label="Chuyển đổi Studio"') && code.includes('aria-current="page"'), 'Studio navigation exposes its group and current page');
+      assert.ok(!code.includes('role="tablist"') && !code.includes('role="tab"'), 'View navigation uses native buttons rather than an incomplete tab pattern');
+    }
+    assert.ok(houseStudioCode.includes('onClick={handleSwitchToMatch}') && houseStudioCode.includes('<span>Match Studio</span>'), 'House Studio keeps the requested Match navigation action');
 
     assert.ok(houseStudioCode.includes('Quay lại kỷ vật'), 'House keeps return navigation');
     assert.ok(!houseStudioCode.includes('LIVE PREVIEW'), 'Duplicate preview is removed');

@@ -168,7 +168,7 @@ export default function AiLetterMuseModal({
               type="button"
               onClick={handleGenerate}
               disabled={loading||!consent}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-500 text-dark-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(212,175,55,0.35)] disabled:opacity-50"
+              className="cta-luxury-gold !w-full !min-h-[44px] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <>

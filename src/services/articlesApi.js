@@ -2,7 +2,7 @@ import {apiRequest} from './apiClient.js';
 const id=encodeURIComponent;
 async function request(path,method='GET',body,options={}){try{return await apiRequest(path,{method,body,...options});}catch(e){return {success:false,message:e.message};}}
 export const getPublishedArticles=({category=null,search=null,limit=12,offset=0,signal}={})=>request('/articles?'+new URLSearchParams({...(category?{category}:{}),...(search?{search}:{}),limit,offset}),'GET',undefined,{signal});
-export const getArticleDetail=slug=>request('/articles/'+id(slug));
+export const getArticleDetail=(slug,{signal}={})=>request('/articles/'+id(slug),'GET',undefined,{signal});
 export const toggleArticleLike=(article,enabled)=>request('/articles/'+id(article)+'/reactions/like','PUT',{enabled});
 export const toggleArticleBookmark=(article,enabled)=>request('/articles/'+id(article)+'/reactions/bookmark','PUT',{enabled});
 export const addArticleComment=({articleId,content,parentId=null})=>request('/articles/'+id(articleId)+'/comments','POST',{content,parentId});

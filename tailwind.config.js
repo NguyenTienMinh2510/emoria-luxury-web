@@ -40,8 +40,8 @@ export default {
       },
       boxShadow: {
         'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-        'silver-glow': '0 0 25px rgba(226, 232, 240, 0.15)',
-        'silver-glow-lg': '0 0 40px rgba(226, 232, 240, 0.25)',
+        'silver-glow': '0 2px 14px rgba(226, 232, 240, 0.12), 0 0 1px rgba(255, 255, 255, 0.2)',
+        'silver-glow-lg': '0 4px 24px rgba(226, 232, 240, 0.18)',
       },
       animation: {
         'float': 'float 4s ease-in-out infinite',

@@ -366,7 +366,7 @@ export default function ProductCatalog({
                         )}
                         <button
                           onClick={(e) => handleAddToCart(product, e)}
-                          className="cta-luxury-gold !w-full !py-2.5 !text-xs !tracking-wider shadow-[0_0_20px_rgba(250,204,21,0.5)]"
+                          className="cta-luxury-gold !w-full !py-2.5 !text-xs !tracking-wider"
                         >
                           <ShoppingBag className="w-3.5 h-3.5" />
                           <span>{isEn ? 'Khám Phá & Đặt Mua · Order Now' : 'Khám Phá & Đặt Mua'}</span>

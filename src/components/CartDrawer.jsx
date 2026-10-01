@@ -153,7 +153,7 @@ export default function CartDrawer({
 
               <button
                 onClick={handleProceedToCheckout}
-                className="w-full !h-13 !text-sm !tracking-wider cta-luxury-gold shadow-[0_0_35px_rgba(250,204,21,0.65)]"
+                className="w-full !h-12 !text-xs !tracking-[0.14em] cta-luxury-gold"
               >
                 {currentUser ? (
                   <>

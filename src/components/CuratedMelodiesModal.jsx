@@ -201,7 +201,7 @@ export default function CuratedMelodiesModal({
                       className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
                         isSelected
                           ? 'bg-white/10 text-slate-300 hover:bg-white/20 border border-white/20'
-                          : 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-500 text-dark-950 hover:brightness-110 shadow-[0_0_15px_rgba(212,175,55,0.3)]'
+                          : 'bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-300 text-dark-950 hover:brightness-105 border border-amber-200/50 shadow-sm'
                       }`}
                     >
                       <Check className="w-3.5 h-3.5" />
