@@ -5,6 +5,7 @@ import {enrichHouseRoomsWithSignedUrls} from '../server/eventMedia.js';
 
 function glb(file){const b=fs.readFileSync(file);assert.equal(b.readUInt32LE(0),0x46546c67);assert.equal(b.readUInt32LE(4),2);assert.equal(b.readUInt32LE(8),b.length);return JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString());}
 const house=glb('public/memoryhouse/models/memory-house.glb'),library=glb('public/memoryhouse/models/decorations.glb');
+assert.deepEqual(DECORATIONS.map(d=>d.id).sort(),library.nodes.filter(n=>n.extras?.assetId).map(n=>n.extras.assetId).sort(),'Catalog exactly matches the shipped 3D models');
 for(const id of HOUSE_ROOM_IDS){
   assert.ok(house.nodes.some(n=>n.extras?.roomId===id&&n.name==='room_'+id));
   for(const slot of ['left','table','right'])assert.equal(house.nodes.filter(n=>n.extras?.roomId===id&&n.extras?.slot===slot).length,1);

@@ -6,7 +6,7 @@ import {
   addDecorationInstance,
   updateDecorationInstance,
   removeDecorationInstance,
-  generateInstanceId, houseLighting, withHouseLighting
+  generateInstanceId, getRoomBoundingBox, houseLighting, withHouseLighting
 } from '../services/house3d.js';
 import { createMusicBoxPlayer, MUSIC_TRACKS } from '../services/musicBoxPlayer.js';
 import MemoryHouse2D from './MemoryHouse2D.jsx';
@@ -17,16 +17,23 @@ export const STYLE_PACKAGES = [
   {
     id: 'first_date',
     name: 'Buổi hẹn đầu',
-    desc: 'Bình tulip, cốc đôi & lịch hẹn hò',
+    desc: 'Bình hoa, cốc toast & thảm hoa cúc',
     lighting: 'sunset',
-    slots: { left: 'vase', table: 'mugs', right: 'calendar' }
+    slots: { left: 'vase', table: 'mugs', right: 'daisy-rug' }
   },
   {
     id: 'cozy_home',
-    name: 'Tổ ấm bình yên',
-    desc: 'Mèo ngủ ngoan, cây xanh & đèn ấm áp',
+    name: 'Tổ ấm chữa lành',
+    desc: 'Thỏ tai cụp, đèn mây & gấu áo len',
     lighting: 'day',
-    slots: { left: 'cat', table: 'plant', right: 'lamp' }
+    slots: { left: 'rabbit', table: 'cloud-lamp', right: 'teddy' }
+  },
+  {
+    id: 'sweet_melody',
+    name: 'Giai điệu kỷ niệm',
+    desc: 'Thảm hoa cúc, máy đĩa nhạc & nến hũ',
+    lighting: 'sunset',
+    slots: { left: 'daisy-rug', table: 'turntable', right: 'honey-candle' }
   },
   {
     id: 'cherished_love',
@@ -37,7 +44,7 @@ export const STYLE_PACKAGES = [
   },
   {
     id: 'travel_memories',
-    name: 'Kỷ niệm chuyến đi',
+    name: 'Chuyến đi đáng nhớ',
     desc: 'Dây ảnh, máy ảnh lấy liền & album chuyến đi',
     lighting: 'day',
     slots: { left: 'bunting', table: 'camera', right: 'album' }
@@ -518,10 +525,14 @@ export default function MemoryHouse3D({
     cancelPlacement();
     const existingDecor = roomDecorations(room);
     const added = [];
-    for (const itemId of Object.values(pkg.slots)) {
-      const hit = engine.current?.findPlacement(room.id, itemId, { extra: added });
+    const bounds = getRoomBoundingBox(room.id);
+    const offsets = [[-.24, -.30, -12], [.13, .07, 8], [.30, .26, -18]];
+    for (const [index, itemId] of Object.values(pkg.slots).entries()) {
+      const [dx, dz, rotation] = offsets[index];
+      const position = [bounds.centerX + dx * bounds.width, bounds.floorY + .6, dz * bounds.depth];
+      const hit = engine.current?.findPlacement(room.id, itemId, { extra: added, position, rotation });
       if (!hit) { setArrangeNotice('Phòng chưa đủ chỗ cho bộ này. Hãy gỡ bớt đồ trước.'); return; }
-      added.push({ id: generateInstanceId(itemId), item: itemId, position: hit.position, surface: hit.surface, rotation: 0, scale: hit.scale, ...(hit.parentId ? { parent_id: hit.parentId } : {}), photos: [], text: '' });
+      added.push({ id: generateInstanceId(itemId), item: itemId, position: hit.position, surface: hit.surface, rotation, scale: hit.scale, ...(hit.parentId ? { parent_id: hit.parentId } : {}), photos: [], text: '' });
     }
     const nextDecor = [...existingDecor, ...added];
     const updatedRoom = {
@@ -1227,7 +1238,7 @@ export default function MemoryHouse3D({
             <summary className="cursor-pointer text-sm text-stone-300">Bài trí nhanh (tùy chọn)</summary>
             <p className="mt-3 text-xs text-stone-400">Mẫu chỉ là gợi ý để trang trí nhanh. Bạn có thể tiếp tục thêm, xóa, di chuyển đồ trong mẫu và tự gắn hoặc đổi ảnh của mình. Đồ và ảnh đang có được giữ nguyên. Có thể hoàn tác.</p>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {STYLE_PACKAGES.filter(pkg => !pkg.isPendingAsset).map(pkg => <button key={pkg.id} type="button" disabled={status !== 'ready' || view !== '3d'} onClick={() => applyStylePackage(pkg)} className="rounded-xl border border-white/15 bg-white/5 p-3 text-left disabled:opacity-40 hover:border-amber-300/50"><span className="block text-xs font-bold">{pkg.name}</span><span className="block mt-1 text-xs text-stone-400">{pkg.desc}</span></button>)}
+              {STYLE_PACKAGES.map(pkg => <button key={pkg.id} type="button" disabled={status !== 'ready' || view !== '3d'} onClick={() => applyStylePackage(pkg)} className="rounded-xl border border-white/15 bg-white/5 p-3 text-left disabled:opacity-40 hover:border-amber-300/50"><span className="block text-xs font-bold">{pkg.name}</span><span className="block mt-1 text-xs text-stone-400">{pkg.desc}</span></button>)}
             </div>
             {(room.memories?.length || 0) > 0 && <button type="button" onClick={autoArrangePhotos} className={`${button} mt-3`}>Tự gắn ảnh vào đồ trang trí</button>}
           </details>

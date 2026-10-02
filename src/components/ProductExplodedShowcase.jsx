@@ -239,7 +239,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
     <section
       id="product-exploded-showcase"
       ref={containerRef}
-      className="relative min-h-[100svh] md:h-[100dvh] md:min-h-[650px] w-full bg-black text-white selection:bg-silver/20 select-none overflow-hidden flex flex-col justify-between items-center"
+      className="relative min-h-[100svh] md:h-[100dvh] md:min-h-[600px] w-full bg-black text-white selection:bg-silver/20 select-none overflow-hidden flex flex-col justify-between items-center"
     >
       {/* LUXURY ATELIER AMBIENT LIGHTING & DIAMOND PATTERN TEXTURE */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(255,255,255,0.06),transparent_75%)] pointer-events-none z-0" />
@@ -360,13 +360,13 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
           aria-hidden={visibleLayers === 0}
           className="hidden md:block absolute z-20 inset-0 pointer-events-none">
           {[0, 2].map(start => (
-            <div key={start} className={`contents md:absolute md:top-1/2 md:-translate-y-1/2 md:flex md:flex-col md:gap-2 md:w-[27%] md:max-w-[290px] ${start === 0 ? 'md:left-3 lg:left-8' : 'md:right-3 lg:right-8'}`}>
+            <div key={start} className={`contents md:absolute md:top-1/2 md:-translate-y-1/2 md:flex md:flex-col md:gap-1.5 md:w-[27%] md:max-w-[290px] ${start === 0 ? 'md:left-3 lg:left-8' : 'md:right-3 lg:right-8'}`}>
               {SHOWCASE_LAYERS.slice(start, start === 0 ? 2 : 5).map((layer, offset) => (
                 <article key={layer.frame} hidden={start + offset >= visibleLayers}
-                  className="shrink-0 w-56 md:w-full rounded-xl border border-white/20 bg-black/80 backdrop-blur-md p-3 pointer-events-auto">
+                  className={`shrink-0 min-w-0 w-full rounded-xl border border-white/20 bg-black/80 backdrop-blur-md pointer-events-auto ${start === 0 ? 'p-3' : 'p-2.5'}`}>
                   <p className="text-[10px] uppercase tracking-[.2em] text-amber-300">Tầng 0{start + offset + 1}</p>
-                  <h4 className="mt-1 text-xs lg:text-sm font-semibold text-white">{layer.name}</h4>
-                  <p className="mt-1 text-[11px] leading-relaxed text-slate-300">{layer.description}</p>
+                  <h4 className={`mt-1 font-semibold text-white ${start === 0 ? 'text-xs lg:text-sm' : 'text-[11px] lg:text-xs leading-snug'}`}>{layer.name}</h4>
+                  <p className={`mt-1 text-slate-300 ${start === 0 ? 'text-[11px] leading-relaxed' : 'text-[10px] leading-snug'}`}>{layer.description}</p>
                 </article>
               ))}
             </div>
@@ -376,10 +376,10 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
       </div>
 
       <article data-showcase-mobile-layer aria-label="Tầng linh kiện đang xem"
-        className="md:hidden shrink-0 relative z-20 w-[calc(100%-2rem)] max-w-md min-h-[136px] rounded-xl border border-white/20 bg-white/[.04] p-4 mb-4">
+        className="md:hidden shrink-0 relative z-20 w-[calc(100%_-_1.5rem)] max-w-sm h-[128px] rounded-xl border border-white/20 bg-white/[.04] p-3 mb-3">
         <p className="text-[10px] uppercase tracking-[.2em] text-amber-300">Tầng {Math.max(1, visibleLayers)} / 5</p>
-        <h4 className="mt-1 text-sm font-semibold text-white">{activeLayer.name}</h4>
-        <p className="mt-1 text-xs leading-relaxed text-slate-300">{activeLayer.description}</p>
+        <h4 className="mt-1 text-xs leading-4 font-semibold text-white">{activeLayer.name}</h4>
+        <p className="mt-1 text-[11px] leading-4 text-slate-300">{activeLayer.description}</p>
       </article>
 
       {/* Collection navigation stays available while the frames are preparing. */}

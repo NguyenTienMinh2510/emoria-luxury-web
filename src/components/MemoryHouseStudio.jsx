@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {createPortal} from 'react-dom';
 import MemoryHouse3D from './MemoryHouse3D.jsx';
 import {createDraftQueue} from '../services/draftQueue.js';
-import {setDecorationPhoto, withEditableHouseFurniture} from '../services/house3d.js';
+import {setDecorationPhoto, withEditableHouseFurniture, DEFAULT_COZY_ROOM_DECORATIONS} from '../services/house3d.js';
 import {createShareUrl} from '../services/shareLinks.js';
 import {captureHouseShareFile} from '../services/houseSharePreview.js';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -38,13 +38,25 @@ import {
 
 // Helper: Map saved rooms while preserving storytelling order and ensuring all 5 rooms exist
 function mapOrderedRooms(savedRooms) {
+  const getDecorationsForRoom = (roomId, existingDecors) => {
+    const hasCustomDecorations = Array.isArray(existingDecors) && existingDecors.some(d => !d.id?.startsWith('base_'));
+    if (hasCustomDecorations) {
+      return existingDecors;
+    }
+    const baseList = Array.isArray(existingDecors) ? existingDecors : [];
+    const cozyDefaults = (DEFAULT_COZY_ROOM_DECORATIONS[roomId] || []).filter(
+      cd => !baseList.some(bd => bd.item === cd.item)
+    );
+    return [...baseList, ...cozyDefaults];
+  };
+
   if (!Array.isArray(savedRooms) || savedRooms.length === 0) {
     return withEditableHouseFurniture(HOUSE_ROOMS_SPEC.map((spec) => ({
       id: spec.id,
       name: spec.name,
       note: '',
       memories: [],
-      decorations: [],
+      decorations: DEFAULT_COZY_ROOM_DECORATIONS[spec.id] || [],
       lighting: 'day'
     })));
   }
@@ -61,7 +73,7 @@ function mapOrderedRooms(savedRooms) {
       name: existing?.name || spec?.name || id,
       note: existing?.note || '',
       memories: existing?.memories || [],
-      decorations: existing?.decorations || [],
+      decorations: getDecorationsForRoom(id, existing?.decorations),
       lighting: existing?.lighting || 'day'
     };
   }));

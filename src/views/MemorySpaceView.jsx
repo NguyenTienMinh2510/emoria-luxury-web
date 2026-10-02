@@ -22,6 +22,7 @@ import {
   Edit3, Key, Clock, AlertTriangle, Save, X, Loader2, ArrowLeft, Music, Feather, Film, Home, Upload, Maximize2
 } from 'lucide-react';
 import { getHouseDraft, getPublicHouseByTag } from '../services/eventService.js';
+import { withEditableHouseFurniture } from '../services/house3d.js';
 import { 
   fetchMemoryView, 
   verifyMemoryPin, 
@@ -167,7 +168,7 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
         houseRequest.then(house => {
           if (sequence !== loadSequence.current) return;
           if (house && Array.isArray(house.rooms)) {
-            setHouseData({ ...house, ...(owner ? {is_owner_draft:true} : {is_published_snapshot:true}) });
+            setHouseData({ ...house, rooms: withEditableHouseFurniture(house.rooms), ...(owner ? {is_owner_draft:true} : {is_published_snapshot:true}) });
           }
         }).catch(() => {
           if (sequence === loadSequence.current) setHouseData(null);

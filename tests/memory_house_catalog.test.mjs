@@ -23,7 +23,12 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const outfile = path.resolve('.local/ui-render/memory-house-catalog.mjs');
 await fs.mkdir(path.dirname(outfile), { recursive: true });
 await build({ entryPoints: ['src/components/MemoryHouse3D.jsx'], outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external', logLevel: 'silent' });
-const { default: MemoryHouse3D, DecorationLibrary } = await import(pathToFileURL(outfile));
+const { default: MemoryHouse3D, DecorationLibrary, STYLE_PACKAGES } = await import(pathToFileURL(outfile));
+for (const pkg of STYLE_PACKAGES) {
+  assert.equal(pkg.isPendingAsset, undefined, 'Every displayed style package is usable');
+  assert.ok(Object.values(pkg.slots).every(id => DECORATIONS.some(d => d.id === id)), 'Style packages use existing catalog models');
+}
+for (const id of ['cozy_home','sweet_melody','travel_memories','first_date']) assert.ok(STYLE_PACKAGES.some(pkg => pkg.id === id));
 const rooms = [{ id: 'beginning', name: 'Phòng đầu tiên', memories: [], decorations: [] }];
 const editor = renderToStaticMarkup(React.createElement(MemoryHouse3D, { rooms, activeRoomId: 'beginning' }));
 const visitor = renderToStaticMarkup(React.createElement(MemoryHouse3D, { rooms, activeRoomId: 'beginning', readOnly: true }));

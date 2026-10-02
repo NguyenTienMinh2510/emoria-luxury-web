@@ -109,9 +109,41 @@ export function withEditableHouseFurniture(rooms = []) {
     if (!b) return room;
     const floor = b.y > 1 ? b.y + .1375 : b.y;
     const make = (item, dx, z, scale = 1, suffix = item) => ({ id: `base_${room.id}_${suffix}`, item, surface: 'floor', position: [round(b.x + dx), round(floor), z], rotation: 0, scale });
-    const base = room.id === 'beginning' ? [make('sofa',0,-.38),make('coffee-table',0,.70,[1,1,1.23])]
-      : room.id === 'first' ? [make('bistro-table',0,-.14),make('chair',-.95,-.25),make('chair',.95,-.25,1,'chair-right')]
-      : room.id === 'little-things' ? [make('cubby',0,-.57,[1.417,.827,1.333])] : [make('desk',0,-.57,[1.063,.988,1])];
+    const base = room.id === 'beginning' ? [
+        make('sofa', 0, -.38),
+        make('coffee-table', 0, .70, [1, 1, 1.23]),
+        make('daisy-rug', 0, .70),
+        make('cat', -.95, -.15),
+        make('plant', .95, -.75),
+        make('cushion', -.85, .55)
+      ]
+      : room.id === 'first' ? [
+        make('bistro-table', 0, -.14),
+        make('chair', -.95, -.25),
+        make('chair', .95, -.25, 1, 'chair-right'),
+        make('plant', -.95, .65),
+        make('birdcage', .95, .65)
+      ]
+      : room.id === 'little-things' ? [
+        make('cubby', 0, -.57, [1.417, .827, 1.333]),
+        make('fern', -.95, .45),
+        make('cushion', .75, .55)
+      ]
+      : room.id === 'memories' ? [
+        make('desk', 0, -.57, [1.063, .988, 1]),
+        make('teddy', -1.1, .40),
+        make('lamp', 1.2, -.45),
+        make('cushion', -1.0, .45),
+        { id: `base_${room.id}_shelf`, item: 'shelf', surface: 'wall', position: [round(b.x), round(floor + .90), -1.15], rotation: 0, scale: 1 },
+        { id: `base_${room.id}_frame`, item: 'frame', surface: 'wall', position: [round(b.x - 1.0), round(floor + .85), -1.15], rotation: 0, scale: 1 }
+      ]
+      : [
+        make('desk', 0, -.57, [1.063, .988, 1]),
+        make('chair', 0, .15),
+        make('rabbit', -1.0, .45),
+        make('vine', 1.2, .45),
+        { id: `base_${room.id}_bunting`, item: 'bunting', surface: 'wall', position: [round(b.x), round(floor + 1.05), -1.15], rotation: 0, scale: 1 }
+      ];
     const supports = base.find(d => DECORATIONS.find(a => a.id === d.item)?.supportsItems);
     const decorations = roomDecorations(room).map(d => {
       // Legacy positions come from exported glTF anchors (+Z is the front),
@@ -129,6 +161,29 @@ export function withEditableHouseFurniture(rooms = []) {
     return { ...room, furnishingVersion: 1, decorations: [...base, ...decorations] };
   });
 }
+
+export const DEFAULT_COZY_ROOM_DECORATIONS = {
+  beginning: [
+    { id: 'decor_beginning_mugs', item: 'mugs', surface: 'table', position: [-2.8, 0.51, 0.70], rotation: 0, scale: 1, parent_id: 'base_beginning_coffee-table' }
+  ],
+  first: [
+    { id: 'decor_first_candles', item: 'candles', surface: 'table', position: [-0.2, 0.77, -0.14], rotation: 0, scale: 1, parent_id: 'base_first_bistro-table' },
+    { id: 'decor_first_vase', item: 'vase', surface: 'table', position: [0.2, 0.77, -0.14], rotation: 0, scale: 1, parent_id: 'base_first_bistro-table' }
+  ],
+  'little-things': [
+    { id: 'decor_little-things_turntable', item: 'turntable', surface: 'table', position: [2.5, 0.76, -0.57], rotation: 0, scale: 1, parent_id: 'base_little-things_cubby' },
+    { id: 'decor_little-things_camera', item: 'camera', surface: 'table', position: [3.1, 0.76, -0.57], rotation: 0, scale: 1, parent_id: 'base_little-things_cubby' }
+  ],
+  memories: [
+    { id: 'decor_memories_album', item: 'album', surface: 'table', position: [-2.1, 3.01, -0.57], rotation: 0, scale: 1, parent_id: 'base_memories_desk' },
+    { id: 'decor_memories_nameplate', item: 'nameplate', surface: 'table', position: [-1.5, 3.01, -0.57], rotation: 0, scale: 1, parent_id: 'base_memories_desk', text: 'Minh & An' }
+  ],
+  'next-chapter': [
+    { id: 'decor_next-chapter_cloud-lamp', item: 'cloud-lamp', surface: 'table', position: [1.4, 3.01, -0.57], rotation: 0, scale: 1, parent_id: 'base_next-chapter_desk' },
+    { id: 'decor_next-chapter_honey-candle', item: 'honey-candle', surface: 'table', position: [1.8, 3.01, -0.57], rotation: 0, scale: 1, parent_id: 'base_next-chapter_desk' },
+    { id: 'decor_next-chapter_calendar', item: 'calendar', surface: 'table', position: [2.2, 3.01, -0.57], rotation: 0, scale: 1, parent_id: 'base_next-chapter_desk', text: 'Mãi bên nhau' }
+  ]
+};
 
 /**
  * Returns half-extents (X and Z) and height accounting for scale and yaw rotation.
