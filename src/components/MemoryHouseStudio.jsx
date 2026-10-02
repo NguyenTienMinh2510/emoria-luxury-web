@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {createPortal} from 'react-dom';
 import MemoryHouse3D from './MemoryHouse3D.jsx';
 import {createDraftQueue} from '../services/draftQueue.js';
-import {setDecorationPhoto} from '../services/house3d.js';
+import {setDecorationPhoto, withEditableHouseFurniture} from '../services/house3d.js';
+import {createShareUrl} from '../services/shareLinks.js';
+import {captureHouseShareFile} from '../services/houseSharePreview.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home, Heart, Sparkles, ArrowLeft, ArrowRight, Upload,
@@ -37,20 +39,20 @@ import {
 // Helper: Map saved rooms while preserving storytelling order and ensuring all 5 rooms exist
 function mapOrderedRooms(savedRooms) {
   if (!Array.isArray(savedRooms) || savedRooms.length === 0) {
-    return HOUSE_ROOMS_SPEC.map((spec) => ({
+    return withEditableHouseFurniture(HOUSE_ROOMS_SPEC.map((spec) => ({
       id: spec.id,
       name: spec.name,
       note: '',
       memories: [],
       decorations: [],
       lighting: 'day'
-    }));
+    })));
   }
   const orderedIds = savedRooms
     .map((r) => r.id)
     .filter((id) => HOUSE_ROOMS_SPEC.some((s) => s.id === id));
   const allIds = [...new Set([...orderedIds, ...HOUSE_ROOMS_SPEC.map((s) => s.id)])];
-  return allIds.map((id) => {
+  return withEditableHouseFurniture(allIds.map((id) => {
     const existing = savedRooms.find((r) => r.id === id);
     const spec = HOUSE_ROOMS_SPEC.find((s) => s.id === id);
     return {
@@ -62,7 +64,7 @@ function mapOrderedRooms(savedRooms) {
       decorations: existing?.decorations || [],
       lighting: existing?.lighting || 'day'
     };
-  });
+  }));
 }
 
 // Visual theme configurations
@@ -137,14 +139,7 @@ export default function MemoryHouseStudio({
   // House Data
   const [houseTitle, setHouseTitle] = useState('Ngôi Nhà Kỷ Niệm Của Đôi Mình');
   const [selectedTheme, setSelectedTheme] = useState('warm_gold');
-  const [rooms, setRooms] = useState(() =>
-    HOUSE_ROOMS_SPEC.map((spec) => ({
-      id: spec.id,
-      name: spec.name,
-      note: '',
-      memories: []
-    }))
-  );
+  const [rooms, setRooms] = useState(() => mapOrderedRooms([]));
   const [isPublished, setIsPublished] = useState(false);
   const latestRooms = useRef(rooms);
   latestRooms.current = rooms;
@@ -383,11 +378,23 @@ export default function MemoryHouseStudio({
   // Publish House
   const handlePublish = async () => {
     if (!tagUid || isPublicVisitor || isPublishing) return;
-    setPublishStage('saving');
+    setPublishStage('capturing');
     setError('');
     setSuccessMsg('');
     try {
-      const payload = latestHouse.current;
+      const original = latestHouse.current;
+      const preview = await captureHouseShareFile(captureHouse3DRef.current,original);
+      const uploaded = await uploadEventPhoto(tagUid.toLowerCase().trim(),preview);
+      if(JSON.stringify(original)!==JSON.stringify(latestHouse.current))throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi xuất bản lại.');
+      const nextRooms = original.rooms.map((room,index) => {
+        const {share_preview_path,...rest} = room;
+        return index === 0 ? {...rest,share_preview_path:uploaded.path} : rest;
+      });
+      const payload = {...original,rooms:nextRooms};
+      latestRooms.current = nextRooms;
+      latestHouse.current = payload;
+      setRooms(nextRooms);
+      setPublishStage('saving');
       await persistHouse(payload,{retry:true});
       await saveQueue.current.flush();
       if(JSON.stringify(payload)!==JSON.stringify(latestHouse.current))throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi xuất bản lại.');
@@ -578,7 +585,7 @@ export default function MemoryHouseStudio({
 
   // Share URL
   const shareUrl = currentShareId
-    ? `${window.location.origin}/?view=memory-house&share=${currentShareId}`
+    ? createShareUrl({view:'memory-house',share:currentShareId})
     : '';
 
   const handleCopyShareLink = () => {
@@ -587,7 +594,7 @@ export default function MemoryHouseStudio({
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
       trackEventAction('house_copy_link', 'house', tagUid || currentShareId || 'house');
-    });
+    }).catch(() => setError('Không thể sao chép. Hãy chọn và sao chép liên kết ngôi nhà đang hiển thị.'));
   };
 
   const themeStyle = THEME_STYLES[selectedTheme] || THEME_STYLES.warm_gold;
@@ -677,7 +684,7 @@ export default function MemoryHouseStudio({
       const res = await sharePostcard({
         canvas: postcardCanvasRef.current,
         title: `${houseTitle || 'Ngôi Nhà Kỷ Niệm'} - EMORIA`,
-        text: `Ghé thăm thiệp kỷ niệm của ${postcardCoupleNames || 'chúng mình'} tại EMORIA nhé!`,
+        text: `Thiệp “${houseTitle || 'Ngôi Nhà Kỷ Niệm'}” của ${postcardCoupleNames || 'chúng mình'}${postcardDate ? ` · ${postcardDate}` : ''}${postcardCaption ? `: ${postcardCaption}` : ''}. Ghé thăm ngôi nhà 3D tại EMORIA nhé!`,
         url: isPublished ? shareUrl : ''
       });
       if (res.success) {
@@ -902,12 +909,12 @@ export default function MemoryHouseStudio({
       <dialog ref={publishDialogRef} onCancel={e => e.preventDefault()} aria-labelledby="house-publish-title" aria-describedby="house-publish-description" aria-busy={isPublishing}
         className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-sm rounded-3xl border border-amber-400/30 bg-stone-950 p-6 text-center text-slate-100 shadow-2xl backdrop:bg-black/75 backdrop:backdrop-blur-sm">
         <Loader2 className="mx-auto mb-4 h-9 w-9 animate-spin text-amber-300" aria-hidden="true" />
-        <h2 id="house-publish-title" className="font-serif text-xl font-bold">{publishStage === 'saving' ? 'Đang lưu ngôi nhà' : 'AI đang duyệt ảnh'}</h2>
+        <h2 id="house-publish-title" className="font-serif text-xl font-bold">{publishStage === 'capturing' ? 'Đang tạo ảnh toàn cảnh' : publishStage === 'saving' ? 'Đang lưu ngôi nhà' : 'AI đang duyệt ảnh'}</h2>
         <p id="house-publish-description" role="status" className="mt-3 text-sm leading-relaxed text-slate-300">
-          {publishStage === 'saving' ? 'Đang lưu những thay đổi mới nhất trước khi xuất bản.' : 'Hệ thống đang kiểm tra ảnh trước khi chia sẻ công khai. Lần đầu có thể lâu hơn vì AI cần khởi động.'}
+          {publishStage === 'capturing' ? 'Đang tạo ảnh toàn cảnh ngôi nhà 3D để hiển thị khi chia sẻ liên kết.' : publishStage === 'saving' ? 'Đang lưu những thay đổi mới nhất trước khi xuất bản.' : 'Hệ thống đang kiểm tra ảnh trước khi chia sẻ công khai. Lần đầu có thể lâu hơn vì AI cần khởi động.'}
         </p>
         {/* ponytail: broad estimate; use measured per-image timings when available. */}
-        <p className="mt-3 text-sm text-amber-200">{publishStage === 'saving' ? 'Ước tính: vài giây.' : 'Ước tính: khoảng 30 giây–3 phút, tùy số ảnh và thời gian khởi động AI.'}</p>
+        <p className="mt-3 text-sm text-amber-200">{publishStage === 'reviewing' ? 'Ước tính: khoảng 30 giây–3 phút, tùy số ảnh và thời gian khởi động AI.' : 'Ước tính: vài giây.'}</p>
         <p className="mt-2 text-xs tabular-nums text-slate-400">Đã chờ {publishElapsed} giây</p>
         <p className="mt-3 text-xs text-amber-200">Vui lòng giữ trang này mở. Kết quả sẽ hiển thị khi hoàn tất.</p>
       </dialog>

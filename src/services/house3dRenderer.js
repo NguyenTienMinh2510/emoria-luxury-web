@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {roomDecorations, getDefaultPosition, houseLighting, gyroTilt} from './house3d.js';
+import {DECORATIONS, roomDecorations, getDefaultPosition, houseLighting, gyroTilt, withEditableHouseFurniture} from './house3d.js';
 import {createPlacementSolver, placementTriangles, transformDecoration} from './housePlacement.js';
 
 export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, onPlacementPreview, getPlacement, getDragPlacement, isEditing, onGyroChange, onError, onReady}) {
@@ -281,6 +281,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   }).catch(()=>{if(!dead)onError?.('Chưa tải được mô hình. Bạn vẫn có thể dùng khung 2D.');});
 
   function update(next){
+    next={...next, rooms:withEditableHouseFurniture(next.rooms || [])};
     state=next;if(!house||dead)return;
     const rooms=next.rooms||[];
     const colors={classic:'#c2a77e',warm_gold:'#c9a375',rose_romance:'#d6a0a6',midnight:'#8995bc',minimal_dark:'#8e8b88',editorial_cream:'#d4c4a5'};
@@ -413,6 +414,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
       const memories=rooms.find(r=>r.id===surface.userData.roomId)?.memories;
       const memory=Number.isInteger(surface.userData.decorPhotoIndex)?memories?.find(m=>m.id===surface.userData.memoryId):memories?.[surface.userData.photoIndex];
       const url=memory?.photo_url;surface.userData.url=url||null;surface.userData.memory=memory||null;surface.material.map=null;surface.material.color.set('#f8ecda');
+      if (Number.isInteger(surface.userData.photoIndex)) surface.visible=Boolean(url);
       const caption = surface.userData.decorText || '';
       if (!url && (caption || surface.userData.placeholderText)) {
         let texture = surface.userData.textTexture;
@@ -532,8 +534,13 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   }
 
   const roomTriangles = new Map();
+  const supportTriangles = new WeakMap();
   let houseTriangles;
   let solverKey = '', solver;
+  const supportType = item => DECORATIONS.find(d => d.id === item)?.supportsItems ? (item === 'shelf' ? 'shelf' : 'table') : null;
+  function placementSupports(roomId, excludeId = null, excludeIds = []) {
+    return decorGroup.children.filter(o => o.userData.roomId === roomId && o.userData.instanceId !== excludeId && !excludeIds.includes(o.userData.instanceId) && supportType(o.userData.decorItem));
+  }
   function getSolver(roomId, item, scale = 1, rotation = 0, excludeId = null, extra = [], excludeIds = []) {
     const template = library?.getObjectByName('decor_' + item);
     const root = roomObjects.get(roomId);
@@ -542,15 +549,29 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     if (key === solverKey) return solver;
     if (!roomTriangles.has(roomId)) roomTriangles.set(roomId, placementTriangles(root));
     houseTriangles ||= placementTriangles(house);
-    const obstacles = decorGroup.children.filter(o => o.userData.instanceId !== excludeId && !excludeIds.includes(o.userData.instanceId)).map(o => new THREE.Box3().setFromObject(o, true));
+    const triangles = [...roomTriangles.get(roomId)], collisionTriangles = [...houseTriangles], obstacles = [];
+    function include(copy, itemId, parentId, inRoom = true) {
+      const surface = supportType(itemId);
+      if (!surface) { obstacles.push(new THREE.Box3().setFromObject(copy, true)); return; }
+      if (!supportTriangles.has(copy)) supportTriangles.set(copy, placementTriangles(copy).map(entry => ({ ...entry, surface, parentId })));
+      const entries = supportTriangles.get(copy);
+      if (inRoom) triangles.push(...entries);
+      // A support's empty space remains usable (e.g. inside a cubby). Its real
+      // triangles still reject penetration into boards, legs and table edges.
+      collisionTriangles.push(...entries);
+    }
+    for (const copy of decorGroup.children) {
+      if (copy.userData.instanceId === excludeId || excludeIds.includes(copy.userData.instanceId)) continue;
+      include(copy, copy.userData.decorItem, copy.userData.instanceId, copy.userData.roomId === roomId);
+    }
     for (const d of extra) {
       const source = library.getObjectByName('decor_' + d.item);
       if (!source) continue;
       const copy = source.clone(true);
       transformDecoration(copy, d.position, d.rotation, d.scale);
-      obstacles.push(new THREE.Box3().setFromObject(copy, true));
+      include(copy, d.item, d.id || d.slot || null);
     }
-    solver = createPlacementSolver({ template, roomId, triangles: roomTriangles.get(roomId), collisionTriangles: houseTriangles, obstacles, scale, rotation });
+    solver = createPlacementSolver({ template, roomId, triangles, collisionTriangles, obstacles, scale, rotation });
     solverKey = key;
     return solver;
   }
@@ -569,7 +590,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     const r = renderer.domElement.getBoundingClientRect();
     if (!r.width || !r.height) return null;
     ray.setFromCamera(new THREE.Vector2((clientX-r.left)/r.width*2-1, -(clientY-r.top)/r.height*2+1), camera);
-    const hit = ray.intersectObject(roomObjects.get(activeRoom), true)[0];
+    const hit = ray.intersectObjects([roomObjects.get(activeRoom), ...placementSupports(activeRoom, excludeId)], true)[0];
     let point = hit?.point;
     if (!point) {
       point = new THREE.Vector3();
@@ -739,6 +760,20 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
       } catch (err) {
         console.warn('[House3D] Snapshot capture error:', err);
         return null;
+      }
+    },
+    async captureWhenReady({ timeoutMs = 5000 } = {}) {
+      const end = Date.now() + Math.max(0, Math.min(10000, timeoutMs));
+      while (!dead && (!house || pending.size) && Date.now() < end) await new Promise(resolve => setTimeout(resolve, 30));
+      if (dead || !house || pending.size) return null;
+      overview(false);renderer.render(scene,camera);
+      try { return renderer.domElement.toDataURL('image/png'); } catch { return null; }
+    },
+    async captureOverviewWhenReady(options) {
+      const position=camera.position.clone(), target=controls.target.clone(), room=focusedRoom;
+      try { return await this.captureWhenReady(options); }
+      finally {
+        if (!dead) { focusedRoom=room;camera.position.copy(position);controls.target.copy(target);controls.update();render(); }
       }
     },
     dispose(){

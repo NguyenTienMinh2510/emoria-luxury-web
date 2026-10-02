@@ -9,7 +9,10 @@ const originalFetch=globalThis.fetch;
 let calls=[],dbError=null,isAdmin=false,dbResult={success:true},userId='owner-a';
 globalThis.fetch=async(input,init={})=>{
   const url=String(input),headers=new Headers(init.headers);
-  assert.notEqual(headers.get('apikey'),'MUST-NOT-USE');
+  if(url.endsWith('/rpc/rpc_check_rate_limit')){
+    assert.equal(headers.get('apikey'),'MUST-NOT-USE');
+    assert.equal(JSON.parse(init.body).p_key,'ai_warmup:owner-a','Only the verified caller quota uses the isolated service client');
+  }else assert.notEqual(headers.get('apikey'),'MUST-NOT-USE');
   calls.push({url,method:init.method||'GET',body:init.body?JSON.parse(init.body):null,authorization:headers.get('authorization')});
   if(url.endsWith('/auth/v1/user'))return Response.json({id:userId,email:'fixture@example.test'});
   if(url.includes('/rpc/is_admin'))return Response.json(isAdmin);
@@ -83,6 +86,11 @@ try{
   dbError={code:'42501',message:'permission denied'};
   assert.equal((await request('PATCH','/api/v1/memories/fixture',{letter:'private'},'customer-token')).status,403);
   dbError=null;dbResult=true;
+  assert.equal((await request('POST','/api/v1/ai/warmup',{})).status,401,'Anonymous warmup cannot start paid AI');
+  assert.equal((await request('GET','/api/v1/ai/warmup')).status,405,'No public GET warmup');
+  dbResult={allowed:false};
+  assert.equal((await request('POST','/api/v1/ai/warmup',{},'customer-token')).status,429,'An exhausted warmup quota cannot start paid AI');
+  dbResult=true;
   if(process.env.GEMINI_API_KEY){
     assert.equal((await request('POST','/api/v1/ai/craft-letter',{occasion:'anniversary',tone:'romantic',recipient:'Taylor',author:'Alex'},'customer-token')).status,400);
   }

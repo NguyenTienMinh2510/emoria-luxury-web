@@ -13,6 +13,7 @@ function RoomScene({room, x=0, y=0, width=340, height=270, active, accent, onSel
   const ink = night ? '#eee2ce' : '#705449';
   const floor = height-65, desk = height-73;
   const decor = roomDecorations(room);
+  const hasFurniture = decor.some(item=>DECORATIONS.find(asset=>asset.id===item.item)?.supportsItems && item.surface==='floor');
   const lanes = {wall:[], table:[], floor:[]};
   for (const item of decor) {
     const asset = DECORATIONS.find(d => d.id === item.item);
@@ -79,13 +80,13 @@ function RoomScene({room, x=0, y=0, width=340, height=270, active, accent, onSel
       <path d={`M${wallStart+16} 125v8M${width-32} 125v8`} stroke="#957255" strokeWidth="3"/>
       <ellipse cx={width/2} cy={height-28} rx={width*.28} ry="17" fill={night ? '#aa8984' : '#e6c3ad'} stroke="#b89b83"/>
       <ellipse cx={width/2} cy={height-28} rx={width*.25} ry="13" fill="none" stroke="#f4ded0" strokeWidth="2"/>
-      <g fill={night ? '#a48b76' : '#bd9c78'} stroke="#947358" strokeWidth="1.5">
+      {room.furnishingVersion !== 1 && !hasFurniture && <g data-fixed-credenza fill={night ? '#a48b76' : '#bd9c78'} stroke="#947358" strokeWidth="1.5">
         <rect x={width*.24} y={desk+5} width={width*.56} height="30" rx="3"/>
         <path d={`M${width*.25} ${desk+35}v15M${width*.78} ${desk+35}v15M${width*.52} ${desk+6}v27`} fill="none" strokeWidth="4"/>
         <rect x={width*.22} y={desk} width={width*.60} height="6" rx="2" fill="#dac2a3"/>
         <path d={`M${width*.35} ${desk+20}h15M${width*.65} ${desk+20}h15`} stroke="#f8e6ca" strokeWidth="2"/>
-      </g>
-      {!lanes.floor.length && <g transform={`translate(28 ${height-64})`} stroke="#a98c74" strokeWidth="1.5"><path d="M1 13Q3 0 17 0H59Q71 0 72 13V32H1Z" fill="#d7b4a4"/><rect x="1" y="20" width="72" height="17" rx="6" fill="#e6cbbc"/><path d="M8 36v9M65 36v9" strokeWidth="4"/><path d="M36 3v17"/><rect x="8" y="7" width="20" height="14" rx="5" fill="#e7daca"/></g>}
+      </g>}
+      {room.furnishingVersion !== 1 && !lanes.floor.length && <g data-fixed-sofa transform={`translate(28 ${height-64})`} stroke="#a98c74" strokeWidth="1.5"><path d="M1 13Q3 0 17 0H59Q71 0 72 13V32H1Z" fill="#d7b4a4"/><rect x="1" y="20" width="72" height="17" rx="6" fill="#e6cbbc"/><path d="M8 36v9M65 36v9" strokeWidth="4"/><path d="M36 3v17"/><rect x="8" y="7" width="20" height="14" rx="5" fill="#e7daca"/></g>}
 
       {Object.entries(lanes).map(([surface,items]) => items.map((item,i) => {
         const asset=DECORATIONS.find(d => d.id === item.item);

@@ -4,6 +4,9 @@ import paymentHandler from './api/sepay-webhook.js';
 import analyticsHandler from './api/analytics.js';
 import memoryMediaHandler from './api/memory-media.js';
 import restHandler from './api/v1.js';
+import {readFile} from 'node:fs/promises';
+import {createShareHandler} from './api/share.js';
+import {isShareRoute} from './src/services/shareLinks.js';
 
 // https://vitejs.dev/config/ - updated for local sandbox
 export default defineConfig(({mode}) => {
@@ -13,6 +16,12 @@ export default defineConfig(({mode}) => {
   for(const key of ['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY','VITE_SUPABASE_PUBLISHABLE_KEY','GA4_PROPERTY_ID','GA4_SERVICE_ACCOUNT_JSON','SUPABASE_SERVICE_ROLE_KEY','SEPAY_WEBHOOK_KEY','SEPAY_ACCOUNT_NUMBER','SEPAY_MODE']) if(env[key]!==undefined)process.env[key]=env[key];
   return {
   plugins: [react(),{name:'emoria-api',configureServer(server){
+    const shareHandler=createShareHandler(async req=>server.transformIndexHtml(req.originalUrl||req.url,await readFile('index.html','utf8')));
+    server.middlewares.use((req,res,next)=>{
+      const url=new URL(req.url,'http://localhost');
+      if(url.pathname==='/share'||url.pathname==='/api/share'||url.pathname==='/'&&isShareRoute(url.searchParams))return shareHandler(req,res);
+      next();
+    });
     server.middlewares.use('/api/v1',restHandler);
     server.middlewares.use('/api/sepay-webhook',paymentHandler);
     server.middlewares.use('/api/analytics',analyticsHandler);

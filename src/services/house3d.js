@@ -1,29 +1,50 @@
 // Stable room/slot IDs are shared with the Blender export and stored inside rooms JSON.
 export const HOUSE_ROOM_IDS = ['beginning', 'first', 'little-things', 'memories', 'next-chapter'];
 
-// 12 Handcrafted decorative assets with surface affinity & photo/text capacities
+// Stable IDs keep existing saved houses compatible; the curated cozy catalog
+// uses real model thumbnails, never the source image as a promise of detail.
 export const DECORATIONS = [
   ['calendar', 'Ngày của đôi mình', 1, 'table', ['table', 'wall']],
   ['cat', 'Mèo ngủ ngoan', 3, 'floor', ['floor', 'table']],
   ['nameplate', 'Biển tên nhỏ', 5, 'table', ['table', 'shelf', 'floor']],
   ['plant', 'Cây tình yêu', 7, 'floor', ['floor', 'table', 'shelf']],
-  ['mugs', 'Cốc đôi', 9, 'table', ['table', 'shelf']],
+  ['mugs', 'Cốc toast', 9, 'table', ['table', 'shelf']],
   ['lamp', 'Đèn ấm áp', 11, 'table', ['table', 'shelf', 'floor']],
-  ['vase', 'Bình tulip', 13, 'table', ['table', 'shelf']],
+  ['vase', 'Bình hoa giấy', 13, 'table', ['table', 'shelf']],
   ['album', 'Album kỷ niệm', 15, 'table', ['table', 'shelf']],
   ['bunting', 'Dây ảnh', 18, 'wall', ['wall', 'ceiling']],
   ['frame', 'Khung ảnh', 20, 'wall', ['wall', 'table']],
   ['birdcage', 'Chim nhỏ', 23, 'table', ['table', 'floor', 'shelf']],
   ['candles', 'Nến hẹn hò', 24, 'table', ['table', 'shelf']],
+  ['rabbit', 'Thỏ tai cụp', 'D15', 'floor', ['floor', 'table', 'shelf']],
+  ['teddy', 'Gấu áo len', 'D16', 'floor', ['floor', 'table', 'shelf']],
+  ['cloud-lamp', 'Đèn mây', 'D24', 'table', ['table', 'shelf', 'floor']],
+  ['honey-candle', 'Nến trong hũ', 'D25', 'table', ['table', 'shelf']],
+  ['turntable', 'Máy đĩa nhạc', 'D30', 'table', ['table', 'shelf']],
+  ['camera', 'Máy ảnh lấy liền', 'D31', 'table', ['table', 'shelf']],
+  ['daisy-rug', 'Thảm hoa cúc', 'D35', 'floor', ['floor']],
+  ['fern', 'Chậu dương xỉ', 'D37', 'floor', ['floor', 'table', 'shelf']],
+  ['vine', 'Chậu cây rủ', 'D38', 'table', ['table', 'shelf', 'floor']],
+  ['cushion', 'Đệm ngồi tròn', 'D39', 'floor', ['floor']],
+  ['shelf', 'Kệ tường gợn sóng', 'D40', 'wall', ['wall']],
+  ['sofa', 'Sofa bo tròn', 'D41', 'floor', ['floor']],
+  ['coffee-table', 'Bàn trà hạt đậu', 'D42', 'floor', ['floor']],
+  ['bistro-table', 'Bàn tròn', 'D43', 'floor', ['floor']],
+  ['chair', 'Ghế tựa cong', 'D44', 'floor', ['floor']],
+  ['cubby', 'Kệ ô vuông', 'D45', 'floor', ['floor']],
+  ['desk', 'Bàn viết', 'D46', 'floor', ['floor']],
 ].map(([id, name, reference, defaultSurface, supportedSurfaces]) => ({
   id,
   name,
-  image: `/memoryhouse/models/thumbnails/${id}.png`,
-  reference: `/memoryhouse/Create_ONE_isolated_miniature__${reference}.jpg`,
+  image: `/memoryhouse/models/thumbnails/${id}.jpg`,
   photoCount: { calendar: 1, nameplate: 1, frame: 1, album: 2, bunting: 3 }[id] || 0,
   textLabel: { calendar: 'Ngày / lời nhắn trên lịch', nameplate: 'Chữ trên biển tên', frame: 'Lời nhắn trên khung ảnh', album: 'Lời nhắn trên album', bunting: 'Lời nhắn trên dây ảnh' }[id] || null,
   defaultSurface: defaultSurface || 'table',
-  supportedSurfaces: [...new Set(['floor', 'table', 'shelf', ...supportedSurfaces])]
+  supportedSurfaces: reference?.startsWith?.('D') ? supportedSurfaces : [...new Set(['floor', 'table', 'shelf', ...supportedSurfaces])],
+  category: ['calendar','nameplate','album','bunting','frame','camera'].includes(id) ? 'memories' : ['plant','vase','fern','vine'].includes(id) ? 'plants' : ['cat','birdcage','rabbit','teddy'].includes(id) ? 'pets' : ['daisy-rug','cushion','shelf','sofa','coffee-table','bistro-table','chair','cubby','desk'].includes(id) ? 'furniture' : 'home',
+  featured: ['frame','album','plant','lamp','mugs','vase','cat','sofa','coffee-table','desk','chair','cubby'].includes(id),
+  referenceId: typeof reference === 'string' ? reference : ({calendar:'D01',cat:'D02',nameplate:'D03',plant:'D04',mugs:'D05',lamp:'D07',vase:'D08',album:'D09',bunting:'D10',frame:'D11',birdcage:'D12'}[id] || null),
+  supportsItems: ['shelf','coffee-table','bistro-table','desk','cubby'].includes(id)
 }));
 
 // Legacy 3 slots for backward compatibility
@@ -61,21 +82,60 @@ export const ASSET_DIMENSIONS = {
   nameplate: { width: 0.76, depth: 0.26, height: 0.35 },
   plant:     { width: 0.40, depth: 0.40, height: 0.55 },
   mugs:      { width: 0.50, depth: 0.42, height: 0.30 },
-  lamp:      { width: 0.36, depth: 0.36, height: 0.65 },
+  lamp:      { width: 0.54, depth: 0.54, height: 0.48 },
   vase:      { width: 0.35, depth: 0.35, height: 0.55 },
   album:     { width: 0.55, depth: 0.45, height: 0.15 },
   bunting:   { width: 0.95, depth: 0.24, height: 0.65 },
   frame:     { width: 0.52, depth: 0.24, height: 0.39 },
   birdcage:  { width: 0.35, depth: 0.35, height: 0.50 },
   candles:   { width: 0.35, depth: 0.25, height: 0.30 }
+  ,rabbit: { width: .38, depth: .32, height: .55 }, teddy: { width: .42, depth: .35, height: .55 },
+  'cloud-lamp': { width: .55, depth: .25, height: .38 }, 'honey-candle': { width: .30, depth: .30, height: .28 },
+  turntable: { width: .55, depth: .42, height: .21 }, camera: { width: .36, depth: .27, height: .34 },
+  'daisy-rug': { width: 1.3, depth: 1.3, height: .035 }, fern: { width: .55, depth: .45, height: .60 },
+  vine: { width: .4, depth: .4, height: .38 }, cushion: { width: .65, depth: .65, height: .22 },
+  shelf: { width: 1.0, depth: .35, height: .22 }, sofa: { width: 1.65, depth: .72, height: .80 },
+  'coffee-table': { width: 1.15, depth: .65, height: .37 }, 'bistro-table': { width: 1.1, depth: 1.1, height: .63 },
+  chair: { width: .48, depth: .5, height: .73 }, cubby: { width: 1.2, depth: .45, height: .75 },
+  desk: { width: 1.6, depth: .60, height: .63 }
 };
+
+// Replace the formerly baked furnishings once, using editable stable instances.
+// The room marker prevents a deliberately deleted sofa/table from reappearing.
+export function withEditableHouseFurniture(rooms = []) {
+  return rooms.map(room => {
+    if (room.furnishingVersion === 1) return room;
+    const b = ROOM_BOUNDS[room.id];
+    if (!b) return room;
+    const floor = b.y > 1 ? b.y + .1375 : b.y;
+    const make = (item, dx, z, scale = 1, suffix = item) => ({ id: `base_${room.id}_${suffix}`, item, surface: 'floor', position: [round(b.x + dx), round(floor), z], rotation: 0, scale });
+    const base = room.id === 'beginning' ? [make('sofa',0,-.38),make('coffee-table',0,.70,[1,1,1.23])]
+      : room.id === 'first' ? [make('bistro-table',0,-.14),make('chair',-.95,-.25),make('chair',.95,-.25,1,'chair-right')]
+      : room.id === 'little-things' ? [make('cubby',0,-.57,[1.417,.827,1.333])] : [make('desk',0,-.57,[1.063,.988,1])];
+    const supports = base.find(d => DECORATIONS.find(a => a.id === d.item)?.supportsItems);
+    const decorations = roomDecorations(room).map(d => {
+      // Legacy positions come from exported glTF anchors (+Z is the front),
+      // not the old approximate JS placement defaults. Freeform coordinates stay.
+      let position=d.position;
+      if (!position && d.slot) {
+        position=d.slot === 'table' ? [b.x,room.id === 'beginning' ? .51 : room.id === 'first' ? .77 : room.id === 'little-things' ? .76 : 3.01,room.id === 'beginning' ? .70 : room.id === 'first' ? -.14 : -.57]
+          : [round(b.x+(d.slot === 'left' ? -1 : 1)*b.width*.29),round(floor+.02),d.slot === 'left' ? .28 : .38];
+      }
+      const tableChild = d.surface === 'table' || d.surface === 'shelf' || d.slot === 'table';
+      const dim=ASSET_DIMENSIONS[supports?.item], scale=Array.isArray(supports?.scale) ? supports.scale : [supports?.scale || 1,supports?.scale || 1,supports?.scale || 1];
+      const onSupport=position && dim && Math.abs(position[1]-(supports.position[1]+dim.height*scale[1]))<.035 && Math.abs(position[0]-supports.position[0])<dim.width*scale[0]/2 && Math.abs(position[2]-supports.position[2])<dim.depth*scale[2]/2;
+      return { ...d, ...(position ? {id:d.id || `legacy_${room.id}_${d.slot}`,position,surface:d.surface || (d.slot === 'table' ? 'table' : 'floor'),scale:d.scale || 1} : {}), ...(tableChild && !d.parent_id && onSupport ? {parent_id:supports.id} : {}) };
+    });
+    return { ...room, furnishingVersion: 1, decorations: [...base, ...decorations] };
+  });
+}
 
 /**
  * Returns half-extents (X and Z) and height accounting for scale and yaw rotation.
  */
 export function getRotatedExtents(itemId, scale = 1.0, rotationYaw = 0) {
   const dim = ASSET_DIMENSIONS[itemId] || { width: 0.3, depth: 0.3, height: 0.3 };
-  const s = Number.isFinite(scale) && scale > 0 ? scale : 1.0;
+  const [sx,sy,sz] = (Array.isArray(scale) && scale.length === 3 ? scale : [scale,scale,scale]).map(value=>Number.isFinite(value)&&value>0?value:1);
   const yaw = Number.isFinite(rotationYaw) ? rotationYaw : (Array.isArray(rotationYaw) ? rotationYaw[1] : 0);
   const rad = (yaw * Math.PI) / 180.0;
   const cos = Math.abs(Math.cos(rad));
@@ -84,9 +144,9 @@ export function getRotatedExtents(itemId, scale = 1.0, rotationYaw = 0) {
   const halfD = dim.depth / 2.0;
 
   return {
-    halfX: round(s * (halfW * cos + halfD * sin)),
-    halfZ: round(s * (halfW * sin + halfD * cos)),
-    height: round(s * dim.height),
+    halfX: round(halfW * sx * cos + halfD * sz * sin),
+    halfZ: round(halfW * sx * sin + halfD * sz * cos),
+    height: round(sy * dim.height),
     width: dim.width,
     depth: dim.depth
   };
@@ -563,7 +623,7 @@ export function getSupportingObjects(room, excludeId = null) {
 
   return decors.filter(d =>
     !excludeIds.has(d.id) &&
-    ['table', 'desk', 'shelf', 'album', 'nameplate'].includes(d.item)
+    (DECORATIONS.find(a => a.id === d.item)?.supportsItems || ['table', 'album', 'nameplate'].includes(d.item))
   );
 }
 

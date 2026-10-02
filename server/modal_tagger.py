@@ -35,10 +35,74 @@ image = (
     .env({
         "HF_HUB_ENABLE_HF_TRANSFER": "0",
         "HF_HOME": "/cache/huggingface",
+        # Public project origin, supplied by the deployment environment.
+        "MODAL_STORAGE_ORIGIN": os.environ.get("MODAL_STORAGE_ORIGIN") or os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL") or "",
     })
 )
 
 MODEL_NAME = "Qwen/Qwen3-VL-4B-Instruct"
+MAX_MEDIA_BYTES = 50 * 1024 * 1024
+
+
+def validate_media_url(value):
+    import re
+    from urllib.parse import urlsplit, unquote, parse_qs
+
+    origin = urlsplit(os.environ.get("MODAL_STORAGE_ORIGIN", ""))
+    if (origin.scheme != "https" or not re.fullmatch(r"[a-z0-9-]+\.supabase\.co", origin.netloc)
+            or origin.path not in ("", "/") or origin.query or origin.fragment):
+        raise ValueError("Storage origin is not configured")
+    if not isinstance(value, str) or len(value) > 8192 or any(ord(char) < 32 for char in value):
+        raise ValueError("Invalid media URL")
+    url = urlsplit(value)
+    if url.scheme != "https" or url.netloc != origin.netloc or url.fragment:
+        raise ValueError("Invalid media URL")
+    parts = url.path.split("/")
+    if (parts[:5] != ["", "storage", "v1", "object", "sign"] or len(parts) < 7
+            or parts[5] not in ("emoria-memory", "emoria-event-media")):
+        raise ValueError("Invalid media URL")
+    for part in parts[6:]:
+        decoded = unquote(part)
+        if (not decoded or decoded in (".", "..") or any(char in decoded for char in ("/", "\\", "%"))
+                or any(ord(char) < 32 for char in decoded)):
+            raise ValueError("Invalid media URL")
+    query = parse_qs(url.query, keep_blank_values=True)
+    if (set(query) != {"token"} or len(query["token"]) != 1
+            or not re.fullmatch(r"[A-Za-z0-9._-]{1,4096}", query["token"][0])):
+        raise ValueError("A signed Storage URL is required")
+    return value
+
+
+def decode_media_base64(value):
+    if not isinstance(value, str) or not value or len(value) > 4 * ((MAX_MEDIA_BYTES + 2) // 3):
+        raise ValueError("Invalid media or media exceeds 50 MB")
+    data = base64.b64decode(value, validate=True)
+    if not data or len(data) > MAX_MEDIA_BYTES:
+        raise ValueError("Invalid media or media exceeds 50 MB")
+    return data
+
+
+def download_media(value, path):
+    import requests
+
+    url = validate_media_url(value)
+    started = time.monotonic()
+    with requests.get(url, timeout=(10, 30), stream=True, allow_redirects=False) as response:
+        if 300 <= response.status_code < 400:
+            raise ValueError("Media redirects are not allowed")
+        response.raise_for_status()
+        length = response.headers.get("Content-Length")
+        if length is not None and (not length.isdigit() or int(length) > MAX_MEDIA_BYTES):
+            raise ValueError("Invalid media or media exceeds 50 MB")
+        size = 0
+        with open(path, "wb") as output:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                size += len(chunk)
+                if size > MAX_MEDIA_BYTES or time.monotonic() - started > 60:
+                    raise ValueError("Media exceeds the download limit")
+                output.write(chunk)
+        if not size:
+            raise ValueError("Empty media")
 
 PROMPT = (
     'Xem kỹ video/hình ảnh kỷ niệm này và thực hiện 2 nhiệm vụ: '
@@ -150,6 +214,11 @@ class QwenTagger:
     def generate_letter_text(self, payload: dict):
         import torch
 
+        for field, limit in (("recipient", 120), ("author", 120), ("memoryHint", 1000),
+                             ("occasion", 40), ("tone", 40), ("language", 2)):
+            if field in payload and (not isinstance(payload[field], str) or len(payload[field]) > limit):
+                raise ValueError("Invalid letter input")
+
         occasion = payload.get("occasion", "anniversary")
         tone = payload.get("tone", "romantic")
         recipient = payload.get("recipient", "Người thương")
@@ -212,25 +281,24 @@ class QwenTagger:
             "model": MODEL_NAME,
         }
 
-    @modal.fastapi_endpoint(method="GET")
+    @modal.fastapi_endpoint(method="GET", requires_proxy_auth=True)
     def warmup(self):
         return {"success": True, "status": "ready", "model": MODEL_NAME}
 
-    @modal.fastapi_endpoint(method="POST")
+    @modal.fastapi_endpoint(method="POST", requires_proxy_auth=True)
     def warmup_post(self, payload: dict = None):
         return {"success": True, "status": "ready", "model": MODEL_NAME}
 
-    @modal.fastapi_endpoint(method="POST")
+    @modal.fastapi_endpoint(method="POST", requires_proxy_auth=True)
     def craft_letter(self, payload: dict):
         try:
             return self.generate_letter_text(payload)
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Letter generation failed"}
 
-    @modal.fastapi_endpoint(method="POST")
+    @modal.fastapi_endpoint(method="POST", requires_proxy_auth=True)
     def tag_video(self, payload: dict):
         import torch
-        import requests
         import numpy as np
         from PIL import Image
         started = time.monotonic()
@@ -245,14 +313,14 @@ class QwenTagger:
             try:
                 return self.generate_letter_text(payload)
             except Exception as e:
-                return {"success": False, "error": str(e)}
+                return {"success": False, "error": "Letter generation failed"}
 
         video_url = payload.get("url")
         video_base64 = payload.get("video_base64")
         media_type = payload.get("type", "video") # 'video' hoặc 'image'
 
-        if not video_url and not video_base64:
-            return {"success": False, "error": "Cần cung cấp url hoặc video_base64"}
+        if media_type not in ("video", "image") or bool(video_url) == bool(video_base64):
+            return {"success": False, "approved": False, "error": "Invalid media input", "labels": [], "violations": []}
 
         with tempfile.NamedTemporaryFile(suffix=".mp4" if media_type == "video" else ".jpg", delete=False) as tmp:
             tmp_path = Path(tmp.name)
@@ -261,18 +329,9 @@ class QwenTagger:
         input_tokens = 0
         try:
             if video_url:
-                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-                with requests.get(video_url, headers=headers, timeout=(10, 30), stream=True) as resp:
-                    resp.raise_for_status()
-                    size = 0
-                    with open(tmp_path, "wb") as f:
-                        for chunk in resp.iter_content(chunk_size=1024 * 1024):
-                            size += len(chunk)
-                            if size > 50 * 1024 * 1024:
-                                raise ValueError("Media exceeds 50 MB")
-                            f.write(chunk)
+                download_media(video_url, tmp_path)
             else:
-                data = base64.b64decode(video_base64)
+                data = decode_media_base64(video_base64)
                 with open(tmp_path, "wb") as f:
                     f.write(data)
 
@@ -362,7 +421,7 @@ class QwenTagger:
                 "success": False,
                 "approved": False,
                 "error_code": "GPU_MEMORY" if isinstance(e, torch.cuda.OutOfMemoryError) else "MEDIA_PROCESSING",
-                "error": str(e),
+                "error": "Media processing failed",
                 "labels": [],
                 "violations": [],
             }

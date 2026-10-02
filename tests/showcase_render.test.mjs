@@ -63,8 +63,17 @@ const touchEvent = (touches,changedTouches=touches) => ({touches,changedTouches,
 const focusEvent = (visible=true) => ({currentTarget:{matches:selector=>{assert.equal(selector,':focus-visible');return visible;}}});
 try {
   const tree=Showcase({});
-  assert.equal(find(tree,node=>node.props?.['data-showcase-layers']),undefined,'The animation has no overlaid layer cards');
-  assert.equal(find(tree,node=>node.type==='progress'||node.type==='h4'||node.props?.role==='status'),undefined,'The image stage has no loading percentages, status messages or layer guides');
+  const layers=find(tree,node=>Object.hasOwn(node.props||{},'data-showcase-layers'));
+  assert.ok(layers,'The homepage restores the five layer cards');
+  const cards=layers.children.flat().flatMap(group=>group.children.flat()).filter(node=>node.type==='article');
+  assert.equal(cards.length,5);
+  assert.ok(layers.props.className.includes('hidden md:block'),'The five-card layout is desktop only');
+  const mobilePanel=find(tree,node=>Object.hasOwn(node.props||{},'data-showcase-mobile-layer'));
+  assert.ok(mobilePanel,'Mobile has one persistent layer panel outside the animation stage');
+  assert.ok(!mobilePanel.props.className.includes('absolute'),'The mobile panel never covers the motion');
+  assert.ok(!mobilePanel.props.className.includes('overflow-x'),'Mobile layers need no horizontal scrolling');
+  assert.ok(cards.every(card=>card.props.hidden),'Layer cards wait for the corresponding decoded frame');
+  assert.equal(find(tree,node=>node.type==='progress'||node.props?.role==='status'),undefined,'The image stage has no loading percentages or status messages');
   const hotspot=find(tree,node=>node.type==='button'&&node.props?.onPointerEnter).props;
   const cleanups=fixture.effects.map(effect=>effect()).filter(fn=>typeof fn==='function');
   assert.equal(listeners.has('wheel'),false,'Wheel events never control frames or block native scrolling');
@@ -92,11 +101,13 @@ try {
   const openingTicks=runToEnd();
   assert.ok(openingTicks<=252,'The remaining sequence retains the original 4.2-second playback rate');
   assert.ok(draws.at(-1).url.includes('frame-299.webp'));
-  assert.ok(fixture.writes.length-beforeWrites<=1,'Animation ticks update only the canvas, with one endpoint state change');
+  assert.ok(fixture.writes.length-beforeWrites<=6,'Animation updates React only for five layer boundaries and the endpoint');
+  assert.ok(fixture.writes.some(([index,value])=>index===2&&value===5),'All five cards appear at the expanded frame');
   assert.equal(layoutReads,1,'Playback never measures layout');
   assert.equal(draws.at(-1).geometry[0],(1600-1600*1.28)/2,'The original contain scale and center are retained');
   hotspot.onPointerLeave(event());runToEnd();
   assert.ok(draws.at(-1).url.includes('frame-000.webp'),'Leaving the image plays back to the closed frame');
+  assert.equal(fixture.writes.filter(([index])=>index===2).at(-1)[1],0,'Closing also hides every layer card');
   hotspot.onPointerEnter(event('touch'));flush();
   assert.equal(raf.size,0,'Touch hover alone does not open the image');
   hotspot.onPointerDown(event('touch'));
@@ -194,7 +205,7 @@ try {
   assert.equal(draws.length,beforeMissing);
   assert.ok(!fixture.writes.some(([index,value])=>index===0&&value),'Missing images never enable playback');
   missingCleanups.forEach(fn=>fn());
-  console.log('PASS showcase: 150 samples, clean image stage, buffered playback and stall/resume, original framing, held touch through native scroll, finger isolation, live bounds, keyboard, reduced motion and cleanup.');
+  console.log('PASS showcase: five restored layer cards, 150 samples, buffered playback and stall/resume, original framing, held touch through native scroll, finger isolation, live bounds, keyboard, reduced motion and cleanup.');
 } finally {
   for(const name of ['showcaseFixture','Image','window','document','ResizeObserver','requestAnimationFrame','cancelAnimationFrame']) delete globalThis[name];
 }

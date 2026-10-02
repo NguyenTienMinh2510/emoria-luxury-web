@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useId, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import {createShareUrl} from '../services/shareLinks.js';
 import {
   Heart, Sparkles, ArrowLeft, ArrowRight, CheckCircle2, Copy,
   Share2, RefreshCw, AlertCircle, Plus, Trash2, Image as ImageIcon,
@@ -592,7 +593,7 @@ export default function MemoryMatchStudio({
   // Copy share invite link
   const activeShareToken = shareInviteToken || viewData?.invite_token || accessInviteToken;
   const inviteLink = matchId && activeShareToken && ['active','completed'].includes(viewData?.status)
-    ? `${window.location.origin}/?view=memory-match&match=${matchId}&invite=${activeShareToken}`
+    ? createShareUrl({view:'memory-match',match:matchId,invite:activeShareToken})
     : '';
 
   const handleCopyLink = () => {
@@ -601,7 +602,7 @@ export default function MemoryMatchStudio({
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
       if (matchId) trackEventAction('house_copy_link', 'match', matchId);
-    });
+    }).catch(() => setError('Không thể sao chép. Hãy chọn và sao chép liên kết mời đang hiển thị.'));
   };
 
   const handleNativeShare = () => {
@@ -609,7 +610,7 @@ export default function MemoryMatchStudio({
     if (navigator.share) {
       navigator.share({
         title: viewData?.title || 'Mismatch - Emoria',
-        text: 'Emoria gửi bạn lời mời tham gia Thử Thách Chơi Vui Cùng Nhau!',
+        text: `${viewData?.status === 'completed' ? 'Xem lại lượt chơi' : `Mời ${viewData?.partner_name || partnerName || 'bạn'} tham gia`} “${viewData?.title || draftTitle}”${viewData?.owner_name || ownerName ? ` cùng ${viewData?.owner_name || ownerName}` : ''}: ${viewData?.total_questions || viewData?.questions?.length || questions.length} câu hỏi để hiểu nhau hơn.`,
         url: inviteLink
       }).catch(() => {});
     } else {

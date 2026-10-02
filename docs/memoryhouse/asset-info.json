@@ -2,16 +2,16 @@
   "assets": [
     {
       "file": "memory-house.glb",
-      "bytes": 1436520,
-      "triangles": 28911
+      "bytes": 557680,
+      "triangles": 11587
     },
     {
       "file": "decorations.glb",
-      "bytes": 761384,
-      "triangles": 16428
+      "bytes": 1470680,
+      "triangles": 38518
     }
   ],
-  "reference": "public/memoryhouse",
+  "reference": "emoria-cozy-reference",
   "method": "Procedural Blender reconstruction based on supplied images; hidden surfaces inferred",
   "rooms": [
     "beginning",
@@ -32,8 +32,26 @@
     "bunting",
     "frame",
     "birdcage",
-    "candles"
+    "candles",
+    "rabbit",
+    "teddy",
+    "cloud-lamp",
+    "honey-candle",
+    "turntable",
+    "camera",
+    "daisy-rug",
+    "fern",
+    "vine",
+    "cushion",
+    "shelf",
+    "sofa",
+    "coffee-table",
+    "bistro-table",
+    "chair",
+    "cubby",
+    "desk"
   ],
   "up": "+Y",
-  "front": "+Z"
+  "front": "+Z",
+  "thumbnailBytes": 106264
 }

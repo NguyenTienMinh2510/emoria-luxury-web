@@ -47,16 +47,21 @@ export function createPlacementSolver({ template, roomId, triangles, collisionTr
     return vertices.reduce((best, p) => p.x * x + p.z * z > best.x * x + best.z * z ? p : best, vertices[0]);
   }).filter(Boolean);
   footprint.push(new THREE.Vector3((bounds.min.x + bounds.max.x) / 2, bounds.min.y, (bounds.min.z + bounds.max.z) / 2));
+  const allowed = DECORATIONS.find(d => template.name === 'decor_' + d.id)?.supportedSurfaces || [];
   const surfaces = new Map();
   for (const entry of triangles) {
     const { box, normal } = entry;
     if (box.max.x < room.minX || box.min.x > room.maxX || box.max.y < room.floorY - .03 || box.min.y > room.ceilingY) continue;
-    const wall = normal.z > .999 && Math.abs(box.max.z - box.min.z) < .001;
+    const wall = (!entry.surface || entry.surface === 'wall') && normal.z > .999 && Math.abs(box.max.z - box.min.z) < .001;
     if (!(normal.y > .999 && Math.abs(box.max.y - box.min.y) < .001) && !wall) continue;
-    if (wall && !DECORATIONS.find(d => template.name === 'decor_' + d.id)?.supportedSurfaces.includes('wall')) continue;
+    const type = wall ? 'wall' : entry.surface || (box.min.y < room.floorY + .18 ? 'floor' : 'table');
+    if (type === 'wall' && !wall) continue;
+    const horizontalSupport = type === 'table' || type === 'shelf';
+    if (!(horizontalSupport ? allowed.includes('table') || allowed.includes('shelf') : allowed.includes(type))) continue;
     const height = wall ? box.min.z : box.min.y;
-    const key = `${wall}:${height.toFixed(3)}`;
-    if (!surfaces.has(key)) surfaces.set(key, { wall, height, entries: [], box: new THREE.Box3() });
+    const parentId = entry.parentId || null;
+    const key = JSON.stringify([type, height.toFixed(3), parentId]);
+    if (!surfaces.has(key)) surfaces.set(key, { wall, height, type, parentId, entries: [], box: new THREE.Box3() });
     const surface = surfaces.get(key);
     surface.entries.push(entry); surface.box.union(box);
   }
@@ -82,7 +87,7 @@ export function createPlacementSolver({ template, roomId, triangles, collisionTr
     const interior = box.clone().expandByScalar(-.002);
     if (obstacles.some(b => interior.intersectsBox(b))) return null;
     if (nearbyTriangles.some(e => interior.intersectsBox(e.box) && interior.intersectsTriangle(e.triangle))) return null;
-    return { isValid: true, position: position.toArray(), surface: surface.wall ? 'wall' : surface.height < room.floorY + .18 ? 'floor' : 'table', parentId: null, roomId, scale };
+    return { isValid: true, position: position.toArray(), surface: surface.type, parentId: surface.parentId, roomId, scale };
   }
   let fallback;
   function choices() {

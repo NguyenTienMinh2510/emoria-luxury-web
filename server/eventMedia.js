@@ -1,4 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
+import {approvedHousePhotoPaths} from './housePreview.js';
+
+export async function signPublishedHousePaths(paths,view,identity) {
+  const approved=await approvedHousePhotoPaths(paths,view,identity);
+  return signEventPaths(approved,120);
+}
 
 /**
  * Tạo Signed URLs có thời hạn cho danh sách ảnh thuộc bucket private 'emoria-event-media'
@@ -73,6 +79,7 @@ export function enrichHouseRoomsWithSignedUrls(rooms, signedMap = {}, {ownerDraf
   if (!Array.isArray(rooms)) return rooms;
   return rooms.map(r => {
     const roomCopy = { ...r };
+    if (!ownerDraft) delete roomCopy.share_preview_path;
     if (!ownerDraft && roomCopy.journey_letter) {
       if (roomCopy.journey_letter.is_shared !== true) {
         delete roomCopy.journey_letter;

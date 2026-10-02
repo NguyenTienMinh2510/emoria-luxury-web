@@ -1,13 +1,14 @@
 // Explicit resource routes. SQL functions remain the transaction boundary.
 import {createClient} from '@supabase/supabase-js';
-import {eventRpc,isEventRpc,streamMatch} from './eventGateway.js';
+import {eventRpc,eventAdmin,isEventRpc,streamMatch} from './eventGateway.js';
 import {normalizeCheckout} from '../src/services/checkoutPayload.js';
 import {analyzeVideo,readVideoLabels,readVideoUploads} from './videoLabels.js';
 import {craftLetter,warmupAi} from './aiService.js';
 import {tryOnConfig} from './tryOn.js';
-import {signEventPaths,enrichMatchQuestionsWithSignedUrls,enrichHouseRoomsWithSignedUrls} from './eventMedia.js';
+import {signEventPaths,signPublishedHousePaths,enrichMatchQuestionsWithSignedUrls,enrichHouseRoomsWithSignedUrls} from './eventMedia.js';
 import {signMemoryMedia} from './memoryMedia.js';
 import {moderateHousePhotos} from './houseModeration.js';
+import {validateHousePreview,attachHousePreview} from './housePreview.js';
 const route=(method,path,access,run,status)=>({method,pattern:new RegExp(`^${path}$`),access,run,status});
 const rpc=(c,name,args={})=>isEventRpc(name)?eventRpc(c,name,args):c.db(c.client.rpc(name,args));
 const integer=(value,fallback,max=10000)=>{const n=Number(value??fallback);if(!Number.isInteger(n)||n<0||n>max)throw Object.assign(new Error('Tham số phân trang không hợp lệ.'),{status:400});return n;};
@@ -21,8 +22,11 @@ export const routes=[
     if(!config)throw Object.assign(new Error('AR is not available for this product.'),{status:404});
     return config;
   }),
-  route('POST','/ai/warmup','public',warmupAi),
-  route('GET','/ai/warmup','public',warmupAi),
+  route('POST','/ai/warmup','user',async c=>{
+    const limit=await c.db(eventAdmin().rpc('rpc_check_rate_limit',{p_key:`ai_warmup:${c.user.id}`,p_max_burst:3,p_window_seconds:3600}));
+    if(!limit?.allowed)throw Object.assign(new Error('Hãy thử lại sau.'),{status:429});
+    return warmupAi();
+  }),
   route('POST','/ai/craft-letter','user',craftLetter),
   route('GET','/admin/accounts','admin',c=>rpc(c,'rpc_admin_accounts',{p_search:(c.query.get('search')||'').slice(0,120)})),
   route('POST','/admin/memories','admin',c=>rpc(c,'rpc_admin_create_memory',{p_owner:c.body.ownerId,p_title:c.body.title}),201),
@@ -295,9 +299,10 @@ export const routes=[
     }
     return draft;
   }),
-  route('PUT','/memories/([^/]+)/house/draft','user',c=>{
+  route('PUT','/memories/([^/]+)/house/draft','user',async c=>{
     if(c.body.title!==undefined&&typeof c.body.title!=='string')throw Object.assign(new Error('Tiêu đề không hợp lệ.'),{status:400});
     if(c.body.rooms!==undefined&&!Array.isArray(c.body.rooms))throw Object.assign(new Error('Danh sách phòng phải là một mảng.'),{status:400});
+    await validateHousePreview(c.body.rooms,c.params[0],c.client);
     return rpc(c,'rpc_house_save_draft',{
       p_tag_uid:c.params[0],
       p_title:c.body.title??null,
@@ -305,9 +310,10 @@ export const routes=[
       p_rooms:c.body.rooms??null
     });
   }),
-  route('POST','/memories/([^/]+)/house/draft','user',c=>{
+  route('POST','/memories/([^/]+)/house/draft','user',async c=>{
     if(c.body.title!==undefined&&typeof c.body.title!=='string')throw Object.assign(new Error('Tiêu đề không hợp lệ.'),{status:400});
     if(c.body.rooms!==undefined&&!Array.isArray(c.body.rooms))throw Object.assign(new Error('Danh sách phòng phải là một mảng.'),{status:400});
+    await validateHousePreview(c.body.rooms,c.params[0],c.client);
     return rpc(c,'rpc_house_save_draft',{
       p_tag_uid:c.params[0],
       p_title:c.body.title??null,
@@ -316,8 +322,10 @@ export const routes=[
     });
   }),
   route('POST','/memories/([^/]+)/house/publish','user',async c=>{
-    await moderateHousePhotos(c,c.params[0]);
-    const res=await rpc(c,'rpc_house_publish',{p_tag_uid:c.params[0]});
+    const draft=await rpc(c,'rpc_house_get_draft',{p_tag_uid:c.params[0]});
+    await validateHousePreview(draft?.rooms,c.params[0],c.client);
+    await moderateHousePhotos(c,c.params[0],draft);
+    const res=await rpc(c,'rpc_house_publish',{p_tag_uid:c.params[0],expected_revision:draft.draft_revision});
 
     return res;
   }),
@@ -331,6 +339,7 @@ export const routes=[
 
     if(!c.params[0]||c.params[0].length>64)throw Object.assign(new Error('Mã liên kết không hợp lệ.'),{status:400});
     const view=await rpc(c,'rpc_house_public_view',{p_share_id:c.params[0]});
+    await attachHousePreview(view,{shareId:c.params[0]});
     if(view&&Array.isArray(view.rooms)){
       const paths=[];
       for(const r of view.rooms){
@@ -342,7 +351,7 @@ export const routes=[
       }
       let signedMap={};
       if(paths.length>0){
-        try{signedMap=await signEventPaths(paths);}catch{/* Bỏ ảnh nếu storage lỗi hoặc chưa cấu hình key */}
+        try{signedMap=await signPublishedHousePaths(paths,view,{shareId:c.params[0]});}catch{/* Bỏ ảnh nếu storage lỗi hoặc chưa cấu hình key */}
       }
       view.rooms=enrichHouseRoomsWithSignedUrls(view.rooms,signedMap);
     }
@@ -352,6 +361,7 @@ export const routes=[
 
     if(!c.params[0]||c.params[0].length>64)throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'),{status:400});
     const view=await rpc(c,'rpc_house_tag_public_view',{p_tag_uid:c.params[0]});
+    await attachHousePreview(view,{tagUid:c.params[0]});
     if(view&&Array.isArray(view.rooms)){
       const paths=[];
       for(const r of view.rooms){
@@ -363,7 +373,7 @@ export const routes=[
       }
       let signedMap={};
       if(paths.length>0){
-        try{signedMap=await signEventPaths(paths);}catch{/* Bỏ ảnh nếu storage lỗi hoặc chưa cấu hình key */}
+        try{signedMap=await signPublishedHousePaths(paths,view,{tagUid:c.params[0]});}catch{/* Bỏ ảnh nếu storage lỗi hoặc chưa cấu hình key */}
       }
       view.rooms=enrichHouseRoomsWithSignedUrls(view.rooms,signedMap);
     }

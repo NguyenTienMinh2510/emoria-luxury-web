@@ -1,0 +1,1055 @@
+{
+  "version": 2,
+  "method": "Low-poly procedural reconstruction from reference silhouettes; unseen surfaces inferred",
+  "curation": "Subjective editorial choice for a smaller varied catalog; no user popularity data",
+  "house": {
+    "references": [
+      "H01",
+      "H02",
+      "H03",
+      "H04"
+    ],
+    "furnishedReference": "H05",
+    "roomReferences": [
+      "R01",
+      "R02",
+      "R03",
+      "R04",
+      "R05"
+    ],
+    "count": 1,
+    "architectureOnly": true
+  },
+  "assets": [
+    {
+      "id": "calendar",
+      "name": "Ngày của đôi mình",
+      "image": "/memoryhouse/models/thumbnails/calendar.jpg",
+      "photoCount": 1,
+      "textLabel": "Ngày / lời nhắn trên lịch",
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf",
+        "wall"
+      ],
+      "category": "memories",
+      "featured": false,
+      "referenceId": "D01",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.48,
+        "depth": 0.26,
+        "height": 0.46
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D01-clover-calendar-01-front.jpg"
+    },
+    {
+      "id": "cat",
+      "name": "Mèo ngủ ngoan",
+      "image": "/memoryhouse/models/thumbnails/cat.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "pets",
+      "featured": true,
+      "referenceId": "D02",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.5,
+        "depth": 0.45,
+        "height": 0.28
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D02-sleeping-cat-01-front.jpg"
+    },
+    {
+      "id": "nameplate",
+      "name": "Biển tên nhỏ",
+      "image": "/memoryhouse/models/thumbnails/nameplate.jpg",
+      "photoCount": 1,
+      "textLabel": "Chữ trên biển tên",
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "memories",
+      "featured": false,
+      "referenceId": "D03",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.76,
+        "depth": 0.26,
+        "height": 0.35
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D03-cloud-nameplate-01-front.jpg"
+    },
+    {
+      "id": "plant",
+      "name": "Cây tình yêu",
+      "image": "/memoryhouse/models/thumbnails/plant.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "plants",
+      "featured": true,
+      "referenceId": "D04",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.4,
+        "depth": 0.4,
+        "height": 0.55
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D04-round-heart-plant-01-front.jpg"
+    },
+    {
+      "id": "mugs",
+      "name": "Cốc toast",
+      "image": "/memoryhouse/models/thumbnails/mugs.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "home",
+      "featured": true,
+      "referenceId": "D05",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.5,
+        "depth": 0.42,
+        "height": 0.3
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D05-toast-mug-butter-01-front.jpg"
+    },
+    {
+      "id": "lamp",
+      "name": "Đèn ấm áp",
+      "image": "/memoryhouse/models/thumbnails/lamp.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "home",
+      "featured": true,
+      "referenceId": "D07",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.54,
+        "depth": 0.54,
+        "height": 0.48
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D07-mushroom-lamp-01-front.jpg"
+    },
+    {
+      "id": "vase",
+      "name": "Bình hoa giấy",
+      "image": "/memoryhouse/models/thumbnails/vase.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "plants",
+      "featured": true,
+      "referenceId": "D08",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.35,
+        "depth": 0.35,
+        "height": 0.55
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D08-paper-bag-vase-01-front.jpg"
+    },
+    {
+      "id": "album",
+      "name": "Album kỷ niệm",
+      "image": "/memoryhouse/models/thumbnails/album.jpg",
+      "photoCount": 2,
+      "textLabel": "Lời nhắn trên album",
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "memories",
+      "featured": true,
+      "referenceId": "D09",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.55,
+        "depth": 0.45,
+        "height": 0.15
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D09-open-memory-album-01-front.jpg"
+    },
+    {
+      "id": "bunting",
+      "name": "Dây ảnh",
+      "image": "/memoryhouse/models/thumbnails/bunting.jpg",
+      "photoCount": 3,
+      "textLabel": "Lời nhắn trên dây ảnh",
+      "defaultSurface": "wall",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf",
+        "wall",
+        "ceiling"
+      ],
+      "category": "memories",
+      "featured": false,
+      "referenceId": "D10",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.95,
+        "depth": 0.24,
+        "height": 0.65
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D10-star-photo-bunting-01-front.jpg"
+    },
+    {
+      "id": "frame",
+      "name": "Khung ảnh",
+      "image": "/memoryhouse/models/thumbnails/frame.jpg",
+      "photoCount": 1,
+      "textLabel": "Lời nhắn trên khung ảnh",
+      "defaultSurface": "wall",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf",
+        "wall"
+      ],
+      "category": "memories",
+      "featured": true,
+      "referenceId": "D11",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.52,
+        "depth": 0.24,
+        "height": 0.39
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D11-biscuit-photo-frame-01-front.jpg"
+    },
+    {
+      "id": "birdcage",
+      "name": "Chim nhỏ",
+      "image": "/memoryhouse/models/thumbnails/birdcage.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "pets",
+      "featured": false,
+      "referenceId": "D12",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.35,
+        "depth": 0.35,
+        "height": 0.5
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D12-songbird-open-perch-01-front.jpg"
+    },
+    {
+      "id": "candles",
+      "name": "Nến hẹn hò",
+      "image": "/memoryhouse/models/thumbnails/candles.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "home",
+      "featured": false,
+      "referenceId": null,
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.35,
+        "depth": 0.25,
+        "height": 0.3
+      },
+      "sourceReference": "docs/memoryhouse/original-reference-images/Create_ONE_isolated_miniature__24.jpg"
+    },
+    {
+      "id": "rabbit",
+      "name": "Thỏ tai cụp",
+      "image": "/memoryhouse/models/thumbnails/rabbit.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "pets",
+      "featured": false,
+      "referenceId": "D15",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.38,
+        "depth": 0.32,
+        "height": 0.55
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D15-lop-rabbit-01-front.jpg"
+    },
+    {
+      "id": "teddy",
+      "name": "Gấu áo len",
+      "image": "/memoryhouse/models/thumbnails/teddy.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "pets",
+      "featured": false,
+      "referenceId": "D16",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.42,
+        "depth": 0.35,
+        "height": 0.55
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D16-sweater-teddy-01-front.jpg"
+    },
+    {
+      "id": "cloud-lamp",
+      "name": "Đèn mây",
+      "image": "/memoryhouse/models/thumbnails/cloud-lamp.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf",
+        "floor"
+      ],
+      "category": "home",
+      "featured": false,
+      "referenceId": "D24",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.55,
+        "depth": 0.25,
+        "height": 0.38
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D24-cloud-lamp-01-front.jpg"
+    },
+    {
+      "id": "honey-candle",
+      "name": "Nến trong hũ",
+      "image": "/memoryhouse/models/thumbnails/honey-candle.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "category": "home",
+      "featured": false,
+      "referenceId": "D25",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.3,
+        "depth": 0.3,
+        "height": 0.28
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D25-honey-jar-candle-01-front.jpg"
+    },
+    {
+      "id": "turntable",
+      "name": "Máy đĩa nhạc",
+      "image": "/memoryhouse/models/thumbnails/turntable.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "category": "home",
+      "featured": false,
+      "referenceId": "D30",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.55,
+        "depth": 0.42,
+        "height": 0.21
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D30-pastel-turntable-01-front.jpg"
+    },
+    {
+      "id": "camera",
+      "name": "Máy ảnh lấy liền",
+      "image": "/memoryhouse/models/thumbnails/camera.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "category": "memories",
+      "featured": false,
+      "referenceId": "D31",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.36,
+        "depth": 0.27,
+        "height": 0.34
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D31-instant-camera-01-front.jpg"
+    },
+    {
+      "id": "daisy-rug",
+      "name": "Thảm hoa cúc",
+      "image": "/memoryhouse/models/thumbnails/daisy-rug.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor"
+      ],
+      "category": "furniture",
+      "featured": false,
+      "referenceId": "D35",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 1.3,
+        "depth": 1.3,
+        "height": 0.035
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D35-daisy-rug-01-front.jpg"
+    },
+    {
+      "id": "fern",
+      "name": "Chậu dương xỉ",
+      "image": "/memoryhouse/models/thumbnails/fern.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "plants",
+      "featured": false,
+      "referenceId": "D37",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.55,
+        "depth": 0.45,
+        "height": 0.6
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D37-fern-planter-01-front.jpg"
+    },
+    {
+      "id": "vine",
+      "name": "Chậu cây rủ",
+      "image": "/memoryhouse/models/thumbnails/vine.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf",
+        "floor"
+      ],
+      "category": "plants",
+      "featured": false,
+      "referenceId": "D38",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.4,
+        "depth": 0.4,
+        "height": 0.38
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D38-trailing-vine-planter-01-front.jpg"
+    },
+    {
+      "id": "cushion",
+      "name": "Đệm ngồi tròn",
+      "image": "/memoryhouse/models/thumbnails/cushion.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor"
+      ],
+      "category": "furniture",
+      "featured": false,
+      "referenceId": "D39",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.65,
+        "depth": 0.65,
+        "height": 0.22
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D39-round-floor-cushion-01-front.jpg"
+    },
+    {
+      "id": "shelf",
+      "name": "Kệ tường gợn sóng",
+      "image": "/memoryhouse/models/thumbnails/shelf.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "wall",
+      "supportedSurfaces": [
+        "wall"
+      ],
+      "category": "furniture",
+      "featured": false,
+      "referenceId": "D40",
+      "supportsItems": true,
+      "dimensions": {
+        "width": 1,
+        "depth": 0.35,
+        "height": 0.22
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D40-scallop-wall-shelf-01-front.jpg"
+    },
+    {
+      "id": "sofa",
+      "name": "Sofa bo tròn",
+      "image": "/memoryhouse/models/thumbnails/sofa.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor"
+      ],
+      "category": "furniture",
+      "featured": true,
+      "referenceId": "D41",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 1.65,
+        "depth": 0.72,
+        "height": 0.8
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D41-rounded-sofa-01-front.jpg"
+    },
+    {
+      "id": "coffee-table",
+      "name": "Bàn trà hạt đậu",
+      "image": "/memoryhouse/models/thumbnails/coffee-table.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor"
+      ],
+      "category": "furniture",
+      "featured": true,
+      "referenceId": "D42",
+      "supportsItems": true,
+      "dimensions": {
+        "width": 1.15,
+        "depth": 0.65,
+        "height": 0.37
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D42-bean-coffee-table-01-front.jpg"
+    },
+    {
+      "id": "bistro-table",
+      "name": "Bàn tròn",
+      "image": "/memoryhouse/models/thumbnails/bistro-table.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor"
+      ],
+      "category": "furniture",
+      "featured": false,
+      "referenceId": "D43",
+      "supportsItems": true,
+      "dimensions": {
+        "width": 1.1,
+        "depth": 1.1,
+        "height": 0.63
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D43-round-bistro-table-01-front.jpg"
+    },
+    {
+      "id": "chair",
+      "name": "Ghế tựa cong",
+      "image": "/memoryhouse/models/thumbnails/chair.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor"
+      ],
+      "category": "furniture",
+      "featured": true,
+      "referenceId": "D44",
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.48,
+        "depth": 0.5,
+        "height": 0.73
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D44-curved-chair-01-front.jpg"
+    },
+    {
+      "id": "cubby",
+      "name": "Kệ ô vuông",
+      "image": "/memoryhouse/models/thumbnails/cubby.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor"
+      ],
+      "category": "furniture",
+      "featured": true,
+      "referenceId": "D45",
+      "supportsItems": true,
+      "dimensions": {
+        "width": 1.2,
+        "depth": 0.45,
+        "height": 0.75
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D45-rounded-cubby-storage-01-front.jpg"
+    },
+    {
+      "id": "desk",
+      "name": "Bàn viết",
+      "image": "/memoryhouse/models/thumbnails/desk.jpg",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor"
+      ],
+      "category": "furniture",
+      "featured": true,
+      "referenceId": "D46",
+      "supportsItems": true,
+      "dimensions": {
+        "width": 1.6,
+        "depth": 0.6,
+        "height": 0.63
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D46-curved-writing-desk-01-front.jpg"
+    }
+  ],
+  "excluded": [
+    {
+      "referenceId": "D06",
+      "reason": "Biến thể mứt của cùng cốc toast D05",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D13",
+      "reason": "Nến bánh trang trí; giữ nến hũ trung tính D25",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D14",
+      "reason": "Mascot theo sở thích riêng; giữ mèo, thỏ và gấu",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D17",
+      "reason": "Đệm corgi trùng chức năng đệm tròn D39",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D18",
+      "reason": "Mascot theo sở thích riêng; giữ mèo, thỏ và gấu",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D19",
+      "reason": "Nhóm vịt trùng vai trò mascot",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D20",
+      "reason": "Biến thể kích thước của nhóm vịt D19",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D21",
+      "reason": "Mascot bổ sung ngoài bộ nhỏ",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D22",
+      "reason": "Đèn hình trái cây trùng chức năng D07/D24",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D23",
+      "reason": "Đèn hình trái cây trùng chức năng D07/D24",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D26",
+      "reason": "Khung ảnh thứ hai trùng chức năng D11",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D27",
+      "reason": "Cốc avocado trùng chức năng cốc D05",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D28",
+      "reason": "Biến thể lõm của cốc avocado D27",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D29",
+      "reason": "Chậu cây trong cốc trùng chức năng D04/D37/D38",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D32",
+      "reason": "Quả cầu tuyết mang phong cách riêng và vật liệu trong suốt",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D33",
+      "reason": "Hũ sao giấy mang phong cách riêng",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D34",
+      "reason": "Biến thể hũ giấy D33",
+      "sourceRetained": true
+    },
+    {
+      "referenceId": "D36",
+      "reason": "Quả thông mang tính mùa vụ",
+      "sourceRetained": true
+    }
+  ],
+  "sourcesRetained": true,
+  "sourceFiles": [
+    {
+      "path": "emoria-cozy-reference/00-style/S00-cozy-style-reference.jpg",
+      "bytes": 76911,
+      "sha256": "13f05c201d65e17f86129436dd8a4a6e07bfe148a1ac05791c47f83acd179216"
+    },
+    {
+      "path": "emoria-cozy-reference/01-house/H01-house-empty-front.jpg",
+      "bytes": 66498,
+      "sha256": "89cc1be9c6d62645f09994bfaa36829e610d20a412cb80c135282a6d7a98b89d"
+    },
+    {
+      "path": "emoria-cozy-reference/01-house/H02-house-empty-left.jpg",
+      "bytes": 66087,
+      "sha256": "0f97de1129bd87e74e9d4a5fef6c56b82525354dc29bd2e3b6fbcc6365ca4311"
+    },
+    {
+      "path": "emoria-cozy-reference/01-house/H03-house-empty-right.jpg",
+      "bytes": 72947,
+      "sha256": "def374f1f989c52f4ea98b09a31e052921003b2a43d0658f7c6d84fd19d08729"
+    },
+    {
+      "path": "emoria-cozy-reference/01-house/H04-house-empty-back.jpg",
+      "bytes": 58125,
+      "sha256": "4554ef79cee80110c5c129a1f0e32909d1c7cb5b4c0807f861671e14f727e6c2"
+    },
+    {
+      "path": "emoria-cozy-reference/01-house/H05-house-furnished-front.jpg",
+      "bytes": 95652,
+      "sha256": "c8ae66bd6e92c68f908766c7d0f4c5dad2bd8f87ec73f9686cd919b1ffde57bf"
+    },
+    {
+      "path": "emoria-cozy-reference/02-rooms/R01-beginning.jpg",
+      "bytes": 109360,
+      "sha256": "2995721372f66e13e668f5b0da633ce8e70dcf2a2f7a0d0faa7eaab4603c3581"
+    },
+    {
+      "path": "emoria-cozy-reference/02-rooms/R02-first.jpg",
+      "bytes": 83299,
+      "sha256": "c7097d10f8004ca8f929d87e8b3fe355ef109cb015703552acdf5259895703f1"
+    },
+    {
+      "path": "emoria-cozy-reference/02-rooms/R03-little-things.jpg",
+      "bytes": 84481,
+      "sha256": "5fc80d0dd7cf7ccdca84041dbc2e99bcc40f2d5f3bef47d3e1e6a64f3ee4e287"
+    },
+    {
+      "path": "emoria-cozy-reference/02-rooms/R04-memories.jpg",
+      "bytes": 78153,
+      "sha256": "b174c7a61b8b6d406300954b5aef1afc2ae4e654b81675f0c91d8dd72e373558"
+    },
+    {
+      "path": "emoria-cozy-reference/02-rooms/R05-next-chapter.jpg",
+      "bytes": 60385,
+      "sha256": "fb16bf868841bc70d283a5aed8416e35f1361b7542f67c65e47ef50fc1a13d5c"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D01-clover-calendar-01-front.jpg",
+      "bytes": 60696,
+      "sha256": "2e7e6e077f7e49bd41a4c0ff89f50c698888bea4681be5f40aacc991e003a022"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D02-sleeping-cat-01-front.jpg",
+      "bytes": 57170,
+      "sha256": "ef10ee5f7ecdc49b735b4a0a1669693310ac1e08c6967bfc454c26e3ecf7c88c"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D03-cloud-nameplate-01-front.jpg",
+      "bytes": 45305,
+      "sha256": "1f5ac07f24af316fd645f036178a6c0dc5b580934caf5d0b48f866e6db60904d"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D04-round-heart-plant-01-front.jpg",
+      "bytes": 47380,
+      "sha256": "21edd3ef432966a937d4b54dca707766edefc4d2b3a5e6db92c920ab87c522df"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D05-toast-mug-butter-01-front.jpg",
+      "bytes": 47565,
+      "sha256": "80e1fbd8eddaeb60fd1eb1fb6a233da51bbe2afcb548598ce151370f97548b7b"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D06-toast-mug-jam-01-front.jpg",
+      "bytes": 50848,
+      "sha256": "031429978dfadda661c0b4c5ccae60068600f0b9c356f4a2860221d1e3859381"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D07-mushroom-lamp-01-front.jpg",
+      "bytes": 42503,
+      "sha256": "309940573cdcae40edd01a490995b148406001ae597c659c7b975aacbba70c91"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D08-paper-bag-vase-01-front.jpg",
+      "bytes": 47454,
+      "sha256": "d185b77241213fe69148c866ddf2733e6719d485cd15508809d1138a922f4d8a"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D09-open-memory-album-01-front.jpg",
+      "bytes": 49196,
+      "sha256": "177c4cb18cd9811635d62018917509e7144eb9ae226db18b96f7b0da487e737e"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D10-star-photo-bunting-01-front.jpg",
+      "bytes": 58989,
+      "sha256": "43f446605f878280f0e51b2accc9cb2d6b06722aae872ac6a9bb9eaceb5121bd"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D11-biscuit-photo-frame-01-front.jpg",
+      "bytes": 49639,
+      "sha256": "63c0365ea34284f2074d35fb03338f9b2e853663f73b08ee8cf4dd4cc9e02037"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D12-songbird-open-perch-01-front.jpg",
+      "bytes": 43876,
+      "sha256": "91823a795a4035d319f2ceaa0f8e75e886cac7c2990406d3766bc16e7bd25b6b"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D13-strawberry-cake-candle-01-front.jpg",
+      "bytes": 39405,
+      "sha256": "1bb9d31eeaccc2d03c5805ee9a5a23b48461e77837809cc0d680767f6d9f7a55"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D14-orange-capybara-01-front.jpg",
+      "bytes": 43881,
+      "sha256": "aef114a706624f96eefbd9c4f499645bfacc74391f67721f17aadedf72cf6ea2"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D15-lop-rabbit-01-front.jpg",
+      "bytes": 42099,
+      "sha256": "0766809d6bdfea96bf5854243397551120a6748f7156c68a58485a16446a8cac"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D16-sweater-teddy-01-front.jpg",
+      "bytes": 47994,
+      "sha256": "0cc4f2f52bb5046da9a45a065d64f3f9045e460ff9d3131a36658c85cc3b2ea9"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D17-corgi-cushion-01-front.jpg",
+      "bytes": 60730,
+      "sha256": "8e9ac8a3146f804a6b5956d5a172ad77f4ae577ecb465d7e309ec480db219cbb"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D18-letter-shiba-01-front.jpg",
+      "bytes": 41544,
+      "sha256": "d126c9e800905f77c585a78bba751c50228cbbd9e84466a4fc336c1491e2bc7e"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D19-mother-duck-01-front.jpg",
+      "bytes": 37964,
+      "sha256": "82940923a9d75fc9a41f3643ff20aa9eb303aad699d9e7cd7a10cec039d82d19"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D20-duckling-01-front.jpg",
+      "bytes": 36531,
+      "sha256": "227431dad9775936aadf81467cb9ab274f20e0249cf8dbae30f35bc6dd79fe8b"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D21-plush-penguin-01-front.jpg",
+      "bytes": 75371,
+      "sha256": "8cafe05c9f1600eac0ae257b0eb9a0f2f9608e76350a2a10d66db67683711933"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D22-pear-lamp-01-front.jpg",
+      "bytes": 34670,
+      "sha256": "cac14e0854f6d2bca5213fef3b74035ffd871aea58fe9c9c6995a5ebdf59af03"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D23-orange-lamp-01-front.jpg",
+      "bytes": 37439,
+      "sha256": "c91fd74fab9de2125e341c4865d1d0bc451a9688fd0f8de291df3e4fd67cba55"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D24-cloud-lamp-01-front.jpg",
+      "bytes": 34401,
+      "sha256": "5440bc62b1d70d4c0a878780a5e744365fd4299ae71b92c408d869cc65fc3212"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D25-honey-jar-candle-01-front.jpg",
+      "bytes": 80339,
+      "sha256": "76f848ef356e387aa776b60777e5f94c73774dbec560a0dd4411e8a8c83b3060"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D26-star-clip-wood-frame-01-front.jpg",
+      "bytes": 60585,
+      "sha256": "6fafdc2cf0a35d026a7c7141fc16d81ea813e47ae310416b2548c71b229e57c8"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D27-avocado-mug-raised-pit-01-front.jpg",
+      "bytes": 43717,
+      "sha256": "3578ed3950a13f60ab2c96f48885427dd58a3c2f002299302e6a5de4f7f54c17"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D28-avocado-mug-recessed-pit-01-front.jpg",
+      "bytes": 41930,
+      "sha256": "7f9ce53f308966ac914223d61e26539afe7067229e0463f82cb84031e85de622"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D29-teacup-succulent-01-front.jpg",
+      "bytes": 47675,
+      "sha256": "dc3b8bcd00305ebae9eb7685faddc5278fe077a0917277f499ebd04c31b6705d"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D30-pastel-turntable-01-front.jpg",
+      "bytes": 50718,
+      "sha256": "2b65f6538010b77a0c8749e1e23b62d5d7430122da203d5178a24436a1540a7c"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D31-instant-camera-01-front.jpg",
+      "bytes": 55031,
+      "sha256": "56767517ee8882420f4589cb20b06aedc5c4128eec09b025adc176a7bebbd834"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D32-memory-snow-globe-01-front.jpg",
+      "bytes": 49971,
+      "sha256": "6c5ebed6f6f15242a0560fe57b228ce59bd087cb9a67cf5cbd2aa78054789d9b"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D33-paper-star-jar-01-front.jpg",
+      "bytes": 64453,
+      "sha256": "2b118e990963b17bb67527bf388904f09b60877c2f73613baed53dbbdb3e7e58"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D34-paper-crane-jar-01-front.jpg",
+      "bytes": 58491,
+      "sha256": "7502cdb32731e876490f1e1c857a9e595df26693cb6467ac3ec74c57526fcace"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D35-daisy-rug-01-front.jpg",
+      "bytes": 85617,
+      "sha256": "ffe4b33c2e8f3fbf0323155fc06e9c5be559ec3a4b901019a0f0ccc84df40ae8"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D36-pinecone-01-front.jpg",
+      "bytes": 67808,
+      "sha256": "30812d018e29a0a0ee9af5726612184ae62b8edd54a476b38bf5ff82aab7c9c0"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D37-fern-planter-01-front.jpg",
+      "bytes": 67444,
+      "sha256": "b21daf49035622f462f568ba3fad0ea7f4b206482195f2cc048443fdb5f73681"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D38-trailing-vine-planter-01-front.jpg",
+      "bytes": 46498,
+      "sha256": "39502cd2435fe713173e4961cf15debcb152a4ab6a573b5a0e8f67b8ef453b0e"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D39-round-floor-cushion-01-front.jpg",
+      "bytes": 109524,
+      "sha256": "8ea96c92d7c83d03c7899100b905e491abc0c53c2e395e51ecc71306ddc54e8b"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D40-scallop-wall-shelf-01-front.jpg",
+      "bytes": 52829,
+      "sha256": "4e9423e647ad2f4dbf8f194c09de58398cf2158797fa1b39125cc684186f124a"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D41-rounded-sofa-01-front.jpg",
+      "bytes": 51263,
+      "sha256": "441ae6fcd53a27501e40fc3c8fb81db5327ee2c936a2be432927a498f10e1c80"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D42-bean-coffee-table-01-front.jpg",
+      "bytes": 52954,
+      "sha256": "181a902261d86d21297d276d3b99af6b90c69544c3174dad987093dfcce97f94"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D43-round-bistro-table-01-front.jpg",
+      "bytes": 41478,
+      "sha256": "c4c92418c9a1d2799181aa049f6e53836485f2777f3b180caa0559fd9a1a70bc"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D44-curved-chair-01-front.jpg",
+      "bytes": 55805,
+      "sha256": "6c1d5b6d23b1047c5a8307bb6a848d71b76ef3925847464805ad659d7a106c8c"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D45-rounded-cubby-storage-01-front.jpg",
+      "bytes": 63351,
+      "sha256": "41a3f360574c43e75e2ed120c709a2e905ae6a642801f244349fcd77992419e0"
+    },
+    {
+      "path": "emoria-cozy-reference/03-assets/D46-curved-writing-desk-01-front.jpg",
+      "bytes": 56947,
+      "sha256": "28fb1fc51652eaf2c992f2857052cb9c8b607fbdd7a36e8e0a837c11093c4f47"
+    }
+  ]
+}

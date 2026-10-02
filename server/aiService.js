@@ -4,6 +4,40 @@ const MODAL_TAGGER_ENDPOINT = process.env.MODAL_TAGGER_URL || 'https://nguyentie
 const MODAL_LETTER_ENDPOINT = process.env.MODAL_LETTER_URL || process.env.MODAL_TAGGER_URL?.replace(/tag-video\/?$/, 'craft-letter') || 'https://nguyentienminh2510--emoria-qwen-tagger-qwentagger-craft-letter.modal.run';
 
 const failure = (message, status = 502) => Object.assign(new Error(message), { status });
+const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
+
+function modalHeaders() {
+  const tokenId = process.env.MODAL_PROXY_TOKEN_ID;
+  const tokenSecret = process.env.MODAL_PROXY_TOKEN_SECRET;
+  if (!/^wk-[A-Za-z0-9_-]+$/.test(tokenId || '') || !/^ws-[A-Za-z0-9_-]+$/.test(tokenSecret || '')) {
+    throw failure('Dịch vụ AI chưa được cấu hình xác thực.', 503);
+  }
+  return { 'Content-Type': 'application/json', 'Modal-Key': tokenId, 'Modal-Secret': tokenSecret };
+}
+
+function validateMediaUrl(value) {
+  try {
+    const origin = new URL(process.env.MODAL_STORAGE_ORIGIN || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '');
+    const url = new URL(value);
+    if (typeof value !== 'string' || value.length > 8192 || /[\x00-\x1f]/.test(value) ||
+        origin.protocol !== 'https:' || !/^[a-z0-9-]+\.supabase\.co$/.test(origin.host) ||
+        origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash ||
+        url.protocol !== 'https:' || url.host !== origin.host || url.username || url.password || url.hash) throw new Error();
+    // Check the raw path too: URL() normalizes literal dot segments.
+    if (/(?:^|\/)\.{1,2}(?:\/|$)|\\/.test(decodeURIComponent(value.split('?')[0]))) throw new Error();
+    const parts = url.pathname.split('/');
+    if (parts.slice(0, 5).join('/') !== '/storage/v1/object/sign' || parts.length < 7 ||
+        !['emoria-memory', 'emoria-event-media'].includes(parts[5])) throw new Error();
+    for (const part of parts.slice(6)) {
+      const decoded = decodeURIComponent(part);
+      if (!decoded || ['.', '..'].includes(decoded) || /[\\/%\x00-\x1f]/.test(decoded)) throw new Error();
+    }
+    const query = [...url.searchParams.entries()];
+    if (query.length !== 1 || query[0][0] !== 'token' || !/^[A-Za-z0-9._-]{1,4096}$/.test(query[0][1])) throw new Error();
+  } catch {
+    throw failure('Đường dẫn phương tiện không hợp lệ.', 422);
+  }
+}
 
 // Bảng mẫu thư tay sang trọng dự phòng khi ngoại tuyến
 const FALLBACK_TEMPLATES = {
@@ -45,26 +79,33 @@ export async function labelWithQwen(media, { fetchImpl = fetch, type, url } = {}
   let mediaType = type;
 
   if (url) {
-    // Only callers that sign an authorized Storage object may supply this URL.
-    if (new URL(url).protocol !== 'https:' || !['video', 'image'].includes(type)) throw failure('Đường dẫn phương tiện không hợp lệ.', 422);
+    validateMediaUrl(url);
   } else if (typeof media?.arrayBuffer === 'function') {
+    if (media.size > MAX_MEDIA_BYTES) throw failure('Phương tiện tối đa 50 MB.', 422);
     const ab = await media.arrayBuffer();
+    if (!ab.byteLength || ab.byteLength > MAX_MEDIA_BYTES) throw failure('Phương tiện tối đa 50 MB.', 422);
     base64 = Buffer.from(ab).toString('base64');
     if (!mediaType) mediaType = media.type?.startsWith('video/') ? 'video' : 'image';
   } else if (Buffer.isBuffer(media) || media instanceof Uint8Array) {
+    if (!media.byteLength || media.byteLength > MAX_MEDIA_BYTES) throw failure('Phương tiện tối đa 50 MB.', 422);
     base64 = Buffer.from(media).toString('base64');
     if (!mediaType) mediaType = 'image';
   } else if (typeof media === 'string') {
+    if (!media || media.length > 4 * Math.ceil(MAX_MEDIA_BYTES / 3) || media.length % 4 ||
+        !/^[A-Za-z0-9+/]*={0,2}$/.test(media) || Buffer.from(media, 'base64').byteLength > MAX_MEDIA_BYTES) {
+      throw failure('Dữ liệu phương tiện không hợp lệ hoặc vượt quá 50 MB.', 422);
+    }
     base64 = media;
     if (!mediaType) mediaType = 'image';
   } else {
     throw failure('Dữ liệu phương tiện không hợp lệ để phân tích.', 422);
   }
+  if (!['video', 'image'].includes(mediaType)) throw failure('Loại phương tiện không hợp lệ.', 422);
 
   const endpoint = MODAL_TAGGER_ENDPOINT.replace(/\/+$/, '');
   const response = await fetchImpl(endpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: modalHeaders(),
     body: JSON.stringify({
       ...(url ? {url} : {video_base64: base64}),
       type: mediaType || 'image'
@@ -206,7 +247,7 @@ export async function craftLetter(c) {
   try {
     const response = await fetch(MODAL_LETTER_ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: modalHeaders(),
       body: JSON.stringify({
         task: 'letter',
         occasion,
@@ -242,11 +283,14 @@ export async function warmupAi() {
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: modalHeaders(),
       body: JSON.stringify({ task: 'warmup' }),
       signal: AbortSignal.timeout(45000)
     });
     const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.success !== true || data.status !== 'ready') {
+      throw failure('Dịch vụ AI chưa sẵn sàng.', response.status === 429 ? 429 : 503);
+    }
     return {
       success: true,
       warmed: true,

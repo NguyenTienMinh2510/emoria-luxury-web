@@ -16,4 +16,5 @@ scripts/*.py
 !scripts/prepare-ar-assets.mjs
 supabase
 docs/memoryhouse
+emoria-cozy-reference
 *.blend1

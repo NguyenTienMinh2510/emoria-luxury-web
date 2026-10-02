@@ -6,6 +6,13 @@ import { ChevronDown } from 'lucide-react';
 // Evenly sampled frames retain the original framing and playback duration.
 const TOTAL_FRAMES = SHOWCASE_FRAME_COUNT;
 const FRAME_RATE = (TOTAL_FRAMES - 1) * 1000 / SHOWCASE_DURATION_MS;
+const SHOWCASE_LAYERS = [
+  { name: 'Nắp Vòm Bạc S925 Đúc Khối', description: 'Mặt nạ bảo vệ đúc khối, khắc logo EMORIA và họa tiết mặt trời.', frame: 30 },
+  { name: 'Seal Silicon Kháng Nước', description: 'Vòng đệm đàn hồi giúp khoang linh kiện kín khít, chống ẩm và mồ hôi.', frame: 48 },
+  { name: 'Vi Chip NFC & Cuộn Đồng', description: 'Chạm điện thoại để mở Memory Space, hoạt động bằng cảm ứng từ và không cần pin.', frame: 66 },
+  { name: 'Lá Chắn Từ Ferrite', description: 'Lớp chống nhiễu giúp điện thoại đọc chip NFC bên trong trang sức bạc.', frame: 80 },
+  { name: 'Khung Đáy Bạc S925 & Quai Dây', description: 'Khung đế nguyên khối giữ và bảo vệ toàn bộ linh kiện của kỷ vật.', frame: 86 }
+];
 
 export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
   const containerRef = useRef(null);
@@ -21,9 +28,12 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
   const reducedMotionRef = useRef(false);
   const touchBoundsRef = useRef(null);
   const activeTouchRef = useRef(null);
+  const visibleLayersRef = useRef(0);
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [visibleLayers, setVisibleLayers] = useState(0);
+  const activeLayer = SHOWCASE_LAYERS[Math.max(0, visibleLayers - 1)];
 
   const drawFrame = useCallback((index) => {
     currentFrameRef.current = index;
@@ -43,6 +53,11 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
       const img = loader.images[frameIndex];
       paintedIndexRef.current = frameIndex;
       const layerFrame = frameIndex * 119 / (TOTAL_FRAMES - 1);
+      const layerCount = SHOWCASE_LAYERS.filter(layer => layerFrame >= layer.frame).length;
+      if (visibleLayersRef.current !== layerCount) {
+        visibleLayersRef.current = layerCount;
+        setVisibleLayers(layerCount);
+      }
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const imgAspect = img.width / img.height;
@@ -120,6 +135,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
       paintFrameRef.current = playbackRef.current = 0;
       currentFrameRef.current = targetFrameRef.current = 0;
       paintedIndexRef.current = -1;
+      visibleLayersRef.current = 0;
     };
   }, [drawFrame, animateTo]);
 
@@ -223,7 +239,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
     <section
       id="product-exploded-showcase"
       ref={containerRef}
-      className="relative min-h-[100svh] md:h-[100dvh] md:min-h-[500px] w-full bg-black text-white selection:bg-silver/20 select-none overflow-hidden flex flex-col justify-between items-center"
+      className="relative min-h-[100svh] md:h-[100dvh] md:min-h-[650px] w-full bg-black text-white selection:bg-silver/20 select-none overflow-hidden flex flex-col justify-between items-center"
     >
       {/* LUXURY ATELIER AMBIENT LIGHTING & DIAMOND PATTERN TEXTURE */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(255,255,255,0.06),transparent_75%)] pointer-events-none z-0" />
@@ -340,7 +356,31 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
           />
         </div>
 
+        <div data-showcase-layers aria-label="5 tầng linh kiện của kỷ vật"
+          aria-hidden={visibleLayers === 0}
+          className="hidden md:block absolute z-20 inset-0 pointer-events-none">
+          {[0, 2].map(start => (
+            <div key={start} className={`contents md:absolute md:top-1/2 md:-translate-y-1/2 md:flex md:flex-col md:gap-2 md:w-[27%] md:max-w-[290px] ${start === 0 ? 'md:left-3 lg:left-8' : 'md:right-3 lg:right-8'}`}>
+              {SHOWCASE_LAYERS.slice(start, start === 0 ? 2 : 5).map((layer, offset) => (
+                <article key={layer.frame} hidden={start + offset >= visibleLayers}
+                  className="shrink-0 w-56 md:w-full rounded-xl border border-white/20 bg-black/80 backdrop-blur-md p-3 pointer-events-auto">
+                  <p className="text-[10px] uppercase tracking-[.2em] text-amber-300">Tầng 0{start + offset + 1}</p>
+                  <h4 className="mt-1 text-xs lg:text-sm font-semibold text-white">{layer.name}</h4>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-300">{layer.description}</p>
+                </article>
+              ))}
+            </div>
+          ))}
+        </div>
+
       </div>
+
+      <article data-showcase-mobile-layer aria-label="Tầng linh kiện đang xem"
+        className="md:hidden shrink-0 relative z-20 w-[calc(100%-2rem)] max-w-md min-h-[136px] rounded-xl border border-white/20 bg-white/[.04] p-4 mb-4">
+        <p className="text-[10px] uppercase tracking-[.2em] text-amber-300">Tầng {Math.max(1, visibleLayers)} / 5</p>
+        <h4 className="mt-1 text-sm font-semibold text-white">{activeLayer.name}</h4>
+        <p className="mt-1 text-xs leading-relaxed text-slate-300">{activeLayer.description}</p>
+      </article>
 
       {/* Collection navigation stays available while the frames are preparing. */}
       <div className="shrink-0 relative z-30 w-full max-w-2xl mx-auto flex flex-col items-center gap-2 pb-3 px-3 sm:px-6">

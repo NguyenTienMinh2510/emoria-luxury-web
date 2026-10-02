@@ -11,6 +11,7 @@ import { useStore } from '../components/StoreProvider';
 import MarkdownContent from '../components/MarkdownContent';
 import { useLanguage, BilingualText } from '../i18n/LanguageProvider';
 import { getLuxuryArticleTranslation } from '../services/aiTranslationService';
+import { createShareUrl } from '../services/shareLinks.js';
 
 export default function ArticleDetailView({ 
   slug, 
@@ -90,8 +91,8 @@ export default function ArticleDetailView({
     if(res.success){setIsBookmarked(res.is_bookmarked);showToast(res.is_bookmarked?'Đã lưu vào tài khoản.':'Đã bỏ lưu.');}else showToast(res.message);
   };
   const handleShare=async()=>{
-    const url=new URL('/',window.location.origin);url.searchParams.set('article',slug);
-    try{if(navigator.share){await navigator.share({title:article.title,url:url.href});showToast('Đã hoàn tất thao tác chia sẻ.');}else{await navigator.clipboard.writeText(url.href);showToast('Đã sao chép liên kết.');}}
+    const url=createShareUrl({article:slug});
+    try{if(navigator.share){await navigator.share({title:article.title,text:article.excerpt || `Đọc bài viết “${article.title}” tại EMORIA.`,url});showToast('Đã hoàn tất thao tác chia sẻ.');}else{await navigator.clipboard.writeText(url);showToast('Đã sao chép liên kết.');}}
     catch(error){if(error.name!=='AbortError')showToast('Không thể chia sẻ. Hãy sao chép đường dẫn trên thanh địa chỉ.');}
   };
   const editComment=async(comment,remove=false)=>{

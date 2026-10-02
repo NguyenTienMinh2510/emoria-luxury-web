@@ -79,7 +79,7 @@ try {
   );
 
   // Upload test photo
-  const catImage = fs.readFileSync('public/memoryhouse/models/thumbnails/cat.png');
+  const catImage = fs.readFileSync('tests/fixtures/house-cat.png');
   await ok(owner.storage.from('emoria-event-media').upload(photoPath, catImage, { contentType: 'image/png' }));
 
   // =========================================================================

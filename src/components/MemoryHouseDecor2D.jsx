@@ -23,15 +23,7 @@ export default function MemoryHouseDecor2D({item, photos = [], text = '', accent
   let drawing;
   switch (item) {
     case 'calendar':
-      drawing = <>
-        <path d="M76 24l7 6v55l-7 5H24V26Z" fill="#c1a084"/>
-        <rect x="22" y="25" width="54" height="61" rx="3" fill={cream}/>
-        <path d="M22 38h54" stroke="#cbb398"/>
-        <path d="M32 31v-9c0-9 11-9 11 0v9m15 0v-9c0-9 11-9 11 0v9" fill="none" stroke={accent} strokeWidth="3"/>
-        {photo(0,29,42,40,28)}
-        {text ? label(49,79,18,5.8) : <g stroke="#baa38e">{[34,44,54,64].map(x => <path key={x} d={`M${x} 76h4m-4 5h4`}/>)}</g>}
-        <path d="M27 89h49" stroke={accent} strokeWidth="2"/>
-      </>;
+      drawing = <><path d="M22 83V29q-18-18-1-29 17-9 28 6 11-15 28-6 17 11-1 29v54q-14 10-26 0-14 10-28 0Z" transform="translate(0 10) scale(1 .84)" fill={sage}/><rect x="27" y="26" width="46" height="57" rx="3" fill={cream}/><path d="M34 30v-9m16 9v-9m16 9v-9" stroke="#c8a570" strokeWidth="4"/>{photo(0,32,36,36,30)}{text ? label(50,77,18,5.8) : <path d="M36 73h6m5 0h6m5 0h6m-29 5h6m5 0h6m5 0h6" stroke="#b29b81"/>}<path d="M38 89h24" stroke="#b4936d" strokeWidth="4"/></>;
       break;
     case 'cat':
       drawing = <>
@@ -46,16 +38,7 @@ export default function MemoryHouseDecor2D({item, photos = [], text = '', accent
       </>;
       break;
     case 'nameplate':
-      drawing = <>
-        <path d="M13 53l-3 30h81l-5-30Z" fill="#c2a082"/>
-        <rect x="11" y="84" width="81" height="6" rx="3" fill="#b88b66"/>
-        <rect x="10" y="48" width="78" height="36" rx="2" fill={cream} stroke={accent} strokeWidth="3"/>
-        {photos[0]?.photo_url ? <>{photo(0,16,55,19,23)}{label(59,68,12,7)}</> : <>
-          <path d="M49 58c-6-7-13 1 0 9 13-8 6-16 0-9Z" fill={blush} stroke="none"/>
-          {label(49,77,20,7)}
-        </>}
-        <path d="M19 85h62" stroke="#e9cbaa"/>
-      </>;
+      drawing = <><path d="M14 83c-22-14-5-37 9-32-6-25 28-31 34-13 20-19 35 3 27 17 23 10 12 34-5 32Z" fill={cream}/><rect x="25" y="52" width="49" height="28" rx="2" fill="#fffcf4" stroke="#d7c2a4"/>{photos[0]?.photo_url ? <>{photo(0,29,56,17,19)}{label(60,69,10,5.5)}</> : label(50,69,20,6)}<path d="M41 89h20" stroke="#b99a75" strokeWidth="5"/></>;
       break;
     case 'plant':
       drawing = <>
@@ -70,42 +53,13 @@ export default function MemoryHouseDecor2D({item, photos = [], text = '', accent
       </>;
       break;
     case 'mugs':
-      drawing = <>
-        <ellipse cx="50" cy="83" rx="44" ry="7" fill="#d4af88"/>
-        <ellipse cx="50" cy="79" rx="44" ry="7" fill="#ead1a9"/>
-        <path d="M25 54H16c-13 0-13 24 1 24h8m50-21h9c13 0 13 23-1 23h-8" fill="none" stroke="#b8947b" strokeWidth="6"/>
-        <path d="M24 51h26v22c0 12-26 12-26 0Z" fill={cream}/>
-        <ellipse cx="37" cy="51" rx="13" ry="5" fill="#8f6e5c"/>
-        <path d="M55 55h24v22c0 11-24 11-24 0Z" fill={blush}/>
-        <ellipse cx="67" cy="55" rx="12" ry="4.5" fill="#8f6e5c"/>
-        <path d="M31 34c-5 5 4 6 0 11m36-7c-4 4 4 5 0 10" fill="none" stroke="#bfa68d"/>
-        <path d="M34 63c-4-5-8 1 0 6 8-5 4-11 0-6Z" fill={blush} stroke="none"/>
-      </>;
+      drawing = <><path d="M70 39h12c17 0 17 34 0 34H70" fill="none" stroke="#b68b57" strokeWidth="8"/><path d="M25 36q-13-21 9-21h23q22 0 9 21v42q-20 10-41 0Z" fill="#b68b57"/><path d="M31 38q-9-15 8-15h14q17 0 8 15v35q-15 7-30 0Z" fill={cream}/><ellipse cx="46" cy="24" rx="13" ry="4" fill="#6c5140"/><rect x="41" y="50" width="13" height="13" rx="3" fill="#e4c77c"/></>;
       break;
     case 'lamp':
-      drawing = <>
-        <ellipse cx="50" cy="85" rx="23" ry="5" fill="#b98f69"/>
-        <path d="M28 82c0-27 44-27 44 0-9 8-34 8-44 0Z" fill="#d5ae88"/>
-        <path d="M50 70V49" stroke={accent} strokeWidth="5"/>
-        <path d="M32 17c10-4 26-4 36 0l12 37c-14 10-46 10-60 0Z" fill={cream}/>
-        <path d="M39 22l-6 31m28-31 6 31" stroke="#e1d0b3"/>
-        <path d="M21 54c16 6 42 6 58 0" fill="none" stroke="#bda080" strokeWidth="2"/>
-        <path d="M72 65v10" fill="none" stroke="#bda080"/>
-        <circle cx="72" cy="77" r="2" fill={accent}/>
-      </>;
+      drawing = <><ellipse cx="50" cy="85" rx="20" ry="5" fill={cream}/><path d="M39 81l4-41h14l4 41q-11 10-22 0Z" fill={cream}/><path d="M10 48q10-47 40-43t40 43q-40 18-80 0Z" fill={clay}/>{[{x:29,y:28,r:6},{x:54,y:16,r:5},{x:71,y:32,r:6},{x:45,y:43,r:5}].map(p => <circle key={p.x} cx={p.x} cy={p.y} r={p.r} fill={cream} stroke="none"/>)}</>;
       break;
     case 'vase':
-      drawing = <>
-        <path d="M47 64 35 17m16 48 16-41m-18 41-1-35m5 35 18-14" fill="none" stroke="#758f67" strokeWidth="2"/>
-        <ellipse cx="34" cy="42" rx="14" ry="4" transform="rotate(25 34 42)" fill={sage}/>
-        <ellipse cx="66" cy="49" rx="14" ry="4" transform="rotate(-24 66 49)" fill="#a0b28c"/>
-        <path d="M34 7c-12 6-11 23 2 24 12-1 15-18 2-24l-1 5Z" fill={blush}/>
-        <path d="M65 16c-12 6-11 23 2 24 12-1 15-18 2-24l-1 5Z" fill="#dba2a2"/>
-        <path d="M47 23c-12 6-11 23 2 24 12-1 15-18 2-24l-1 5Z" fill="#ebc0b1"/>
-        <path d="M37 63c-4 9-10 11-8 18 3 12 39 12 42 0 2-7-4-9-8-18Z" fill={cream}/>
-        <ellipse cx="50" cy="63" rx="13" ry="3" fill="#d9c7ac"/>
-        <path d="M37 85c6 3 20 3 26 0" stroke="#d5b48e" fill="none"/>
-      </>;
+      drawing = <><path d="M43 60 29 22m21 38 13-45m-12 45 23-23" stroke={sage} strokeWidth="2"/>{[{x:29,y:22},{x:63,y:15},{x:74,y:37}].map(p => <g key={p.x} transform={`translate(${p.x} ${p.y})`}>{[0,1,2,3,4,5].map(i => <ellipse key={i} cx="0" cy="-6" rx="3" ry="6" fill={cream} transform={`rotate(${i*60})`}/>)}<circle r="4" fill="#d8b16b"/></g>)}<path d="M30 62h40l4 26H27Z" fill="#d0b58f"/><path d="M30 62l-2-9h44l-2 9Z" fill="#e2ceaa"/><path d="M39 65l-4 18m22-16 8 15" stroke="#b79770" fill="none"/></>;
       break;
     case 'album':
       drawing = <>
@@ -142,31 +96,69 @@ export default function MemoryHouseDecor2D({item, photos = [], text = '', accent
       </>;
       break;
     case 'birdcage':
-      drawing = <>
-        <ellipse cx="50" cy="86" rx="28" ry="4" fill="#cfaa79"/>
-        <path d="M25 81V45c0-31 50-31 50 0v36Z" fill="#f4e5c7" fillOpacity=".35" stroke="#af9063"/>
-        <ellipse cx="50" cy="81" rx="25" ry="5" fill="#dbc19b"/>
-        <path d="M29 64h42" stroke={accent} strokeWidth="2"/>
-        <path d="M39 64c-6-11 0-19 10-16 3-8 14-5 15 0l5 3-6 2c-2 10-13 18-24 11Z" fill={cream}/>
-        <path d="M42 56c6-5 11-1 8 4" fill={sage}/>
-        <circle cx="60" cy="48" r="1" fill="#624b3d" stroke="none"/>
-        <path d="M33 79V43c0-23 34-23 34 0v36M42 81V37m16 44V37M26 43c9 6 39 6 48 0" fill="none" stroke="#c3a475"/>
-        <ellipse cx="50" cy="26" rx="22" ry="5" fill="none" stroke="#c3a475"/>
-        <ellipse cx="50" cy="17" rx="6" ry="8" fill="none" stroke="#af9063" strokeWidth="2"/>
-      </>;
+      drawing = <><ellipse cx="50" cy="86" rx="21" ry="4" fill={cream}/><path d="M50 85V68m-19-1h38" stroke="#ad9068" strokeWidth="6"/><path d="M36 62c-16-16-2-28 10-27-4-15 14-24 23-13l10 5-10 4c5 21-12 40-33 31Z" fill={cream}/><path d="M33 42q22-5 16 21-13 3-19-10Z" fill={sage}/><circle cx="66" cy="26" r="1.5" fill="#604a3c" stroke="none"/><path d="M73 27l9 3-9 4" fill="#d2ad6d"/></>;
       break;
     case 'candles':
+      drawing = <><ellipse cx="50" cy="84" rx="30" ry="6" fill="#c7a782"/>{[{x:31,y:50,h:31},{x:58,y:31,h:50}].map(p => <g key={p.x}><rect x={p.x-8} y={p.y} width="16" height={p.h} rx="3" fill={cream}/><path d={`M${p.x} ${p.y}v-6`} stroke="#75553a"/><path d={`M${p.x} ${p.y-20}q-11 15 0 15 10 0 0-15Z`} fill="#ddb672" stroke="none"/></g>)}</>;
+      break;
+    case 'rabbit':
+    case 'teddy':
       drawing = <>
-        <ellipse cx="50" cy="85" rx="25" ry="5" fill={cream}/>
-        <path d="M50 85V44m-24 9v11l24 6 24-6V53" fill="none" stroke="#b69a6d" strokeWidth="5"/>
-        {[{x:20,y:30,h:25},{x:44,y:17,h:26},{x:68,y:33,h:23}].map(({x,y,h}) => <g key={x}>
-          <rect x={x} y={y} width="12" height={h} rx="2" fill={blush}/>
-          <path d={`M${x+6} ${y}v-4`} stroke="#6b5740" strokeWidth="1"/>
-          <path d={`M${x+6} ${y-15}c-8 11-2 13 0 11 5-2 4-6 0-11Z`} fill="#e7b461" stroke="none"/>
-          <path d={`M${x+3} ${y+4}v${h-9}`} stroke="#f2d3c8" strokeWidth="1"/>
+        <ellipse cx="50" cy="65" rx="22" ry="24" fill={item === 'rabbit' ? cream : '#bf946a'}/>
+        <ellipse cx="50" cy="37" rx="22" ry="19" fill={item === 'rabbit' ? cream : '#bf946a'}/>
+        {[-1,1].map(side => <g key={side}>
+          <ellipse cx={50+side*21} cy={item === 'rabbit' ? 39 : 19} rx={item === 'rabbit' ? 7 : 8} ry={item === 'rabbit' ? 22 : 8} transform={`rotate(${side*-12} ${50+side*21} 39)`} fill={item === 'rabbit' ? cream : '#bf946a'}/>
+          <ellipse cx={50+side*17} cy="83" rx="11" ry="7" fill={item === 'rabbit' ? cream : '#bf946a'}/>
+          <circle cx={50+side*7} cy="36" r="1.5" fill="#614537" stroke="none"/>
         </g>)}
-        <path d="M34 87h32" stroke="#ddc7a7" fill="none"/>
+        <ellipse cx="50" cy="45" rx="8" ry="5" fill={cream}/><circle cx="50" cy="42" r="2" fill={clay}/>
+        {item === 'teddy' ? <><path d="M30 56q20-8 40 0v19q-20 6-40 0Z" fill={sage}/><path d="M38 58v16m8-18v20m8-20v20m8-18v16" stroke="#a9ba9d"/></> : <><path d="M47 58l15 5-13 18Z" fill="#d69b55"/><path d="M54 60l-2-11 7 7 6-8-2 14" fill={sage}/></>}
       </>;
+      break;
+    case 'cloud-lamp':
+      drawing = <><path d="M15 85c-20-20-6-39 7-40-1-24 27-30 40-14 17-7 28 6 26 19 20 8 12 35-2 37Z" fill={cream}/><path d="M39 63q5 5 10 0m10 0q5 5 10 0" fill="none" stroke={clay}/><ellipse cx="51" cy="89" rx="31" ry="2" fill="#d2b58c" stroke="none"/></>;
+      break;
+    case 'honey-candle':
+      drawing = <><path d="M23 37h54v41c0 17-54 17-54 0Z" fill="#d5ac6b"/><ellipse cx="50" cy="37" rx="27" ry="9" fill={cream}/><ellipse cx="50" cy="37" rx="23" ry="6" fill="#ead6a7"/><path d="M50 37v-8" stroke="#644f3a"/><path d="M23 50q27 10 54 0" fill="none" stroke={sage} strokeWidth="3"/><path d="M48 53q-20-15-21 0t21 0q20-15 21 0t-21 0l-8 19m8-19 9 18" fill="none" stroke={cream}/></>;
+      break;
+    case 'turntable':
+      drawing = <><path d="M12 33h76v48q-38 11-76 0Z" fill={sage}/><path d="M12 33l11-10h55l10 10-11 23H23Z" fill="#a4b19a"/><ellipse cx="48" cy="39" rx="24" ry="11" fill="#534b42"/><ellipse cx="48" cy="39" rx="6" ry="3" fill="#d0ad68"/><path d="M73 27l-5 16-11 4" fill="none" stroke="#c9a66c" strokeWidth="4"/><circle cx="71" cy="69" r="5" fill={cream}/><circle cx="83" cy="68" r="3" fill={cream}/></>;
+      break;
+    case 'camera':
+      drawing = <><rect x="17" y="22" width="66" height="53" rx="8" fill={blush}/><rect x="21" y="26" width="15" height="45" rx="5" fill={sage}/><circle cx="51" cy="49" r="18" fill={cream}/><circle cx="51" cy="49" r="12" fill="#c4b18f"/><circle cx="51" cy="49" r="7" fill="#515350"/><rect x="65" y="27" width="10" height="6" rx="2" fill={cream}/><path d="M31 72h43l-6 18H24Z" fill={cream}/><path d="M35 77h33l-3 8H31Z" fill="#e1d4bd"/></>;
+      break;
+    case 'daisy-rug':
+      drawing = <g transform="translate(50 57) scale(1 .62)">{Array.from({length:10},(_,i) => <ellipse key={i} cx="0" cy="-28" rx="13" ry="24" fill={cream} transform={`rotate(${i*36})`}/>)}<circle r="21" fill="#dcb776"/><circle r="16" fill="none" stroke="#ebd198"/></g>;
+      break;
+    case 'fern':
+    case 'vine':
+      drawing = <><path d="M28 65h44l-5 23H33Z" fill={cream}/><ellipse cx="50" cy="65" rx="22" ry="5" fill="#6f7155"/>
+        {item === 'fern' ? [-2,-1,0,1,2].map(n => <g key={n} transform={`rotate(${n*15} 50 65)`}><path d="M50 65V20" stroke={sage}/>{[0,1,2,3].map(i => <g key={i} fill={sage}><ellipse cx="44" cy={27+i*8} rx="7" ry="3" transform={`rotate(25 44 ${27+i*8})`}/><ellipse cx="56" cy={27+i*8} rx="7" ry="3" transform={`rotate(-25 56 ${27+i*8})`}/></g>)}</g>) : <><path d="M35 64q20-38 31-20t-2 22q-9 12 8 25" fill="none" stroke={sage} strokeWidth="3"/>{[0,1,2,3,4,5].map(i => <ellipse key={i} cx={68+(i%2 ? -5 : 5)} cy={48+i*7} rx="7" ry="4" fill={sage} transform={`rotate(${i%2 ? 25 : -25} 68 ${48+i*7})`}/>)}</>}
+      </>;
+      break;
+    case 'cushion':
+      drawing = <><ellipse cx="50" cy="68" rx="39" ry="21" fill={sage}/><path d="M12 65v9c0 26 76 26 76 0v-9" fill={sage}/><ellipse cx="50" cy="65" rx="37" ry="20" fill="#a2b096"/><ellipse cx="50" cy="64" rx="5" ry="2" fill="#718264"/><path d="M20 79q30 14 60 0" fill="none" stroke={cream}/></>;
+      break;
+    case 'shelf':
+      drawing = <><path d="M12 47l9-9h65l5 9v13H12Z" fill="#dcc39f"/><path d="M12 58h79v12q-7 9-13 0-7 10-13 0-7 10-13 0-7 10-13 0-7 10-13 0-7 10-14 0Z" fill="#c5a37d"/><path d="M24 71v15h8V71m44 0v15h8V71" fill="#bc9771"/><path d="M17 47h68" stroke={cream}/></>;
+      break;
+    case 'sofa':
+      drawing = <><path d="M15 67V42q0-14 14-14h43q14 0 14 14v25" fill={cream}/><rect x="9" y="62" width="82" height="21" rx="7" fill={blush}/><rect x="7" y="44" width="14" height="34" rx="7" fill={clay}/><rect x="79" y="44" width="14" height="34" rx="7" fill={clay}/><rect x="22" y="58" width="27" height="15" rx="6" fill={cream}/><rect x="51" y="58" width="27" height="15" rx="6" fill={cream}/><path d="M17 83v7m66-7v7" stroke="#a78761" strokeWidth="5"/></>;
+      break;
+    case 'coffee-table':
+    case 'bistro-table':
+      drawing = <>
+        {item === 'coffee-table' ? <><path d="M27 63l-5 25m51-25 5 25m-25-26v23" stroke="#b2936c" strokeWidth="7"/><path d="M10 51c4-18 39-26 46-17 16 14 29-5 35 11 8 23-83 34-81 6Z" fill="#d4b790"/><path d="M15 54q38 14 72-5" fill="none" stroke={cream}/></> : <><path d="M50 52v30m-17 5h34m-17-7-11 9m11-9 11 9" stroke={cream} strokeWidth="7"/><ellipse cx="50" cy="48" rx="39" ry="12" fill="#d8bf9b"/><path d="M11 48v4c0 15 78 15 78 0v-4" fill="#c2a47d"/><ellipse cx="50" cy="46" rx="39" ry="11" fill="#e1ccaa"/></>}
+      </>;
+      break;
+    case 'chair':
+      drawing = <><path d="M26 62l-3 28m53-28 3 28M29 64l4 24m36-24-3 24" stroke="#b29470" strokeWidth="6"/><path d="M26 30v36m48-36v36" stroke="#b29470" strokeWidth="5"/><path d="M24 30q26-17 52 0v10q-26-15-52 0Z" fill="#d4b992"/><ellipse cx="50" cy="64" rx="29" ry="8" fill={sage}/></>;
+      break;
+    case 'cubby':
+      drawing = <><rect x="15" y="20" width="70" height="68" rx="8" fill="#c7aa85"/><rect x="22" y="26" width="56" height="55" rx="3" fill={cream}/><path d="M50 26v56M22 54h56" stroke="#c7aa85" strokeWidth="6"/><path d="M20 89h60" stroke="#aa8962"/></>;
+      break;
+    case 'desk':
+      drawing = <><path d="M17 52v37m65-37v37M25 55v29m49-29v29" stroke="#ba9871" strokeWidth="5"/><path d="M51 51h30v18H51Z" fill="#bea07b"/><rect x="55" y="53" width="23" height="12" rx="2" fill={sage}/><circle cx="67" cy="59" r="1.8" fill={cream}/><path d="M10 44l7-8h69l6 8v9H10Z" fill="#ddc8a7"/><path d="M12 44h77" stroke={cream}/></>;
       break;
     default:
       drawing = null;

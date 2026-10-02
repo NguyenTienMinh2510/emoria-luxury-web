@@ -27,6 +27,7 @@ import confetti from 'canvas-confetti';
 import { getMemoryByTag, updateMemory } from '../services/memoryViewerService';
 import { uploadMedia } from '../services/storageService';
 import { supabase } from '../lib/supabaseClient';
+import {createShareUrl} from '../services/shareLinks.js';
 
 export default function MemoryViewer({ tagUid: propTag, token: propToken, onClose, currentUser }) {
   // Read params from URL query or props
@@ -186,11 +187,11 @@ export default function MemoryViewer({ tagUid: propTag, token: propToken, onClos
 
   // Copy shareable link
   const handleCopyShareLink = () => {
-    const origin = window.location.origin;
-    const shareUrl = `${origin}?tag=${encodeURIComponent(tagUid)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
-    navigator.clipboard.writeText(shareUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+    const shareUrl = createShareUrl({tag:tagUid});
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }).catch(() => setError('Không thể sao chép liên kết. Vui lòng thử lại.'));
   };
 
   if (loading) {

@@ -7,6 +7,7 @@
  * is typing, choosing options, or browsing their hard drive for photos/videos.
  */
 
+import {apiRequest} from './apiClient.js';
 let isWarmed = false;
 let warmingPromise = null;
 
@@ -15,19 +16,8 @@ export function triggerAiWarmup() {
 
   warmingPromise = (async () => {
     try {
-      const response = await fetch('/api/v1/ai/warmup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task: 'warmup' }),
-        // Background timeout: fails silently if network is offline
-        signal: AbortSignal.timeout(50000)
-      });
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}));
-        if (data.success) {
-          isWarmed = true;
-        }
-      }
+      const data = await apiRequest('/ai/warmup',{method:'POST',body:{task:'warmup'},timeoutMs:50000});
+      if(data.success)isWarmed = true;
     } catch {
       // Proactive background ping fails gracefully with zero impact on UI
     } finally {

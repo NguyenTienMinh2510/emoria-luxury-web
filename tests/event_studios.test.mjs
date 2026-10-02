@@ -13,6 +13,7 @@ import * as eventService from '../src/services/eventService.js';
 process.env.SUPABASE_URL = 'https://fixture-event-studios.supabase.co';
 process.env.SUPABASE_PUBLISHABLE_KEY = 'fixture-anon-key';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fixture-service-role-key';
+process.env.NODE_ENV = 'test';
 
 const originalFetch = globalThis.fetch;
 let expectedDbLogs = [];
@@ -89,6 +90,7 @@ const state = {
   ],
   matches: {},
   houses: {},
+  housePhotoReviews: {},
   storageObjects: {
     'emoria-event-media': new Set(['emo-heart/img1.jpg', 'emo-heart/img2.jpg', 'emo-heart/room1.jpg', 'emo-foreign/pic1.jpg'])
   },
@@ -103,6 +105,9 @@ const state = {
 
   // Simulated RPC runner reproducing exact PostgreSQL semantics from 20260928072518_event_studios.sql & 20260929060533_event_studios_completion.sql
   function runSimulatedRpc(name, args, callerUserId) {
+    if (name === 'rpc_house_photo_review_namespace') {
+      return {data: args.p_path.startsWith(args.p_tag + '/') && state.storageObjects['emoria-event-media'].has(args.p_path)};
+    }
     if (name === 'rpc_event_dispatch') {
       const action = args.p_action;
       const a = args.p_args || {};
@@ -888,6 +893,33 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.endsWith('/auth/v1/user')) {
     if (!callerUser) return Response.json({ message: 'Invalid token' }, { status: 401 });
     return Response.json(callerUser);
+  }
+
+  if (url.includes('/storage/v1/object/info/emoria-event-media/')) {
+    assert.equal(token, 'fixture-service-role-key');
+    const path = decodeURIComponent(url.split('/object/info/emoria-event-media/')[1].split('?')[0]);
+    if (!state.storageObjects['emoria-event-media'].has(path)) return Response.json({message:'Missing object'}, {status:404});
+    return Response.json({content_type:'image/jpeg',size:1024,version:'fixture-version-1',last_modified:'2026-01-01T00:00:00Z'});
+  }
+  if (url.includes('/rest/v1/house_photo_reviews')) {
+    assert.equal(token, 'fixture-service-role-key', 'House reviews remain server-only');
+    if (init.method === 'POST') {
+      const row = JSON.parse(init.body);
+      state.housePhotoReviews[row.path] = row;
+      return new Response(null, {status:201});
+    }
+    const query = new URL(url).searchParams;
+    const rows = Object.values(state.housePhotoReviews).filter(row =>
+      (!query.has('tag') || query.get('tag') === 'eq.' + row.tag) &&
+      (!query.has('status') || query.get('status') === 'eq.' + row.status));
+    return Response.json(rows);
+  }
+  if (url.includes('/rest/v1/memory_houses')) {
+    assert.equal(token, 'fixture-service-role-key');
+    const share = new URL(url).searchParams.get('share_id')?.slice(3);
+    const house = Object.values(state.houses).find(h => h.share_id === share);
+    const memory = Object.values(state.memories).find(m => m.id === house?.memory_id);
+    return Response.json(memory ? [{memory_spaces:{tag_uid:memory.tag_uid}}] : []);
   }
 
   if (url.endsWith('/storage/v1/object/sign/emoria-event-media')) {

@@ -84,7 +84,7 @@ try {
     assert.equal((await ok(root.from('memory_spaces').select('id').eq('owner_id',user.id))).length,0);
   }
   await api('POST','/events/matches',{},null,401);
-  const image=fs.readFileSync('public/memoryhouse/models/thumbnails/cat.png');
+  const image=fs.readFileSync('tests/fixtures/house-cat.png');
   for(let i=0;i<2;i++) {
     const photo=`match_${accounts[i].id}/fixture.png`;
     await ok(clients[i].storage.from('emoria-event-media').upload(photo,image,{contentType:'image/png'}));photos.push(photo);

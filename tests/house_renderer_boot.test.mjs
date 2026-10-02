@@ -59,11 +59,28 @@ const engine=createHouseRenderer({...element(),clientWidth:1000,clientHeight:600
 const rooms=HOUSE_ROOM_IDS.map(id=>({id,memories:[],decorations:[]}));
 engine.update({rooms,title:'Admin owner private house',theme:'warm_gold'});
 await loaded;
+const tabletop = engine.findPlacement('memories','turntable');
+assert.equal(tabletop?.surface,'table','Table-only model can use real editable desk geometry');
+assert.equal(tabletop?.parentId,'base_memories_desk','Initial placement records the actual support instance');
+const tableAgain = engine.findPlacement('memories','turntable',{position:tabletop.position,scale:tabletop.scale});
+assert.deepEqual(tableAgain,tabletop,'Revalidation preserves support and pivot');
+for (const item of ['honey-candle','turntable','camera']) {
+  const coffeeHit=engine.findPlacement('beginning',item,{scale:1});
+  assert.equal(coffeeHit?.parentId,'base_beginning_coffee-table',`Real coffee top fits ${item} at full size`);
+  assert.equal(coffeeHit.surface,'table');
+}
 engine.calibrateGyroscope();
 engine.setGyroSensitivity(.8);
 assert.equal(await engine.enableGyroscope(true),false,'Desktop without orientation sensors still renders the house');
 engine.focus('beginning',false);
-const spot=engine.findPlacement('beginning','cat');assert.ok(spot);
+draw();
+let coffee;renderedScene.traverse(o=>{if(o.userData.instanceId==='base_beginning_coffee-table'&&!coffee)coffee=o;});
+const coffeeBox=new THREE.Box3().setFromObject(coffee,true), coffeePoint=coffeeBox.getCenter(new THREE.Vector3());
+coffeePoint.y=coffeeBox.max.y;
+const coffeeScreen=coffeePoint.project(renderedCamera);
+const aimed=engine.raycastSurface((coffeeScreen.x+1)*500,(1-coffeeScreen.y)*300,'beginning','camera');
+assert.equal(aimed?.parentId,'base_beginning_coffee-table','Pointer ray targets the real editable support');
+const spot=engine.findPlacement('beginning','cat',{position:[-3.75,.16,.7]});assert.ok(spot);
 rooms[0].decorations=[{id:'drag-cat',item:'cat',position:spot.position,scale:spot.scale,rotation:0,surface:spot.surface}];
 engine.update({rooms,activeRoomId:'beginning'});
 draw();
@@ -84,6 +101,25 @@ assert.ok(previews>1,'Mouse hover previews placement before clicking');
 event('pointerdown',0,'touch');event('pointermove',40,'touch');event('pointerup',40,'touch');
 assert.equal(moves.length,2);assert.equal(moves[1].id,undefined,'Existing touch placement still commits');
 placement=null;
+// Updated furnishings invalidate cached world triangles; temporary supports in
+// a multi-item insertion also participate before they are committed to rooms.
+rooms[3]={id:'memories',furnishingVersion:1,decorations:[]};
+engine.update({rooms});
+assert.equal(engine.findPlacement('memories','turntable'),null,'Deleting all supports cannot put a table-only object on the floor');
+assert.equal(engine.findPlacement('memories','cushion')?.surface,'floor','A floor-only object still uses the shell floor');
+const temporaryDesk={id:'temporary-desk',item:'desk',position:[-1.8,2.388,-.57],rotation:25,scale:1};
+const extraHit=engine.findPlacement('memories','camera',{extra:[temporaryDesk]});
+assert.equal(extraHit?.parentId,'temporary-desk','Batch insertion can parent a model to a newly added support');
+assert.equal(extraHit?.surface,'table');
+rooms[3].decorations=[temporaryDesk]; engine.update({rooms});
+const beforeMove=engine.findPlacement('memories','camera');
+assert.equal(beforeMove?.parentId,'temporary-desk');
+temporaryDesk.position=[-1.2,2.388,-.25]; engine.update({rooms});
+const afterMove=engine.findPlacement('memories','camera',{position:beforeMove.position,scale:beforeMove.scale});
+assert.equal(afterMove?.parentId,'temporary-desk');
+assert.notDeepEqual(afterMove.position,beforeMove.position,'Moving a support rebuilds its world geometry');
+assert.equal(engine.findPlacement('memories','camera',{excludeId:'temporary-desk'}),null,'A dragged support cannot support itself');
+assert.equal(engine.findPlacement('memories','camera',{excludeIds:['temporary-desk']}),null,'Deleted parents are excluded from placement candidates');
 engine.overview(false);
 engine.dispose();
-console.log('PASS House renderer: real GLBs, desktop drag/click/cancel, read-only protection, hover preview, touch placement, gyro and disposal.');
+console.log('PASS House renderer: real GLBs/supports, parent IDs, moved/deleted/temporary supports, desktop drag/click/cancel, read-only protection, hover preview, touch placement, gyro and disposal.');

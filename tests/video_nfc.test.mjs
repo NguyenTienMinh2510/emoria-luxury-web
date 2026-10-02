@@ -30,6 +30,9 @@ const googleResponse=()=>Response.json({candidates:[{finishReason:'STOP',content
 const small=new Blob(['video fixture'],{type:'video/mp4'});
 const qwenResponse=()=>Response.json({success:true,approved:true,labels:['Biển','Du lịch'],violations:[]});
 const signedUrl='https://video-fixture.supabase.co/storage/v1/object/sign/emoria-memory/emo-test/file?token=fixture';
+process.env.MODAL_STORAGE_ORIGIN='https://video-fixture.supabase.co';
+process.env.MODAL_PROXY_TOKEN_ID='wk-offline-fixture';
+process.env.MODAL_PROXY_TOKEN_SECRET='ws-offline-fixture';
 let qwenBody;
 assert.equal((await labelWithQwen(null,{url:signedUrl,type:'video',fetchImpl:async(_url,options)=>{
   qwenBody=JSON.parse(options.body);return qwenResponse();

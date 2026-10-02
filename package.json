@@ -7,7 +7,7 @@
     "esbuild@0.25.12": true
   },
   "scripts": {
-    "test:ci": "npm test && node tests/performance_regression.test.mjs && node tests/rest_api.test.mjs && node tests/bank_transfer.test.mjs && node tests/analytics_api.test.mjs && node tests/video_nfc.test.mjs && node tests/memory_media.test.mjs && node tests/memory_intro.test.mjs && node tests/ui_render.test.mjs && node tests/ar_try_on.test.mjs && node tests/event_studios.test.mjs && node tests/memory_house_3d.test.mjs && node tests/house_renderer_boot.test.mjs && node tests/memory_house_freeform.test.mjs && node tests/mismatch_integration.test.mjs && node tests/memory_house_placement.test.mjs",
+    "test:ci": "npm test && node tests/performance_regression.test.mjs && node tests/rest_api.test.mjs && node tests/bank_transfer.test.mjs && node tests/analytics_api.test.mjs && node tests/video_nfc.test.mjs && node tests/memory_media.test.mjs && node tests/memory_intro.test.mjs && node tests/ui_render.test.mjs && node tests/ar_try_on.test.mjs && node tests/event_studios.test.mjs && node tests/memory_house_3d.test.mjs && node tests/house_renderer_boot.test.mjs && node tests/memory_house_freeform.test.mjs && node tests/mismatch_integration.test.mjs && node tests/memory_house_placement.test.mjs && node tests/memory_house_catalog.test.mjs && node tests/memory_house_preview.test.mjs && node tests/memory_house_cozy.test.mjs && node tests/share_previews.test.mjs && node tests/modal_security.test.mjs",
     "test:event": "node tests/event_studios.test.mjs",
     "test:mismatch": "node tests/mismatch_integration.test.mjs",
     "test:house-placement": "node tests/memory_house_placement.test.mjs",

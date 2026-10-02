@@ -3,6 +3,7 @@ import ast
 import base64
 from io import BytesIO
 import json
+import os
 from pathlib import Path
 import tempfile
 import time
@@ -49,8 +50,11 @@ endpoint = next(node for node in service.body if isinstance(node, ast.FunctionDe
 endpoint.decorator_list = []
 unique = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'unique_labels')
 endpoint_namespace = {'Path': Path, 'time': time, 'base64': base64, 'json': json,
-                      'unicodedata': unicodedata, 'PROMPT': 'Review image'}
-exec(compile(ast.Module(body=[endpoint, unique], type_ignores=[]), str(source), 'exec'), endpoint_namespace)
+                      'os': os, 'unicodedata': unicodedata, 'PROMPT': 'Review image',
+                      'MAX_MEDIA_BYTES': 50 * 1024 * 1024}
+media_helpers = [node for node in tree.body if isinstance(node, ast.FunctionDef)
+                 and node.name in ('validate_media_url', 'decode_media_base64', 'download_media')]
+exec(compile(ast.Module(body=[endpoint, unique, *media_helpers], type_ignores=[]), str(source), 'exec'), endpoint_namespace)
 references, cleaned = [], []
 
 class Inputs(dict):

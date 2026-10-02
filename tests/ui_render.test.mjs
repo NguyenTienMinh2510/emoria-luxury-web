@@ -241,9 +241,9 @@ console.log('PASS event studios render: MemoryMatchStudio and MemoryHouseStudio 
  assert.ok(images.length>0&&images.every(url=>memories.some(memory=>memory.photo_url===url)),'Only memory URLs appear as SVG images');
  for(const asset of DECORATIONS){
   assert.ok(html.includes(`data-decoration="${asset.id}"`),`${asset.id} is illustrated in the room`);
-  assert.ok(!html.includes(asset.image)&&!html.includes(asset.reference),'Object thumbnails and references must not be pasted into 2D');
+  assert.ok(!html.includes(asset.image),'Object thumbnails must not be pasted into 2D');
   const drawing=renderDecor({item:asset.id});
-  assert.ok(drawing.includes('<path')&&!drawing.includes('<image'),`${asset.id} has a vector drawing without memory photos`);
+  assert.ok(/<(path|rect|circle|ellipse)\b/.test(drawing)&&!drawing.includes('<image'),`${asset.id} has a vector drawing without memory photos`);
  }
  assert.equal((html.match(/data-decoration="cat"/g)||[]).length,4,'Both responsive views retain duplicate instances');
  for(const surface of ['wall','table','floor'])assert.ok(html.includes(`data-surface="${surface}"`));
@@ -258,5 +258,9 @@ console.log('PASS event studios render: MemoryMatchStudio and MemoryHouseStudio 
  const clips=[...html.matchAll(/<clipPath\b[^>]*id="([^"]+)"/g)].map(match=>match[1]);
  assert.equal(new Set(clips).size,clips.length,'Clip IDs are unique across desktop and mobile scenes');
  for(const [,id] of html.matchAll(/clip-path="url\(#([^)]*)\)"/g))assert.ok(clips.includes(id),'Every memory image clipping reference resolves');
- console.log('PASS House 2D render: 12 vector assets, framed memory slots, immutable deterministic layout, duplicates, numeric/vector scale and unique responsive clip IDs.');
+ assert.ok(!html.includes('data-fixed-credenza'),'Editable furniture replaces the fixed 2D cabinet');
+ const emptyFurnishedRooms=props.rooms.map(room=>({...room,furnishingVersion:1,decorations:[]}));
+ const emptyFurnished=render(House2D,{...props,rooms:emptyFurnishedRooms});
+ assert.ok(!emptyFurnished.includes('data-fixed-credenza')&&!emptyFurnished.includes('data-fixed-sofa'),'Deleted furniture stays deleted in the 2D illustration');
+ console.log('PASS House 2D render:29 vector assets, framed memory slots, immutable deterministic layout, duplicates, numeric/vector scale and unique responsive clip IDs.');
 }

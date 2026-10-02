@@ -38,12 +38,109 @@ export const STYLE_PACKAGES = [
   {
     id: 'travel_memories',
     name: 'Kỷ niệm chuyến đi',
-    desc: 'Dây ảnh (Máy ảnh & Postcard đang chờ tạo asset 3D)',
+    desc: 'Dây ảnh, máy ảnh lấy liền & album chuyến đi',
     lighting: 'day',
-    slots: { left: 'bunting' },
-    isPendingAsset: true
+    slots: { left: 'bunting', table: 'camera', right: 'album' }
   }
 ];
+
+const DECORATION_CATEGORIES = [
+  { id: 'recent', name: 'Đã chọn gần đây' },
+  { id: 'featured', name: 'Gợi ý' },
+  { id: 'memories', name: 'Kỷ niệm' },
+  { id: 'plants', name: 'Cây & hoa' },
+  { id: 'home', name: 'Đồ dùng & ánh sáng' },
+  { id: 'pets', name: 'Thú cưng' },
+  { id: 'furniture', name: 'Nội thất' },
+  { id: 'all', name: 'Tất cả' }
+];
+const searchableDecorName = value => value.toLocaleLowerCase('vi').normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/đ/g, 'd');
+const RECENT_DECOR_KEY = 'emoria-house-recent-decor';
+const validRecentDecor = ids => Array.isArray(ids) ? [...new Set(ids.filter(id => DECORATIONS.some(d => d.id === id)))].slice(0, 12) : [];
+
+export function DecorationLibrary({ disabled, view, placingItem, placedCount, onSelect }) {
+  const library = useRef(null);
+  const [category, setCategory] = useState('featured'), [query, setQuery] = useState(''), [page, setPage] = useState(1);
+  const [recent, setRecent] = useState(() => {
+    try { return validRecentDecor(JSON.parse(window.localStorage.getItem(RECENT_DECOR_KEY) || '[]')); }
+    catch { return []; }
+  });
+  const [pageSize, setPageSize] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(min-width: 768px)')?.matches ? 12 : 6);
+  useEffect(() => {
+    const media = window.matchMedia?.('(min-width: 768px)');
+    if (!media) return;
+    const resize = () => { setPageSize(media.matches ? 12 : 6); setPage(1); };
+    resize();
+    media.addEventListener('change', resize);
+    return () => media.removeEventListener('change', resize);
+  }, []);
+
+  const search = searchableDecorName(query.trim());
+  const candidates = category === 'recent' ? recent.map(id => DECORATIONS.find(d => d.id === id)).filter(Boolean) : DECORATIONS;
+  const filtered = candidates.filter(d => (category === 'recent' || category === 'all' || d.category === category || (category === 'featured' && d.featured)) && searchableDecorName(d.name).includes(search));
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize)), currentPage = Math.min(page, pages);
+  const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const control = 'min-h-11 rounded-xl border border-white/20 bg-stone-900 px-3 text-base sm:text-sm text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300';
+
+  return (
+    <details ref={library} className="min-w-0 rounded-2xl border border-white/10 p-3">
+      <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300">
+        Thêm đồ trang trí <span className="ml-2 text-xs font-normal text-stone-400">{placedCount} món trong phòng</span>
+      </summary>
+      <div className="min-w-0 space-y-3 pt-2">
+        <p className="text-xs text-stone-400">Chọn món rồi giữ và kéo trên ngôi nhà; thả tay để đặt. Món đã chọn được lưu ở nhóm Gần đây trên thiết bị này.</p>
+        <div className="grid min-w-0 grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="min-w-0 text-xs text-stone-300">
+            Nhóm đồ vật
+            <select value={category} onChange={e => { setCategory(e.target.value); setPage(1); }} className={`${control} mt-1 block w-full min-w-0`}>
+              {DECORATION_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+          <label className="min-w-0 text-xs text-stone-300">
+            Tìm đồ vật
+            <input type="search" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} placeholder="Tìm trong nhóm đã chọn…" className={`${control} mt-1 block w-full min-w-0`} />
+          </label>
+        </div>
+        <p role="status" className="text-xs text-stone-400">
+          {filtered.length ? `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length} món` : '0 món'} · Tối đa {pageSize} món/trang
+        </p>
+        {visible.length ? (
+          <div className="grid min-w-0 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-[min(50svh,24rem)] overflow-y-auto overscroll-contain" aria-label="Đồ vật có thể thêm">
+            {visible.map(d => (
+              <button key={d.id} type="button" disabled={disabled} onClick={() => {
+                const next = validRecentDecor([d.id, ...recent]);
+                setRecent(next);
+                try { window.localStorage.setItem(RECENT_DECOR_KEY, JSON.stringify(next)); } catch { /* Selection still works when storage is unavailable. */ }
+                onSelect(d.id);
+                library.current.open = false;
+                library.current.querySelector('summary').focus({ preventScroll: true });
+              }}
+                aria-label={`Thêm ${d.name}`} aria-pressed={placingItem === d.id}
+                className={`min-w-0 min-h-11 text-left rounded-2xl border p-2 transition-colors cursor-pointer disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300 ${placingItem === d.id ? 'border-amber-400 bg-amber-400/15' : 'border-white/10 hover:border-amber-300/40 bg-white/[0.02] hover:bg-white/[0.06]'}`}>
+                {view === '2d' ? <svg viewBox="0 0 100 100" className="w-full h-16 md:h-20 rounded-xl bg-[#f7f1e8]" aria-hidden="true"><MemoryHouseDecor2D item={d.id}/></svg> : <img loading="lazy" src={d.image} alt="" className="w-full h-16 md:h-20 object-contain rounded-xl" />}
+                <span className="mt-2 block text-xs font-medium text-white break-words">{d.name}</span>
+                <span className="mt-1 flex flex-wrap gap-x-2 text-[10px] text-stone-400">
+                  <span>{d.defaultSurface === 'table' ? 'Mặt bàn' : d.defaultSurface === 'wall' ? 'Tường' : 'Sàn'}</span>
+                  {d.photoCount > 0 && <span className="text-amber-300">{d.photoCount} ảnh</span>}
+                  {d.textLabel && <span className="text-indigo-300">Chữ</span>}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : <p className="py-4 text-sm text-stone-300">{category === 'recent' && !recent.length ? 'Chưa chọn món nào. Các món bạn chọn sẽ xuất hiện ở đây để dùng lại nhanh.' : 'Không tìm thấy đồ vật. Thử từ khác hoặc chọn nhóm Tất cả.'}</p>}
+        {category === 'recent' && recent.length > 0 && <button type="button" className="min-h-11 text-xs text-stone-300 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300" onClick={() => {
+          setRecent([]); setPage(1);
+          try { window.localStorage.removeItem(RECENT_DECOR_KEY); } catch { /* Clearing still works for this session. */ }
+        }}>Xóa lịch sử chọn</button>}
+        <nav aria-label="Phân trang đồ trang trí" className="flex flex-wrap items-center justify-between gap-2 text-xs text-stone-300">
+          <button type="button" disabled={currentPage === 1} onClick={() => setPage(p => Math.max(1, p - 1))} className={`${control} disabled:opacity-40`} aria-label="Trang đồ vật trước">Trước</button>
+          <span>Trang {currentPage}/{pages}</span>
+          <button type="button" disabled={currentPage === pages} onClick={() => setPage(p => Math.min(pages, p + 1))} className={`${control} disabled:opacity-40`} aria-label="Trang đồ vật tiếp theo">Sau</button>
+        </nav>
+      </div>
+    </details>
+  );
+}
 
 export default function MemoryHouse3D({
   rooms,
@@ -229,7 +326,7 @@ export default function MemoryHouse3D({
         });
         engine.current.update(latest.current);
         if (onRegisterCapture) {
-          onRegisterCapture(() => engine.current?.capture());
+          onRegisterCapture(options => options?.overview ? engine.current?.captureOverviewWhenReady(options) : engine.current?.capture());
         }
       } catch {
         setError('Thiết bị chưa mở được 3D. Khung 2D bên dưới vẫn dùng bình thường.');
@@ -354,7 +451,7 @@ export default function MemoryHouse3D({
     const next = { ...selectedInstance, ...updates };
     const hit = engine.current?.findPlacement(room.id, next.item, { ...next, excludeId: selectedInstanceId });
     if (!hit) return;
-    commitChange(updateDecorationInstance(room, selectedInstanceId, { ...updates, position: hit.position, surface: hit.surface, parent_id: null }, { validatedPlacement: true }));
+    commitChange(updateDecorationInstance(room, selectedInstanceId, { ...updates, position: hit.position, surface: hit.surface, parent_id: hit.parentId || null }, { validatedPlacement: true }));
   }
 
   function rotateSelected(deltaDegrees) {
@@ -368,7 +465,7 @@ export default function MemoryHouse3D({
     if (readOnly || !selectedInstance || !room) return;
     const hit = engine.current?.findPlacement(room.id, selectedInstance.item, selectedInstance);
     if (!hit) { setArrangeNotice('Chưa còn chỗ vừa bản sao. Hãy gỡ bớt đồ trước.'); return; }
-    const clone = { ...selectedInstance, id: generateInstanceId(selectedInstance.item), slot: undefined, parent_id: null, position: hit.position, surface: hit.surface };
+    const clone = { ...selectedInstance, id: generateInstanceId(selectedInstance.item), slot: undefined, parent_id: hit.parentId || null, position: hit.position, surface: hit.surface };
     commitChange({ ...room, decorations: [...decorationsList, clone] });
     setSelectedInstanceId(clone.id);
   }
@@ -398,7 +495,7 @@ export default function MemoryHouse3D({
       for (const d of displaced) {
         const hit = engine.current?.findPlacement(room.id, d.item, { ...d, excludeIds, extra });
         if (!hit) { setArrangeNotice('Chưa đủ chỗ để chuyển các món bên trên. Các món vẫn được giữ nguyên.'); setDeleteDialog(null); return; }
-        extra.push({ ...d, parent_id: null, position: hit.position, surface: hit.surface });
+        extra.push({ ...d, parent_id: hit.parentId || null, position: hit.position, surface: hit.surface });
       }
       updated = { ...updated, decorations: [...roomDecorations(updated), ...extra] };
     }
@@ -424,7 +521,7 @@ export default function MemoryHouse3D({
     for (const itemId of Object.values(pkg.slots)) {
       const hit = engine.current?.findPlacement(room.id, itemId, { extra: added });
       if (!hit) { setArrangeNotice('Phòng chưa đủ chỗ cho bộ này. Hãy gỡ bớt đồ trước.'); return; }
-      added.push({ id: generateInstanceId(itemId), item: itemId, position: hit.position, surface: hit.surface, rotation: 0, scale: hit.scale, photos: [], text: '' });
+      added.push({ id: generateInstanceId(itemId), item: itemId, position: hit.position, surface: hit.surface, rotation: 0, scale: hit.scale, ...(hit.parentId ? { parent_id: hit.parentId } : {}), photos: [], text: '' });
     }
     const nextDecor = [...existingDecor, ...added];
     const updatedRoom = {
@@ -470,7 +567,7 @@ export default function MemoryHouse3D({
       for (const item of ['frame', 'album', 'bunting']) {
         const hit = engine.current?.findPlacement(room.id, item, { extra: added });
         if (!hit) continue;
-        added.push({ id: generateInstanceId(item), item, position: hit.position, surface: hit.surface, rotation: 0, scale: hit.scale, photos: Array(DECORATIONS.find(d => d.id === item).photoCount).fill(null) });
+        added.push({ id: generateInstanceId(item), item, position: hit.position, surface: hit.surface, rotation: 0, scale: hit.scale, ...(hit.parentId ? { parent_id: hit.parentId } : {}), photos: Array(DECORATIONS.find(d => d.id === item).photoCount).fill(null) });
       }
       if (!added.length) { setArrangeNotice('Chưa còn chỗ cho khung ảnh. Hãy gỡ bớt đồ trước.'); return; }
       targetDecor.push(...added);
@@ -1128,70 +1225,14 @@ export default function MemoryHouse3D({
           {arrangeNotice && <p role="status" className="p-3 rounded-xl bg-amber-400/10 text-amber-200 text-sm">{arrangeNotice}<button type="button" onClick={() => setArrangeNotice('')} aria-label="Đóng thông báo trang trí" className="ml-3">×</button></p>}
           <details className="rounded-2xl border border-white/10 p-3">
             <summary className="cursor-pointer text-sm text-stone-300">Bài trí nhanh (tùy chọn)</summary>
-            <p className="mt-3 text-xs text-stone-400">Thêm một bộ đồ có sẵn vào phòng đang chọn. Có thể hoàn tác.</p>
+            <p className="mt-3 text-xs text-stone-400">Mẫu chỉ là gợi ý để trang trí nhanh. Bạn có thể tiếp tục thêm, xóa, di chuyển đồ trong mẫu và tự gắn hoặc đổi ảnh của mình. Đồ và ảnh đang có được giữ nguyên. Có thể hoàn tác.</p>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
               {STYLE_PACKAGES.filter(pkg => !pkg.isPendingAsset).map(pkg => <button key={pkg.id} type="button" disabled={status !== 'ready' || view !== '3d'} onClick={() => applyStylePackage(pkg)} className="rounded-xl border border-white/15 bg-white/5 p-3 text-left disabled:opacity-40 hover:border-amber-300/50"><span className="block text-xs font-bold">{pkg.name}</span><span className="block mt-1 text-xs text-stone-400">{pkg.desc}</span></button>)}
             </div>
             {(room.memories?.length || 0) > 0 && <button type="button" onClick={autoArrangePhotos} className={`${button} mt-3`}>Tự gắn ảnh vào đồ trang trí</button>}
           </details>
 
-          {/* Freeform Decoration Library & Placement */}
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-3 justify-between items-center">
-              <div>
-                <h3 className="font-serif text-base font-bold text-white flex items-center gap-2">
-                  <span>Thêm đồ trang trí</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-mono">
-                    {decorationsList.length} món
-                  </span>
-                </h3>
-                <p className="text-xs text-stone-400">
-                  Chọn món rồi giữ và kéo trên ngôi nhà; thả tay để đặt trên sàn, bàn hoặc ghế.
-                </p>
-              </div>
-
-            </div>
-
-            {/* Library Grid */}
-            <div className="flex gap-2.5 overflow-x-auto pb-2">
-              {DECORATIONS.map(d => (
-                <button
-                  key={d.id}
-                  type="button"
-                  disabled={status !== 'ready' || view !== '3d'}
-                  onClick={() => startPlacement(d.id)}
-                  className={`w-28 shrink-0 text-left rounded-2xl border p-2 transition-all cursor-pointer relative group ${
-                    placingItem === d.id
-                      ? 'border-amber-400 bg-amber-400/15 ring-2 ring-amber-400/30'
-                      : 'border-white/10 hover:border-amber-300/40 bg-white/[0.02] hover:bg-white/[0.06]'
-                  }`}
-                >
-                  {view === '2d' ? <svg viewBox="0 0 100 100" className="w-full aspect-[4/3] rounded-xl bg-[#f7f1e8]" aria-hidden="true"><MemoryHouseDecor2D item={d.id}/></svg> : <img
-                    loading="lazy"
-                    src={d.image}
-                    alt=""
-                    className="w-full aspect-[4/3] object-cover rounded-xl"
-                  />}
-                  <div className="pt-2 px-1">
-                    <span className="block text-xs font-medium text-white truncate">{d.name}</span>
-                    <div className="flex items-center justify-between mt-1 text-[10px]">
-                      <span className="text-stone-400">
-                        {d.defaultSurface === 'table' ? 'Mặt bàn' : d.defaultSurface === 'wall' ? 'Tường' : 'Sàn'}
-                      </span>
-                      {d.photoCount > 0 && (
-                        <span className="text-amber-300 font-semibold">{d.photoCount} ảnh</span>
-                      )}
-                      {d.textLabel && (
-                        <span className="text-indigo-300 font-semibold">Chữ</span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-
-          </div>
+          <DecorationLibrary disabled={status !== 'ready' || view !== '3d'} view={view} placingItem={placingItem} placedCount={decorationsList.length} onSelect={startPlacement} />
         </div>
       )}
 

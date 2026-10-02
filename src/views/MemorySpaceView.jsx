@@ -8,6 +8,7 @@ import MemoryCinema from '../components/MemoryCinema';
 import LuxuryUnboxingExperience from '../components/LuxuryUnboxingExperience';
 import AiLetterMuseModal from '../components/AiLetterMuseModal';
 import CuratedMelodiesModal from '../components/CuratedMelodiesModal';
+import MemoryHousePreview from '../components/MemoryHousePreview.jsx';
 import { triggerAiWarmup } from '../services/aiWarmup.js';
 import confetti from 'canvas-confetti';
 import {callStore} from '../services/catalogService';
@@ -20,7 +21,7 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2, ShieldCheck, Image as ImageIcon,
   Edit3, Key, Clock, AlertTriangle, Save, X, Loader2, ArrowLeft, Music, Feather, Film, Home, Upload, Maximize2
 } from 'lucide-react';
-import { getHouseDraft, getPublicHouseByTag, HOUSE_ROOMS_SPEC, HOUSE_THEMES } from '../services/eventService.js';
+import { getHouseDraft, getPublicHouseByTag } from '../services/eventService.js';
 import { 
   fetchMemoryView, 
   verifyMemoryPin, 
@@ -42,7 +43,6 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
   const [memoryData, setMemoryData] = useState(null);
   const [houseData, setHouseData] = useState(null);
   const [houseLoading, setHouseLoading] = useState(false);
-  const [activeHouseRoomIndex, setActiveHouseRoomIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [allMemories, setAllMemories] = useState([]);
@@ -943,109 +943,11 @@ export default function MemorySpaceView({ initialTag = 'emoria-lumen', onNavigat
                 )}
               </div>
             ) : (
-              /* PUBLISHED SNAPSHOT (GUEST/RECIPIENT) HOẶC OWNER DRAFT (OWNER) */
-              <>
-                {/* 5 Rooms Switcher */}
-                <div className="overflow-x-auto pb-2 scrollbar-none relative z-10">
-                  <div className="flex items-center gap-2 min-w-max">
-                    {(houseData.rooms || []).map((room, idx) => {
-                      const isSelected = activeHouseRoomIndex === idx;
-                      const photoCount = room.memories?.length || 0;
-                      return (
-                        <button
-                          key={room.id || idx}
-                          type="button"
-                          onClick={() => setActiveHouseRoomIndex(idx)}
-                          className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-amber-400 text-dark-950 border-amber-400 shadow-md'
-                              : 'bg-black/40 border-white/10 text-slate-300 hover:border-white/20 hover:bg-white/5'
-                          }`}
-                        >
-                          <span>{room.name || `Phòng ${idx + 1}`}</span>
-                          {photoCount > 0 && (
-                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                              isSelected ? 'bg-dark-950 text-amber-300' : 'bg-white/10 text-slate-400'
-                            }`}>
-                              {photoCount}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Active Room Content */}
-                {(() => {
-                  const roomsList = houseData.rooms || [];
-                  const currentActiveRoom = roomsList[activeHouseRoomIndex] || roomsList[0] || {};
-                  const roomMemories = currentActiveRoom.memories || [];
-
-                  return (
-                    <div className="space-y-4 relative z-10">
-                      {/* Room Note / Story */}
-                      <div className="p-4 sm:p-5 rounded-2xl bg-black/40 border border-white/10 space-y-1">
-                        <p className="text-xs uppercase tracking-wider text-amber-300/80 font-bold font-mono">
-                          {currentActiveRoom.name || `Phòng ${activeHouseRoomIndex + 1}`}
-                        </p>
-                        <p className="font-serif text-sm sm:text-base text-slate-200 italic leading-relaxed">
-                          {currentActiveRoom.note ? `“${currentActiveRoom.note}”` : `“Nơi lưu giữ những khoảnh khắc dịu dàng nhất của đôi mình.”`}
-                        </p>
-                      </div>
-
-                      {/* Room Photos */}
-                      {roomMemories.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                          {roomMemories.map((mem, memIdx) => (
-                            <div
-                              key={mem.id || memIdx}
-                              onClick={() => mem.photo_url && setFullScreenImage({ url: mem.photo_url, caption: mem.caption || currentActiveRoom.name })}
-                              className="bg-[#faf8f5] text-slate-800 rounded-2xl p-3 shadow-lg space-y-2 cursor-pointer hover:-translate-y-1 transition-transform group"
-                            >
-                              <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-200">
-                                {mem.photo_url ? (
-                                  <img
-                                    src={mem.photo_url}
-                                    alt={mem.caption || currentActiveRoom.name}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
-                                    Ảnh đang tải
-                                  </div>
-                                )}
-                              </div>
-                              {mem.caption && (
-                                <p className="text-[11px] text-slate-600 line-clamp-1 italic font-serif text-center px-1">
-                                  {mem.caption}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="py-10 border border-dashed border-white/15 rounded-2xl text-center space-y-2 bg-black/20">
-                          <Home className="w-8 h-8 text-amber-300/40 mx-auto" />
-                          <p className="text-xs sm:text-sm text-slate-300 font-medium">
-                            {t("Căn phòng này chưa có bức ảnh nào.", "This room has no photos yet.")}
-                          </p>
-                          {memoryData.is_owner && onOpenHouseStudio && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenHouseStudio(currentTag)}
-                              className="text-xs text-amber-300 hover:text-amber-200 underline font-semibold cursor-pointer inline-flex items-center gap-1"
-                            >
-                              <Upload className="w-3 h-3" />
-                              <span>{t("Tải ảnh vào phòng này trong Studio", "Upload photo to this room")}</span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </>
+              <MemoryHousePreview
+                key={currentTag}
+                house={houseData}
+                onPreview={(url, caption) => setFullScreenImage({ url, caption })}
+              />
             )}
           </section>
 

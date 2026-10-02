@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShieldCheck, Lock, SmartphoneNfc, Check, Share2, Mail, Phone, MapPin, EyeOff, ArrowUp } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageProvider';
+import { createShareUrl } from '../services/shareLinks.js';
 
 export default function PrivacyPolicyModal({ isOpen, onClose }) {
   const { t } = useLanguage();
@@ -75,7 +76,7 @@ export default function PrivacyPolicyModal({ isOpen, onClose }) {
   };
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}${window.location.pathname}?policy=privacy`;
+    const url = createShareUrl({policy:'privacy'});
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
