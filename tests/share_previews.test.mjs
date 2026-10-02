@@ -8,6 +8,12 @@ import {captureHouseShareFile} from '../src/services/houseSharePreview.js';
 import {moderateHousePhotos} from '../server/houseModeration.js';
 
 const origin='https://emoria.test', query=value=>new URLSearchParams(value);
+// Root is a real index.html route on Vercel: filesystem precedence bypasses
+// rewrites, so legacy NFC/content URLs must redirect before that lookup.
+const routing=JSON.parse(await readFile(new URL('../vercel.json',import.meta.url)));
+assert.deepEqual(routing.redirects.map(rule=>rule.has[0].key),['view','share','match','invite','article','tag','memory','chip','policy','privacy']);
+assert.ok(routing.redirects.every(rule=>rule.source==='/'&&rule.destination==='/share'&&rule.permanent===false&&rule.has[0].type==='query'));
+assert.ok(!routing.rewrites.some(rule=>rule.source==='/'));
 const match='12345678-1234-1234-1234-123456789abc',invite='a-safe-invitation-token';
 const share=createShareUrl({view:'memory-match',match,invite,token:'PRIVATE-GRANT',pin:'1234',unrelated:'drop'},origin);
 assert.equal(new URL(share).pathname,'/share');
