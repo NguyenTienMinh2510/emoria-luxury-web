@@ -13,7 +13,9 @@ async function compile(file,name){
  await build({entryPoints:[file],outfile,bundle:true,platform:'node',format:'esm',packages:'external',define:{'import.meta.env':'{}'},logLevel:'silent'});
  return import(pathToFileURL(outfile).href+'?'+Date.now());
 }
-const {canNavigateView,readStudioRoute}=await compile('src/App.jsx','app-navigation');
+const {canNavigateView,readStudioRoute,readEntryView}=await compile('src/App.jsx','app-navigation');
+for(const [search,view] of [['','home'],['?tag=emoria-pulse','memory'],['?memory=emoria-lumen','memory'],['?chip=nfc-id','nfc'],['?view=memory','memory'],['?share=house-id','memory-house'],['?invite=match-id','memory-match'],['?article=story','article-detail'],['?payment=success&orderId=123','shop'],['?view=shop','shop']])
+ assert.equal(readEntryView(search),view,'Initial routing prioritizes the destination before any homepage frame preparation');
 {
  const appCode=fs.readFileSync('src/App.jsx','utf8');
  assert.equal((appCode.match(/setMatchRouteVersion\(/g)||[]).length,1,'Only route parsing may remount a Match; autosave changes keep the mounted editor');

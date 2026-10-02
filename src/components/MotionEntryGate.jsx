@@ -1,11 +1,15 @@
 import React, { useSyncExternalStore } from 'react';
 import { prepareShowcaseFrames, SHOWCASE_FRAME_COUNT } from '../services/showcaseFrames.js';
 
-export default function MotionEntryGate({ children }) {
-  const sequence = prepareShowcaseFrames();
-  const { loadedCount, ready, failed } = useSyncExternalStore(sequence.subscribe, sequence.getSnapshot, sequence.getSnapshot);
-  if (ready) return children;
-  const percent = Math.floor(loadedCount / SHOWCASE_FRAME_COUNT * 100);
+const idleState = { bufferedCount: 0, preloadCount: SHOWCASE_FRAME_COUNT, ready: false, failed: false };
+const idleSnapshot = () => idleState;
+const idleSubscribe = () => () => {};
+
+export default function MotionEntryGate({ children, pending = false, waitForFrames = true }) {
+  const sequence = waitForFrames ? prepareShowcaseFrames() : null;
+  const { bufferedCount, preloadCount, ready, failed } = useSyncExternalStore(
+    sequence?.subscribe || idleSubscribe, sequence?.getSnapshot || idleSnapshot, sequence?.getSnapshot || idleSnapshot);
+  if (!pending && ready) return children;
   return (
     <main className="fixed inset-0 z-[200] overflow-y-auto bg-dark-950 px-5 py-8 text-white font-sans" aria-busy={!failed}>
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_50%_35%,rgba(212,175,55,0.09),transparent_65%)]" />
@@ -28,9 +32,8 @@ export default function MotionEntryGate({ children }) {
           <div className="mt-8 text-left">
             <div aria-hidden="true" className="mb-3 flex items-center justify-between text-[11px] tracking-wide text-slate-400">
               <span>{failed ? 'Tạm gián đoạn' : 'Hoàn thiện trải nghiệm'}</span>
-              <span className="tabular-nums text-amber-100">{percent}%</span>
             </div>
-            <progress value={loadedCount} max={SHOWCASE_FRAME_COUNT} aria-label="Chuẩn bị trải nghiệm" aria-describedby="entry-status"
+            <progress value={sequence ? Math.min(bufferedCount, preloadCount) : undefined} max={preloadCount} aria-label="Chuẩn bị trải nghiệm" aria-describedby="entry-status"
               className="block h-1 w-full overflow-hidden rounded-full bg-white/10 accent-amber-200 [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-amber-200 [&::-moz-progress-bar]:bg-amber-200" />
           </div>
           {failed && <button type="button" onClick={sequence.retry} className="cta-luxury-gold mt-7 w-full">Thử lại</button>}

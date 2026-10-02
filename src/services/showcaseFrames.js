@@ -84,25 +84,37 @@ export function loadShowcaseFrames({ count, getPath, getFallbackPath, onLoad, Im
   };
 }
 
-export const SHOWCASE_FRAME_COUNT = 300;
+export const SHOWCASE_FRAME_COUNT = 150;
+export const SHOWCASE_DURATION_MS = 299 / 72 * 1000;
+
+export function getShowcasePreloadCount(loadedCount, elapsedMs) {
+  // Reserve 30% of measured throughput and 12 frames for network/decode variation.
+  const rate = loadedCount * 1000 / Math.max(1, elapsedMs) * 0.7;
+  return Math.min(SHOWCASE_FRAME_COUNT, Math.max(30,
+    Math.ceil(SHOWCASE_FRAME_COUNT - rate * SHOWCASE_DURATION_MS / 1000 + 12)));
+}
 let showcaseSequence;
 
 // One decoded sequence per visit, shared by the entry screen and home page.
 export function prepareShowcaseFrames() {
   if (showcaseSequence) return showcaseSequence;
   const listeners = new Set();
-  let loadedCount = 0, settledCount = 0;
-  let snapshot = { loadedCount: 0, ready: false, failed: false };
+  let loadedCount = 0, settledCount = 0, bufferedCount = 0, ready = false;
+  const startedAt = performance.now();
+  let snapshot = { loadedCount: 0, bufferedCount: 0, preloadCount: SHOWCASE_FRAME_COUNT, ready: false, failed: false };
   const publish = () => {
-    snapshot = { loadedCount, ready: loadedCount === SHOWCASE_FRAME_COUNT,
+    while (loader.ready[bufferedCount]) bufferedCount++;
+    const preloadCount = getShowcasePreloadCount(bufferedCount, performance.now() - startedAt);
+    ready ||= bufferedCount >= preloadCount;
+    snapshot = { loadedCount, bufferedCount, preloadCount, ready,
       failed: settledCount === SHOWCASE_FRAME_COUNT && loadedCount < SHOWCASE_FRAME_COUNT };
     listeners.forEach(listener => listener());
   };
   const mobile = window.innerWidth < 768;
   const loader = loadShowcaseFrames({
     count: SHOWCASE_FRAME_COUNT,
-    getPath: index => `/assets/animation-optimized/frame-${String(index).padStart(3, '0')}${mobile ? '-640' : ''}.webp?v=3`,
-    getFallbackPath: index => `/assets/animation/ezgif-frame-${String(index + 1).padStart(3, '0')}.jpg?v=2`,
+    getPath: index => `/assets/animation-optimized/frame-${String(Math.round(index * 299 / (SHOWCASE_FRAME_COUNT - 1))).padStart(3, '0')}${mobile ? '-640' : ''}.webp?v=3`,
+    getFallbackPath: index => `/assets/animation/ezgif-frame-${String(Math.round(index * 299 / (SHOWCASE_FRAME_COUNT - 1)) + 1).padStart(3, '0')}.jpg?v=2`,
     onLoad: (index, loaded) => {
       settledCount++;
       if (loaded) loadedCount++;

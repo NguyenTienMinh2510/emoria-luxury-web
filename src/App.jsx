@@ -7,6 +7,7 @@ import { useStore } from './components/StoreProvider';
 import ArticlesSection from './components/ArticlesSection';
 import HeroSection from './components/HeroSection';
 import ProductExplodedShowcase from './components/ProductExplodedShowcase';
+import MotionEntryGate from './components/MotionEntryGate.jsx';
 import CollectionShowcase from './components/CollectionShowcase';
 import ProductCatalog from './components/ProductCatalog';
 import FeedbackSection from './components/FeedbackSection';
@@ -63,10 +64,15 @@ export function readStudioRoute(search) {
   };
 }
 
+export function readEntryView(search) {
+  const q = new URLSearchParams(search);
+  return readStudioRoute(q).view || (q.get('payment') && q.get('orderId') ? 'shop' : q.get('article') ? 'article-detail' : q.get('chip') ? 'nfc' : q.get('tag') || q.get('memory') ? 'memory' : ['home','shop','memory','articles','about','admin'].includes(q.get('view')) ? q.get('view') : 'home');
+}
+
 export default function App() {
   const store = useStore();
   // Navigation View: Mặc định là 'home' (Trang chủ & Câu chuyện thương hiệu)
-  const [currentView, setCurrentView] = useState('home');
+  const [currentView, setCurrentView] = useState(() => readEntryView(window.location.search));
   const currentViewRef = useRef(currentView);
   currentViewRef.current = currentView;
   const navigationDirtyRef = useRef(null);
@@ -199,7 +205,7 @@ export default function App() {
     const readRoute = () => {
       const q=new URLSearchParams(window.location.search);
       const studioRoute=readStudioRoute(q);
-      const targetView=studioRoute.view || (q.get('payment') && q.get('orderId') ? 'shop' : q.get('article') ? 'article-detail' : q.get('chip') ? 'nfc' : q.get('tag') || q.get('memory') ? 'memory' : ['home','shop','memory','articles','about','admin'].includes(q.get('view')) ? q.get('view') : 'home');
+      const targetView=readEntryView(q);
       const sameContext=JSON.stringify(readStudioRoute(new URL(currentRouteRef.current).search))===JSON.stringify(studioRoute);
       if (!canNavigateView(currentViewRef.current, targetView, navigationDirtyRef.current?.current, message => window.confirm(message), sameContext)) {
         window.history.pushState({}, '', currentRouteRef.current);
@@ -365,7 +371,7 @@ export default function App() {
   };
 
   // SYSTEM MAINTENANCE GATE CHECK
-  if(!systemReady||!routeReady)return <div role="status" className="min-h-screen flex items-center justify-center bg-dark-950 text-slate-300">Đang mở EMORIA…</div>;
+  if(!systemReady||!routeReady)return <MotionEntryGate pending waitForFrames={currentView === 'home'} />;
   const isSystemBlocked = systemConfig.isMaintenanceMode && 
     authSession.role === ROLES.GUEST && 
     !vipBypassed;
@@ -455,6 +461,7 @@ export default function App() {
         <DeferredContent key={currentView}>
         {/* VIEW 1: TRANG CHỦ & CÂU CHUYỆN THƯƠNG HIỆU (MẶC ĐỊNH) */}
         {currentView === 'home' && (
+          <MotionEntryGate>
           <div>
             <ProductExplodedShowcase
               mode="hero"
@@ -522,6 +529,7 @@ export default function App() {
 
             <ContactSection />
           </div>
+          </MotionEntryGate>
         )}
 
         {/* VIEW 2: DEDICATED STOREFRONT / SHOPPING INTERFACE */}

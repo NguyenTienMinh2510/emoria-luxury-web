@@ -54,7 +54,6 @@ const find = (node,predicate) => {
   if (predicate(node)) return node;
   for(const child of (Array.isArray(node)?node:node.children||[])) {const match=find(child,predicate);if(match)return match;}
 };
-const frameWrites = () => fixture.writes.filter(([index])=>index===2);
 const lastFrame = () => Number(draws.at(-1).url.match(/frame-(\d+)/)[1]);
 const hotspotElement = {getBoundingClientRect:()=>hotspotRect};
 const event = (pointerType='mouse',extra={}) => ({pointerType,isPrimary:true,button:0,clientX:200,clientY:200,
@@ -64,9 +63,8 @@ const touchEvent = (touches,changedTouches=touches) => ({touches,changedTouches,
 const focusEvent = (visible=true) => ({currentTarget:{matches:selector=>{assert.equal(selector,':focus-visible');return visible;}}});
 try {
   const tree=Showcase({});
-  const mobileCard=find(tree,node=>node.props?.['data-showcase-layers']);
-  assert.ok(mobileCard.props.className.includes('h-[188px]')&&mobileCard.props.className.includes('shrink-0'),'Mobile reserves fixed card height throughout playback');
-  assert.ok(!JSON.stringify(mobileCard).includes('presence'),'The mobile card has no exit/enter fade or empty layout gap');
+  assert.equal(find(tree,node=>node.props?.['data-showcase-layers']),undefined,'The animation has no overlaid layer cards');
+  assert.equal(find(tree,node=>node.type==='progress'||node.type==='h4'||node.props?.role==='status'),undefined,'The image stage has no loading percentages, status messages or layer guides');
   const hotspot=find(tree,node=>node.type==='button'&&node.props?.onPointerEnter).props;
   const cleanups=fixture.effects.map(effect=>effect()).filter(fn=>typeof fn==='function');
   assert.equal(listeners.has('wheel'),false,'Wheel events never control frames or block native scrolling');
@@ -78,15 +76,23 @@ try {
   assert.equal(draws.length,0,'Undecoded frames are never drawn');
   await ImageFixture.created[0].finish();flush();
   assert.equal(draws.length,1,'The original closed image appears while remaining frames preload');
-  assert.ok(!fixture.writes.some(([index,value])=>index===1&&value),'Playback stays unready until the entire sequence settles');
-  for(let i=1;i<ImageFixture.created.length;i++)await ImageFixture.created[i].finish();
-  assert.equal(ImageFixture.created.length,300,'All original frames are prepared without further input');
-  assert.ok(fixture.writes.some(([index,value])=>index===1&&value));
-  const beforeWrites=frameWrites().length;
+  for(let i=1;i<29;i++)await ImageFixture.created[i].finish();
+  assert.ok(!fixture.writes.some(([index,value])=>index===0&&value),'A partial undecoded buffer cannot enable playback');
+  await ImageFixture.created[29].finish();
+  assert.ok(fixture.writes.some(([index,value])=>index===0&&value),'Playback starts from a safe buffer before all images finish');
+  for(let i=0;i<150;i++)flush();
+  const stalledFrame=lastFrame();
+  assert.ok(stalledFrame<=58,'Playback stops at its decoded buffer rather than skipping unloaded images');
+  for(let i=0;i<60;i++)flush();
+  assert.equal(lastFrame(),stalledFrame,'A stalled network holds the visible image');
+  assert.ok(raf.size>0,'The held pointer remains active while waiting for a frame');
+  for(let i=30;i<ImageFixture.created.length;i++)await ImageFixture.created[i].finish();
+  assert.equal(ImageFixture.created.length,150,'Only the evenly sampled sequence is downloaded');
+  const beforeWrites=fixture.writes.length;
   const openingTicks=runToEnd();
-  assert.ok(openingTicks<=252,'The full sequence plays in about 4.2 seconds at 60Hz (20% faster rate)');
+  assert.ok(openingTicks<=252,'The remaining sequence retains the original 4.2-second playback rate');
   assert.ok(draws.at(-1).url.includes('frame-299.webp'));
-  assert.ok(frameWrites().length-beforeWrites<=6,'Layer labels update at milestones instead of each animation frame');
+  assert.ok(fixture.writes.length-beforeWrites<=1,'Animation ticks update only the canvas, with one endpoint state change');
   assert.equal(layoutReads,1,'Playback never measures layout');
   assert.equal(draws.at(-1).geometry[0],(1600-1600*1.28)/2,'The original contain scale and center are retained');
   hotspot.onPointerLeave(event());runToEnd();
@@ -161,7 +167,7 @@ try {
   Showcase({});
   const cachedCleanups=fixture.effects.map(effect=>effect()).filter(fn=>typeof fn==='function');flush();
   assert.equal(ImageFixture.created.length,preparedImages,'Home remount reuses the decoded sequence without new downloads');
-  assert.ok(fixture.writes.some(([index,value])=>index===1&&value),'Cached-ready home initializes readiness immediately');
+  assert.ok(fixture.writes.some(([index,value])=>index===0&&value),'Cached-ready home initializes readiness immediately');
   cachedCleanups.forEach(fn=>fn());
   fixture.effects=[];fixture.writes=[];fixture.nextState=0;ImageFixture.created=[];
   window.innerWidth=390;window.matchMedia=()=>({matches:true});
@@ -184,11 +190,11 @@ try {
   const beforeMissing=draws.length;
   for(let i=0;i<ImageFixture.created.length;i++){ImageFixture.created[i].onerror();ImageFixture.created[i].onerror();}
   flush();
-  assert.equal(ImageFixture.created.length,300,'Terminal failures still finish the eager queue');
+  assert.equal(ImageFixture.created.length,150,'Terminal failures still finish the bounded queue');
   assert.equal(draws.length,beforeMissing);
-  assert.ok(!fixture.writes.some(([index,value])=>index===1&&value),'Missing images never enable playback');
+  assert.ok(!fixture.writes.some(([index,value])=>index===0&&value),'Missing images never enable playback');
   missingCleanups.forEach(fn=>fn());
-  console.log('PASS showcase: 300 eagerly decoded frames, original desktop framing, mouse/pen playback, held touch through native scroll, finger isolation/release/cancel, live bounds, keyboard focus, milestone labels, reduced motion, image failures and cleanup.');
+  console.log('PASS showcase: 150 samples, clean image stage, buffered playback and stall/resume, original framing, held touch through native scroll, finger isolation, live bounds, keyboard, reduced motion and cleanup.');
 } finally {
   for(const name of ['showcaseFixture','Image','window','document','ResizeObserver','requestAnimationFrame','cancelAnimationFrame']) delete globalThis[name];
 }

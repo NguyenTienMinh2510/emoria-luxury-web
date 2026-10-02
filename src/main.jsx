@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
-import MotionEntryGate from './components/MotionEntryGate.jsx';
 import StoreProvider from './components/StoreProvider.jsx';
 import LanguageProvider from './i18n/LanguageProvider.jsx';
 import { Analytics } from '@vercel/analytics/react';
@@ -11,7 +10,6 @@ import './styles/index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <MotionEntryGate>
       <LanguageProvider>
         <StoreProvider>
           <App />
@@ -32,6 +30,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           />
         </StoreProvider>
       </LanguageProvider>
-    </MotionEntryGate>
   </React.StrictMode>,
 );
