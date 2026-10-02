@@ -301,7 +301,7 @@ export async function warmupAi() {
     return {
       success: false,
       warmed: false,
-      message: err.message
+      message: 'Dịch vụ AI chưa sẵn sàng. Hãy thử lại sau.'
     };
   }
 }

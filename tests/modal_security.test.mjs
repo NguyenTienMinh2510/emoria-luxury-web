@@ -50,6 +50,8 @@ try {
   assert.deepEqual(calls.at(-1).options.headers, headers);
   globalThis.fetch = async () => Response.json({success: false}, {status: 401});
   assert.equal((await warmupAi()).warmed, false, 'Rejected warmups cannot report a ready GPU');
+  globalThis.fetch = async () => { throw new Error('private internal diagnostic fixture'); };
+  assert.deepEqual(await warmupAi(), {success:false,warmed:false,message:'Dịch vụ AI chưa sẵn sàng. Hãy thử lại sau.'});
 
   const context = {body: {consent: true}, client: {rpc: name => { assert.equal(name, 'reserve_letter_generation'); return true; }}, db: async value => value};
   globalThis.fetch = async (url, options) => { calls.push({url, options}); return Response.json({success: true, letter: 'A sufficiently long offline letter fixture.'}); };
