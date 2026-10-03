@@ -335,7 +335,7 @@ export default function MemoryHouse3D({
               await new Promise(resolve=>setTimeout(resolve,0));
               plans.push(planCozyHouseUpgrade([room],(...args)=>engine.current.findPlacement(...args),options));
             }
-            return {rooms:plans.flatMap(p=>p.rooms),skipped:plans.flatMap(p=>p.skipped),added:plans.reduce((n,p)=>n+p.added,0)};
+            return {rooms:plans.flatMap(p=>p.rooms),skipped:plans.flatMap(p=>p.skipped),added:plans.reduce((n,p)=>n+p.added,0),removed:plans.reduce((n,p)=>n+p.removed,0)};
           }); } },
           onError: message => { if (!cancelled) { setError(message); setStatus('error'); } }
         });

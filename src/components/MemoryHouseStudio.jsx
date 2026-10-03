@@ -408,7 +408,7 @@ export default function MemoryHouseStudio({
       await saveQueue.current.flush();
       const plan=await planLayout(original.rooms,options);
       if(JSON.stringify(original)!==JSON.stringify(latestHouse.current)) throw new Error('Bạn vừa chỉnh sửa thêm. Hãy thử xem trước lại.');
-      if(plan.added || options?.rearrange) setLayoutPreview(plan);
+      if(plan.added || options?.rearrange || options?.replace) setLayoutPreview(plan);
       else setError('Chưa có chỗ trống phù hợp. Hãy sắp xếp lại đồ trước khi nâng cấp.');
     } catch(err) { setError(err.message); }
     finally {setLayoutBusy(false);}
@@ -1146,14 +1146,15 @@ export default function MemoryHouseStudio({
         {/* ===================================================================== */}
         {!isPublicVisitor && activeTab === 'edit' && <p className="text-sm text-slate-400">Chọn một phòng bên dưới, thêm ảnh và lời nhắn, rồi xuất bản để chia sẻ. Mọi thay đổi được tự động lưu.</p>}
         {!isPublicVisitor && activeTab === 'edit' && <section aria-label="Nâng cấp bố cục" className="rounded-2xl border border-white/15 p-4 space-y-3">
-          <p className="text-sm text-slate-300">Bố cục Cozy giữ nguyên đồ cũ, ảnh và vị trí tùy chỉnh, rồi bổ sung vào chỗ còn trống. Bạn có thể khôi phục bố cục trước nâng cấp.</p>
-          <div className="flex flex-wrap gap-3">
+            <p className="text-sm text-slate-300">Thay nội thất bằng bố cục Cozy mới để dọn đồ cũ dư thừa. Đồ có ảnh hoặc lời nhắn được giữ và sắp xếp lại. Xem trước toàn bộ ngôi nhà trước khi lưu.</p>
+            <div className="flex flex-wrap gap-3">
+            {!layoutPreview && <button type="button" disabled={!planLayout || layoutBusy || isPublishing || autosaveState==='saving'} className="min-h-11 rounded-xl bg-amber-200 px-4 text-stone-950 disabled:opacity-40" onClick={()=>previewLayout({replace:true})}>Xem trước thay nội thất Cozy</button>}
             {!layoutPreview && rooms.some(r=>r.furnishingVersion!==2) && <button type="button" disabled={!planLayout || layoutBusy || isPublishing || autosaveState==='saving'} className="min-h-11 rounded-xl border border-amber-300/40 px-4 text-amber-200 disabled:opacity-40" onClick={()=>previewLayout()}>Xem trước bố cục Cozy</button>}
             {!layoutPreview && rooms.some(r=>r.furnishingVersion!==2) && <button type="button" disabled={!planLayout || layoutBusy || isPublishing || autosaveState==='saving'} className="min-h-11 rounded-xl bg-amber-200 px-4 text-stone-950 disabled:opacity-40" onClick={()=>previewLayout({rearrange:true})}>Xem trước sắp xếp H05</button>}
             {layoutBusy && <p role="status" className="w-full text-sm text-amber-200">Đang kiểm tra vị trí và lưu bố cục…</p>}
             {layoutPreview && <>
-              <p className="w-full text-sm text-amber-200">Xem trước bố cục với {layoutPreview.added} món bổ sung; {layoutPreview.skipped.length} món chưa có chỗ phù hợp. Chưa lưu thay đổi.</p>
-              <button type="button" disabled={layoutBusy} onClick={applyLayoutPreview} className="min-h-11 rounded-xl bg-amber-200 px-4 text-stone-950">Áp dụng và lưu bố cục</button>
+              <p className="w-full text-sm text-amber-200">Xem trước: thêm {layoutPreview.added} món, dọn {layoutPreview.removed || 0} món cũ; {layoutPreview.skipped.length} món chưa có chỗ phù hợp. Chưa lưu thay đổi.</p>
+              <button type="button" disabled={layoutBusy || layoutPreview.skipped.length>0} onClick={applyLayoutPreview} className="min-h-11 rounded-xl bg-amber-200 px-4 text-stone-950 disabled:opacity-40">Áp dụng và lưu bố cục</button>
               <button type="button" disabled={layoutBusy} onClick={()=>setLayoutPreview(null)} className="min-h-11 rounded-xl border border-white/20 px-4">Hủy xem trước</button>
             </>}
             {canRestoreLayout && !layoutPreview && <button type="button" disabled={layoutBusy || isPublishing || autosaveState==='saving'} onClick={restoreLayout} className="min-h-11 rounded-xl border border-white/20 px-4">Khôi phục bố cục trước nâng cấp</button>}

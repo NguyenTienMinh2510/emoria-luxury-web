@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {DECORATIONS, roomDecorations, getDefaultPosition, houseLighting, gyroTilt, houseAssetUrl} from './house3d.js';
+import {DECORATIONS, roomDecorations, getDefaultPosition, houseLighting, gyroTilt, houseAssetUrl, houseGalleryMemories} from './house3d.js';
 import {createPlacementSolver, placementTriangles, transformDecoration} from './housePlacement.js';
 
 export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, onPlacementPreview, getPlacement, getDragPlacement, isEditing, onGyroChange, onError, onReady}) {
@@ -411,8 +411,9 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     // Only visible wall/decoration photos are decoded; each texture is at most 512px per side.
     const needed=new Set();
     for(const surface of photoSurfaces()){
-      const memories=rooms.find(r=>r.id===surface.userData.roomId)?.memories;
-      const memory=Number.isInteger(surface.userData.decorPhotoIndex)?memories?.find(m=>m.id===surface.userData.memoryId):memories?.[surface.userData.photoIndex];
+      const room=rooms.find(r=>r.id===surface.userData.roomId);
+      const memories=room?.memories;
+      const memory=Number.isInteger(surface.userData.decorPhotoIndex)?memories?.find(m=>m.id===surface.userData.memoryId):houseGalleryMemories(room)[surface.userData.photoIndex];
       const url=memory?.photo_url;surface.userData.url=url||null;surface.userData.memory=memory||null;surface.material.map=null;surface.material.color.set('#f8ecda');
       if (Number.isInteger(surface.userData.photoIndex)) surface.visible=Boolean(url);
       const caption = surface.userData.decorText || '';

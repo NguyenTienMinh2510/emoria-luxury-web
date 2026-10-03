@@ -276,18 +276,18 @@ export function createCozyHouseRooms(rooms) {
   });
 }
 
-export function planCozyHouseUpgrade(rooms, findPlacement, {rearrange = false} = {}) {
+export function planCozyHouseUpgrade(rooms, findPlacement, {rearrange = false, replace = false} = {}) {
   const skipped=[];
   const next=rooms.map(room => {
-    if (room.furnishingVersion >= 2) return room;
+    if (room.furnishingVersion >= 2 && !replace) return room;
     const existing = roomDecorations(room), added=[];
-    if (rearrange) {
+    if (rearrange || replace) {
       const used=new Set(), remapped=new Map(), excludeIds=existing.map(d=>d.id).filter(Boolean);
-      const place = (wanted, previous) => {
+      const place = (wanted, previous, reportFailure = true) => {
         const parent=added.find(d=>d.id===(remapped.get(wanted.parent_id) || wanted.parent_id));
         const templateParent=cozyRoomDecorations(room.id).find(d=>d.id===wanted.parent_id);
         const position=parent && templateParent ? [wanted.position[0]+parent.position[0]-templateParent.position[0],parent.position[1]+ASSET_DIMENSIONS[parent.item].height*parent.scale+.004,wanted.position[2]+parent.position[2]-templateParent.position[2]] : wanted.position;
-        const supportId=parent && templateParent && ['table','shelf'].includes(wanted.surface) && DECORATIONS.find(d=>d.id===wanted.item)?.defaultSurface==='table' ? parent.id : null;
+        const supportId=parent ? parent.id : null;
         const originalScale=Array.isArray(wanted.scale) ? Math.min(...wanted.scale) : wanted.scale || 1;
         for (const factor of [1,.8,.65,.5]) {
           const hit=findPlacement(room.id,wanted.item,{position,scale:originalScale*factor,rotation:wanted.rotation,excludeIds,extra:added,supportId,furnishingVersion:2});
@@ -297,21 +297,39 @@ export function planCozyHouseUpgrade(rooms, findPlacement, {rearrange = false} =
           added.push({...desired,...content,position:hit.position.map(n=>round(n)),surface:hit.surface,scale:hit.scale,rotation:wanted.rotation,...(hit.parentId ? {parent_id:hit.parentId} : {})});
           remapped.set(wanted.id,added.at(-1).id);
           if(previous) used.add(previous);
-          return;
+          return true;
         }
-        skipped.push({roomId:room.id,item:wanted.item});
+        if (reportFailure) skipped.push({roomId:room.id,item:wanted.item});
+        return false;
       };
-      for(const wanted of cozyRoomDecorations(room.id)) place(wanted,existing.find(d=>d.item===wanted.item && !used.has(d)));
+      const personalized = d => Boolean(d.text?.trim() || d.photos?.some(Boolean));
+      for(const wanted of cozyRoomDecorations(room.id)) {
+        const matches=existing.filter(d=>d.item===wanted.item && !used.has(d));
+        place(wanted,matches.find(personalized) || matches[0]);
+      }
       // Keep every old instance and its personal attachments. The preview may
       // move/resize it only after the owner explicitly chooses rearrangement.
-      const remainder=existing.filter(d=>!used.has(d)).sort((a,b)=>Number(Boolean(DECORATIONS.find(d=>d.id===b.item)?.supportsItems))-Number(Boolean(DECORATIONS.find(d=>d.id===a.item)?.supportsItems)));
+      const remainder=existing.filter(d=>!used.has(d) && (!replace || personalized(d))).sort((a,b)=>Number(Boolean(DECORATIONS.find(d=>d.id===b.item)?.supportsItems))-Number(Boolean(DECORATIONS.find(d=>d.id===a.item)?.supportsItems)));
       for(const d of remainder) {
         const floor=ROOM_BOUNDS[room.id].y > 1 ? 2.388 : .14;
-        const position=d.surface==='wall' ? [ROOM_BOUNDS[room.id].x+.85,floor+.70,-1.04] : d.position;
-        place({...d,position},d);
+        const supports=replace && DECORATIONS.find(a=>a.id===d.item)?.defaultSurface==='table'
+          ? added.filter(a=>['coffee-table','bistro-table','desk','cubby','shelf'].includes(a.item)) : [];
+        let placed=false;
+        for (const support of supports) {
+          const position=[support.position[0],support.position[1]+ASSET_DIMENSIONS[support.item].height*support.scale+.004,support.position[2]];
+          if (place({...d,position,parent_id:support.id,scale:.65},d,false)) { placed=true; break; }
+        }
+        if (!placed) {
+          const position=d.surface==='wall' ? [ROOM_BOUNDS[room.id].x+.85,floor+.70,-1.04] : d.position;
+          place({...d,position},d);
+        }
         if(!used.has(d)) added.push(d);
       }
-      const baseline=added.map(({text,photos,...d})=>d);
+      // A replacement is atomic: never retain an overlapping old position when
+      // a personal object cannot fit. The owner can revise the preview first.
+      if (replace && skipped.some(d=>d.roomId===room.id)) return room;
+      const originalBaseline=new Map((room.furnishingBaseline || []).map(d=>[d.id,d]));
+      const baseline=added.map(({text,photos,...d})=>originalBaseline.get(d.id) || d);
       return {...room,furnishingVersion:2,decorations:added,furnishingBaseline:baseline};
     }
     for (const wanted of cozyRoomDecorations(room.id)) {
@@ -326,7 +344,15 @@ export function planCozyHouseUpgrade(rooms, findPlacement, {rearrange = false} =
     if (!added.length) return room;
     return {...room,furnishingVersion:2,decorations:[...(room.decorations || []),...added],furnishingBaseline:structuredClone(added)};
   });
-  return {rooms:next,skipped,added:next.reduce((n,r,i)=>n+(r.decorations?.length||0)-(rooms[i].decorations?.length||0),0)};
+  return {rooms:next,skipped,
+    added:next.reduce((n,r,i)=>n+roomDecorations(r).filter(d=>!roomDecorations(rooms[i]).some(old=>old.id===d.id)).length,0),
+    removed:next.reduce((n,r,i)=>n+roomDecorations(rooms[i]).filter(d=>!roomDecorations(r).some(next=>next.id===d.id)).length,0)};
+}
+
+// Gallery cards must not repeat memories already attached to a photo object.
+export function houseGalleryMemories(room) {
+  const attached=new Set(roomDecorations(room).flatMap(d=>d.photos || []));
+  return (room?.memories || []).filter(m=>!attached.has(m.id));
 }
 
 /**

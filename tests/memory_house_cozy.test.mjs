@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
-import {DECORATIONS,withEditableHouseFurniture,serializeHouseRooms,HOUSE_ROOM_IDS,getRotatedExtents,createCozyHouseRooms,planCozyHouseUpgrade} from '../src/services/house3d.js';
+import {DECORATIONS,withEditableHouseFurniture,serializeHouseRooms,HOUSE_ROOM_IDS,getRotatedExtents,createCozyHouseRooms,planCozyHouseUpgrade,houseGalleryMemories} from '../src/services/house3d.js';
 
 assert.equal(DECORATIONS.length,46);
 assert.equal(new Set(DECORATIONS.map(d=>d.id)).size,46);
@@ -21,6 +21,17 @@ assert.equal(opted.rooms[0].decorations.find(d=>d.id==='custom').text,'Keep me')
 assert.deepEqual(planCozyHouseUpgrade(opted.rooms,()=>{throw Error('Must not rerun');},{rearrange:true}).rooms,opted.rooms,'Successful rearrangement is idempotent');
 const deleted={...opted.rooms[0],decorations:opted.rooms[0].decorations.filter(d=>d.item!=='sofa')};
 assert.deepEqual(planCozyHouseUpgrade([deleted],hit,{rearrange:true}).rooms,[deleted],'Saved deletions remain deleted after reopen');
+const crowded={...opted.rooms[0],decorations:[...opted.rooms[0].decorations,{id:'obsolete-desk',item:'desk',surface:'floor',position:[-2,2.392,0],scale:1,rotation:0}]};
+const replacement=planCozyHouseUpgrade([crowded],hit,{replace:true});
+assert.equal(replacement.removed,1,'Explicit replacement removes leftover old furniture even in v2 rooms');
+assert.ok(!replacement.rooms[0].decorations.some(d=>d.id==='obsolete-desk'));
+assert.deepEqual(replacement.rooms[0].decorations.find(d=>d.id==='custom').photos,['p']);
+assert.equal(replacement.rooms[0].decorations.find(d=>d.id==='custom').text,'Keep me');
+const failedReplacement=planCozyHouseUpgrade([crowded],()=>null,{replace:true});
+assert.deepEqual(failedReplacement.rooms,[crowded],'A failed replacement is atomic per room');
+assert.ok(failedReplacement.skipped.length);
+assert.deepEqual(houseGalleryMemories({memories:[{id:'a'},{id:'b'},{id:'c'}],decorations:[{id:'photo-frame',item:'frame',surface:'wall',photos:['b']}]}).map(m=>m.id),['a','c'],'Wall gallery omits assigned photos without changing the memories');
+assert.deepEqual(houseGalleryMemories(undefined),[]);
 const extent=getRotatedExtents('sofa',[2,1.5,.5],90);
 assert.deepEqual([extent.halfX,extent.halfZ,extent.height],[.18,1.65,1.2],'Bounds follow each scale axis and yaw');
 const rooms=HOUSE_ROOM_IDS.map(id=>({id,note:'keep',memories:[{id:'photo',photo_path:'tag/photo.jpg'}],decorations:[{id:'custom',item:'frame',position:[0,1,0],surface:'wall',photos:['photo'],text:'keep',scale:.5,rotation:15}]}));
