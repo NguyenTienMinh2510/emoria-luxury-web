@@ -19,20 +19,22 @@ globalThis.cancelAnimationFrame = id => frames.delete(id);
 function draw(){const pending=[...frames.values()];frames.clear();for(const callback of pending)callback(performance.now());}
 globalThis.ResizeObserver = globalThis.IntersectionObserver = class {observe(){} disconnect(){}};
 let renderedScene, renderedCamera, orbit;
-const listeners = new Map();
+const listeners = new Map();let rendererDisposed=false, canvasRemoved=false, controlsDisposed=false;
 globalThis.__houseTestRenderer = class {
   domElement={...element(),
     addEventListener(name, callback){listeners.set(name, callback);},
+    removeEventListener(name, callback){if(listeners.get(name)===callback)listeners.delete(name);},
+    remove(){canvasRemoved=true;},
     getBoundingClientRect:()=>({left:0,top:0,width:1000,height:600}),
     setPointerCapture(){},hasPointerCapture:()=>false
   }; shadowMap={};
-  setPixelRatio(){} setSize(){} dispose(){}
+  setPixelRatio(){} setSize(){} dispose(){rendererDisposed=true;}
   render(scene,camera){renderedScene=scene;renderedCamera=camera;scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);}
 };
 globalThis.__houseTestControls = class {
   constructor(camera) { orbit=this;this.camera=camera;this.target=camera.position.clone(); }
   touches={}; enabled=true;
-  update(){this.camera.lookAt(this.target);} addEventListener(){} dispose(){}
+  update(){this.camera.lookAt(this.target);} addEventListener(){} dispose(){controlsDisposed=true;}
 };
 GLTFLoader.prototype.loadAsync = async function(url) {
   const data=await fs.readFile(path.join('public',url.split('?')[0]));
@@ -122,4 +124,7 @@ assert.equal(engine.findPlacement('memories','camera',{excludeId:'temporary-desk
 assert.equal(engine.findPlacement('memories','camera',{excludeIds:['temporary-desk']}),null,'Deleted parents are excluded from placement candidates');
 engine.overview(false);
 engine.dispose();
+assert.equal(listeners.size,0,'Disposal removes canvas event handlers');
+assert.equal(frames.size,0,'Disposal cancels scheduled animation frames');
+assert.ok(rendererDisposed && controlsDisposed && canvasRemoved,'Disposal releases the renderer, controls and canvas');
 console.log('PASS House renderer: real GLBs/supports, parent IDs, moved/deleted/temporary supports, desktop drag/click/cancel, read-only protection, hover preview, touch placement, gyro and disposal.');

@@ -61,8 +61,12 @@ try{
   assert.equal((await request('POST','/api/v1/orders',{...body,requestId:''},'customer-token')).status,400);
   dbError={code:'P0001',message:'Không đủ tồn kho'};
   assert.equal((await request('POST','/api/v1/orders',body,'customer-token')).status,409);
+  dbError=null;calls=[];
+  assert.equal((await request('POST','/api/v1/orders/lookup',{id:'EMO-server',token:'private-token'})).status,400);
+  assert.equal(calls.length,0,'Malformed lookup tokens must be rejected before database access');
   dbError={code:'XX000',message:'private DB details'};
-  r=await request('POST','/api/v1/orders/lookup',{id:'EMO-server',token:'private-token'});
+  r=await request('POST','/api/v1/orders/lookup',{id:'EMO-server',token:'private-lookup-token-fixture'});
+  assert.ok(calls.at(-1).url.endsWith('/rpc/rpc_track_order'),'Valid lookup input must reach the simulated database failure');
   assert.equal(r.status,503);assert.ok(!JSON.stringify(r).includes('private DB details'));
   dbError=null;dbResult=[];calls=[];
   await request('GET','/api/v1/me/orders?page=1&user_id=other',undefined,'customer-token');

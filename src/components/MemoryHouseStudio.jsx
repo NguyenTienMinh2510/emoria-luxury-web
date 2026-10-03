@@ -3,7 +3,8 @@ import {createPortal} from 'react-dom';
 import MemoryHouse3D from './MemoryHouse3D.jsx';
 import {createDraftQueue} from '../services/draftQueue.js';
 import {setDecorationPhoto} from '../services/house3d.js';
-import {HOUSE_PRESETS, ROOM_PRESETS, applyPresetToRooms, applyPresetToSingleRoom} from '../data/housePresets.js';
+import {HOUSE_PRESETS, ROOM_PRESETS, applyPresetToRooms, getRoomPresetId, getHousePresetId} from '../data/housePresets.js';
+import {createHousePresetSession} from '../services/housePresetSession.js';
 import {createShareUrl} from '../services/shareLinks.js';
 import {captureHouseShareFile} from '../services/houseSharePreview.js';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -123,14 +124,9 @@ export default function MemoryHouseStudio({
   const [houseTitle, setHouseTitle] = useState('Ngôi Nhà Kỷ Niệm Của Đôi Mình');
   const [selectedTheme, setSelectedTheme] = useState('warm_gold');
   const [rooms, setRooms] = useState(() => mapOrderedRooms([]));
-  const [layoutPreview, setLayoutPreview] = useState(null);
   const [canRestoreLayout, setCanRestoreLayout] = useState(false);
-  const [layoutBusy, setLayoutBusy] = useState(false);
-  const [selectedPresetId, setSelectedPresetId] = useState(null);
-  const [presetBusy, setPresetBusy] = useState(false);
-  const [selectedRoomPresetId, setSelectedRoomPresetId] = useState(null);
-  const [roomPresetBusy, setRoomPresetBusy] = useState(false);
-  const [planLayout, setPlanLayout] = useState(null);
+  const [presetState, setPresetState] = useState({busy: false, preview: null, undo: null});
+  const presetSession = useRef(null);
   const [isPublished, setIsPublished] = useState(false);
   const latestRooms = useRef(rooms);
   latestRooms.current = rooms;
@@ -145,6 +141,8 @@ export default function MemoryHouseStudio({
     return () => { if (navigationDirtyRef.current === isDirty) navigationDirtyRef.current = null; };
   }, [navigationDirtyRef]);
   const saveRevision = useRef(0);
+  const autosaveTimer = useRef(null);
+  const savedSnapshot = useRef(null);
   const saveQueue = useRef(null);
   const latestHouse = useRef(null);
   latestHouse.current={title:houseTitle.trim()||'Ngôi Nhà Kỷ Niệm Của Đôi Mình',theme:selectedTheme,rooms};
@@ -159,6 +157,28 @@ export default function MemoryHouseStudio({
     if(JSON.stringify(payload)===JSON.stringify(latestHouse.current)&&!saveQueue.current.pending){isDirty.current=false;setAutosaveState('saved');}
     return result;
   }
+  async function flushDraft() {
+    clearTimeout(autosaveTimer.current);
+    saveRevision.current += 1;
+    await saveQueue.current?.flush();
+    if (isDirty.current) await persistHouse(latestHouse.current, {retry:true});
+  }
+  if (!presetSession.current) presetSession.current = createHousePresetSession({
+    read: () => latestHouse.current,
+    flush: flushDraft,
+    save: payload => persistHouse(payload, {retry:true}),
+    commit: payload => {
+      savedSnapshot.current = JSON.stringify(payload);
+      latestRooms.current = payload.rooms;
+      latestHouse.current = payload;
+      setRooms(payload.rooms); setSelectedTheme(payload.theme);
+      isDirty.current = false; setAutosaveState('saved');
+    },
+    onChange: setPresetState,
+  });
+  const layoutPreview = presetState.preview;
+  const layoutBusy = presetState.busy;
+  const selectedPresetId = getHousePresetId({rooms, theme:selectedTheme});
   const isInitialLoad = useRef(true);
 
   // UI Action States
@@ -177,6 +197,17 @@ export default function MemoryHouseStudio({
   }, [isPublishing]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [uploadingRoomId, setUploadingRoomId] = useState(null);
+  const editorLocked = layoutBusy || Boolean(layoutPreview) || isPublishing || isSaving || Boolean(uploadingRoomId);
+  const presetDisabled = editorLocked || autosaveState === 'saving' || autosaveState === 'error';
+  const canMutate = () => !isPublicVisitor && !presetSession.current.locked && !isPublishing && !isSaving && !uploadingRoomId;
+  function editRooms(next) {
+    if (!canMutate()) return;
+    const value = typeof next === 'function' ? next(latestRooms.current) : next;
+    latestRooms.current = value;
+    latestHouse.current = {...latestHouse.current, rooms:value};
+    isDirty.current = true;
+    setRooms(value);
+  }
   const [lightboxData, setLightboxData] = useState(null);
   const [likedPhotos, setLikedPhotos] = useState(() => new Set());
   const [showReportModal, setShowReportModal] = useState(false);
@@ -226,7 +257,8 @@ export default function MemoryHouseStudio({
   // Load House Data (either draft for owner or public snapshot for guest/share)
   const loadHouse = useCallback(async () => {
     const sequence = ++loadSequence.current;
-    setLayoutPreview(null); setCanRestoreLayout(false);
+    presetSession.current.reset(); setCanRestoreLayout(false);
+    clearTimeout(autosaveTimer.current); savedSnapshot.current = null;
     setLoading(true);
     setCanEdit(false);
     setLoadError('');
@@ -302,7 +334,7 @@ export default function MemoryHouseStudio({
 
   useEffect(() => {
     loadHouse();
-    return () => { loadSequence.current += 1; };
+    return () => { loadSequence.current += 1; clearTimeout(autosaveTimer.current); presetSession.current.reset(); };
   }, [loadHouse]);
 
   // Debounced Autosave (800-1200ms) after changes
@@ -312,13 +344,17 @@ export default function MemoryHouseStudio({
       return;
     }
     if (isPublicVisitor || !canEdit || !tagUid) return;
+    if (savedSnapshot.current === JSON.stringify(latestHouse.current)) {
+      isDirty.current = false; setAutosaveState('saved'); return;
+    }
 
     isDirty.current = true;
     saveRevision.current += 1;
     const currentRev = saveRevision.current;
     setAutosaveState('saving');
 
-    const timer = setTimeout(async () => {
+    const timer = autosaveTimer.current = setTimeout(async () => {
+      if (presetSession.current.locked) return;
       try {
         await persistHouse({...latestHouse.current,rooms:latestRooms.current});
         if (currentRev === saveRevision.current) {
@@ -349,13 +385,15 @@ export default function MemoryHouseStudio({
   }, []);
 
   // Save Draft (Manual or programmatic)
-  const handleSaveDraft = async (customRooms = rooms) => {
-    if (!tagUid || isPublicVisitor) return;
+  const handleSaveDraft = async (customRooms = latestRooms.current) => {
+    if (!tagUid || !canMutate()) return;
+    return presetSession.current.run(async isCurrent => {
     setIsSaving(true);
     setAutosaveState('saving');
     setError('');
     try {
       await persistHouse({...latestHouse.current,rooms:customRooms},{retry:true});
+      if (!isCurrent()) return false;
       setSuccessMsg('Đã lưu bản nháp ngôi nhà thành công!');
       setTimeout(() => setSuccessMsg(''), 2500);
       return true;
@@ -366,11 +404,14 @@ export default function MemoryHouseStudio({
     } finally {
       setIsSaving(false);
     }
+    });
   };
 
   // Publish House
   const handlePublish = async () => {
-    if (!tagUid || isPublicVisitor || isPublishing || layoutPreview || layoutBusy) return;
+    if (!tagUid || !canMutate()) return;
+    return presetSession.current.run(async isCurrent => {
+    clearTimeout(autosaveTimer.current);
     setPublishStage('capturing');
     setError('');
     setSuccessMsg('');
@@ -378,6 +419,7 @@ export default function MemoryHouseStudio({
       const original = latestHouse.current;
       const preview = await captureHouseShareFile(captureHouse3DRef.current,original);
       const uploaded = await uploadEventPhoto(tagUid.toLowerCase().trim(),preview);
+      if (!isCurrent()) return;
       if(JSON.stringify(original)!==JSON.stringify(latestHouse.current))throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi xuất bản lại.');
       const nextRooms = original.rooms.map((room,index) => {
         const {share_preview_path,...rest} = room;
@@ -389,126 +431,108 @@ export default function MemoryHouseStudio({
       setRooms(nextRooms);
       setPublishStage('saving');
       await persistHouse(payload,{retry:true});
+      if (!isCurrent()) return;
       await saveQueue.current.flush();
+      if (!isCurrent()) return;
       if(JSON.stringify(payload)!==JSON.stringify(latestHouse.current))throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi xuất bản lại.');
       setPublishStage('reviewing');
       const res = await publishHouse(tagUid);
+      if (!isCurrent()) return;
       setIsPublished(true);
       if (res.share_id) {
         setCurrentShareId(res.share_id);
       }
       setSuccessMsg('Ngôi nhà đã được xuất bản! Bạn có thể chia sẻ liên kết này.');
     } catch (err) {
+      if (isDirty.current) setAutosaveState('error');
       setError(err?.message || 'Không thể xuất bản ngôi nhà.');
     } finally {
       setPublishStage('');
     }
+    });
   };
 
-  async function previewLayout(options) {
-    if(!planLayout || layoutBusy) return;
-    const original=latestHouse.current;
-    setLayoutBusy(true); setError('');
+  async function refreshLayoutBackup() {
+    const sequence = loadSequence.current;
     try {
-      await saveQueue.current.flush();
-      const plan=await planLayout(original.rooms,options);
-      if(JSON.stringify(original)!==JSON.stringify(latestHouse.current)) throw new Error('Bạn vừa chỉnh sửa thêm. Hãy thử xem trước lại.');
-      if(plan.added || options?.rearrange || options?.replace) setLayoutPreview(plan);
-      else setError('Chưa có chỗ trống phù hợp. Hãy sắp xếp lại đồ trước khi nâng cấp.');
-    } catch(err) { setError(err.message); }
-    finally {setLayoutBusy(false);}
+      const draft = await getHouseDraft(tagUid);
+      if (sequence === loadSequence.current) setCanRestoreLayout(Boolean(draft.can_restore_layout));
+    } catch { /* The saved preset and local undo remain available if this read fails. */ }
+  }
+
+  async function previewPreset(presetId, roomId = null) {
+    if (!canMutate() || presetDisabled) return;
+    setError(''); setSuccessMsg('');
+    try { await presetSession.current.preview(presetId, roomId); }
+    catch (err) { if (isDirty.current) setAutosaveState('error'); setError(err.message); }
   }
 
   async function applyLayoutPreview() {
-    if (!layoutPreview || layoutBusy || isPublicVisitor) return;
-    setLayoutBusy(true); setError('');
-    try {
-      await persistHouse({...latestHouse.current,rooms:layoutPreview.rooms});
-      setRooms(layoutPreview.rooms); setLayoutPreview(null); setCanRestoreLayout(true);
-      setSuccessMsg('Đã lưu bố cục mới. Bản công khai chỉ đổi khi bạn xuất bản.');
-    } catch (err) { setError(err.message); }
-    finally { setLayoutBusy(false); }
-  }
-  async function restoreLayout() {
-    if (layoutBusy || isPublicVisitor) return;
-    setLayoutBusy(true); setError('');
-    try {
-      await saveQueue.current.flush();
-      await restoreHouseLayout(tagUid,saveQueue.current.revision);
-      await loadHouse();
-      setSuccessMsg('Đã khôi phục bố cục trước nâng cấp; ảnh và lời nhắn hiện tại vẫn được giữ.');
-    } catch (err) { setError(err.message); }
-    finally { setLayoutBusy(false); }
-  }
-
-  const handleApplyRoomPreset = async (roomId, presetId) => {
-    if (isPublicVisitor || roomPresetBusy || presetBusy || layoutBusy || isPublishing || autosaveState === 'saving') return;
-    setRoomPresetBusy(true);
-    setSelectedRoomPresetId(presetId);
     setError('');
     try {
-      await saveQueue.current?.flush();
-      const nextRooms = rooms.map(room => {
-        if (room.id !== roomId) return room;
-        return applyPresetToSingleRoom(room, presetId);
-      });
-      setRooms(nextRooms);
-      latestRooms.current = nextRooms;
-      await persistHouse({ ...latestHouse.current, rooms: nextRooms }, { retry: true });
-      const roomPreset = (ROOM_PRESETS[roomId] || []).find(p => p.id === presetId);
-      setSuccessMsg(`Đã đổi bài trí cho phòng "${currentRoom.name}" sang kiểu "${roomPreset?.name || presetId}"! Ảnh kỷ niệm của phòng đã được giữ nguyên.`);
-      setTimeout(() => setSuccessMsg(''), 3500);
-    } catch (err) {
-      setError(err?.message || 'Không thể đổi kiểu bài trí phòng.');
-    } finally {
-      setRoomPresetBusy(false);
-    }
-  };
-
-  const handleApplyPreset = async (presetId) => {
-    if (isPublicVisitor || presetBusy || layoutBusy || isPublishing || autosaveState === 'saving') return;
-    setPresetBusy(true);
-    setSelectedPresetId(presetId);
-    setError('');
-    try {
-      await saveQueue.current?.flush();
-      const nextRooms = applyPresetToRooms(rooms, presetId);
-      const chosenPreset = HOUSE_PRESETS.find(p => p.id === presetId);
-      if (chosenPreset?.theme) {
-        setSelectedTheme(chosenPreset.theme);
+      if (await presetSession.current.apply()) {
+        setSuccessMsg('Đã lưu mẫu bài trí. Bạn có thể hoàn tác; bản công khai chỉ đổi khi xuất bản.');
+        await refreshLayoutBackup();
       }
-      setRooms(nextRooms);
-      latestRooms.current = nextRooms;
-      await persistHouse({ ...latestHouse.current, theme: chosenPreset?.theme || selectedTheme, rooms: nextRooms }, { retry: true });
-      setSuccessMsg(`Đã áp dụng mẫu "${chosenPreset?.name || presetId}" cho ngôi nhà! Ảnh kỷ niệm của bạn đã được gắn vào khung.`);
-      setTimeout(() => setSuccessMsg(''), 3500);
-    } catch (err) {
-      setError(err?.message || 'Không thể áp dụng mẫu bài trí.');
-    } finally {
-      setPresetBusy(false);
-    }
-  };
+    } catch (err) { setAutosaveState('error'); setError(err.message || 'Chưa lưu được mẫu. Hãy thử áp dụng lại.'); }
+  }
+
+  async function undoPreset() {
+    if (!canMutate() || presetDisabled) return;
+    setError('');
+    try {
+      if (await presetSession.current.undo()) {
+        setSuccessMsg('Đã hoàn tác lần đổi mẫu gần nhất. Ảnh và lời nhắn hiện tại được giữ nguyên.');
+        await refreshLayoutBackup();
+      }
+    } catch (err) { setAutosaveState('error'); setError(err.message); }
+  }
+
+  async function restoreLayout() {
+    if (!canMutate() || presetDisabled) return;
+    setError('');
+    await presetSession.current.run(async isCurrent => {
+      try {
+        clearTimeout(autosaveTimer.current);
+        await saveQueue.current.flush();
+        if (isDirty.current) await persistHouse(latestHouse.current, {retry:true});
+        await restoreHouseLayout(tagUid,saveQueue.current.revision);
+        if (!isCurrent()) return;
+        await loadHouse();
+        setSuccessMsg('Đã khôi phục bố cục đã sao lưu; ảnh và lời nhắn hiện tại vẫn được giữ.');
+      } catch (err) { setError(err.message); }
+    });
+  }
 
   // Unpublish House
   const handleUnpublish = async () => {
-    if (!tagUid || isPublicVisitor) return;
+    if (!tagUid || !canMutate()) return;
+    return presetSession.current.run(async isCurrent => {
     setError('');
     try {
+      await flushDraft();
+      if (!isCurrent()) return;
       await unpublishHouse(tagUid);
+      if (!isCurrent()) return;
       setIsPublished(false);
       setSuccessMsg('Ngôi nhà đã được chuyển về chế độ riêng tư.');
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       setError(err?.message || 'Không thể gỡ xuất bản.');
     }
+    });
   };
 
   // Revoke Share ID
   const handleRevokeShare = async () => {
-    if (!tagUid || isPublicVisitor) return;
+    if (!tagUid || !canMutate()) return;
+    return presetSession.current.run(async isCurrent => {
     setError('');
     try {
+      await flushDraft();
+      if (!isCurrent()) return;
       const res = await revokeHouseShare(tagUid);
+      if (!isCurrent()) return;
       if (res.share_id) {
         setCurrentShareId(res.share_id);
       }
@@ -518,19 +542,22 @@ export default function MemoryHouseStudio({
     } catch (err) {
       setError(err?.message || 'Không thể thu hồi liên kết.');
     }
+    });
   };
 
   // Photo Upload to Room
   const handlePhotoUpload = async (roomId, file, decorationTarget) => {
-    if (!file || !tagUid || isPublicVisitor || uploadingRoomId) return;
+    if (!file || !tagUid || !canMutate()) return;
     if ((latestRooms.current.find(r => r.id === roomId)?.memories?.length || 0) >= 10) {
       setError('Mỗi phòng chỉ được chứa tối đa 10 khoảnh khắc.');
       return;
     }
+    return presetSession.current.run(async isCurrent => {
     setUploadingRoomId(roomId);
     setError('');
     try {
       const res = await uploadEventPhoto(tagUid, file);
+      if (!isCurrent()) return;
       let createdMemory = null;
       const nextRooms = latestRooms.current.map((r) => {
         if (r.id !== roomId) return r;
@@ -554,21 +581,30 @@ export default function MemoryHouseStudio({
           : next;
       });
       setRooms(nextRooms);
-      const saved = await handleSaveDraft(nextRooms);
-      if(saved) setSuccessMsg('Đã thêm ảnh vào phòng kỷ niệm!');
+      latestRooms.current = nextRooms;
+      latestHouse.current = {...latestHouse.current,rooms:nextRooms};
+      isDirty.current = true;
+      clearTimeout(autosaveTimer.current);
+      await persistHouse(latestHouse.current, {retry:true});
+      if (!isCurrent()) return;
+      savedSnapshot.current = JSON.stringify(latestHouse.current);
+      setSuccessMsg('Đã thêm ảnh vào phòng kỷ niệm!');
       setTimeout(() => setSuccessMsg(''), 2500);
       return createdMemory;
     } catch (err) {
+      setAutosaveState('error');
       setError(err?.message || 'Không thể tải ảnh lên phòng.');
     } finally {
       setUploadingRoomId(null);
     }
+    });
   };
 
   // Reorder Photos within Room
   const handleMovePhoto = (roomId, fromIndex, toIndex) => {
     if (fromIndex === toIndex) return;
-    const nextRooms = rooms.map((r) => {
+    if (!canMutate()) return;
+    const nextRooms = latestRooms.current.map((r) => {
       if (r.id !== roomId) return r;
       const mems = [...(r.memories || [])];
       if (toIndex < 0 || toIndex >= mems.length) return r;
@@ -576,12 +612,13 @@ export default function MemoryHouseStudio({
       mems.splice(toIndex, 0, item);
       return { ...r, memories: mems };
     });
-    setRooms(nextRooms);
+    editRooms(nextRooms);
   };
 
   // Remove Photo (with safe cleanup of decoration references)
   const handleRemovePhoto = (roomId, photoIndex) => {
-    const nextRooms = rooms.map((r) => {
+    if (!canMutate()) return;
+    const nextRooms = latestRooms.current.map((r) => {
       if (r.id !== roomId) return r;
       const removedMem = r.memories?.[photoIndex];
       const nextMems = (r.memories || []).filter((_, idx) => idx !== photoIndex);
@@ -601,32 +638,35 @@ export default function MemoryHouseStudio({
         decorations: nextDecor
       };
     });
-    setRooms(nextRooms);
+    editRooms(nextRooms);
   };
 
   // Update Photo Caption
   const handleUpdateCaption = (roomId, photoIndex, caption) => {
-    const nextRooms = rooms.map((r) => {
+    if (!canMutate()) return;
+    const nextRooms = latestRooms.current.map((r) => {
       if (r.id !== roomId) return r;
       const mems = [...(r.memories || [])];
       mems[photoIndex] = { ...mems[photoIndex], caption: caption.slice(0, 500) };
       return { ...r, memories: mems };
     });
-    setRooms(nextRooms);
+    editRooms(nextRooms);
   };
 
   // Update Room Note
   const handleUpdateRoomNote = (roomId, note) => {
-    const nextRooms = rooms.map((r) => {
+    if (!canMutate()) return;
+    const nextRooms = latestRooms.current.map((r) => {
       if (r.id !== roomId) return r;
       return { ...r, note: note.slice(0, 1500) };
     });
-    setRooms(nextRooms);
+    editRooms(nextRooms);
   };
 
   // Update Journey's End Love Letter (Chặng C)
   const handleUpdateJourneyLetter = (field, value) => {
-    const nextRooms = rooms.map((r) => {
+    if (!canMutate()) return;
+    const nextRooms = latestRooms.current.map((r) => {
       if (r.id !== 'next-chapter') return r;
       const cur = r.journey_letter || {
         title: 'Gửi người thương ở tương lai',
@@ -640,7 +680,7 @@ export default function MemoryHouseStudio({
         journey_letter: { ...cur, [field]: value }
       };
     });
-    setRooms(nextRooms);
+    editRooms(nextRooms);
     isDirty.current = true;
   };
 
@@ -1199,7 +1239,7 @@ export default function MemoryHouseStudio({
         {/* ===================================================================== */}
         {!isPublicVisitor && activeTab === 'edit' && <p className="text-sm text-slate-400">Chọn một phòng bên dưới, thêm ảnh và lời nhắn, rồi xuất bản để chia sẻ. Mọi thay đổi được tự động lưu.</p>}
         {!isPublicVisitor && activeTab === 'edit' && <section aria-label="Mẫu bài trí có sẵn" className="rounded-2xl border border-white/15 p-4 space-y-3">
-            <p className="text-sm text-slate-300">Chọn 1 mẫu bài trí bên dưới để áp dụng cho cả 5 phòng. Ảnh kỷ niệm đã tải lên sẽ được tự động gắn vào khung ảnh của mẫu mới.</p>
+            <p className="text-sm text-slate-300">Xem trước mẫu cho cả 5 phòng rồi chọn áp dụng. Ảnh luôn được giữ trong phòng; ảnh vừa số khung sẽ được gắn vào đồ vật.</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
               {HOUSE_PRESETS.map((preset) => {
                 const isSelected = selectedPresetId === preset.id;
@@ -1226,52 +1266,65 @@ export default function MemoryHouseStudio({
                     </div>
                     <button
                       type="button"
-                      disabled={presetBusy || isPublishing || autosaveState === 'saving'}
-                      onClick={() => handleApplyPreset(preset.id)}
+                      disabled={presetDisabled}
+                      onClick={() => previewPreset(preset.id)}
                       className={`mt-4 w-full py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-amber-300 text-stone-950 hover:bg-amber-200'
                           : 'bg-white/10 text-white hover:bg-white/20 hover:text-amber-200'
                       } disabled:opacity-40`}
                     >
-                      {presetBusy && selectedPresetId === preset.id ? (
+                      {layoutBusy ? (
                         <>
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           <span>Đang áp dụng...</span>
                         </>
                       ) : (
-                        <span>Áp dụng mẫu này</span>
+                        <span>Xem trước mẫu này</span>
                       )}
                     </button>
                   </div>
                 );
               })}
             </div>
+            {presetState.undo && <button type="button" disabled={presetDisabled} onClick={undoPreset}
+              className="min-h-10 px-4 rounded-xl border border-amber-300/30 text-amber-200 disabled:opacity-40">
+              Hoàn tác lần đổi mẫu gần nhất
+            </button>}
             {canRestoreLayout && (
               <div className="flex flex-wrap gap-3 pt-2">
                 <button
                   type="button"
-                  disabled={presetBusy || layoutBusy || isPublishing || autosaveState === 'saving'}
+                  disabled={presetDisabled}
                   onClick={restoreLayout}
                   className="min-h-9 px-3.5 py-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-xs text-slate-300 hover:text-white transition-all cursor-pointer disabled:opacity-40"
                 >
-                  Khôi phục bố cục trước đó
+                  Khôi phục bố cục đã sao lưu
                 </button>
               </div>
             )}
         </section>}
+        {!isPublicVisitor && layoutPreview && <section aria-label="Xem trước mẫu bài trí" className="sticky top-4 z-20 rounded-2xl border border-amber-300/40 bg-stone-950 p-4 shadow-xl space-y-3">
+          <p role="status" className="font-semibold text-amber-200">Đang xem trước: {layoutPreview.name} · {layoutPreview.roomId ? rooms.find(r=>r.id===layoutPreview.roomId)?.name : 'Cả 5 phòng'}</p>
+          <p className="text-sm text-slate-300">Mẫu chưa được lưu. Ảnh và lời nhắn được giữ nguyên; bạn có thể xoay mô hình và chuyển phòng để xem.</p>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" disabled={layoutBusy} onClick={applyLayoutPreview} className="min-h-11 px-5 rounded-xl bg-amber-300 text-stone-950 font-semibold disabled:opacity-50">{layoutBusy ? 'Đang lưu mẫu...' : 'Áp dụng mẫu'}</button>
+            <button type="button" disabled={layoutBusy} onClick={()=>{presetSession.current.cancel();setError('');}} className="min-h-11 px-5 rounded-xl border border-white/20 disabled:opacity-50">Hủy xem trước</button>
+          </div>
+          {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+        </section>}
         <MemoryHouse3D
-          rooms={layoutPreview?.rooms || rooms} title={houseTitle} theme={selectedTheme}
+          rooms={layoutPreview?.next.rooms || rooms} title={houseTitle} theme={layoutPreview?.next.theme || selectedTheme}
           activeRoomId={currentRoom.id}
           onSelectRoom={id=>{const index=rooms.findIndex(r=>r.id===id);if(index>=0)setActiveRoomIndex(index);}}
-          onRoomsChange={setRooms} onPhoto={handleOpenLightbox}
+          onRoomsChange={editRooms} onPhoto={handleOpenLightbox}
           onUploadPhoto={handlePhotoUpload} uploading={Boolean(uploadingRoomId)}
-          readOnly={isPublicVisitor || activeTab !== 'edit' || Boolean(layoutPreview) || layoutBusy}
+          readOnly={isPublicVisitor || activeTab !== 'edit' || editorLocked}
           onRegisterCapture={(fn) => { captureHouse3DRef.current = fn; }}
-          onRegisterLayoutPlanner={fn=>setPlanLayout(()=>fn)}
         />
         {activeTab === 'edit' && !isPublicVisitor && (
           <section aria-label={`Ảnh và lời nhắn · ${currentRoom.name}`}>
+            <fieldset disabled={editorLocked} className="min-w-0">
             <div className="space-y-5">
                 {/* Current Room Editor Card */}
                 <div className="bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
@@ -1294,7 +1347,7 @@ export default function MemoryHouseStudio({
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
                           className="sr-only"
-                          disabled={uploadingRoomId === currentRoom.id}
+                          disabled={editorLocked}
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) handlePhotoUpload(currentRoom.id, file);
@@ -1311,17 +1364,22 @@ export default function MemoryHouseStudio({
                         <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                         <span>Mẫu bài trí riêng cho {currentRoom.name}</span>
                       </span>
-                      <span className="text-[11px] text-slate-400">Đổi phong cách chỉ phòng này, tự động giữ nguyên ảnh</span>
+                      <span className="text-[11px] text-slate-400">Chọn mẫu để xem trước, chỉ lưu khi áp dụng</span>
                     </div>
+                    <p className="text-xs text-slate-300">{getRoomPresetId(currentRoom)
+                      ? `Đang dùng: ${ROOM_PRESETS[currentRoom.id].find(p=>p.id===getRoomPresetId(currentRoom)).name}`
+                      : 'Bố cục tùy chỉnh'}</p>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 pt-1">
                       {(ROOM_PRESETS[currentRoom.id] || []).map((preset) => {
-                        const isSelected = selectedRoomPresetId === preset.id;
+                        const isSelected = getRoomPresetId(currentRoom) === preset.id;
                         return (
                           <button
                             key={preset.id}
                             type="button"
-                            disabled={roomPresetBusy || presetBusy || isPublishing || autosaveState === 'saving'}
-                            onClick={() => handleApplyRoomPreset(currentRoom.id, preset.id)}
+                            aria-pressed={isSelected}
+                            aria-label={`Xem trước ${preset.name} cho ${currentRoom.name}`}
+                            disabled={presetDisabled}
+                            onClick={() => previewPreset(preset.id, currentRoom.id)}
                             className={`flex flex-col items-start text-left p-3 rounded-xl border transition-all cursor-pointer ${
                               isSelected
                                 ? 'border-amber-400 bg-amber-400/15 text-white'
@@ -1562,7 +1620,7 @@ export default function MemoryHouseStudio({
                       <input
                         type="text"
                         value={houseTitle}
-                        onChange={(e) => setHouseTitle(e.target.value)}
+                        onChange={(e) => {if(canMutate()){setHouseTitle(e.target.value);latestHouse.current={...latestHouse.current,title:e.target.value.trim()||'Ngôi Nhà Kỷ Niệm Của Đôi Mình'};isDirty.current=true;}}}
                         placeholder="Ví dụ: Tổ Ấm Của Minh & Thảo"
                         className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors"
                       />
@@ -1571,7 +1629,7 @@ export default function MemoryHouseStudio({
                       <label className="block text-xs font-medium text-slate-400 mb-1.5">Tông màu chủ đạo (Theme)</label>
                       <select
                         value={selectedTheme}
-                        onChange={(e) => setSelectedTheme(e.target.value)}
+                        onChange={(e) => {if(canMutate()){setSelectedTheme(e.target.value);latestHouse.current={...latestHouse.current,theme:e.target.value};isDirty.current=true;}}}
                         className="w-full px-4 py-2.5 rounded-xl bg-dark-900 border border-white/10 text-white text-sm focus:border-amber-400 focus:outline-none transition-colors cursor-pointer"
                       >
                         {HOUSE_THEMES.map((themeKey) => (
@@ -1587,7 +1645,7 @@ export default function MemoryHouseStudio({
                 <details className="rounded-2xl border border-white/10 p-4 space-y-3">
                   <summary className="cursor-pointer text-sm font-semibold text-slate-300">Lời nhắn của khách & quyền riêng tư</summary>
                   <label className="block text-sm">Ai có thể gửi lời nhắn khi ghé nhà?
-                    <select className="block mt-2 bg-stone-900 p-2 rounded-lg" value={rooms.find(r=>r.id==='beginning')?.reply_policy||'off'} onChange={e=>setRooms(prev=>prev.map(r=>r.id==='beginning'?{...r,reply_policy:e.target.value}:r))}>
+                    <select className="block mt-2 bg-stone-900 p-2 rounded-lg" value={rooms.find(r=>r.id==='beginning')?.reply_policy||'off'} onChange={e=>editRooms(prev=>prev.map(r=>r.id==='beginning'?{...r,reply_policy:e.target.value}:r))}>
                       <option value="off">Tắt lời nhắn</option><option value="visitors">Người có liên kết nhà</option><option value="signed_in">Người đã đăng nhập</option>
                     </select>
                   </label><p className="text-xs text-stone-400">Thay đổi có hiệu lực với khách sau khi xuất bản. Chỉ bạn xem được lời hồi đáp.</p>
@@ -1607,7 +1665,7 @@ export default function MemoryHouseStudio({
                     {autosaveState === 'error' && <button
                       type="button"
                       onClick={() => handleSaveDraft()}
-                      disabled={isSaving}
+                      disabled={editorLocked}
                       className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm border border-white/15 transition-all cursor-pointer disabled:opacity-50"
                     >
                       {isSaving ? 'Đang lưu...' : 'Thử lưu lại'}
@@ -1639,7 +1697,7 @@ export default function MemoryHouseStudio({
                     <button
                       type="button"
                       onClick={handlePublish}
-                      disabled={isPublishing || Boolean(layoutPreview) || layoutBusy}
+                      disabled={editorLocked}
                       aria-label={isPublishing ? 'Đang xuất bản' : isPublished ? 'Cập nhật xuất bản' : 'Xuất Bản Ngôi Nhà'}
                       className="group flex-1 sm:flex-none min-w-0 inline-flex items-center justify-between gap-5 px-5 py-3 rounded-2xl bg-gradient-to-br from-amber-100 via-amber-300 to-amber-500 hover:from-white hover:to-amber-300 text-stone-950 border border-amber-100/50 shadow-[0_8px_28px_rgba(245,158,11,0.22)] transition-all cursor-pointer disabled:opacity-50"
                     >
@@ -1650,6 +1708,7 @@ export default function MemoryHouseStudio({
                 </div>
                 </div>
             </div>
+            </fieldset>
           </section>
         )}
 

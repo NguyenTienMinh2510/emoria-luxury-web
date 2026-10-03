@@ -318,10 +318,10 @@ export const HOUSE_PRESETS = [
 export function applyPresetToSingleRoom(currentRoom, presetId = 'cozy') {
   if (!currentRoom || !currentRoom.id) return currentRoom;
   const presetsForRoom = ROOM_PRESETS[currentRoom.id] || [];
-  const targetPreset = presetsForRoom.find(p => p.id === presetId) || presetsForRoom[0];
+  const targetPreset = presetsForRoom.find(p => p.id === presetId);
   if (!targetPreset) return currentRoom;
 
-  const newDecorations = (targetPreset.decorations || []).map(item => ({ ...item }));
+  const newDecorations = structuredClone(targetPreset.decorations || []);
 
   // Phân bổ lại ảnh kỷ niệm đang có vào đồ vật hỗ trợ ảnh
   const memories = Array.isArray(currentRoom.memories) ? currentRoom.memories : [];
@@ -341,7 +341,7 @@ export function applyPresetToSingleRoom(currentRoom, presetId = 'cozy') {
   }
 
   // Baseline chuẩn hóa = chính xác các món đồ hiện có sau khi bỏ text và photos
-  const baseline = newDecorations.map(({ text, photos, ...base }) => ({ ...base }));
+  const baseline = newDecorations.map(({ text, photos, ...base }) => structuredClone(base));
 
   return {
     ...currentRoom,
@@ -365,3 +365,18 @@ export function applyPresetToRooms(currentRooms = [], presetId = 'cozy') {
 
 export const applyPresetToHouse = applyPresetToRooms;
 
+// Derive the selection from saved furniture so reloads and manual edits remain honest.
+function layoutKey(decorations = []) {
+  return JSON.stringify(decorations.map(d => [d.id, d.item, d.surface, d.position,
+    d.rotation ?? 0, d.scale ?? 1, d.parent_id ?? null]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+}
+
+export function getRoomPresetId(room) {
+  const key = layoutKey(room?.decorations);
+  return (ROOM_PRESETS[room?.id] || []).find(p => layoutKey(p.decorations) === key)?.id || null;
+}
+
+export function getHousePresetId(house) {
+  return HOUSE_PRESETS.find(p => house.theme === p.theme &&
+    Object.keys(ROOM_PRESETS).every(id => getRoomPresetId(house.rooms.find(r => r.id === id)) === p.id))?.id || null;
+}

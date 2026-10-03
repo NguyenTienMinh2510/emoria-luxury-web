@@ -689,7 +689,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
       }
     },
     dispose(){
-      dead=true;cancelAnimationFrame(frame);cancelAnimationFrame(particleRaf);
+      dead=true;cancelAnimationFrame(frame);
       if(currentTween){cancelAnimationFrame(currentTween.raf);currentTween=null;}
       observer.disconnect();intersectionObserver.disconnect();controls.dispose();
       if(typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityChange);
@@ -701,7 +701,6 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
       clearDecor();
       for(const t of textures.values())t.dispose();
       titleTexture?.dispose();disposeTree(titleMesh);disposeTree(house);disposeTree(library);
-      particleGeo.dispose();particleMat.dispose();particleTexture?.dispose();
       renderer.dispose();renderer.domElement.remove();
     }
   };
