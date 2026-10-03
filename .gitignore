@@ -10,7 +10,9 @@ dist
 test-accounts.json
 TEST-ACCOUNTS-FOR-TESTERS.txt
 local-stack/
+scratch/
 *.docx
+
 
 # AI Guides, Prompts, and Handoff Documentation
 *.md

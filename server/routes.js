@@ -74,6 +74,11 @@ export const routes=[
     return {products:products.map(product=>({...product,try_on_available:product.active&&!!tryOnConfig(product.id,product)})),settings};
   }),
   route('PUT','/admin/products/([^/]+)','admin',async c=>{
+    if (c.body.product?.details) {
+      if (typeof c.body.product.details !== 'object' || Buffer.byteLength(JSON.stringify(c.body.product.details)) > 65536) {
+        throw Object.assign(new Error('Thông tin chi tiết sản phẩm không hợp lệ hoặc vượt quá dung lượng cho phép.'),{status:400});
+      }
+    }
     const res=await rpc(c,'rpc_save_catalog',{p_id:c.params[0],p_expected:c.body.expected??null,p_product:c.body.product,p_variants:c.body.variants});
     if(c.body.product?.details){
       await c.db(c.client.from('checkout_products').update({details:c.body.product.details}).eq('id',c.params[0]));
@@ -87,7 +92,17 @@ export const routes=[
     return rpc(c,'rpc_create_order',{p_request_id:c.body.requestId,p_payload:normalizeCheckout(c.body)});
   },201),
   // The private lookup token belongs in a body, never an URL/access log.
-  route('POST','/orders/lookup','public',c=>rpc(c,'rpc_track_order',{p_order_id:String(c.body.id||'').trim(),p_token:c.body.token||null})),
+  route('POST','/orders/lookup','public',c=>{
+    const orderId = String(c.body.id||'').trim();
+    if (!orderId || !/^EMO-[a-zA-Z0-9-]{6,36}$/i.test(orderId)) {
+      throw Object.assign(new Error('Mã đơn hàng không hợp lệ.'), {status: 400});
+    }
+    const token = c.body.token ? String(c.body.token).trim() : null;
+    if (token && !/^[a-zA-Z0-9_-]{16,128}$/.test(token)) {
+      throw Object.assign(new Error('Mã truy cập đơn hàng không hợp lệ.'), {status: 400});
+    }
+    return rpc(c,'rpc_track_order',{p_order_id:orderId,p_token:token});
+  }),
   route('GET','/me/orders','user',c=>{const page=integer(c.query.get('page'),0);return c.db(c.client.from('orders').select('id,created_at,status,final_total,is_test').eq('user_id',c.user.id).order('created_at',{ascending:false}).range(page*10,page*10+9));}),
   route('GET','/admin/orders','admin',c=>{
     const page=integer(c.query.get('page'),0),term=(c.query.get('search')||'').slice(0,120).replace(/[^a-zA-Z0-9@+ ._-]/g,'').trim();
@@ -102,7 +117,15 @@ export const routes=[
   route('POST','/admin/orders/([^/]+)/chips','admin',c=>rpc(c,'rpc_issue_chip',{p_order_id:c.params[0],p_item_id:c.body.itemId}),201),
   route('GET','/admin/payment-events','admin',c=>c.db(c.client.from('bank_payment_events').select('id,provider_id,order_id,amount,outcome,received_at,is_test,content').order('received_at',{ascending:false}).limit(50))),
   route('GET','/admin/reports/marketing','admin',c=>rpc(c,'rpc_marketing_report',{p_days:integer(c.query.get('days'),30,90),p_test:c.query.get('test')==='true'})),
-  route('POST','/contacts','public',c=>rpc(c,'rpc_contact',{p_name:c.body.name,p_phone:c.body.phone,p_note:c.body.note}),201),
+  route('POST','/contacts','public',c=>{
+    const name = String(c.body.name || '').trim();
+    const phone = String(c.body.phone || '').trim();
+    const note = String(c.body.note || '').trim();
+    if (!name || name.length > 100) throw Object.assign(new Error('Họ và tên phải từ 1 đến 100 ký tự.'),{status:400});
+    if (!phone || !/^[0-9+() -]{8,20}$/.test(phone)) throw Object.assign(new Error('Số điện thoại không hợp lệ.'),{status:400});
+    if (note.length > 2000) throw Object.assign(new Error('Ghi chú tối đa 2000 ký tự.'),{status:400});
+    return rpc(c,'rpc_contact',{p_name:name,p_phone:phone,p_note:note||null});
+  },201),
   route('GET','/admin/contacts','admin',c=>c.db(c.client.from('contact_requests').select('*').order('created_at',{ascending:false}).limit(100))),
   route('PATCH','/admin/contacts/([^/]+)','admin',c=>c.db(c.client.from('contact_requests').update({resolved:c.body.resolved===true}).eq('id',c.params[0]).select('id').single())),
   route('GET','/admin/memories','admin',c=>rpc(c,'rpc_admin_memory_spaces',{p_search:(c.query.get('search')||'').slice(0,120),p_offset:integer(c.query.get('page'),0)*25})),
@@ -127,10 +150,28 @@ export const routes=[
     }
     return data;
   }),
-  route('POST','/memories/([^/]+)/grants','public',c=>rpc(c,'rpc_verify_memory_pin',{p_tag_uid:c.params[0],p_pin:c.body.pin}),201),
-  route('POST','/memories/([^/]+)/claims','user',c=>rpc(c,'rpc_claim_nfc_chip',{p_tag_uid:c.params[0],p_claim_code:c.body.code}),201),
+  route('POST','/memories/([^/]+)/grants','public',c=>{
+    if(!c.params[0]||!/^[a-zA-Z0-9_-]{1,64}$/.test(c.params[0]))throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'),{status:400});
+    const pin = typeof c.body.pin === 'string' || typeof c.body.pin === 'number' ? String(c.body.pin).trim() : '';
+    if (!pin || pin.length > 32) throw Object.assign(new Error('Mã PIN không hợp lệ.'),{status:400});
+    return rpc(c,'rpc_verify_memory_pin',{p_tag_uid:c.params[0],p_pin:pin});
+  },201),
+  route('POST','/memories/([^/]+)/claims','user',c=>{
+    if(!c.params[0]||!/^[a-zA-Z0-9_-]{1,64}$/.test(c.params[0]))throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'),{status:400});
+    const code = typeof c.body.code === 'string' ? c.body.code.trim() : '';
+    if (!code || code.length < 4 || code.length > 32) throw Object.assign(new Error('Mã xác nhận sở hữu không hợp lệ.'),{status:400});
+    return rpc(c,'rpc_claim_nfc_chip',{p_tag_uid:c.params[0],p_claim_code:code});
+  },201),
   route('PATCH','/memories/([^/]+)','user',c=>rpc(c,'rpc_update_memory_space',{p_tag_uid:c.params[0],p_payload:c.body})),
-  route('POST','/memories/([^/]+)/guestbook','public',c=>rpc(c,'rpc_guestbook',{p_tag:c.params[0],p_token:c.body.grant??null,p_name:c.body.name,p_message:c.body.message,p_relationship:c.body.relationship||''}),201),
+  route('POST','/memories/([^/]+)/guestbook','public',c=>{
+    if(!c.params[0]||!/^[a-zA-Z0-9_-]{1,64}$/.test(c.params[0]))throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'),{status:400});
+    const name = String(c.body.name || '').trim();
+    const message = String(c.body.message || '').trim();
+    if (!name || name.length > 80) throw Object.assign(new Error('Tên phải từ 1 đến 80 ký tự.'),{status:400});
+    if (!message || message.length > 1000) throw Object.assign(new Error('Lời nhắn phải từ 1 đến 1000 ký tự.'),{status:400});
+    const relationship = c.body.relationship ? String(c.body.relationship).trim().slice(0, 80) : '';
+    return rpc(c,'rpc_guestbook',{p_tag:c.params[0],p_token:c.body.grant??null,p_name:name,p_message:message,p_relationship:relationship});
+  },201),
   route('POST','/memories/([^/]+)/guestbook/manage','user',c=>rpc(c,'rpc_memory_guestbook',{p_tag:c.params[0],p_id:c.body.id||null,p_action:c.body.action||'list'})),
   route('PATCH','/admin/memories/([^/]+)/availability','admin',c=>c.db(c.client.from('memory_spaces').update({availability_status:c.body.status,unlock_at:c.body.unlockDate||null,updated_at:new Date().toISOString()}).eq('tag_uid',c.params[0]).select('tag_uid').single())),
   route('GET','/me/profile','user',c=>rpc(c,'rpc_get_my_profile')),
@@ -411,44 +452,103 @@ export const routes=[
   }),
 
   route('POST','/events/matches/([^/]+)/stream','public',streamMatch),
-  route('POST','/events/houses/replies','public',c=>eventRpc(c,'house_reply',c.body),201),
+  route('POST','/events/houses/replies','public',async c=>{
+    const {share_id, tag_uid, kind, name, message, request_id} = c.body || {};
+    if (!request_id || typeof request_id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request_id)) {
+      throw Object.assign(new Error('Mã yêu cầu không hợp lệ để chống trùng lặp tin nhắn.'), {status: 400});
+    }
+    if (!kind || !['heart', 'message'].includes(kind)) {
+      throw Object.assign(new Error('Loại phản hồi không hợp lệ.'), {status: 400});
+    }
+    const cleanName = String(name || '').trim();
+    if (!cleanName || cleanName.length > 80) {
+      throw Object.assign(new Error('Tên người gửi phải từ 1 đến 80 ký tự.'), {status: 400});
+    }
+    const cleanMessage = String(message || '').trim();
+    if (cleanMessage.length > 1000) {
+      throw Object.assign(new Error('Lời nhắn tối đa 1000 ký tự.'), {status: 400});
+    }
+    const cleanShareId = share_id ? String(share_id).trim() : null;
+    const cleanTagUid = tag_uid ? String(tag_uid).trim() : null;
+    if (!cleanShareId && !cleanTagUid) {
+      throw Object.assign(new Error('Thiếu thông tin căn nhà để gửi lời nhắn.'), {status: 400});
+    }
+    if (cleanShareId && !/^[a-zA-Z0-9_-]{1,64}$/.test(cleanShareId)) {
+      throw Object.assign(new Error('Mã chia sẻ không hợp lệ.'), {status: 400});
+    }
+    if (cleanTagUid && !/^[a-zA-Z0-9_-]{1,64}$/.test(cleanTagUid)) {
+      throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'), {status: 400});
+    }
+    return eventRpc(c, 'house_reply', {
+      share_id: cleanShareId,
+      tag_uid: cleanTagUid,
+      kind,
+      name: cleanName,
+      message: cleanMessage,
+      request_id
+    });
+  },201),
   route('GET','/memories/([^/]+)/house/replies','user',c=>eventRpc(c,'house_replies',{p_tag_uid:c.params[0]})),
   // Event Studios - Content Reporting
   route('POST','/events/reports','public',async c=>{
-
-    const {resource_type,resource_id,reason,details}=c.body;
+    const {resource_type,resource_id,reason,details,invite_token}=c.body || {};
     if(!resource_type||!resource_id||!reason)throw Object.assign(new Error('Dữ liệu báo cáo không đầy đủ.'),{status:400});
+    if(!['house','match','guestbook'].includes(resource_type)){
+      throw Object.assign(new Error('Loại tài nguyên báo cáo không hợp lệ.'),{status:400});
+    }
+    const strResId = String(resource_id).trim();
+    if (['match','guestbook'].includes(resource_type) && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(strResId)) {
+      throw Object.assign(new Error('Mã đối tượng báo cáo không hợp lệ.'),{status:400});
+    }
+    if (resource_type === 'house' && (!/^[a-zA-Z0-9_-]{1,64}$/.test(strResId))) {
+      throw Object.assign(new Error('Mã ngôi nhà báo cáo không hợp lệ.'),{status:400});
+    }
+    const cleanReason = String(reason).trim();
+    if (!cleanReason || cleanReason.length > 100) {
+      throw Object.assign(new Error('Lý do báo cáo không hợp lệ.'),{status:400});
+    }
+    const cleanDetails = details ? String(details).trim().slice(0, 1000) : null;
     return rpc(c,'rpc_submit_content_report',{
       p_resource_type:resource_type,
-      p_resource_id:String(resource_id),
-      p_reason:reason,
-      p_details:details||null
+      p_resource_id:strResId,
+      p_reason:cleanReason,
+      p_details:cleanDetails,
+      invite_token:invite_token||null
     });
   },201),
   // Event Studios - Analytics Tracking Ingestion
   route('POST','/events/analytics/track','public',async c=>{
-
-    const {event_name,resource_type,resource_id,dedupe_key,metadata}=c.body;
+    const {event_name,resource_type,resource_id,dedupe_key,metadata}=c.body || {};
     if(!event_name||!resource_type||!resource_id)throw Object.assign(new Error('Dữ liệu sự kiện không hợp lệ.'),{status:400});
     const clientAllowedEvents=[
       'match_invite_opened','house_opened_share','house_share_click','house_copy_link',
-      'house_postcard_download','house_postcard_shared','house_viewed_public'
+      'house_postcard_download','house_postcard_shared'
     ];
     if(!clientAllowedEvents.includes(event_name)){
       throw Object.assign(new Error('Sự kiện mang tính thẩm quyền chỉ được ghi nhận từ hệ thống máy chủ.'),{status:403});
     }
-    let cleanDedupeKey=dedupe_key||null;
-    if(event_name==='house_viewed_public'&&cleanDedupeKey){
-      const visitorHash=c.ip?c.ip.replace(/[^a-zA-Z0-9]/g,''):'visitor';
-      const dateStr=new Date().toISOString().slice(0,10);
-      cleanDedupeKey=`${cleanDedupeKey}:${visitorHash}:${dateStr}`;
+    if(!['house','match'].includes(resource_type)){
+      throw Object.assign(new Error('Loại tài nguyên không hợp lệ.'),{status:400});
+    }
+    const strResId = String(resource_id).trim();
+    if(resource_type==='match'&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(strResId)){
+      throw Object.assign(new Error('Mã lượt chơi không hợp lệ.'),{status:400});
+    }
+    if(resource_type==='house'&&!/^[a-zA-Z0-9_-]{1,64}$/.test(strResId)){
+      throw Object.assign(new Error('Mã ngôi nhà không hợp lệ.'),{status:400});
+    }
+    let safeMetadata = {};
+    if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+      if (Buffer.byteLength(JSON.stringify(metadata)) <= 8192) {
+        safeMetadata = metadata;
+      }
     }
     return rpc(c,'rpc_track_event_action',{
       p_event_name:event_name,
       p_resource_type:resource_type,
-      p_resource_id:String(resource_id),
-      p_dedupe_key:cleanDedupeKey,
-      p_metadata:metadata||{}
+      p_resource_id:strResId,
+      p_dedupe_key:dedupe_key ? String(dedupe_key).slice(0, 128) : null,
+      p_metadata:safeMetadata
     });
   }),
   // Admin - Event Content Reports & Moderation
@@ -463,12 +563,18 @@ export const routes=[
     });
   }),
   route('POST','/admin/events/moderate','admin',c=>{
-    const {report_id,action,reason}=c.body;
-    if(!report_id||!action)throw Object.assign(new Error('Dữ liệu kiểm duyệt không hợp lệ.'),{status:400});
+    const {report_id,action,reason}=c.body || {};
+    if(!report_id||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(report_id).trim())) {
+      throw Object.assign(new Error('Mã báo cáo không hợp lệ.'),{status:400});
+    }
+    if(!action||!['hide','restore','dismiss'].includes(action)) {
+      throw Object.assign(new Error('Hành động kiểm duyệt không hợp lệ.'),{status:400});
+    }
+    const cleanReason = reason ? String(reason).trim().slice(0, 500) : null;
     return rpc(c,'rpc_admin_moderate_content',{
-      p_report_id:report_id,
+      p_report_id:String(report_id).trim(),
       p_action:action,
-      p_reason:reason||null
+      p_reason:cleanReason
     });
   }),
   route('GET','/admin/events/analytics/summary','admin',c=>{

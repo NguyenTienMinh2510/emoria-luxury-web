@@ -18,6 +18,9 @@ export default async function handler(req,res) {
   res.setHeader('Content-Type','application/json; charset=utf-8');
   res.setHeader('Cache-Control','no-store');
   res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Frame-Options','DENY');
+  res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy','accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()');
   const send=(status,data)=>{res.statusCode=status;res.end(JSON.stringify(data));};
   try {
     const url=new URL(req.originalUrl||req.url,'http://localhost');
@@ -27,7 +30,12 @@ export default async function handler(req,res) {
     if(!matches.length)throw fail(404,'Không tìm thấy tài nguyên.');
     const route=matches.find(r=>r.method===req.method);
     if(!route){res.setHeader('Allow',[...new Set(matches.map(r=>r.method))].join(', '));throw fail(405,'Phương thức không hỗ trợ.');}
-    const params=path.match(route.pattern).slice(1).map(decodeURIComponent);
+    let params;
+    try {
+      params = path.match(route.pattern).slice(1).map(decodeURIComponent);
+    } catch {
+      throw fail(400, 'Tham số đường dẫn không hợp lệ.');
+    }
     const body=await readBody(req);
     const base=process.env.SUPABASE_URL||process.env.VITE_SUPABASE_URL;
     const key=process.env.SUPABASE_PUBLISHABLE_KEY||process.env.VITE_SUPABASE_ANON_KEY||process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -56,7 +64,8 @@ export default async function handler(req,res) {
       return data;
     };
     const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
-    const ip = String(Array.isArray(rawIp) ? rawIp[0] : rawIp).split(',')[0].trim() || '127.0.0.1';
+    const candidateIp = String(Array.isArray(rawIp) ? rawIp[0] : rawIp).split(',')[0].trim();
+    const ip = /^[0-9a-fA-F:.]+$/.test(candidateIp) ? candidateIp.slice(0, 45) : '127.0.0.1';
     const result=await route.run({client,db,user,body,params,query:url.searchParams,ip,req,res});
     if(res.writableEnded)return;
     send(route.status||200,result??{success:true});

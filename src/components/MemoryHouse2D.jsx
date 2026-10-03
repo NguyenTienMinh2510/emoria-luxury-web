@@ -44,8 +44,8 @@ function RoomScene({room, x=0, y=0, width=340, height=270, active, accent, onSel
       {[.12,.38,.65,.88].map((n,i) => <path key={n} d={`M${width*n} ${floor+(i%2)*34}v${i%2 ? 31 : 34}`} stroke="#95795f" opacity=".25"/>)}
       <path d={`M0 ${floor}H${width}`} stroke="#ae9273" strokeWidth="5"/>
       <rect x="14" y="14" width={width-28} height="25" rx="4" fill={night ? '#49444f' : '#fffcf5'} opacity=".95"/>
-      <text x="25" y="31" fontFamily="Georgia,serif" fontSize="13" fontWeight="600" fill={ink}>{room.name}</text>
-      <text x={width-24} y="31" textAnchor="end" fontSize="10" fill={ink} opacity=".7">{room.memories?.length || 0} ảnh</text>
+      <text x="25" y="31" fontFamily="Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" fontSize="13" fontWeight="600" fill={ink}>{room.name}</text>
+      <text x={width-24} y="31" textAnchor="end" fontFamily="Inter, system-ui, -apple-system, sans-serif" fontSize="10" fill={ink} opacity=".7">{room.memories?.length || 0} ảnh</text>
 
       {/* A recessed window and curtains give the room depth without pasted furniture. */}
       <g stroke="#a48a70" strokeWidth="1.5">
@@ -78,8 +78,8 @@ function RoomScene({room, x=0, y=0, width=340, height=270, active, accent, onSel
       {/* Illustrated joinery: one shelf, a credenza and a woven rug. */}
       <rect x={wallStart} y="120" width={wallWidth} height="5" rx="2" fill="#b29472"/>
       <path d={`M${wallStart+16} 125v8M${width-32} 125v8`} stroke="#957255" strokeWidth="3"/>
-      <ellipse cx={width/2} cy={height-28} rx={width*.28} ry="17" fill={night ? '#aa8984' : '#e6c3ad'} stroke="#b89b83"/>
-      <ellipse cx={width/2} cy={height-28} rx={width*.25} ry="13" fill="none" stroke="#f4ded0" strokeWidth="2"/>
+      <ellipse cx={width/2} cy={floor-8} rx={width*.28} ry="17" fill={night ? '#aa8984' : '#e6c3ad'} stroke="#b89b83"/>
+      <ellipse cx={width/2} cy={floor-8} rx={width*.25} ry="13" fill="none" stroke="#f4ded0" strokeWidth="2"/>
       {!room.furnishingVersion && !hasFurniture && <g data-fixed-credenza fill={night ? '#a48b76' : '#bd9c78'} stroke="#947358" strokeWidth="1.5">
         <rect x={width*.24} y={desk+5} width={width*.56} height="30" rx="3"/>
         <path d={`M${width*.25} ${desk+35}v15M${width*.78} ${desk+35}v15M${width*.52} ${desk+6}v27`} fill="none" strokeWidth="4"/>
@@ -89,14 +89,18 @@ function RoomScene({room, x=0, y=0, width=340, height=270, active, accent, onSel
       {!room.furnishingVersion && !lanes.floor.length && <g data-fixed-sofa transform={`translate(28 ${height-64})`} stroke="#a98c74" strokeWidth="1.5"><path d="M1 13Q3 0 17 0H59Q71 0 72 13V32H1Z" fill="#d7b4a4"/><rect x="1" y="20" width="72" height="17" rx="6" fill="#e6cbbc"/><path d="M8 36v9M65 36v9" strokeWidth="4"/><path d="M36 3v17"/><rect x="8" y="7" width="20" height="14" rx="5" fill="#e7daca"/></g>}
 
       {Object.entries(lanes).map(([surface,items]) => items.map((item,i) => {
-        const asset=DECORATIONS.find(d => d.id === item.item);
+        const asset=DECORATIONS.find(d => d.id === item.item) || { name: item.item };
         const scale=Array.isArray(item.scale) ? item.scale[1] : item.scale;
         const area=surface === 'table' ? width*.54 : surface === 'wall' ? wallWidth : width-36;
-        const size=Math.min(surface === 'wall' ? 67 : 76, surface === 'wall' ? wallCell*.88 : area/Math.max(1,items.length), 64*Math.max(.55,Math.min(1.4,Number(scale)||1)));
-        const cx=surface === 'wall' ? wallStart+wallCell*(photos.length+i+.5) : surface === 'floor' && items.length <= 2 ? (i === 0 ? 48 : width-48) : (width-area)/2+area*(i+.5)/items.length;
-        const baseline=surface === 'wall' ? 120 : surface === 'table' ? desk+1 : height-12;
+        const size=Math.max(38, Math.min(surface === 'wall' ? 58 : 66, surface === 'wall' ? wallCell*.88 : area/Math.max(1,items.length)*1.1, 60*Math.max(.7,Math.min(1.3,Number(scale)||1))));
+        const cx=surface === 'wall' 
+          ? wallStart+wallCell*(photos.length+i+.5) 
+          : surface === 'table' 
+            ? (width-area)/2+area*(i+.5)/items.length 
+            : 24+(width-48)*(i+.5)/items.length;
+        const baseline=surface === 'wall' ? 120 : surface === 'table' ? desk : floor;
         const memories=(item.photos || []).map(id => room.memories?.find(m => m.id === id));
-        return <g key={item.id || item.slot || i} data-decoration={item.item} data-surface={surface} transform={`translate(${cx-size/2} ${baseline-size*.9}) scale(${size/100})`}>
+        return <g key={item.id || item.slot || i} data-decoration={item.item} data-surface={surface} transform={`translate(${cx-size/2} ${baseline-size*.95}) scale(${size/100})`}>
           <title>{`${asset.name}${item.text ? `: ${item.text}` : ''}`}</title>
           <MemoryHouseDecor2D item={item.item} photos={memories} text={item.text} accent={accent} onPhoto={onPhoto}/>
         </g>;
@@ -131,7 +135,7 @@ export default function MemoryHouse2D({rooms=[], title, theme, activeRoomId, onS
         {[0,1,2].map(i => <g key={i} fill="#a8b395"><ellipse cx={25+i*5} cy={773-i*30} rx="8" ry="18" transform={`rotate(-35 ${25+i*5} ${773-i*30})`}/><ellipse cx={1135-i*5} cy={773-i*30} rx="8" ry="18" transform={`rotate(35 ${1135-i*5} ${773-i*30})`}/></g>)}
       </g>
       {rooms.slice(0,5).map((room,index) => <RoomScene key={room.id} room={room} x={index < 3 ? 76+index*341 : 76+(index-3)*513} y={index < 3 ? 545 : 270} width={index < 3 ? 326 : 497} height={250} active={room.id === current?.id} {...props}/>)}
-      <text x="580" y="862" textAnchor="middle" fill={accent} fontSize="12" letterSpacing="4">EMORIA · NHÀ LÀ NƠI CÓ NHAU</text>
+      <text x="580" y="862" textAnchor="middle" fill={accent} fontFamily="Inter, system-ui, -apple-system, sans-serif" fontSize="12" letterSpacing="4">EMORIA · NHÀ LÀ NƠI CÓ NHAU</text>
     </svg>
     {current && <svg viewBox="-8 -8 376 294" className="w-full md:hidden" aria-label={`Cận cảnh phòng ${current.name} trong ngôi nhà 2D`}><RoomScene room={current} width={360} height={278} active {...props}/></svg>}
     <p className="mt-3 text-center text-xs text-stone-600">Chạm ảnh trong khung để mở kỷ niệm<span className="hidden md:inline"> · Chạm phòng để ghé thăm</span></p>

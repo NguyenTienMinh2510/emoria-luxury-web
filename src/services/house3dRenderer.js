@@ -7,12 +7,10 @@ import {createPlacementSolver, placementTriangles, transformDecoration} from './
 export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, onPlacementPreview, getPlacement, getDragPlacement, isEditing, onGyroChange, onError, onReady}) {
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
   const compact = window.matchMedia?.('(pointer: coarse)').matches || host.clientWidth < 640;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,compact ? 1 : 1.5));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, compact ? 1 : 1.25));
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
-  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;
-  // Shadows change with furniture, not with the camera or floating dust.
-  renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;
+  renderer.shadowMap.enabled=false;
   host.appendChild(renderer.domElement);
   renderer.domElement.setAttribute('aria-label','Ngôi nhà 3D: kéo nền để xoay, kéo đồ vật bằng chuột để di chuyển, chạm phòng để chọn');
   renderer.domElement.style.cssText='width:100%;height:100%;display:block;touch-action:none';
@@ -25,12 +23,10 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   controls.touches.ONE=THREE.TOUCH.ROTATE;controls.touches.TWO=THREE.TOUCH.DOLLY_PAN;
   controls.enableDamping=false;
 
-  // Lighting setup for 3 distinct moods (Chặng C)
-  const ambient=new THREE.HemisphereLight('#fff5e3','#b89d88',1.5);scene.add(ambient);
+  // Lighting setup for 3 distinct moods
+  const ambient=new THREE.HemisphereLight('#fff5e3','#b89d88',1.6);scene.add(ambient);
   const sun=new THREE.DirectionalLight('#ffe3bb',2.4);sun.position.set(-4,8,7);scene.add(sun);
-  sun.castShadow=true;sun.shadow.mapSize.set(compact ? 512 : 1024,compact ? 512 : 1024);
-  Object.assign(sun.shadow.camera,{left:-7,right:7,top:7,bottom:-7,near:.5,far:24});
-  sun.shadow.normalBias=.025;sun.shadow.bias=-.0001;
+  sun.castShadow=false;
   const fill=new THREE.DirectionalLight('#ffffff',.8);fill.position.set(5,3,4);scene.add(fill);
 
   // Warm local glow for candles, lamps and lanterns
@@ -49,88 +45,14 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   const decorMaterials=[],decorTextTextures=[];
   const photoSurfaces=()=>[...surfaces,...decorSurfaces];
 
-  // Micro-particles system (Chặng C)
-  const PARTICLE_COUNT = compact ? 20 : 35;
-  const particleGeo = new THREE.BufferGeometry();
-  const particlePos = new Float32Array(PARTICLE_COUNT * 3);
-  const particleVel = new Float32Array(PARTICLE_COUNT * 3);
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
-    particlePos[i * 3] = (Math.random() - 0.5) * 12;
-    particlePos[i * 3 + 1] = 0.5 + Math.random() * 4.5;
-    particlePos[i * 3 + 2] = (Math.random() - 0.5) * 12;
-    particleVel[i * 3] = (Math.random() - 0.5) * 0.004;
-    particleVel[i * 3 + 1] = 0.002 + Math.random() * 0.004;
-    particleVel[i * 3 + 2] = (Math.random() - 0.5) * 0.004;
-  }
-  particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
-
-  let particleTexture = null;
-  function getParticleTexture() {
-    if (particleTexture) return particleTexture;
-    const c = document.createElement('canvas'); c.width = 64; c.height = 64;
-    const ctx = c.getContext('2d');
-    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 30);
-    g.addColorStop(0, 'rgba(255,255,255,1)');
-    g.addColorStop(0.35, 'rgba(255,255,255,0.7)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2); ctx.fill();
-    particleTexture = new THREE.CanvasTexture(c);
-    return particleTexture;
-  }
-
-  const particleMat = new THREE.PointsMaterial({
-    size: 0.22,
-    map: getParticleTexture(),
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    color: '#ffe89e'
-  });
-  const particlesMesh = new THREE.Points(particleGeo, particleMat);
-  scene.add(particlesMesh);
-
-  // Particle Lifecycle & Performance Controls
+  // Pure Render On-Demand: 0% GPU load when idle
   let isTabVisible = typeof document !== 'undefined' ? !document.hidden : true;
-  let isReducedMotion = typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
   let isCanvasVisible = true;
-  let particleRaf = 0;
-  let lastParticleTime = 0;
-
-  function updateParticles(now) {
-    if (dead || !isTabVisible || isReducedMotion || !isCanvasVisible) return;
-    particleRaf = requestAnimationFrame(updateParticles);
-    const elapsed = now - lastParticleTime;
-    if (elapsed < 1000 / 30) return;
-    const step = Math.min(elapsed, 70) / (1000 / 60);
-    lastParticleTime = now;
-    const pos = particleGeo.attributes.position.array;
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      pos[i * 3 + 1] += particleVel[i * 3 + 1] * step;
-      pos[i * 3] += particleVel[i * 3] * step;
-      pos[i * 3 + 2] += particleVel[i * 3 + 2] * step;
-      if (pos[i * 3 + 1] > 5.5) pos[i * 3 + 1] = 0.5;
-      if (pos[i * 3] > 6) pos[i * 3] = -6;
-      if (pos[i * 3] < -6) pos[i * 3] = 6;
-      if (pos[i * 3 + 2] > 6) pos[i * 3 + 2] = -6;
-      if (pos[i * 3 + 2] < -6) pos[i * 3 + 2] = 6;
-    }
-    particleGeo.attributes.position.needsUpdate = true;
-    render();
-  }
-
-  function restartParticleLoop() {
-    cancelAnimationFrame(particleRaf);
-    lastParticleTime = performance.now();
-    if (!dead && isTabVisible && !isReducedMotion && isCanvasVisible) {
-      particleRaf = requestAnimationFrame(updateParticles);
-    }
-  }
 
   const onVisibilityChange = () => {
     isTabVisible = !document.hidden;
     if (!isTabVisible) resetGyroOffset();
-    restartParticleLoop();
+    else render();
   };
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', onVisibilityChange);
@@ -138,7 +60,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
 
   const intersectionObserver = new IntersectionObserver((entries) => {
     isCanvasVisible = entries[0]?.isIntersecting ?? true;
-    restartParticleLoop();
+    if (isCanvasVisible) render();
   }, { threshold: 0.1 });
   intersectionObserver.observe(host);
 
@@ -264,9 +186,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     if(dead){disposeTree(a.scene);disposeTree(b.scene);return;}
     house=a.scene;library=b.scene;scene.add(house);
     house.updateMatrixWorld(true);
-    library.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
     house.traverse(o=>{
-      if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}
       if(o.userData.roomId && o.name.startsWith('room_'))roomObjects.set(o.userData.roomId,o);
       if(o.userData.slot)slots.set(`${o.userData.roomId}/${o.userData.slot}`,o);
       if(o.isMesh && Number.isInteger(o.userData.photoIndex)){
@@ -277,7 +197,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
         titleMesh.position.copy(o.getWorldPosition(new THREE.Vector3()));scene.add(titleMesh);
       }
     });
-    update(state);onReady?.();render();restartParticleLoop();
+    update(state);onReady?.();render();
   }).catch(()=>{if(!dead)onError?.('Chưa tải được mô hình. Bạn vẫn có thể dùng khung 2D.');});
 
   function update(next){
@@ -288,33 +208,24 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
     house.traverse(o=>{if(o.isMesh&&o.material?.name==='Theme blush')o.material.color.set(colors[next.theme]||colors.warm_gold);});
     const light=houseLighting(rooms);
 
-    // 3 Light Moods (Chặng C)
+    // 3 Light Moods
     if(light==='night'){
       ambient.color.set('#8995bc'); ambient.intensity=0.7;
       sun.color.set('#9cb3ff'); sun.intensity=1.3;
       fill.color.set('#6a78a6'); fill.intensity=0.5;
       scene.background.set('#1a1829');
-      particleMat.color.set('#d8ff7a'); // Fireflies
-      particleMat.opacity=0.8;
-      particleMat.size=0.28;
       warmLight.intensity=2.2;
     } else if(light==='sunset'){
       ambient.color.set('#ffe8d6'); ambient.intensity=1.35;
       sun.color.set('#ff9e66'); sun.intensity=2.6;
       fill.color.set('#ffccd4'); fill.intensity=0.9;
       scene.background.set('#543638');
-      particleMat.color.set('#ffb0b0'); // Warm rose dust
-      particleMat.opacity=0.65;
-      particleMat.size=0.24;
       warmLight.intensity=1.5;
     } else { // 'day'
       ambient.color.set('#fffbf0'); ambient.intensity=1.6;
       sun.color.set('#fff0d8'); sun.intensity=2.4;
       fill.color.set('#ffffff'); fill.intensity=0.8;
       scene.background.set('#e9dfd2');
-      particleMat.color.set('#ffe89e'); // Golden sun dust
-      particleMat.opacity=0.55;
-      particleMat.size=0.20;
       warmLight.intensity=0.6;
     }
 

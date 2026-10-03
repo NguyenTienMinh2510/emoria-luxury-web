@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {createPortal} from 'react-dom';
 import MemoryHouse3D from './MemoryHouse3D.jsx';
 import {createDraftQueue} from '../services/draftQueue.js';
-import {setDecorationPhoto, createCozyHouseRooms} from '../services/house3d.js';
+import {setDecorationPhoto} from '../services/house3d.js';
+import {HOUSE_PRESETS, ROOM_PRESETS, applyPresetToRooms, applyPresetToSingleRoom} from '../data/housePresets.js';
 import {createShareUrl} from '../services/shareLinks.js';
 import {captureHouseShareFile} from '../services/houseSharePreview.js';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,7 +41,7 @@ import {
 function mapOrderedRooms(savedRooms, {newHouse = false} = {}) {
   if (!Array.isArray(savedRooms) || !savedRooms.length) {
     const empty=HOUSE_ROOMS_SPEC.map(spec=>({id:spec.id,name:spec.name,note:'',memories:[],decorations:[],lighting:'day'}));
-    return newHouse ? createCozyHouseRooms(empty) : empty;
+    return newHouse ? applyPresetToRooms(empty, 'cozy') : empty;
   }
   const ids=[...new Set([...savedRooms.map(r=>r.id),...HOUSE_ROOMS_SPEC.map(r=>r.id)])];
   return ids.filter(id=>HOUSE_ROOMS_SPEC.some(r=>r.id===id)).map(id=>{
@@ -125,6 +126,10 @@ export default function MemoryHouseStudio({
   const [layoutPreview, setLayoutPreview] = useState(null);
   const [canRestoreLayout, setCanRestoreLayout] = useState(false);
   const [layoutBusy, setLayoutBusy] = useState(false);
+  const [selectedPresetId, setSelectedPresetId] = useState(null);
+  const [presetBusy, setPresetBusy] = useState(false);
+  const [selectedRoomPresetId, setSelectedRoomPresetId] = useState(null);
+  const [roomPresetBusy, setRoomPresetBusy] = useState(false);
   const [planLayout, setPlanLayout] = useState(null);
   const [isPublished, setIsPublished] = useState(false);
   const latestRooms = useRef(rooms);
@@ -435,6 +440,54 @@ export default function MemoryHouseStudio({
     } catch (err) { setError(err.message); }
     finally { setLayoutBusy(false); }
   }
+
+  const handleApplyRoomPreset = async (roomId, presetId) => {
+    if (isPublicVisitor || roomPresetBusy || presetBusy || layoutBusy || isPublishing || autosaveState === 'saving') return;
+    setRoomPresetBusy(true);
+    setSelectedRoomPresetId(presetId);
+    setError('');
+    try {
+      await saveQueue.current?.flush();
+      const nextRooms = rooms.map(room => {
+        if (room.id !== roomId) return room;
+        return applyPresetToSingleRoom(room, presetId);
+      });
+      setRooms(nextRooms);
+      latestRooms.current = nextRooms;
+      await persistHouse({ ...latestHouse.current, rooms: nextRooms }, { retry: true });
+      const roomPreset = (ROOM_PRESETS[roomId] || []).find(p => p.id === presetId);
+      setSuccessMsg(`Đã đổi bài trí cho phòng "${currentRoom.name}" sang kiểu "${roomPreset?.name || presetId}"! Ảnh kỷ niệm của phòng đã được giữ nguyên.`);
+      setTimeout(() => setSuccessMsg(''), 3500);
+    } catch (err) {
+      setError(err?.message || 'Không thể đổi kiểu bài trí phòng.');
+    } finally {
+      setRoomPresetBusy(false);
+    }
+  };
+
+  const handleApplyPreset = async (presetId) => {
+    if (isPublicVisitor || presetBusy || layoutBusy || isPublishing || autosaveState === 'saving') return;
+    setPresetBusy(true);
+    setSelectedPresetId(presetId);
+    setError('');
+    try {
+      await saveQueue.current?.flush();
+      const nextRooms = applyPresetToRooms(rooms, presetId);
+      const chosenPreset = HOUSE_PRESETS.find(p => p.id === presetId);
+      if (chosenPreset?.theme) {
+        setSelectedTheme(chosenPreset.theme);
+      }
+      setRooms(nextRooms);
+      latestRooms.current = nextRooms;
+      await persistHouse({ ...latestHouse.current, theme: chosenPreset?.theme || selectedTheme, rooms: nextRooms }, { retry: true });
+      setSuccessMsg(`Đã áp dụng mẫu "${chosenPreset?.name || presetId}" cho ngôi nhà! Ảnh kỷ niệm của bạn đã được gắn vào khung.`);
+      setTimeout(() => setSuccessMsg(''), 3500);
+    } catch (err) {
+      setError(err?.message || 'Không thể áp dụng mẫu bài trí.');
+    } finally {
+      setPresetBusy(false);
+    }
+  };
 
   // Unpublish House
   const handleUnpublish = async () => {
@@ -1145,20 +1198,67 @@ export default function MemoryHouseStudio({
         {/* TAB 1: EDIT MODE (Chủ sở hữu chỉnh sửa nội dung và tải ảnh)             */}
         {/* ===================================================================== */}
         {!isPublicVisitor && activeTab === 'edit' && <p className="text-sm text-slate-400">Chọn một phòng bên dưới, thêm ảnh và lời nhắn, rồi xuất bản để chia sẻ. Mọi thay đổi được tự động lưu.</p>}
-        {!isPublicVisitor && activeTab === 'edit' && <section aria-label="Nâng cấp bố cục" className="rounded-2xl border border-white/15 p-4 space-y-3">
-            <p className="text-sm text-slate-300">Thay nội thất bằng bố cục Cozy mới để dọn đồ cũ dư thừa. Đồ có ảnh hoặc lời nhắn được giữ và sắp xếp lại. Xem trước toàn bộ ngôi nhà trước khi lưu.</p>
-            <div className="flex flex-wrap gap-3">
-            {!layoutPreview && <button type="button" disabled={!planLayout || layoutBusy || isPublishing || autosaveState==='saving'} className="min-h-11 rounded-xl bg-amber-200 px-4 text-stone-950 disabled:opacity-40" onClick={()=>previewLayout({replace:true})}>Xem trước thay nội thất Cozy</button>}
-            {!layoutPreview && rooms.some(r=>r.furnishingVersion!==2) && <button type="button" disabled={!planLayout || layoutBusy || isPublishing || autosaveState==='saving'} className="min-h-11 rounded-xl border border-amber-300/40 px-4 text-amber-200 disabled:opacity-40" onClick={()=>previewLayout()}>Xem trước bố cục Cozy</button>}
-            {!layoutPreview && rooms.some(r=>r.furnishingVersion!==2) && <button type="button" disabled={!planLayout || layoutBusy || isPublishing || autosaveState==='saving'} className="min-h-11 rounded-xl bg-amber-200 px-4 text-stone-950 disabled:opacity-40" onClick={()=>previewLayout({rearrange:true})}>Xem trước sắp xếp H05</button>}
-            {layoutBusy && <p role="status" className="w-full text-sm text-amber-200">Đang kiểm tra vị trí và lưu bố cục…</p>}
-            {layoutPreview && <>
-              <p className="w-full text-sm text-amber-200">Xem trước: thêm {layoutPreview.added} món, dọn {layoutPreview.removed || 0} món cũ; {layoutPreview.skipped.length} món chưa có chỗ phù hợp. Chưa lưu thay đổi.</p>
-              <button type="button" disabled={layoutBusy || layoutPreview.skipped.length>0} onClick={applyLayoutPreview} className="min-h-11 rounded-xl bg-amber-200 px-4 text-stone-950 disabled:opacity-40">Áp dụng và lưu bố cục</button>
-              <button type="button" disabled={layoutBusy} onClick={()=>setLayoutPreview(null)} className="min-h-11 rounded-xl border border-white/20 px-4">Hủy xem trước</button>
-            </>}
-            {canRestoreLayout && !layoutPreview && <button type="button" disabled={layoutBusy || isPublishing || autosaveState==='saving'} onClick={restoreLayout} className="min-h-11 rounded-xl border border-white/20 px-4">Khôi phục bố cục trước nâng cấp</button>}
-          </div>
+        {!isPublicVisitor && activeTab === 'edit' && <section aria-label="Mẫu bài trí có sẵn" className="rounded-2xl border border-white/15 p-4 space-y-3">
+            <p className="text-sm text-slate-300">Chọn 1 mẫu bài trí bên dưới để áp dụng cho cả 5 phòng. Ảnh kỷ niệm đã tải lên sẽ được tự động gắn vào khung ảnh của mẫu mới.</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              {HOUSE_PRESETS.map((preset) => {
+                const isSelected = selectedPresetId === preset.id;
+                return (
+                  <div
+                    key={preset.id}
+                    className={`flex flex-col justify-between p-4 rounded-2xl border transition-all ${
+                      isSelected
+                        ? 'border-amber-400 bg-amber-400/10'
+                        : 'border-white/10 bg-black/30 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl">{preset.icon}</span>
+                        {isSelected && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400 text-stone-950">
+                            Đang dùng
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-bold text-white">{preset.name}</h4>
+                      <p className="text-xs text-slate-300 leading-relaxed">{preset.tagline}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={presetBusy || isPublishing || autosaveState === 'saving'}
+                      onClick={() => handleApplyPreset(preset.id)}
+                      className={`mt-4 w-full py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-amber-300 text-stone-950 hover:bg-amber-200'
+                          : 'bg-white/10 text-white hover:bg-white/20 hover:text-amber-200'
+                      } disabled:opacity-40`}
+                    >
+                      {presetBusy && selectedPresetId === preset.id ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Đang áp dụng...</span>
+                        </>
+                      ) : (
+                        <span>Áp dụng mẫu này</span>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            {canRestoreLayout && (
+              <div className="flex flex-wrap gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={presetBusy || layoutBusy || isPublishing || autosaveState === 'saving'}
+                  onClick={restoreLayout}
+                  className="min-h-9 px-3.5 py-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-xs text-slate-300 hover:text-white transition-all cursor-pointer disabled:opacity-40"
+                >
+                  Khôi phục bố cục trước đó
+                </button>
+              </div>
+            )}
         </section>}
         <MemoryHouse3D
           rooms={layoutPreview?.rooms || rooms} title={houseTitle} theme={selectedTheme}
@@ -1202,6 +1302,43 @@ export default function MemoryHouseStudio({
                         />
                       </label>
                     )}
+                  </div>
+
+                  {/* Room-level Presets Selector */}
+                  <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                      <span className="font-semibold text-amber-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Mẫu bài trí riêng cho {currentRoom.name}</span>
+                      </span>
+                      <span className="text-[11px] text-slate-400">Đổi phong cách chỉ phòng này, tự động giữ nguyên ảnh</span>
+                    </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 pt-1">
+                      {(ROOM_PRESETS[currentRoom.id] || []).map((preset) => {
+                        const isSelected = selectedRoomPresetId === preset.id;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            disabled={roomPresetBusy || presetBusy || isPublishing || autosaveState === 'saving'}
+                            onClick={() => handleApplyRoomPreset(currentRoom.id, preset.id)}
+                            className={`flex flex-col items-start text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-amber-400 bg-amber-400/15 text-white'
+                                : 'border-white/10 bg-black/30 hover:border-white/20 text-slate-200 hover:text-white'
+                            } disabled:opacity-40`}
+                          >
+                            <div className="flex items-center gap-1.5 w-full">
+                              <span className="text-base">{preset.icon}</span>
+                              <span className="text-xs font-bold truncate">{preset.name}</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 line-clamp-2 mt-1 leading-snug">
+                              {preset.description}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   {/* Room Note / Intro */}
