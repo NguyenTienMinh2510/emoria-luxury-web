@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {createPortal} from 'react-dom';
 import MemoryHouse3D from './MemoryHouse3D.jsx';
 import {createDraftQueue} from '../services/draftQueue.js';
-import {setDecorationPhoto, withEditableHouseFurniture, DEFAULT_COZY_ROOM_DECORATIONS} from '../services/house3d.js';
+import {setDecorationPhoto, createCozyHouseRooms} from '../services/house3d.js';
 import {createShareUrl} from '../services/shareLinks.js';
 import {captureHouseShareFile} from '../services/houseSharePreview.js';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,7 +22,7 @@ import {
   POSTCARD_TEMPLATES
 } from '../services/postcardGenerator.js';
 import {
-  getHouseDraft,
+  getHouseDraft, restoreHouseLayout,
   saveHouseDraft,
   publishHouse,
   unpublishHouse,
@@ -37,46 +37,16 @@ import {
 } from '../services/eventService.js';
 
 // Helper: Map saved rooms while preserving storytelling order and ensuring all 5 rooms exist
-function mapOrderedRooms(savedRooms) {
-  const getDecorationsForRoom = (roomId, existingDecors) => {
-    const hasCustomDecorations = Array.isArray(existingDecors) && existingDecors.some(d => !d.id?.startsWith('base_'));
-    if (hasCustomDecorations) {
-      return existingDecors;
-    }
-    const baseList = Array.isArray(existingDecors) ? existingDecors : [];
-    const cozyDefaults = (DEFAULT_COZY_ROOM_DECORATIONS[roomId] || []).filter(
-      cd => !baseList.some(bd => bd.item === cd.item)
-    );
-    return [...baseList, ...cozyDefaults];
-  };
-
-  if (!Array.isArray(savedRooms) || savedRooms.length === 0) {
-    return withEditableHouseFurniture(HOUSE_ROOMS_SPEC.map((spec) => ({
-      id: spec.id,
-      name: spec.name,
-      note: '',
-      memories: [],
-      decorations: DEFAULT_COZY_ROOM_DECORATIONS[spec.id] || [],
-      lighting: 'day'
-    })));
+function mapOrderedRooms(savedRooms, {newHouse = false} = {}) {
+  if (!Array.isArray(savedRooms) || !savedRooms.length) {
+    const empty=HOUSE_ROOMS_SPEC.map(spec=>({id:spec.id,name:spec.name,note:'',memories:[],decorations:[],lighting:'day'}));
+    return newHouse ? createCozyHouseRooms(empty) : empty;
   }
-  const orderedIds = savedRooms
-    .map((r) => r.id)
-    .filter((id) => HOUSE_ROOMS_SPEC.some((s) => s.id === id));
-  const allIds = [...new Set([...orderedIds, ...HOUSE_ROOMS_SPEC.map((s) => s.id)])];
-  return withEditableHouseFurniture(allIds.map((id) => {
-    const existing = savedRooms.find((r) => r.id === id);
-    const spec = HOUSE_ROOMS_SPEC.find((s) => s.id === id);
-    return {
-      ...existing,
-      id,
-      name: existing?.name || spec?.name || id,
-      note: existing?.note || '',
-      memories: existing?.memories || [],
-      decorations: getDecorationsForRoom(id, existing?.decorations),
-      lighting: existing?.lighting || 'day'
-    };
-  }));
+  const ids=[...new Set([...savedRooms.map(r=>r.id),...HOUSE_ROOMS_SPEC.map(r=>r.id)])];
+  return ids.filter(id=>HOUSE_ROOMS_SPEC.some(r=>r.id===id)).map(id=>{
+    const existing=savedRooms.find(r=>r.id===id);
+    return {...existing,id,name:existing?.name || HOUSE_ROOMS_SPEC.find(r=>r.id===id).name,note:existing?.note || '',memories:existing?.memories || [],decorations:existing?.decorations || [],lighting:existing?.lighting || 'day'};
+  });
 }
 
 // Visual theme configurations
@@ -152,6 +122,10 @@ export default function MemoryHouseStudio({
   const [houseTitle, setHouseTitle] = useState('Ngôi Nhà Kỷ Niệm Của Đôi Mình');
   const [selectedTheme, setSelectedTheme] = useState('warm_gold');
   const [rooms, setRooms] = useState(() => mapOrderedRooms([]));
+  const [layoutPreview, setLayoutPreview] = useState(null);
+  const [canRestoreLayout, setCanRestoreLayout] = useState(false);
+  const [layoutBusy, setLayoutBusy] = useState(false);
+  const [planLayout, setPlanLayout] = useState(null);
   const [isPublished, setIsPublished] = useState(false);
   const latestRooms = useRef(rooms);
   latestRooms.current = rooms;
@@ -247,6 +221,7 @@ export default function MemoryHouseStudio({
   // Load House Data (either draft for owner or public snapshot for guest/share)
   const loadHouse = useCallback(async () => {
     const sequence = ++loadSequence.current;
+    setLayoutPreview(null); setCanRestoreLayout(false);
     setLoading(true);
     setCanEdit(false);
     setLoadError('');
@@ -277,7 +252,8 @@ export default function MemoryHouseStudio({
           setIsPublished(Boolean(draft.is_published));
           setCurrentShareId(draft.share_id || null);
 
-          setRooms(mapOrderedRooms(draft.rooms));
+          setRooms(mapOrderedRooms(draft.rooms,{newHouse:draft.exists === false}));
+          setCanRestoreLayout(Boolean(draft.can_restore_layout));
         } catch (draftErr) {
           if (sequence !== loadSequence.current) return;
           if (draftErr.status !== 403) throw draftErr;
@@ -389,7 +365,7 @@ export default function MemoryHouseStudio({
 
   // Publish House
   const handlePublish = async () => {
-    if (!tagUid || isPublicVisitor || isPublishing) return;
+    if (!tagUid || isPublicVisitor || isPublishing || layoutPreview || layoutBusy) return;
     setPublishStage('capturing');
     setError('');
     setSuccessMsg('');
@@ -423,6 +399,42 @@ export default function MemoryHouseStudio({
       setPublishStage('');
     }
   };
+
+  async function previewLayout(options) {
+    if(!planLayout || layoutBusy) return;
+    const original=latestHouse.current;
+    setLayoutBusy(true); setError('');
+    try {
+      await saveQueue.current.flush();
+      const plan=await planLayout(original.rooms,options);
+      if(JSON.stringify(original)!==JSON.stringify(latestHouse.current)) throw new Error('Bạn vừa chỉnh sửa thêm. Hãy thử xem trước lại.');
+      if(plan.added || options?.rearrange) setLayoutPreview(plan);
+      else setError('Chưa có chỗ trống phù hợp. Hãy sắp xếp lại đồ trước khi nâng cấp.');
+    } catch(err) { setError(err.message); }
+    finally {setLayoutBusy(false);}
+  }
+
+  async function applyLayoutPreview() {
+    if (!layoutPreview || layoutBusy || isPublicVisitor) return;
+    setLayoutBusy(true); setError('');
+    try {
+      await persistHouse({...latestHouse.current,rooms:layoutPreview.rooms});
+      setRooms(layoutPreview.rooms); setLayoutPreview(null); setCanRestoreLayout(true);
+      setSuccessMsg('Đã lưu bố cục mới. Bản công khai chỉ đổi khi bạn xuất bản.');
+    } catch (err) { setError(err.message); }
+    finally { setLayoutBusy(false); }
+  }
+  async function restoreLayout() {
+    if (layoutBusy || isPublicVisitor) return;
+    setLayoutBusy(true); setError('');
+    try {
+      await saveQueue.current.flush();
+      await restoreHouseLayout(tagUid,saveQueue.current.revision);
+      await loadHouse();
+      setSuccessMsg('Đã khôi phục bố cục trước nâng cấp; ảnh và lời nhắn hiện tại vẫn được giữ.');
+    } catch (err) { setError(err.message); }
+    finally { setLayoutBusy(false); }
+  }
 
   // Unpublish House
   const handleUnpublish = async () => {
@@ -1133,14 +1145,29 @@ export default function MemoryHouseStudio({
         {/* TAB 1: EDIT MODE (Chủ sở hữu chỉnh sửa nội dung và tải ảnh)             */}
         {/* ===================================================================== */}
         {!isPublicVisitor && activeTab === 'edit' && <p className="text-sm text-slate-400">Chọn một phòng bên dưới, thêm ảnh và lời nhắn, rồi xuất bản để chia sẻ. Mọi thay đổi được tự động lưu.</p>}
+        {!isPublicVisitor && activeTab === 'edit' && <section aria-label="Nâng cấp bố cục" className="rounded-2xl border border-white/15 p-4 space-y-3">
+          <p className="text-sm text-slate-300">Bố cục Cozy giữ nguyên đồ cũ, ảnh và vị trí tùy chỉnh, rồi bổ sung vào chỗ còn trống. Bạn có thể khôi phục bố cục trước nâng cấp.</p>
+          <div className="flex flex-wrap gap-3">
+            {!layoutPreview && rooms.some(r=>r.furnishingVersion!==2) && <button type="button" disabled={!planLayout || layoutBusy || isPublishing || autosaveState==='saving'} className="min-h-11 rounded-xl border border-amber-300/40 px-4 text-amber-200 disabled:opacity-40" onClick={()=>previewLayout()}>Xem trước bố cục Cozy</button>}
+            {!layoutPreview && rooms.some(r=>r.furnishingVersion!==2) && <button type="button" disabled={!planLayout || layoutBusy || isPublishing || autosaveState==='saving'} className="min-h-11 rounded-xl bg-amber-200 px-4 text-stone-950 disabled:opacity-40" onClick={()=>previewLayout({rearrange:true})}>Xem trước sắp xếp H05</button>}
+            {layoutBusy && <p role="status" className="w-full text-sm text-amber-200">Đang kiểm tra vị trí và lưu bố cục…</p>}
+            {layoutPreview && <>
+              <p className="w-full text-sm text-amber-200">Xem trước bố cục với {layoutPreview.added} món bổ sung; {layoutPreview.skipped.length} món chưa có chỗ phù hợp. Chưa lưu thay đổi.</p>
+              <button type="button" disabled={layoutBusy} onClick={applyLayoutPreview} className="min-h-11 rounded-xl bg-amber-200 px-4 text-stone-950">Áp dụng và lưu bố cục</button>
+              <button type="button" disabled={layoutBusy} onClick={()=>setLayoutPreview(null)} className="min-h-11 rounded-xl border border-white/20 px-4">Hủy xem trước</button>
+            </>}
+            {canRestoreLayout && !layoutPreview && <button type="button" disabled={layoutBusy || isPublishing || autosaveState==='saving'} onClick={restoreLayout} className="min-h-11 rounded-xl border border-white/20 px-4">Khôi phục bố cục trước nâng cấp</button>}
+          </div>
+        </section>}
         <MemoryHouse3D
-          rooms={rooms} title={houseTitle} theme={selectedTheme}
+          rooms={layoutPreview?.rooms || rooms} title={houseTitle} theme={selectedTheme}
           activeRoomId={currentRoom.id}
           onSelectRoom={id=>{const index=rooms.findIndex(r=>r.id===id);if(index>=0)setActiveRoomIndex(index);}}
           onRoomsChange={setRooms} onPhoto={handleOpenLightbox}
           onUploadPhoto={handlePhotoUpload} uploading={Boolean(uploadingRoomId)}
-          readOnly={isPublicVisitor || activeTab !== 'edit'}
+          readOnly={isPublicVisitor || activeTab !== 'edit' || Boolean(layoutPreview) || layoutBusy}
           onRegisterCapture={(fn) => { captureHouse3DRef.current = fn; }}
+          onRegisterLayoutPlanner={fn=>setPlanLayout(()=>fn)}
         />
         {activeTab === 'edit' && !isPublicVisitor && (
           <section aria-label={`Ảnh và lời nhắn · ${currentRoom.name}`}>
@@ -1474,7 +1501,7 @@ export default function MemoryHouseStudio({
                     <button
                       type="button"
                       onClick={handlePublish}
-                      disabled={isPublishing}
+                      disabled={isPublishing || Boolean(layoutPreview) || layoutBusy}
                       aria-label={isPublishing ? 'Đang xuất bản' : isPublished ? 'Cập nhật xuất bản' : 'Xuất Bản Ngôi Nhà'}
                       className="group flex-1 sm:flex-none min-w-0 inline-flex items-center justify-between gap-5 px-5 py-3 rounded-2xl bg-gradient-to-br from-amber-100 via-amber-300 to-amber-500 hover:from-white hover:to-amber-300 text-stone-950 border border-amber-100/50 shadow-[0_8px_28px_rgba(245,158,11,0.22)] transition-all cursor-pointer disabled:opacity-50"
                     >

@@ -1,0 +1,965 @@
+[
+  {
+    "id": "beginning",
+    "memories": [],
+    "furnishingVersion": 2,
+    "decorations": [
+      {
+        "id": "cozy2_beginning_chair",
+        "item": "chair",
+        "surface": "floor",
+        "position": [
+          -3.6,
+          0.142,
+          -0.55
+        ],
+        "rotation": -12,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_beginning_daisy-rug",
+        "item": "daisy-rug",
+        "surface": "floor",
+        "position": [
+          -2.6,
+          0.142,
+          0.45
+        ],
+        "rotation": 0,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_beginning_capybara",
+        "item": "capybara",
+        "surface": "floor",
+        "position": [
+          -2.485,
+          0.173,
+          0.869
+        ],
+        "rotation": 0,
+        "scale": 0.9,
+        "parent_id": "cozy2_beginning_daisy-rug"
+      },
+      {
+        "id": "cozy2_beginning_cat",
+        "item": "cat",
+        "surface": "floor",
+        "position": [
+          -2.997,
+          0.173,
+          0.348
+        ],
+        "rotation": 0,
+        "scale": 0.65,
+        "parent_id": "cozy2_beginning_daisy-rug"
+      },
+      {
+        "id": "cozy2_beginning_cubby",
+        "item": "cubby",
+        "surface": "floor",
+        "position": [
+          -2.25,
+          0.142,
+          -0.64
+        ],
+        "rotation": 0,
+        "scale": 0.55
+      },
+      {
+        "id": "cozy2_beginning_pear-lamp",
+        "item": "pear-lamp",
+        "surface": "table",
+        "position": [
+          -2.25,
+          0.558,
+          -0.64
+        ],
+        "rotation": 0,
+        "scale": 0.8,
+        "parent_id": "cozy2_beginning_cubby"
+      }
+    ],
+    "furnishingBaseline": [
+      {
+        "id": "cozy2_beginning_chair",
+        "item": "chair",
+        "surface": "floor",
+        "position": [
+          -3.6,
+          0.142,
+          -0.55
+        ],
+        "rotation": -12,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_beginning_daisy-rug",
+        "item": "daisy-rug",
+        "surface": "floor",
+        "position": [
+          -2.6,
+          0.142,
+          0.45
+        ],
+        "rotation": 0,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_beginning_capybara",
+        "item": "capybara",
+        "surface": "floor",
+        "position": [
+          -2.485,
+          0.173,
+          0.869
+        ],
+        "rotation": 0,
+        "scale": 0.9,
+        "parent_id": "cozy2_beginning_daisy-rug"
+      },
+      {
+        "id": "cozy2_beginning_cat",
+        "item": "cat",
+        "surface": "floor",
+        "position": [
+          -2.997,
+          0.173,
+          0.348
+        ],
+        "rotation": 0,
+        "scale": 0.65,
+        "parent_id": "cozy2_beginning_daisy-rug"
+      },
+      {
+        "id": "cozy2_beginning_cubby",
+        "item": "cubby",
+        "surface": "floor",
+        "position": [
+          -2.25,
+          0.142,
+          -0.64
+        ],
+        "rotation": 0,
+        "scale": 0.55
+      },
+      {
+        "id": "cozy2_beginning_pear-lamp",
+        "item": "pear-lamp",
+        "surface": "table",
+        "position": [
+          -2.25,
+          0.558,
+          -0.64
+        ],
+        "rotation": 0,
+        "scale": 0.8,
+        "parent_id": "cozy2_beginning_cubby"
+      }
+    ]
+  },
+  {
+    "id": "first",
+    "memories": [],
+    "furnishingVersion": 2,
+    "decorations": [
+      {
+        "id": "cozy2_first_bistro-table",
+        "item": "bistro-table",
+        "surface": "floor",
+        "position": [
+          0.12,
+          0.142,
+          -0.28
+        ],
+        "rotation": -8,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_first_cushion",
+        "item": "cushion",
+        "surface": "floor",
+        "position": [
+          -0.75,
+          0.142,
+          0.48
+        ],
+        "rotation": 0,
+        "scale": 0.8
+      },
+      {
+        "id": "cozy2_first_cushion-right",
+        "item": "cushion",
+        "surface": "floor",
+        "position": [
+          0.78,
+          0.142,
+          0.68
+        ],
+        "rotation": 0,
+        "scale": 0.8
+      },
+      {
+        "id": "cozy2_first_shiba",
+        "item": "shiba",
+        "surface": "floor",
+        "position": [
+          0.704,
+          0.142,
+          0.227
+        ],
+        "rotation": 0,
+        "scale": 0.85
+      },
+      {
+        "id": "cozy2_first_mugs",
+        "item": "mugs",
+        "surface": "table",
+        "position": [
+          -0.2,
+          0.776,
+          -0.3
+        ],
+        "rotation": 0,
+        "scale": 0.65,
+        "parent_id": "cozy2_first_bistro-table"
+      },
+      {
+        "id": "cozy2_first_mugs-jam",
+        "item": "mugs-jam",
+        "surface": "table",
+        "position": [
+          0.38,
+          0.776,
+          -0.13
+        ],
+        "rotation": 14,
+        "scale": 0.65,
+        "parent_id": "cozy2_first_bistro-table"
+      },
+      {
+        "id": "cozy2_first_shelf",
+        "item": "shelf",
+        "surface": "wall",
+        "position": [
+          -0.8,
+          0.83,
+          -1.031
+        ],
+        "rotation": 0,
+        "scale": 0.6
+      },
+      {
+        "id": "cozy2_first_honey-candle",
+        "item": "honey-candle",
+        "surface": "shelf",
+        "position": [
+          -0.8,
+          0.966,
+          -1.031
+        ],
+        "rotation": 0,
+        "scale": 0.65,
+        "parent_id": "cozy2_first_shelf"
+      }
+    ],
+    "furnishingBaseline": [
+      {
+        "id": "cozy2_first_bistro-table",
+        "item": "bistro-table",
+        "surface": "floor",
+        "position": [
+          0.12,
+          0.142,
+          -0.28
+        ],
+        "rotation": -8,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_first_cushion",
+        "item": "cushion",
+        "surface": "floor",
+        "position": [
+          -0.75,
+          0.142,
+          0.48
+        ],
+        "rotation": 0,
+        "scale": 0.8
+      },
+      {
+        "id": "cozy2_first_cushion-right",
+        "item": "cushion",
+        "surface": "floor",
+        "position": [
+          0.78,
+          0.142,
+          0.68
+        ],
+        "rotation": 0,
+        "scale": 0.8
+      },
+      {
+        "id": "cozy2_first_shiba",
+        "item": "shiba",
+        "surface": "floor",
+        "position": [
+          0.704,
+          0.142,
+          0.227
+        ],
+        "rotation": 0,
+        "scale": 0.85
+      },
+      {
+        "id": "cozy2_first_mugs",
+        "item": "mugs",
+        "surface": "table",
+        "position": [
+          -0.2,
+          0.776,
+          -0.3
+        ],
+        "rotation": 0,
+        "scale": 0.65,
+        "parent_id": "cozy2_first_bistro-table"
+      },
+      {
+        "id": "cozy2_first_mugs-jam",
+        "item": "mugs-jam",
+        "surface": "table",
+        "position": [
+          0.38,
+          0.776,
+          -0.13
+        ],
+        "rotation": 14,
+        "scale": 0.65,
+        "parent_id": "cozy2_first_bistro-table"
+      },
+      {
+        "id": "cozy2_first_shelf",
+        "item": "shelf",
+        "surface": "wall",
+        "position": [
+          -0.8,
+          0.83,
+          -1.031
+        ],
+        "rotation": 0,
+        "scale": 0.6
+      },
+      {
+        "id": "cozy2_first_honey-candle",
+        "item": "honey-candle",
+        "surface": "shelf",
+        "position": [
+          -0.8,
+          0.966,
+          -1.031
+        ],
+        "rotation": 0,
+        "scale": 0.65,
+        "parent_id": "cozy2_first_shelf"
+      }
+    ]
+  },
+  {
+    "id": "little-things",
+    "memories": [],
+    "furnishingVersion": 2,
+    "decorations": [
+      {
+        "id": "cozy2_little-things_cubby",
+        "item": "cubby",
+        "surface": "floor",
+        "position": [
+          2.8,
+          0.142,
+          -0.6
+        ],
+        "rotation": 0,
+        "scale": 1.25
+      },
+      {
+        "id": "cozy2_little-things_succulent",
+        "item": "succulent",
+        "surface": "table",
+        "position": [
+          2.3,
+          1.083,
+          -0.6
+        ],
+        "rotation": 0,
+        "scale": 0.8,
+        "parent_id": "cozy2_little-things_cubby"
+      },
+      {
+        "id": "cozy2_little-things_camera",
+        "item": "camera",
+        "surface": "table",
+        "position": [
+          2.8,
+          1.083,
+          -0.54
+        ],
+        "rotation": -12,
+        "scale": 0.8,
+        "parent_id": "cozy2_little-things_cubby"
+      },
+      {
+        "id": "cozy2_little-things_turntable",
+        "item": "turntable",
+        "surface": "table",
+        "position": [
+          3.094,
+          0.668,
+          -0.523
+        ],
+        "rotation": 0,
+        "scale": 0.8,
+        "parent_id": "cozy2_little-things_cubby"
+      },
+      {
+        "id": "cozy2_little-things_fern",
+        "item": "fern",
+        "surface": "floor",
+        "position": [
+          1.9,
+          0.142,
+          0.5
+        ],
+        "rotation": 0,
+        "scale": 0.8
+      },
+      {
+        "id": "cozy2_little-things_duck",
+        "item": "duck",
+        "surface": "floor",
+        "position": [
+          3.45,
+          0.142,
+          0.6
+        ],
+        "rotation": 0,
+        "scale": 0.8
+      },
+      {
+        "id": "cozy2_little-things_duckling",
+        "item": "duckling",
+        "surface": "floor",
+        "position": [
+          3.85,
+          0.142,
+          0.4
+        ],
+        "rotation": 0,
+        "scale": 0.7
+      }
+    ],
+    "furnishingBaseline": [
+      {
+        "id": "cozy2_little-things_cubby",
+        "item": "cubby",
+        "surface": "floor",
+        "position": [
+          2.8,
+          0.142,
+          -0.6
+        ],
+        "rotation": 0,
+        "scale": 1.25
+      },
+      {
+        "id": "cozy2_little-things_succulent",
+        "item": "succulent",
+        "surface": "table",
+        "position": [
+          2.3,
+          1.083,
+          -0.6
+        ],
+        "rotation": 0,
+        "scale": 0.8,
+        "parent_id": "cozy2_little-things_cubby"
+      },
+      {
+        "id": "cozy2_little-things_camera",
+        "item": "camera",
+        "surface": "table",
+        "position": [
+          2.8,
+          1.083,
+          -0.54
+        ],
+        "rotation": -12,
+        "scale": 0.8,
+        "parent_id": "cozy2_little-things_cubby"
+      },
+      {
+        "id": "cozy2_little-things_turntable",
+        "item": "turntable",
+        "surface": "table",
+        "position": [
+          3.094,
+          0.668,
+          -0.523
+        ],
+        "rotation": 0,
+        "scale": 0.8,
+        "parent_id": "cozy2_little-things_cubby"
+      },
+      {
+        "id": "cozy2_little-things_fern",
+        "item": "fern",
+        "surface": "floor",
+        "position": [
+          1.9,
+          0.142,
+          0.5
+        ],
+        "rotation": 0,
+        "scale": 0.8
+      },
+      {
+        "id": "cozy2_little-things_duck",
+        "item": "duck",
+        "surface": "floor",
+        "position": [
+          3.45,
+          0.142,
+          0.6
+        ],
+        "rotation": 0,
+        "scale": 0.8
+      },
+      {
+        "id": "cozy2_little-things_duckling",
+        "item": "duckling",
+        "surface": "floor",
+        "position": [
+          3.85,
+          0.142,
+          0.4
+        ],
+        "rotation": 0,
+        "scale": 0.7
+      }
+    ]
+  },
+  {
+    "id": "memories",
+    "memories": [],
+    "furnishingVersion": 2,
+    "decorations": [
+      {
+        "id": "cozy2_memories_sofa",
+        "item": "sofa",
+        "surface": "floor",
+        "position": [
+          -2.05,
+          2.392,
+          -0.58
+        ],
+        "rotation": 0,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_memories_teddy",
+        "item": "teddy",
+        "surface": "floor",
+        "position": [
+          -0.8,
+          2.392,
+          -0.38
+        ],
+        "rotation": 0,
+        "scale": 1.15
+      },
+      {
+        "id": "cozy2_memories_daisy-rug",
+        "item": "daisy-rug",
+        "surface": "floor",
+        "position": [
+          -0.857,
+          2.392,
+          0.547
+        ],
+        "rotation": 0,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_memories_coffee-table",
+        "item": "coffee-table",
+        "surface": "floor",
+        "position": [
+          -0.857,
+          2.431,
+          0.547
+        ],
+        "rotation": 10,
+        "scale": 1,
+        "parent_id": "cozy2_memories_daisy-rug"
+      },
+      {
+        "id": "cozy2_memories_album",
+        "item": "album",
+        "surface": "table",
+        "position": [
+          -0.957,
+          2.805,
+          0.547
+        ],
+        "rotation": -9,
+        "scale": 0.7,
+        "parent_id": "cozy2_memories_coffee-table"
+      },
+      {
+        "id": "cozy2_memories_shelf",
+        "item": "shelf",
+        "surface": "wall",
+        "position": [
+          -3.108,
+          3.132,
+          -1.022
+        ],
+        "rotation": 0,
+        "scale": 0.65
+      },
+      {
+        "id": "cozy2_memories_lamp",
+        "item": "lamp",
+        "surface": "shelf",
+        "position": [
+          -3.108,
+          3.279,
+          -1.022
+        ],
+        "rotation": 0,
+        "scale": 0.4,
+        "parent_id": "cozy2_memories_shelf"
+      },
+      {
+        "id": "cozy2_memories_frame",
+        "item": "frame",
+        "surface": "wall",
+        "position": [
+          -0.75,
+          3.528,
+          -1.058
+        ],
+        "rotation": 0,
+        "scale": 0.65
+      }
+    ],
+    "furnishingBaseline": [
+      {
+        "id": "cozy2_memories_sofa",
+        "item": "sofa",
+        "surface": "floor",
+        "position": [
+          -2.05,
+          2.392,
+          -0.58
+        ],
+        "rotation": 0,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_memories_teddy",
+        "item": "teddy",
+        "surface": "floor",
+        "position": [
+          -0.8,
+          2.392,
+          -0.38
+        ],
+        "rotation": 0,
+        "scale": 1.15
+      },
+      {
+        "id": "cozy2_memories_daisy-rug",
+        "item": "daisy-rug",
+        "surface": "floor",
+        "position": [
+          -0.857,
+          2.392,
+          0.547
+        ],
+        "rotation": 0,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_memories_coffee-table",
+        "item": "coffee-table",
+        "surface": "floor",
+        "position": [
+          -0.857,
+          2.431,
+          0.547
+        ],
+        "rotation": 10,
+        "scale": 1,
+        "parent_id": "cozy2_memories_daisy-rug"
+      },
+      {
+        "id": "cozy2_memories_album",
+        "item": "album",
+        "surface": "table",
+        "position": [
+          -0.957,
+          2.805,
+          0.547
+        ],
+        "rotation": -9,
+        "scale": 0.7,
+        "parent_id": "cozy2_memories_coffee-table"
+      },
+      {
+        "id": "cozy2_memories_shelf",
+        "item": "shelf",
+        "surface": "wall",
+        "position": [
+          -3.108,
+          3.132,
+          -1.022
+        ],
+        "rotation": 0,
+        "scale": 0.65
+      },
+      {
+        "id": "cozy2_memories_lamp",
+        "item": "lamp",
+        "surface": "shelf",
+        "position": [
+          -3.108,
+          3.279,
+          -1.022
+        ],
+        "rotation": 0,
+        "scale": 0.4,
+        "parent_id": "cozy2_memories_shelf"
+      },
+      {
+        "id": "cozy2_memories_frame",
+        "item": "frame",
+        "surface": "wall",
+        "position": [
+          -0.75,
+          3.528,
+          -1.058
+        ],
+        "rotation": 0,
+        "scale": 0.65
+      }
+    ]
+  },
+  {
+    "id": "next-chapter",
+    "memories": [],
+    "furnishingVersion": 2,
+    "decorations": [
+      {
+        "id": "cozy2_next-chapter_desk",
+        "item": "desk",
+        "surface": "floor",
+        "position": [
+          1.6,
+          2.392,
+          -0.6
+        ],
+        "rotation": 0,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_next-chapter_rabbit",
+        "item": "rabbit",
+        "surface": "floor",
+        "position": [
+          2.9,
+          2.392,
+          0.45
+        ],
+        "rotation": 0,
+        "scale": 1.2
+      },
+      {
+        "id": "cozy2_next-chapter_chair",
+        "item": "chair",
+        "surface": "floor",
+        "position": [
+          1.5,
+          2.392,
+          0.35
+        ],
+        "rotation": 14,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_next-chapter_cloud-lamp",
+        "item": "cloud-lamp",
+        "surface": "table",
+        "position": [
+          1.318,
+          3.025,
+          -0.724
+        ],
+        "rotation": 0,
+        "scale": 0.85,
+        "parent_id": "cozy2_next-chapter_desk"
+      },
+      {
+        "id": "cozy2_next-chapter_honey-candle",
+        "item": "honey-candle",
+        "surface": "table",
+        "position": [
+          1.67,
+          3.025,
+          -0.53
+        ],
+        "rotation": 0,
+        "scale": 0.65,
+        "parent_id": "cozy2_next-chapter_desk"
+      },
+      {
+        "id": "cozy2_next-chapter_calendar",
+        "item": "calendar",
+        "surface": "table",
+        "position": [
+          2.15,
+          3.025,
+          -0.6
+        ],
+        "rotation": 0,
+        "scale": 0.8,
+        "parent_id": "cozy2_next-chapter_desk"
+      },
+      {
+        "id": "cozy2_next-chapter_bunting",
+        "item": "bunting",
+        "surface": "wall",
+        "position": [
+          2.65,
+          3.588,
+          -1.052
+        ],
+        "rotation": 0,
+        "scale": 0.7
+      },
+      {
+        "id": "cozy2_next-chapter_vine",
+        "item": "vine",
+        "surface": "floor",
+        "position": [
+          0.6,
+          2.392,
+          0.5
+        ],
+        "rotation": 0,
+        "scale": 0.85
+      }
+    ],
+    "furnishingBaseline": [
+      {
+        "id": "cozy2_next-chapter_desk",
+        "item": "desk",
+        "surface": "floor",
+        "position": [
+          1.6,
+          2.392,
+          -0.6
+        ],
+        "rotation": 0,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_next-chapter_rabbit",
+        "item": "rabbit",
+        "surface": "floor",
+        "position": [
+          2.9,
+          2.392,
+          0.45
+        ],
+        "rotation": 0,
+        "scale": 1.2
+      },
+      {
+        "id": "cozy2_next-chapter_chair",
+        "item": "chair",
+        "surface": "floor",
+        "position": [
+          1.5,
+          2.392,
+          0.35
+        ],
+        "rotation": 14,
+        "scale": 1
+      },
+      {
+        "id": "cozy2_next-chapter_cloud-lamp",
+        "item": "cloud-lamp",
+        "surface": "table",
+        "position": [
+          1.318,
+          3.025,
+          -0.724
+        ],
+        "rotation": 0,
+        "scale": 0.85,
+        "parent_id": "cozy2_next-chapter_desk"
+      },
+      {
+        "id": "cozy2_next-chapter_honey-candle",
+        "item": "honey-candle",
+        "surface": "table",
+        "position": [
+          1.67,
+          3.025,
+          -0.53
+        ],
+        "rotation": 0,
+        "scale": 0.65,
+        "parent_id": "cozy2_next-chapter_desk"
+      },
+      {
+        "id": "cozy2_next-chapter_calendar",
+        "item": "calendar",
+        "surface": "table",
+        "position": [
+          2.15,
+          3.025,
+          -0.6
+        ],
+        "rotation": 0,
+        "scale": 0.8,
+        "parent_id": "cozy2_next-chapter_desk"
+      },
+      {
+        "id": "cozy2_next-chapter_bunting",
+        "item": "bunting",
+        "surface": "wall",
+        "position": [
+          2.65,
+          3.588,
+          -1.052
+        ],
+        "rotation": 0,
+        "scale": 0.7
+      },
+      {
+        "id": "cozy2_next-chapter_vine",
+        "item": "vine",
+        "surface": "floor",
+        "position": [
+          0.6,
+          2.392,
+          0.5
+        ],
+        "rotation": 0,
+        "scale": 0.85
+      }
+    ]
+  }
+]

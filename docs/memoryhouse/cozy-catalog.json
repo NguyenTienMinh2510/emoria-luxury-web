@@ -1,7 +1,7 @@
 {
-  "version": 2,
+  "version": 3,
   "method": "Low-poly procedural reconstruction from reference silhouettes; unseen surfaces inferred",
-  "curation": "Subjective editorial choice for a smaller varied catalog; no user popularity data",
+  "curation": "All 46 Cozy object references retained; browsing stays classified and paginated. Source photos and personal memories are preserved.",
   "house": {
     "references": [
       "H01",
@@ -24,11 +24,15 @@
     {
       "id": "calendar",
       "name": "Ngày của đôi mình",
-      "image": "/memoryhouse/models/thumbnails/calendar.jpg",
+      "image": "/memoryhouse/models/thumbnails/calendar.jpg?v=cozy46-20261003",
       "photoCount": 1,
       "textLabel": "Ngày / lời nhắn trên lịch",
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "wall"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf",
@@ -48,11 +52,15 @@
     {
       "id": "cat",
       "name": "Mèo ngủ ngoan",
-      "image": "/memoryhouse/models/thumbnails/cat.jpg",
+      "image": "/memoryhouse/models/thumbnails/cat.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
+        "floor",
+        "table"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -71,11 +79,16 @@
     {
       "id": "nameplate",
       "name": "Biển tên nhỏ",
-      "image": "/memoryhouse/models/thumbnails/nameplate.jpg",
+      "image": "/memoryhouse/models/thumbnails/nameplate.jpg?v=cozy46-20261003",
       "photoCount": 1,
       "textLabel": "Chữ trên biển tên",
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf",
+        "floor"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -94,11 +107,16 @@
     {
       "id": "plant",
       "name": "Cây tình yêu",
-      "image": "/memoryhouse/models/thumbnails/plant.jpg",
+      "image": "/memoryhouse/models/thumbnails/plant.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -117,11 +135,15 @@
     {
       "id": "mugs",
       "name": "Cốc toast",
-      "image": "/memoryhouse/models/thumbnails/mugs.jpg",
+      "image": "/memoryhouse/models/thumbnails/mugs.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -140,11 +162,16 @@
     {
       "id": "lamp",
       "name": "Đèn ấm áp",
-      "image": "/memoryhouse/models/thumbnails/lamp.jpg",
+      "image": "/memoryhouse/models/thumbnails/lamp.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf",
+        "floor"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -163,11 +190,15 @@
     {
       "id": "vase",
       "name": "Bình hoa giấy",
-      "image": "/memoryhouse/models/thumbnails/vase.jpg",
+      "image": "/memoryhouse/models/thumbnails/vase.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -186,11 +217,15 @@
     {
       "id": "album",
       "name": "Album kỷ niệm",
-      "image": "/memoryhouse/models/thumbnails/album.jpg",
+      "image": "/memoryhouse/models/thumbnails/album.jpg?v=cozy46-20261003",
       "photoCount": 2,
       "textLabel": "Lời nhắn trên album",
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -209,11 +244,15 @@
     {
       "id": "bunting",
       "name": "Dây ảnh",
-      "image": "/memoryhouse/models/thumbnails/bunting.jpg",
+      "image": "/memoryhouse/models/thumbnails/bunting.jpg?v=cozy46-20261003",
       "photoCount": 3,
       "textLabel": "Lời nhắn trên dây ảnh",
       "defaultSurface": "wall",
       "supportedSurfaces": [
+        "wall",
+        "ceiling"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf",
@@ -234,11 +273,15 @@
     {
       "id": "frame",
       "name": "Khung ảnh",
-      "image": "/memoryhouse/models/thumbnails/frame.jpg",
+      "image": "/memoryhouse/models/thumbnails/frame.jpg?v=cozy46-20261003",
       "photoCount": 1,
       "textLabel": "Lời nhắn trên khung ảnh",
       "defaultSurface": "wall",
       "supportedSurfaces": [
+        "wall",
+        "table"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf",
@@ -258,11 +301,16 @@
     {
       "id": "birdcage",
       "name": "Chim nhỏ",
-      "image": "/memoryhouse/models/thumbnails/birdcage.jpg",
+      "image": "/memoryhouse/models/thumbnails/birdcage.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "floor",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -281,34 +329,43 @@
     {
       "id": "candles",
       "name": "Nến hẹn hò",
-      "image": "/memoryhouse/models/thumbnails/candles.jpg",
+      "image": "/memoryhouse/models/thumbnails/candles.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
       ],
       "category": "home",
       "featured": false,
-      "referenceId": null,
+      "referenceId": "D13",
       "supportsItems": false,
       "dimensions": {
         "width": 0.35,
         "depth": 0.25,
         "height": 0.3
       },
-      "sourceReference": "docs/memoryhouse/original-reference-images/Create_ONE_isolated_miniature__24.jpg"
+      "sourceReference": "emoria-cozy-reference/03-assets/D13-strawberry-cake-candle-01-front.jpg"
     },
     {
       "id": "rabbit",
       "name": "Thỏ tai cụp",
-      "image": "/memoryhouse/models/thumbnails/rabbit.jpg",
+      "image": "/memoryhouse/models/thumbnails/rabbit.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -327,11 +384,16 @@
     {
       "id": "teddy",
       "name": "Gấu áo len",
-      "image": "/memoryhouse/models/thumbnails/teddy.jpg",
+      "image": "/memoryhouse/models/thumbnails/teddy.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -350,11 +412,16 @@
     {
       "id": "cloud-lamp",
       "name": "Đèn mây",
-      "image": "/memoryhouse/models/thumbnails/cloud-lamp.jpg",
+      "image": "/memoryhouse/models/thumbnails/cloud-lamp.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf",
+        "floor"
+      ],
+      "legacySupportedSurfaces": [
         "table",
         "shelf",
         "floor"
@@ -373,11 +440,15 @@
     {
       "id": "honey-candle",
       "name": "Nến trong hũ",
-      "image": "/memoryhouse/models/thumbnails/honey-candle.jpg",
+      "image": "/memoryhouse/models/thumbnails/honey-candle.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "table",
         "shelf"
       ],
@@ -395,11 +466,15 @@
     {
       "id": "turntable",
       "name": "Máy đĩa nhạc",
-      "image": "/memoryhouse/models/thumbnails/turntable.jpg",
+      "image": "/memoryhouse/models/thumbnails/turntable.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "table",
         "shelf"
       ],
@@ -417,11 +492,15 @@
     {
       "id": "camera",
       "name": "Máy ảnh lấy liền",
-      "image": "/memoryhouse/models/thumbnails/camera.jpg",
+      "image": "/memoryhouse/models/thumbnails/camera.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "table",
         "shelf"
       ],
@@ -439,17 +518,20 @@
     {
       "id": "daisy-rug",
       "name": "Thảm hoa cúc",
-      "image": "/memoryhouse/models/thumbnails/daisy-rug.jpg",
+      "image": "/memoryhouse/models/thumbnails/daisy-rug.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
         "floor"
       ],
+      "legacySupportedSurfaces": [
+        "floor"
+      ],
       "category": "furniture",
       "featured": false,
       "referenceId": "D35",
-      "supportsItems": false,
+      "supportsItems": true,
       "dimensions": {
         "width": 1.3,
         "depth": 1.3,
@@ -460,11 +542,16 @@
     {
       "id": "fern",
       "name": "Chậu dương xỉ",
-      "image": "/memoryhouse/models/thumbnails/fern.jpg",
+      "image": "/memoryhouse/models/thumbnails/fern.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
         "floor",
         "table",
         "shelf"
@@ -483,11 +570,16 @@
     {
       "id": "vine",
       "name": "Chậu cây rủ",
-      "image": "/memoryhouse/models/thumbnails/vine.jpg",
+      "image": "/memoryhouse/models/thumbnails/vine.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "table",
       "supportedSurfaces": [
+        "table",
+        "shelf",
+        "floor"
+      ],
+      "legacySupportedSurfaces": [
         "table",
         "shelf",
         "floor"
@@ -506,17 +598,20 @@
     {
       "id": "cushion",
       "name": "Đệm ngồi tròn",
-      "image": "/memoryhouse/models/thumbnails/cushion.jpg",
+      "image": "/memoryhouse/models/thumbnails/cushion.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
         "floor"
       ],
+      "legacySupportedSurfaces": [
+        "floor"
+      ],
       "category": "furniture",
       "featured": false,
       "referenceId": "D39",
-      "supportsItems": false,
+      "supportsItems": true,
       "dimensions": {
         "width": 0.65,
         "depth": 0.65,
@@ -527,11 +622,14 @@
     {
       "id": "shelf",
       "name": "Kệ tường gợn sóng",
-      "image": "/memoryhouse/models/thumbnails/shelf.jpg",
+      "image": "/memoryhouse/models/thumbnails/shelf.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "wall",
       "supportedSurfaces": [
+        "wall"
+      ],
+      "legacySupportedSurfaces": [
         "wall"
       ],
       "category": "furniture",
@@ -548,17 +646,20 @@
     {
       "id": "sofa",
       "name": "Sofa bo tròn",
-      "image": "/memoryhouse/models/thumbnails/sofa.jpg",
+      "image": "/memoryhouse/models/thumbnails/sofa.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
         "floor"
       ],
+      "legacySupportedSurfaces": [
+        "floor"
+      ],
       "category": "furniture",
       "featured": true,
       "referenceId": "D41",
-      "supportsItems": false,
+      "supportsItems": true,
       "dimensions": {
         "width": 1.65,
         "depth": 0.72,
@@ -569,11 +670,14 @@
     {
       "id": "coffee-table",
       "name": "Bàn trà hạt đậu",
-      "image": "/memoryhouse/models/thumbnails/coffee-table.jpg",
+      "image": "/memoryhouse/models/thumbnails/coffee-table.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
+        "floor"
+      ],
+      "legacySupportedSurfaces": [
         "floor"
       ],
       "category": "furniture",
@@ -590,11 +694,14 @@
     {
       "id": "bistro-table",
       "name": "Bàn tròn",
-      "image": "/memoryhouse/models/thumbnails/bistro-table.jpg",
+      "image": "/memoryhouse/models/thumbnails/bistro-table.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
+        "floor"
+      ],
+      "legacySupportedSurfaces": [
         "floor"
       ],
       "category": "furniture",
@@ -611,17 +718,20 @@
     {
       "id": "chair",
       "name": "Ghế tựa cong",
-      "image": "/memoryhouse/models/thumbnails/chair.jpg",
+      "image": "/memoryhouse/models/thumbnails/chair.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
         "floor"
       ],
+      "legacySupportedSurfaces": [
+        "floor"
+      ],
       "category": "furniture",
       "featured": true,
       "referenceId": "D44",
-      "supportsItems": false,
+      "supportsItems": true,
       "dimensions": {
         "width": 0.48,
         "depth": 0.5,
@@ -632,11 +742,14 @@
     {
       "id": "cubby",
       "name": "Kệ ô vuông",
-      "image": "/memoryhouse/models/thumbnails/cubby.jpg",
+      "image": "/memoryhouse/models/thumbnails/cubby.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
+        "floor"
+      ],
+      "legacySupportedSurfaces": [
         "floor"
       ],
       "category": "furniture",
@@ -653,11 +766,14 @@
     {
       "id": "desk",
       "name": "Bàn viết",
-      "image": "/memoryhouse/models/thumbnails/desk.jpg",
+      "image": "/memoryhouse/models/thumbnails/desk.jpg?v=cozy46-20261003",
       "photoCount": 0,
       "textLabel": null,
       "defaultSurface": "floor",
       "supportedSurfaces": [
+        "floor"
+      ],
+      "legacySupportedSurfaces": [
         "floor"
       ],
       "category": "furniture",
@@ -670,100 +786,471 @@
         "height": 0.63
       },
       "sourceReference": "emoria-cozy-reference/03-assets/D46-curved-writing-desk-01-front.jpg"
-    }
-  ],
-  "excluded": [
+    },
     {
+      "id": "mugs-jam",
+      "name": "Cốc toast mứt dâu",
+      "image": "/memoryhouse/models/thumbnails/mugs-jam.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "category": "home",
+      "featured": false,
       "referenceId": "D06",
-      "reason": "Biến thể mứt của cùng cốc toast D05",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.5,
+        "depth": 0.42,
+        "height": 0.3
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D06-toast-mug-jam-01-front.jpg"
     },
     {
-      "referenceId": "D13",
-      "reason": "Nến bánh trang trí; giữ nến hũ trung tính D25",
-      "sourceRetained": true
-    },
-    {
+      "id": "capybara",
+      "name": "Capybara đội cam",
+      "image": "/memoryhouse/models/thumbnails/capybara.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "pets",
+      "featured": false,
       "referenceId": "D14",
-      "reason": "Mascot theo sở thích riêng; giữ mèo, thỏ và gấu",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.55,
+        "depth": 0.38,
+        "height": 0.42
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D14-orange-capybara-01-front.jpg"
     },
     {
+      "id": "corgi",
+      "name": "Đệm corgi",
+      "image": "/memoryhouse/models/thumbnails/corgi.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table"
+      ],
+      "legacySupportedSurfaces": [
+        "floor",
+        "table"
+      ],
+      "category": "pets",
+      "featured": false,
       "referenceId": "D17",
-      "reason": "Đệm corgi trùng chức năng đệm tròn D39",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.65,
+        "depth": 0.48,
+        "height": 0.28
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D17-corgi-cushion-01-front.jpg"
     },
     {
+      "id": "shiba",
+      "name": "Shiba ôm thư",
+      "image": "/memoryhouse/models/thumbnails/shiba.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "pets",
+      "featured": false,
       "referenceId": "D18",
-      "reason": "Mascot theo sở thích riêng; giữ mèo, thỏ và gấu",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.38,
+        "depth": 0.4,
+        "height": 0.58
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D18-letter-shiba-01-front.jpg"
     },
     {
+      "id": "duck",
+      "name": "Vịt mẹ",
+      "image": "/memoryhouse/models/thumbnails/duck.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "pets",
+      "featured": false,
       "referenceId": "D19",
-      "reason": "Nhóm vịt trùng vai trò mascot",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.38,
+        "depth": 0.38,
+        "height": 0.52
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D19-mother-duck-01-front.jpg"
     },
     {
+      "id": "duckling",
+      "name": "Vịt con",
+      "image": "/memoryhouse/models/thumbnails/duckling.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "pets",
+      "featured": false,
       "referenceId": "D20",
-      "reason": "Biến thể kích thước của nhóm vịt D19",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.28,
+        "depth": 0.3,
+        "height": 0.38
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D20-duckling-01-front.jpg"
     },
     {
+      "id": "penguin",
+      "name": "Chim cánh cụt bông",
+      "image": "/memoryhouse/models/thumbnails/penguin.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "floor",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "pets",
+      "featured": false,
       "referenceId": "D21",
-      "reason": "Mascot bổ sung ngoài bộ nhỏ",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.42,
+        "depth": 0.32,
+        "height": 0.55
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D21-plush-penguin-01-front.jpg"
     },
     {
+      "id": "pear-lamp",
+      "name": "Đèn quả lê",
+      "image": "/memoryhouse/models/thumbnails/pear-lamp.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "home",
+      "featured": false,
       "referenceId": "D22",
-      "reason": "Đèn hình trái cây trùng chức năng D07/D24",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.33,
+        "depth": 0.32,
+        "height": 0.5
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D22-pear-lamp-01-front.jpg"
     },
     {
+      "id": "orange-lamp",
+      "name": "Đèn quả cam",
+      "image": "/memoryhouse/models/thumbnails/orange-lamp.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "home",
+      "featured": false,
       "referenceId": "D23",
-      "reason": "Đèn hình trái cây trùng chức năng D07/D24",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.38,
+        "depth": 0.36,
+        "height": 0.42
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D23-orange-lamp-01-front.jpg"
     },
     {
+      "id": "star-frame",
+      "name": "Khung ảnh kẹp sao",
+      "image": "/memoryhouse/models/thumbnails/star-frame.jpg?v=cozy46-20261003",
+      "photoCount": 1,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf",
+        "wall"
+      ],
+      "legacySupportedSurfaces": [
+        "table",
+        "shelf",
+        "wall"
+      ],
+      "category": "memories",
+      "featured": false,
       "referenceId": "D26",
-      "reason": "Khung ảnh thứ hai trùng chức năng D11",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.52,
+        "depth": 0.24,
+        "height": 0.46
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D26-star-clip-wood-frame-01-front.jpg"
     },
     {
+      "id": "avocado-mug",
+      "name": "Cốc bơ hạt nổi",
+      "image": "/memoryhouse/models/thumbnails/avocado-mug.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "category": "home",
+      "featured": false,
       "referenceId": "D27",
-      "reason": "Cốc avocado trùng chức năng cốc D05",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.48,
+        "depth": 0.34,
+        "height": 0.34
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D27-avocado-mug-raised-pit-01-front.jpg"
     },
     {
+      "id": "avocado-mug-cutout",
+      "name": "Cốc bơ hạt lõm",
+      "image": "/memoryhouse/models/thumbnails/avocado-mug-cutout.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "category": "home",
+      "featured": false,
       "referenceId": "D28",
-      "reason": "Biến thể lõm của cốc avocado D27",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.48,
+        "depth": 0.34,
+        "height": 0.34
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D28-avocado-mug-recessed-pit-01-front.jpg"
     },
     {
+      "id": "succulent",
+      "name": "Sen đá trong tách",
+      "image": "/memoryhouse/models/thumbnails/succulent.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "plants",
+      "featured": false,
       "referenceId": "D29",
-      "reason": "Chậu cây trong cốc trùng chức năng D04/D37/D38",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.4,
+        "depth": 0.34,
+        "height": 0.38
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D29-teacup-succulent-01-front.jpg"
     },
     {
+      "id": "snow-globe",
+      "name": "Quả cầu tuyết",
+      "image": "/memoryhouse/models/thumbnails/snow-globe.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "category": "memories",
+      "featured": false,
       "referenceId": "D32",
-      "reason": "Quả cầu tuyết mang phong cách riêng và vật liệu trong suốt",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.45,
+        "depth": 0.45,
+        "height": 0.55
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D32-memory-snow-globe-01-front.jpg"
     },
     {
+      "id": "star-jar",
+      "name": "Hũ sao giấy",
+      "image": "/memoryhouse/models/thumbnails/star-jar.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "category": "memories",
+      "featured": false,
       "referenceId": "D33",
-      "reason": "Hũ sao giấy mang phong cách riêng",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.34,
+        "depth": 0.34,
+        "height": 0.32
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D33-paper-star-jar-01-front.jpg"
     },
     {
+      "id": "crane-jar",
+      "name": "Hũ hạc giấy",
+      "image": "/memoryhouse/models/thumbnails/crane-jar.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "table",
+        "shelf"
+      ],
+      "category": "memories",
+      "featured": false,
       "referenceId": "D34",
-      "reason": "Biến thể hũ giấy D33",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.36,
+        "depth": 0.36,
+        "height": 0.38
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D34-paper-crane-jar-01-front.jpg"
     },
     {
+      "id": "pinecone",
+      "name": "Quả thông",
+      "image": "/memoryhouse/models/thumbnails/pinecone.jpg?v=cozy46-20261003",
+      "photoCount": 0,
+      "textLabel": null,
+      "defaultSurface": "table",
+      "supportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "legacySupportedSurfaces": [
+        "floor",
+        "table",
+        "shelf"
+      ],
+      "category": "plants",
+      "featured": false,
       "referenceId": "D36",
-      "reason": "Quả thông mang tính mùa vụ",
-      "sourceRetained": true
+      "supportsItems": false,
+      "dimensions": {
+        "width": 0.42,
+        "depth": 0.27,
+        "height": 0.28
+      },
+      "sourceReference": "emoria-cozy-reference/03-assets/D36-pinecone-01-front.jpg"
     }
   ],
+  "excluded": [],
   "sourcesRetained": true,
   "sourceFiles": [
     {

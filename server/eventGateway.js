@@ -19,7 +19,7 @@ export async function eventRpc(c,name,args={}){
   if(limit.error||!limit.data)throw Object.assign(new Error('Chưa kiểm tra được giới hạn truy cập. Hãy thử lại.'),{status:503});
   if(!limit.data.allowed)throw Object.assign(new Error('Bạn thao tác hơi nhanh. Hãy thử lại sau một chút.'),{status:429,code:'RATE_LIMIT_EXCEEDED',retryAfter:limit.data.retry_after});
   const body={...args};
-  if(['rpc_house_save_draft','rpc_match_save_questions','rpc_match_save_progress'].includes(name)){
+  if(['rpc_house_save_draft','rpc_house_restore_layout','rpc_match_save_questions','rpc_match_save_progress'].includes(name)){
     if(c.body.expected_revision!==undefined&&c.body.expected_revision!==null){
       const revision=c.body.expected_revision;
       if(!Number.isSafeInteger(revision)||revision<0)throw Object.assign(new Error('Phiên bản bản nháp phải là số nguyên không âm.'),{status:422});

@@ -206,6 +206,8 @@ export async function publishHouse(tagUid) {
   });
 }
 
+export const restoreHouseLayout=(tagUid,expected_revision)=>apiRequest(`/memories/${encodeURIComponent(tagUid)}/house/restore-layout`,{method:'POST',body:{expected_revision}});
+
 /**
  * Hủy xuất bản Memory House (chuyển sang chế độ riêng tư)
  */

@@ -332,6 +332,7 @@ export const routes=[
   route('POST','/memories/([^/]+)/house/unpublish','user',c=>{
     return rpc(c,'rpc_house_unpublish',{p_tag_uid:c.params[0]});
   }),
+  route('POST','/memories/([^/]+)/house/restore-layout','user',c=>rpc(c,'rpc_house_restore_layout',{p_tag_uid:c.params[0]})),
   route('POST','/memories/([^/]+)/house/revoke','user',c=>{
     return rpc(c,'rpc_house_revoke_share',{p_tag_uid:c.params[0]});
   }),

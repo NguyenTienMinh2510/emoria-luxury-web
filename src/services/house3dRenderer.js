@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {DECORATIONS, roomDecorations, getDefaultPosition, houseLighting, gyroTilt, withEditableHouseFurniture} from './house3d.js';
+import {DECORATIONS, roomDecorations, getDefaultPosition, houseLighting, gyroTilt, houseAssetUrl} from './house3d.js';
 import {createPlacementSolver, placementTriangles, transformDecoration} from './housePlacement.js';
 
 export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfaceTap, onPlacementPreview, getPlacement, getDragPlacement, isEditing, onGyroChange, onError, onReady}) {
@@ -255,7 +255,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   const observer=new ResizeObserver(()=>{const w=host.clientWidth,h=host.clientHeight;if(w&&h){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();if(focusedRoom)focusRoom(focusedRoom,false);else overview(false);render();}});observer.observe(host);
   function disposeTree(root){if(!root)return;root.traverse(o=>{if(o.isMesh){o.geometry.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material]))m.dispose();}});}
   const loader=new GLTFLoader();
-  Promise.allSettled([loader.loadAsync('/memoryhouse/models/memory-house.glb'),loader.loadAsync('/memoryhouse/models/decorations.glb')]).then(results=>{
+  Promise.allSettled([loader.loadAsync(houseAssetUrl('memory-house.glb')),loader.loadAsync(houseAssetUrl('decorations.glb'))]).then(results=>{
     if(results.some(r=>r.status==='rejected')){
       for(const r of results)if(r.status==='fulfilled')disposeTree(r.value.scene);
       throw new Error('Model unavailable');
@@ -281,7 +281,7 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   }).catch(()=>{if(!dead)onError?.('Chưa tải được mô hình. Bạn vẫn có thể dùng khung 2D.');});
 
   function update(next){
-    next={...next, rooms:withEditableHouseFurniture(next.rooms || [])};
+    next={...next, rooms:next.rooms || []};
     state=next;if(!house||dead)return;
     const rooms=next.rooms||[];
     const colors={classic:'#c2a77e',warm_gold:'#c9a375',rose_romance:'#d6a0a6',midnight:'#8995bc',minimal_dark:'#8e8b88',editorial_cream:'#d4c4a5'};
@@ -537,15 +537,15 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
   const supportTriangles = new WeakMap();
   let houseTriangles;
   let solverKey = '', solver;
-  const supportType = item => DECORATIONS.find(d => d.id === item)?.supportsItems ? (item === 'shelf' ? 'shelf' : 'table') : null;
+  const supportType = item => DECORATIONS.find(d => d.id === item)?.supportsItems ? (item === 'shelf' ? 'shelf' : item === 'daisy-rug' ? 'floor' : 'table') : null;
   function placementSupports(roomId, excludeId = null, excludeIds = []) {
     return decorGroup.children.filter(o => o.userData.roomId === roomId && o.userData.instanceId !== excludeId && !excludeIds.includes(o.userData.instanceId) && supportType(o.userData.decorItem));
   }
-  function getSolver(roomId, item, scale = 1, rotation = 0, excludeId = null, extra = [], excludeIds = []) {
+  function getSolver(roomId, item, scale = 1, rotation = 0, excludeId = null, extra = [], excludeIds = [], supportId = null, furnishingVersion = state.rooms?.find(r=>r.id===roomId)?.furnishingVersion || 1) {
     const template = library?.getObjectByName('decor_' + item);
     const root = roomObjects.get(roomId);
     if (!template || !root) return null;
-    const key = JSON.stringify([decorKey, roomId, item, scale, rotation, excludeId, extra, excludeIds]);
+    const key = JSON.stringify([decorKey, roomId, item, scale, rotation, excludeId, extra, excludeIds, supportId, furnishingVersion]);
     if (key === solverKey) return solver;
     if (!roomTriangles.has(roomId)) roomTriangles.set(roomId, placementTriangles(root));
     houseTriangles ||= placementTriangles(house);
@@ -571,13 +571,13 @@ export function createHouseRenderer(host, {onRoom, onPhoto, onDecorItem, onSurfa
       transformDecoration(copy, d.position, d.rotation, d.scale);
       include(copy, d.item, d.id || d.slot || null);
     }
-    solver = createPlacementSolver({ template, roomId, triangles, collisionTriangles, obstacles, scale, rotation });
+    solver = createPlacementSolver({ template, roomId, triangles:supportId ? triangles.filter(e=>e.parentId===supportId) : triangles, collisionTriangles, obstacles, scale, rotation, furnishingVersion });
     solverKey = key;
     return solver;
   }
   function findPlacement(roomId, item, options = {}) {
     for (const scale of options.scale === undefined ? [1, .8, .6] : [options.scale]) {
-      const hit = getSolver(roomId, item, scale, options.rotation, options.excludeId, options.extra, options.excludeIds)?.find(options.position ? new THREE.Vector3(...options.position) : undefined);
+      const hit = getSolver(roomId, item, scale, options.rotation, options.excludeId, options.extra, options.excludeIds, options.supportId, options.furnishingVersion)?.find(options.position ? new THREE.Vector3(...options.position) : undefined);
       if (hit) return hit;
     }
     return null;

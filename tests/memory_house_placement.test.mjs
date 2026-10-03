@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createPlacementSolver, placementTriangles, transformDecoration } from '../src/services/housePlacement.js';
-import { DECORATIONS, HOUSE_ROOM_IDS, addDecorationInstance, updateDecorationInstance, withEditableHouseFurniture } from '../src/services/house3d.js';
+import { DECORATIONS, HOUSE_ROOM_IDS, addDecorationInstance, updateDecorationInstance, withEditableHouseFurniture, createCozyHouseRooms, ASSET_DIMENSIONS } from '../src/services/house3d.js';
 
 const loader = new GLTFLoader();
 async function load(name) {
@@ -12,6 +12,26 @@ async function load(name) {
 }
 const [house, library] = await Promise.all([load('memory-house'), load('decorations')]);
 const houseTriangles = placementTriangles(house);
+for(const asset of DECORATIONS) {
+  const b=new THREE.Box3().setFromObject(library.getObjectByName('decor_'+asset.id),true),size=b.getSize(new THREE.Vector3()),dim=ASSET_DIMENSIONS[asset.id];
+  assert.ok(Math.abs(size.x-dim.width)<.0001 && Math.abs(size.y-dim.height)<.0001 && Math.abs(size.z-dim.depth)<.0001,`${asset.id}: exported dimensions match validation`);
+  assert.ok(Math.abs(b.min.y)<.0001,`${asset.id}: exact floor pivot`);
+}
+for(const room of createCozyHouseRooms(HOUSE_ROOM_IDS.map(id=>({id,memories:[]})))) for(const d of room.decorations) {
+  const m=library.getObjectByName('decor_'+d.item).clone(true);transformDecoration(m,d.position,d.rotation,d.scale);
+  const interior=new THREE.Box3().setFromObject(m,true).expandByScalar(-.002);
+  assert.ok(!houseTriangles.some(t=>interior.intersectsBox(t.box)&&interior.intersectsTriangle(t.triangle)),`${room.id}/${d.item}: H05 cannot penetrate the shell`);
+  if(d.parent_id) assert.ok(room.decorations.some(p=>p.id===d.parent_id),'Every H05 support instance exists');
+}
+// Adjacent GLB floorboards lie on the same plane despite export float error.
+const seams = new THREE.Group();
+for (const [x,y] of [[-3,.137499988],[-2.6,.137500001]]) {
+  const board=new THREE.Mesh(new THREE.PlaneGeometry(.4,2));
+  board.rotation.x=-Math.PI/2; board.position.set(x,y,0); seams.add(board);
+}
+const seamHit=createPlacementSolver({template:library.getObjectByName('decor_cushion'),roomId:'beginning',triangles:placementTriangles(seams)}).find(new THREE.Vector3(-2.8,.14,0));
+assert.ok(seamHit,'Export rounding cannot split a continuous floor into unusable strips');
+assert.ok(Math.abs(seamHit.position[0]+2.8)<.001,'The model remains over the intended floor seam');
 const start = performance.now();
 for (const roomId of HOUSE_ROOM_IDS) {
   const roomTriangles = placementTriangles(house.getObjectByName('room_' + roomId));
@@ -31,9 +51,9 @@ for (const roomId of HOUSE_ROOM_IDS) {
     const obstacles = tableOnly ? furnishingObstacles : [];
     const template = library.getObjectByName('decor_' + asset.id);
     let scale = 1;
-    let solver = createPlacementSolver({ template, roomId, triangles, collisionTriangles, obstacles, scale });
+    let solver = createPlacementSolver({ template, roomId, triangles, collisionTriangles, obstacles, scale, furnishingVersion:2 });
     let hit = solver.find();
-    if (!hit) { scale = .6; solver = createPlacementSolver({ template, roomId, triangles, collisionTriangles, obstacles, scale }); hit = solver.find(); }
+    if (!hit) { scale = .6; solver = createPlacementSolver({ template, roomId, triangles, collisionTriangles, obstacles, scale, furnishingVersion:2 }); hit = solver.find(); }
     assert(hit?.isValid, `${roomId}/${asset.id}: a real surface must fit the model`);
     assert(asset.supportedSurfaces.includes(hit.surface), `${roomId}/${asset.id}: placement must respect the catalog's allowed surfaces`);
     if (hit.surface === 'table' || hit.surface === 'shelf') assert.ok(hit.parentId, 'Editable supports must retain their instance ID');

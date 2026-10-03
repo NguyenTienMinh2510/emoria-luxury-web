@@ -11,8 +11,8 @@ for(const id of HOUSE_ROOM_IDS){
   for(const slot of ['left','table','right'])assert.equal(house.nodes.filter(n=>n.extras?.roomId===id&&n.extras?.slot===slot).length,1);
   for(let i=0;i<3;i++)assert.equal(house.nodes.filter(n=>n.extras?.roomId===id&&n.extras?.photoIndex===i).length,1);
 }
-for(const d of DECORATIONS){assert.ok(library.nodes.some(n=>n.name==='decor_'+d.id));assert.ok(fs.existsSync('public'+d.image));}
-assert.equal(library.nodes.filter(n=>Number.isInteger(n.extras?.decorPhotoIndex)).length,6);
+for(const d of DECORATIONS){assert.ok(library.nodes.some(n=>n.name==='decor_'+d.id));assert.ok(fs.existsSync('public'+d.image.split('?')[0]));}
+assert.equal(library.nodes.filter(n=>Number.isInteger(n.extras?.decorPhotoIndex)).length,7);
 assert.equal(library.nodes.filter(n=>n.extras?.decorText).length,2);
 for(const file of ['memory-house.glb','decorations.glb'])assert.ok(fs.statSync('public/memoryhouse/models/'+file).size<5_000_000);
 let room={id:'beginning',memories:[{id:'a',photo_path:'tag/photo.jpg',photo_url:'https://signed.example/photo'}]};
@@ -34,4 +34,4 @@ assert.deepEqual(serializeHouseRooms([frameRoom])[0].decorations[0].photos,['a']
 assert.deepEqual(roomDecorations({...frameRoom,memories:[]})[0].photos,[null],'Deleted photo must not leave a stale attachment');
 assert.deepEqual(setDecorationPhoto(frameRoom,'table','album',0,'a'),frameRoom,'Upload must not replace a different selected object');
 assert.equal(roomDecorations({...room,decorations:[{slot:'left',item:'nameplate',rotation:0,text:'Minh & An'}]})[0].text,'Minh & An');
-console.log('PASS House 3D: GLB contracts, 5 rooms, 15 frames/slots,29 assets, bounded decoration state, owner reload-save and public photo privacy.');
+console.log('PASS House 3D: GLB contracts, 5 rooms, 15 frames/slots,46 assets, bounded decoration state, owner reload-save and public photo privacy.');

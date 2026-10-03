@@ -1,5 +1,7 @@
 // Stable room/slot IDs are shared with the Blender export and stored inside rooms JSON.
 export const HOUSE_ROOM_IDS = ['beginning', 'first', 'little-things', 'memories', 'next-chapter'];
+export const HOUSE_ASSET_VERSION = 'cozy46-20261003';
+export const houseAssetUrl = file => `/memoryhouse/models/${file}?v=${HOUSE_ASSET_VERSION}`;
 
 // Stable IDs keep existing saved houses compatible; the curated cozy catalog
 // uses real model thumbnails, never the source image as a promise of detail.
@@ -33,18 +35,36 @@ export const DECORATIONS = [
   ['chair', 'Ghế tựa cong', 'D44', 'floor', ['floor']],
   ['cubby', 'Kệ ô vuông', 'D45', 'floor', ['floor']],
   ['desk', 'Bàn viết', 'D46', 'floor', ['floor']],
+  ['mugs-jam', 'Cốc toast mứt dâu', 'D06', 'table', ['table', 'shelf']],
+  ['capybara', 'Capybara đội cam', 'D14', 'floor', ['floor', 'table', 'shelf']],
+  ['corgi', 'Đệm corgi', 'D17', 'floor', ['floor', 'table']],
+  ['shiba', 'Shiba ôm thư', 'D18', 'floor', ['floor', 'table', 'shelf']],
+  ['duck', 'Vịt mẹ', 'D19', 'floor', ['floor', 'table', 'shelf']],
+  ['duckling', 'Vịt con', 'D20', 'floor', ['floor', 'table', 'shelf']],
+  ['penguin', 'Chim cánh cụt bông', 'D21', 'floor', ['floor', 'table', 'shelf']],
+  ['pear-lamp', 'Đèn quả lê', 'D22', 'table', ['floor', 'table', 'shelf']],
+  ['orange-lamp', 'Đèn quả cam', 'D23', 'table', ['floor', 'table', 'shelf']],
+  ['star-frame', 'Khung ảnh kẹp sao', 'D26', 'table', ['table', 'shelf', 'wall']],
+  ['avocado-mug', 'Cốc bơ hạt nổi', 'D27', 'table', ['table', 'shelf']],
+  ['avocado-mug-cutout', 'Cốc bơ hạt lõm', 'D28', 'table', ['table', 'shelf']],
+  ['succulent', 'Sen đá trong tách', 'D29', 'table', ['floor', 'table', 'shelf']],
+  ['snow-globe', 'Quả cầu tuyết', 'D32', 'table', ['table', 'shelf']],
+  ['star-jar', 'Hũ sao giấy', 'D33', 'table', ['table', 'shelf']],
+  ['crane-jar', 'Hũ hạc giấy', 'D34', 'table', ['table', 'shelf']],
+  ['pinecone', 'Quả thông', 'D36', 'table', ['floor', 'table', 'shelf']],
 ].map(([id, name, reference, defaultSurface, supportedSurfaces]) => ({
   id,
   name,
-  image: `/memoryhouse/models/thumbnails/${id}.jpg`,
-  photoCount: { calendar: 1, nameplate: 1, frame: 1, album: 2, bunting: 3 }[id] || 0,
+  image: houseAssetUrl(`thumbnails/${id}.jpg`),
+  photoCount: { calendar: 1, nameplate: 1, frame: 1, 'star-frame': 1, album: 2, bunting: 3 }[id] || 0,
   textLabel: { calendar: 'Ngày / lời nhắn trên lịch', nameplate: 'Chữ trên biển tên', frame: 'Lời nhắn trên khung ảnh', album: 'Lời nhắn trên album', bunting: 'Lời nhắn trên dây ảnh' }[id] || null,
   defaultSurface: defaultSurface || 'table',
-  supportedSurfaces: reference?.startsWith?.('D') ? supportedSurfaces : [...new Set(['floor', 'table', 'shelf', ...supportedSurfaces])],
-  category: ['calendar','nameplate','album','bunting','frame','camera'].includes(id) ? 'memories' : ['plant','vase','fern','vine'].includes(id) ? 'plants' : ['cat','birdcage','rabbit','teddy'].includes(id) ? 'pets' : ['daisy-rug','cushion','shelf','sofa','coffee-table','bistro-table','chair','cubby','desk'].includes(id) ? 'furniture' : 'home',
+  supportedSurfaces,
+  legacySupportedSurfaces: typeof reference==='number' ? [...new Set(['floor','table','shelf',...supportedSurfaces])] : supportedSurfaces,
+  category: ['calendar','nameplate','album','bunting','frame','star-frame','camera','snow-globe','star-jar','crane-jar'].includes(id) ? 'memories' : ['plant','vase','fern','vine','succulent','pinecone'].includes(id) ? 'plants' : ['cat','birdcage','rabbit','teddy','capybara','corgi','shiba','duck','duckling','penguin'].includes(id) ? 'pets' : ['daisy-rug','cushion','shelf','sofa','coffee-table','bistro-table','chair','cubby','desk'].includes(id) ? 'furniture' : 'home',
   featured: ['frame','album','plant','lamp','mugs','vase','cat','sofa','coffee-table','desk','chair','cubby'].includes(id),
-  referenceId: typeof reference === 'string' ? reference : ({calendar:'D01',cat:'D02',nameplate:'D03',plant:'D04',mugs:'D05',lamp:'D07',vase:'D08',album:'D09',bunting:'D10',frame:'D11',birdcage:'D12'}[id] || null),
-  supportsItems: ['shelf','coffee-table','bistro-table','desk','cubby'].includes(id)
+  referenceId: typeof reference === 'string' ? reference : ({calendar:'D01',cat:'D02',nameplate:'D03',plant:'D04',mugs:'D05',lamp:'D07',vase:'D08',album:'D09',bunting:'D10',frame:'D11',birdcage:'D12',candles:'D13'}[id] || null),
+  supportsItems: ['shelf','coffee-table','bistro-table','desk','cubby','daisy-rug','cushion','sofa','chair'].includes(id)
 }));
 
 // Legacy 3 slots for backward compatibility
@@ -97,14 +117,22 @@ export const ASSET_DIMENSIONS = {
   shelf: { width: 1.0, depth: .35, height: .22 }, sofa: { width: 1.65, depth: .72, height: .80 },
   'coffee-table': { width: 1.15, depth: .65, height: .37 }, 'bistro-table': { width: 1.1, depth: 1.1, height: .63 },
   chair: { width: .48, depth: .5, height: .73 }, cubby: { width: 1.2, depth: .45, height: .75 },
-  desk: { width: 1.6, depth: .60, height: .63 }
+  desk: { width: 1.6, depth: .60, height: .63 },
+  'mugs-jam': {width:.50,depth:.42,height:.30}, capybara:{width:.55,depth:.38,height:.42},
+  corgi:{width:.65,depth:.48,height:.28}, shiba:{width:.38,depth:.40,height:.58},
+  duck:{width:.38,depth:.38,height:.52}, duckling:{width:.28,depth:.30,height:.38}, penguin:{width:.42,depth:.32,height:.55},
+  'pear-lamp':{width:.33,depth:.32,height:.50}, 'orange-lamp':{width:.38,depth:.36,height:.42},
+  'star-frame':{width:.52,depth:.24,height:.46}, 'avocado-mug':{width:.48,depth:.34,height:.34},
+  'avocado-mug-cutout':{width:.48,depth:.34,height:.34}, succulent:{width:.40,depth:.34,height:.38},
+  'snow-globe':{width:.45,depth:.45,height:.55}, 'star-jar':{width:.34,depth:.34,height:.32},
+  'crane-jar':{width:.36,depth:.36,height:.38}, pinecone:{width:.42,depth:.27,height:.28}
 };
 
 // Replace the formerly baked furnishings once, using editable stable instances.
 // The room marker prevents a deliberately deleted sofa/table from reappearing.
 export function withEditableHouseFurniture(rooms = []) {
   return rooms.map(room => {
-    if (room.furnishingVersion === 1) return room;
+    if (room.furnishingVersion >= 1) return room;
     const b = ROOM_BOUNDS[room.id];
     if (!b) return room;
     const floor = b.y > 1 ? b.y + .1375 : b.y;
@@ -144,7 +172,7 @@ export function withEditableHouseFurniture(rooms = []) {
         make('vine', 1.2, .45),
         { id: `base_${room.id}_bunting`, item: 'bunting', surface: 'wall', position: [round(b.x), round(floor + 1.05), -1.15], rotation: 0, scale: 1 }
       ];
-    const supports = base.find(d => DECORATIONS.find(a => a.id === d.item)?.supportsItems);
+    const supports = base.find(d => ['coffee-table','bistro-table','desk','cubby'].includes(d.item));
     const decorations = roomDecorations(room).map(d => {
       // Legacy positions come from exported glTF anchors (+Z is the front),
       // not the old approximate JS placement defaults. Freeform coordinates stay.
@@ -176,7 +204,7 @@ export const DEFAULT_COZY_ROOM_DECORATIONS = {
   ],
   memories: [
     { id: 'decor_memories_album', item: 'album', surface: 'table', position: [-2.1, 3.01, -0.57], rotation: 0, scale: 1, parent_id: 'base_memories_desk' },
-    { id: 'decor_memories_nameplate', item: 'nameplate', surface: 'table', position: [-1.5, 3.01, -0.57], rotation: 0, scale: 1, parent_id: 'base_memories_desk', text: 'Minh & An' }
+    { id: 'decor_memories_nameplate', item: 'nameplate', surface: 'table', position: [-1.5, 3.01, -0.57], rotation: 0, scale: 1, parent_id: 'base_memories_desk' }
   ],
   'next-chapter': [
     { id: 'decor_next-chapter_cloud-lamp', item: 'cloud-lamp', surface: 'table', position: [1.4, 3.01, -0.57], rotation: 0, scale: 1, parent_id: 'base_next-chapter_desk' },
@@ -184,6 +212,122 @@ export const DEFAULT_COZY_ROOM_DECORATIONS = {
     { id: 'decor_next-chapter_calendar', item: 'calendar', surface: 'table', position: [2.2, 3.01, -0.57], rotation: 0, scale: 1, parent_id: 'base_next-chapter_desk', text: 'Mãi bên nhau' }
   ]
 };
+
+// Only newly generated instances have provenance. Legacy IDs are not evidence
+// of ownership: upgrades keep every old object, including its exact transform.
+const COZY_ROOM_DECORATIONS = {
+  "beginning": [
+    {"id":"cozy2_beginning_chair","item":"chair","surface":"floor","position":[-3.6,0.142,-0.55],"rotation":-12,"scale":1},
+    {"id":"cozy2_beginning_daisy-rug","item":"daisy-rug","surface":"floor","position":[-2.6,0.142,0.45],"rotation":0,"scale":1},
+    {"id":"cozy2_beginning_capybara","item":"capybara","surface":"floor","position":[-2.485,0.173,0.869],"rotation":0,"scale":0.9,"parent_id":"cozy2_beginning_daisy-rug"},
+    {"id":"cozy2_beginning_cat","item":"cat","surface":"floor","position":[-2.997,0.173,0.348],"rotation":0,"scale":0.65,"parent_id":"cozy2_beginning_daisy-rug"},
+    {"id":"cozy2_beginning_cubby","item":"cubby","surface":"floor","position":[-2.25,0.142,-0.64],"rotation":0,"scale":0.55},
+    {"id":"cozy2_beginning_pear-lamp","item":"pear-lamp","surface":"table","position":[-2.25,0.558,-0.64],"rotation":0,"scale":0.8,"parent_id":"cozy2_beginning_cubby"}
+  ],
+  "first": [
+    {"id":"cozy2_first_bistro-table","item":"bistro-table","surface":"floor","position":[0.12,0.142,-0.28],"rotation":-8,"scale":1},
+    {"id":"cozy2_first_cushion","item":"cushion","surface":"floor","position":[-0.75,0.142,0.48],"rotation":0,"scale":0.8},
+    {"id":"cozy2_first_cushion-right","item":"cushion","surface":"floor","position":[0.78,0.142,0.68],"rotation":0,"scale":0.8},
+    {"id":"cozy2_first_shiba","item":"shiba","surface":"floor","position":[0.704,0.142,0.227],"rotation":0,"scale":0.85},
+    {"id":"cozy2_first_mugs","item":"mugs","surface":"table","position":[-0.2,0.776,-0.3],"rotation":0,"scale":0.65,"parent_id":"cozy2_first_bistro-table"},
+    {"id":"cozy2_first_mugs-jam","item":"mugs-jam","surface":"table","position":[0.38,0.776,-0.13],"rotation":14,"scale":0.65,"parent_id":"cozy2_first_bistro-table"},
+    {"id":"cozy2_first_shelf","item":"shelf","surface":"wall","position":[-0.8,0.83,-1.031],"rotation":0,"scale":0.6},
+    {"id":"cozy2_first_honey-candle","item":"honey-candle","surface":"shelf","position":[-0.8,0.966,-1.031],"rotation":0,"scale":0.65,"parent_id":"cozy2_first_shelf"}
+  ],
+  "little-things": [
+    {"id":"cozy2_little-things_cubby","item":"cubby","surface":"floor","position":[2.8,0.142,-0.6],"rotation":0,"scale":1.25},
+    {"id":"cozy2_little-things_succulent","item":"succulent","surface":"table","position":[2.3,1.083,-0.6],"rotation":0,"scale":0.8,"parent_id":"cozy2_little-things_cubby"},
+    {"id":"cozy2_little-things_camera","item":"camera","surface":"table","position":[2.8,1.083,-0.54],"rotation":-12,"scale":0.8,"parent_id":"cozy2_little-things_cubby"},
+    {"id":"cozy2_little-things_turntable","item":"turntable","surface":"table","position":[3.094,0.668,-0.523],"rotation":0,"scale":0.8,"parent_id":"cozy2_little-things_cubby"},
+    {"id":"cozy2_little-things_fern","item":"fern","surface":"floor","position":[1.9,0.142,0.5],"rotation":0,"scale":0.8},
+    {"id":"cozy2_little-things_duck","item":"duck","surface":"floor","position":[3.45,0.142,0.6],"rotation":0,"scale":0.8},
+    {"id":"cozy2_little-things_duckling","item":"duckling","surface":"floor","position":[3.85,0.142,0.4],"rotation":0,"scale":0.7}
+  ],
+  "memories": [
+    {"id":"cozy2_memories_sofa","item":"sofa","surface":"floor","position":[-2.05,2.392,-0.58],"rotation":0,"scale":1},
+    {"id":"cozy2_memories_teddy","item":"teddy","surface":"floor","position":[-0.8,2.392,-0.38],"rotation":0,"scale":1.15},
+    {"id":"cozy2_memories_daisy-rug","item":"daisy-rug","surface":"floor","position":[-0.857,2.392,0.547],"rotation":0,"scale":1},
+    {"id":"cozy2_memories_coffee-table","item":"coffee-table","surface":"floor","position":[-0.857,2.431,0.547],"rotation":10,"scale":1,"parent_id":"cozy2_memories_daisy-rug"},
+    {"id":"cozy2_memories_album","item":"album","surface":"table","position":[-0.957,2.805,0.547],"rotation":-9,"scale":0.7,"parent_id":"cozy2_memories_coffee-table"},
+    {"id":"cozy2_memories_shelf","item":"shelf","surface":"wall","position":[-3.108,3.132,-1.022],"rotation":0,"scale":0.65},
+    {"id":"cozy2_memories_lamp","item":"lamp","surface":"shelf","position":[-3.108,3.279,-1.022],"rotation":0,"scale":0.4,"parent_id":"cozy2_memories_shelf"},
+    {"id":"cozy2_memories_frame","item":"frame","surface":"wall","position":[-0.75,3.528,-1.058],"rotation":0,"scale":0.65}
+  ],
+  "next-chapter": [
+    {"id":"cozy2_next-chapter_desk","item":"desk","surface":"floor","position":[1.6,2.392,-0.6],"rotation":0,"scale":1},
+    {"id":"cozy2_next-chapter_rabbit","item":"rabbit","surface":"floor","position":[2.9,2.392,0.45],"rotation":0,"scale":1.2},
+    {"id":"cozy2_next-chapter_chair","item":"chair","surface":"floor","position":[1.5,2.392,0.35],"rotation":14,"scale":1},
+    {"id":"cozy2_next-chapter_cloud-lamp","item":"cloud-lamp","surface":"table","position":[1.318,3.025,-0.724],"rotation":0,"scale":0.85,"parent_id":"cozy2_next-chapter_desk"},
+    {"id":"cozy2_next-chapter_honey-candle","item":"honey-candle","surface":"table","position":[1.67,3.025,-0.53],"rotation":0,"scale":0.65,"parent_id":"cozy2_next-chapter_desk"},
+    {"id":"cozy2_next-chapter_calendar","item":"calendar","surface":"table","position":[2.15,3.025,-0.6],"rotation":0,"scale":0.8,"parent_id":"cozy2_next-chapter_desk"},
+    {"id":"cozy2_next-chapter_bunting","item":"bunting","surface":"wall","position":[2.65,3.588,-1.052],"rotation":0,"scale":0.7},
+    {"id":"cozy2_next-chapter_vine","item":"vine","surface":"floor","position":[0.6,2.392,0.5],"rotation":0,"scale":0.85}
+  ]
+};
+
+export function cozyRoomDecorations(roomId) {
+  return structuredClone(COZY_ROOM_DECORATIONS[roomId] || []);
+}
+
+export function createCozyHouseRooms(rooms) {
+  return rooms.map(room => {
+    const decorations = cozyRoomDecorations(room.id);
+    return {...room,furnishingVersion:2,decorations,furnishingBaseline:decorations.map(({text,photos,...d})=>d)};
+  });
+}
+
+export function planCozyHouseUpgrade(rooms, findPlacement, {rearrange = false} = {}) {
+  const skipped=[];
+  const next=rooms.map(room => {
+    if (room.furnishingVersion >= 2) return room;
+    const existing = roomDecorations(room), added=[];
+    if (rearrange) {
+      const used=new Set(), remapped=new Map(), excludeIds=existing.map(d=>d.id).filter(Boolean);
+      const place = (wanted, previous) => {
+        const parent=added.find(d=>d.id===(remapped.get(wanted.parent_id) || wanted.parent_id));
+        const templateParent=cozyRoomDecorations(room.id).find(d=>d.id===wanted.parent_id);
+        const position=parent && templateParent ? [wanted.position[0]+parent.position[0]-templateParent.position[0],parent.position[1]+ASSET_DIMENSIONS[parent.item].height*parent.scale+.004,wanted.position[2]+parent.position[2]-templateParent.position[2]] : wanted.position;
+        const supportId=parent && templateParent && ['table','shelf'].includes(wanted.surface) && DECORATIONS.find(d=>d.id===wanted.item)?.defaultSurface==='table' ? parent.id : null;
+        const originalScale=Array.isArray(wanted.scale) ? Math.min(...wanted.scale) : wanted.scale || 1;
+        for (const factor of [1,.8,.65,.5]) {
+          const hit=findPlacement(room.id,wanted.item,{position,scale:originalScale*factor,rotation:wanted.rotation,excludeIds,extra:added,supportId,furnishingVersion:2});
+          if (!hit) continue;
+          const {parent_id,...content}=previous || {};
+          const {parent_id:plannedParent,...desired}=wanted;
+          added.push({...desired,...content,position:hit.position.map(n=>round(n)),surface:hit.surface,scale:hit.scale,rotation:wanted.rotation,...(hit.parentId ? {parent_id:hit.parentId} : {})});
+          remapped.set(wanted.id,added.at(-1).id);
+          if(previous) used.add(previous);
+          return;
+        }
+        skipped.push({roomId:room.id,item:wanted.item});
+      };
+      for(const wanted of cozyRoomDecorations(room.id)) place(wanted,existing.find(d=>d.item===wanted.item && !used.has(d)));
+      // Keep every old instance and its personal attachments. The preview may
+      // move/resize it only after the owner explicitly chooses rearrangement.
+      const remainder=existing.filter(d=>!used.has(d)).sort((a,b)=>Number(Boolean(DECORATIONS.find(d=>d.id===b.item)?.supportsItems))-Number(Boolean(DECORATIONS.find(d=>d.id===a.item)?.supportsItems)));
+      for(const d of remainder) {
+        const floor=ROOM_BOUNDS[room.id].y > 1 ? 2.388 : .14;
+        const position=d.surface==='wall' ? [ROOM_BOUNDS[room.id].x+.85,floor+.70,-1.04] : d.position;
+        place({...d,position},d);
+        if(!used.has(d)) added.push(d);
+      }
+      const baseline=added.map(({text,photos,...d})=>d);
+      return {...room,furnishingVersion:2,decorations:added,furnishingBaseline:baseline};
+    }
+    for (const wanted of cozyRoomDecorations(room.id)) {
+      // Previously available types may have been deliberately deleted. An
+      // unknown legacy history must never resurrect them during an upgrade.
+      const legacyItem = DECORATIONS.findIndex(d=>d.id===wanted.item) < 29;
+      if (legacyItem || existing.some(d=>d.item===wanted.item) || added.some(d=>d.id===wanted.id)) continue;
+      const hit = findPlacement(room.id,wanted.item,{position:wanted.position,scale:wanted.scale,rotation:wanted.rotation,extra:added,furnishingVersion:2});
+      if (!hit) { skipped.push({roomId:room.id,item:wanted.item}); continue; }
+      added.push({...wanted,position:hit.position.map(n=>round(n)),surface:hit.surface,scale:hit.scale,...(hit.parentId ? {parent_id:hit.parentId} : {parent_id:undefined})});
+    }
+    if (!added.length) return room;
+    return {...room,furnishingVersion:2,decorations:[...(room.decorations || []),...added],furnishingBaseline:structuredClone(added)};
+  });
+  return {rooms:next,skipped,added:next.reduce((n,r,i)=>n+(r.decorations?.length||0)-(rooms[i].decorations?.length||0),0)};
+}
 
 /**
  * Returns half-extents (X and Z) and height accounting for scale and yaw rotation.
@@ -602,7 +746,7 @@ export function removeDecorationInstance(room, instanceId, options = {}) {
 
       // Check if child supports floor
       const childAsset = DECORATIONS.find(a => a.id === d.item);
-      const supportsFloor = childAsset?.supportedSurfaces?.includes('floor');
+      const supportsFloor = (room.furnishingVersion===2 ? childAsset?.supportedSurfaces : childAsset?.legacySupportedSurfaces)?.includes('floor');
       if (supportsFloor) {
         const floorY = getRoomBoundingBox(room?.id).floorY;
         const droppedPos = Array.isArray(d.position)

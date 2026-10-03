@@ -2,13 +2,15 @@
   "assets": [
     {
       "file": "memory-house.glb",
-      "bytes": 557680,
-      "triangles": 11587
+      "bytes": 1619344,
+      "triangles": 32819,
+      "sha256": "ff99190af56f02eda30eb831f4fc3980cb4e9826073eb6214ac7504bced308ff"
     },
     {
       "file": "decorations.glb",
-      "bytes": 1470680,
-      "triangles": 38518
+      "bytes": 4348904,
+      "triangles": 180600,
+      "sha256": "05aefb08d50bc0e3ec4ff58d29c17a95faead8a36bab38b3a2219d3545e2db1d"
     }
   ],
   "reference": "emoria-cozy-reference",
@@ -49,9 +51,25 @@
     "bistro-table",
     "chair",
     "cubby",
-    "desk"
+    "desk",
+    "mugs-jam",
+    "capybara",
+    "corgi",
+    "shiba",
+    "duck",
+    "duckling",
+    "penguin",
+    "pear-lamp",
+    "orange-lamp",
+    "star-frame",
+    "avocado-mug",
+    "avocado-mug-cutout",
+    "succulent",
+    "snow-globe",
+    "star-jar",
+    "crane-jar",
+    "pinecone"
   ],
   "up": "+Y",
-  "front": "+Z",
-  "thumbnailBytes": 106264
+  "front": "+Z"
 }

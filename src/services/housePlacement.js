@@ -14,7 +14,7 @@ export function placementTriangles(root) {
   const triangles = [];
   root.updateMatrixWorld(true);
   root.traverse(mesh => {
-    if (!mesh.isMesh) return;
+    if (!mesh.isMesh || Number.isInteger(mesh.userData.photoIndex)) return;
     const { position } = mesh.geometry.attributes, index = mesh.geometry.index;
     for (let i = 0; i < (index?.count ?? position.count); i += 3) {
       const vertices = [0, 1, 2].map(j => new THREE.Vector3().fromBufferAttribute(position, index ? index.getX(i + j) : i + j).applyMatrix4(mesh.matrixWorld));
@@ -25,7 +25,7 @@ export function placementTriangles(root) {
   return triangles;
 }
 
-export function createPlacementSolver({ template, roomId, triangles, collisionTriangles = triangles, obstacles = [], rotation = 0, scale = 1 }) {
+export function createPlacementSolver({ template, roomId, triangles, collisionTriangles = triangles, obstacles = [], rotation = 0, scale = 1, furnishingVersion = 1 }) {
   const model = template.clone(true);
   transformDecoration(model, [0, 0, 0], rotation, scale);
   const bounds = new THREE.Box3().setFromObject(model, true);
@@ -47,7 +47,8 @@ export function createPlacementSolver({ template, roomId, triangles, collisionTr
     return vertices.reduce((best, p) => p.x * x + p.z * z > best.x * x + best.z * z ? p : best, vertices[0]);
   }).filter(Boolean);
   footprint.push(new THREE.Vector3((bounds.min.x + bounds.max.x) / 2, bounds.min.y, (bounds.min.z + bounds.max.z) / 2));
-  const allowed = DECORATIONS.find(d => template.name === 'decor_' + d.id)?.supportedSurfaces || [];
+  const asset = DECORATIONS.find(d => template.name === 'decor_' + d.id);
+  const allowed = (furnishingVersion===2 ? asset?.supportedSurfaces : asset?.legacySupportedSurfaces) || [];
   const surfaces = new Map();
   for (const entry of triangles) {
     const { box, normal } = entry;
@@ -58,9 +59,11 @@ export function createPlacementSolver({ template, roomId, triangles, collisionTr
     if (type === 'wall' && !wall) continue;
     const horizontalSupport = type === 'table' || type === 'shelf';
     if (!(horizontalSupport ? allowed.includes('table') || allowed.includes('shelf') : allowed.includes(type))) continue;
-    const height = wall ? box.min.z : box.min.y;
+    // Adjacent boards exported as 0.13749999 and 0.13750001 are one plane.
+    // Quantize before bucketing so floating point rounding cannot split it.
+    const height = Math.round((wall ? box.min.z : box.min.y) * 1e5) / 1e5;
     const parentId = entry.parentId || null;
-    const key = JSON.stringify([type, height.toFixed(3), parentId]);
+    const key = JSON.stringify([type, height, parentId]);
     if (!surfaces.has(key)) surfaces.set(key, { wall, height, type, parentId, entries: [], box: new THREE.Box3() });
     const surface = surfaces.get(key);
     surface.entries.push(entry); surface.box.union(box);
@@ -101,12 +104,10 @@ export function createPlacementSolver({ template, roomId, triangles, collisionTr
       // Include centres of small surfaces (e.g. chair seats) between grid points.
       const centres = [b.getCenter(new THREE.Vector3()), ...surface.entries.map(e => e.box.getCenter(new THREE.Vector3()))];
       for (const p of centres) {
-        const hit = candidate(surface, p.x, surface.wall ? p.y : p.z);
-        if (hit) fallback.push(hit);
+        fallback.push({surface,x:p.x,v:surface.wall ? p.y : p.z});
       }
       for (let x = minX; x <= maxX; x += .16) for (let v = minV; v <= maxV; v += .16) {
-        const hit = candidate(surface, x, v);
-        if (hit) fallback.push(hit);
+        fallback.push({surface,x,v});
       }
     }
     return fallback;
@@ -117,7 +118,18 @@ export function createPlacementSolver({ template, roomId, triangles, collisionTr
     const nearest = (best, hit) => !best || distance(hit) < distance(best) ? hit : best;
     const best = direct.reduce(nearest, null);
     // Near an edge, prefer the adjacent tabletop over the floor far below it.
-    return best && distance(best) < .01 ? best : choices().reduce(nearest, best);
+    if (best && distance(best) < .01) return best;
+    // Check nearest grid candidates first. Exact triangle validation still
+    // decides acceptance; distant positions need no expensive collision scan.
+    const ordered=choices().map(c=>({...c,position:c.surface.wall
+      ? [c.x,c.v,c.surface.height-bounds.min.z+.004]
+      : [c.x,c.surface.height-bounds.min.y+.004,c.v]})).sort((a,b)=>distance(a)-distance(b));
+    for(const c of ordered) {
+      if(best && distance(c)>=distance(best)) break;
+      const hit=candidate(c.surface,c.x,c.v);
+      if(hit) return hit;
+    }
+    return best;
   }
   return { find, bounds };
 }

@@ -4,7 +4,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {build} from 'esbuild';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {HOUSE_ROOM_IDS} from '../src/services/house3d.js';
+import {HOUSE_ROOM_IDS,withEditableHouseFurniture} from '../src/services/house3d.js';
 import * as THREE from 'three';
 
 // Exercise the real renderer lifecycle and GLBs; replace only browser/GPU APIs.
@@ -35,7 +35,7 @@ globalThis.__houseTestControls = class {
   update(){this.camera.lookAt(this.target);} addEventListener(){} dispose(){}
 };
 GLTFLoader.prototype.loadAsync = async function(url) {
-  const data=await fs.readFile(path.join('public',url));
+  const data=await fs.readFile(path.join('public',url.split('?')[0]));
   return this.parseAsync(data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength),'');
 };
 const outfile=path.resolve('.local/ui-render/house-renderer-boot.mjs');
@@ -56,7 +56,7 @@ const engine=createHouseRenderer({...element(),clientWidth:1000,clientHeight:600
   getDragPlacement:d=>({item:d.decorItem,roomId:d.roomId,excludeId:d.instanceId,scale:d.decorScale,rotation:d.decorRotation}),
   onSurfaceTap:(hit,id)=>moves.push({hit,id}),onDecorItem:()=>selections++,onPlacementPreview:()=>previews++
 });
-const rooms=HOUSE_ROOM_IDS.map(id=>({id,memories:[],decorations:[]}));
+const rooms=withEditableHouseFurniture(HOUSE_ROOM_IDS.map(id=>({id,memories:[],decorations:[]})));
 engine.update({rooms,title:'Admin owner private house',theme:'warm_gold'});
 await loaded;
 const tabletop = engine.findPlacement('memories','turntable');
@@ -65,7 +65,7 @@ assert.equal(tabletop?.parentId,'base_memories_desk','Initial placement records 
 const tableAgain = engine.findPlacement('memories','turntable',{position:tabletop.position,scale:tabletop.scale});
 assert.deepEqual(tableAgain,tabletop,'Revalidation preserves support and pivot');
 for (const item of ['honey-candle','turntable','camera']) {
-  const coffeeHit=engine.findPlacement('beginning',item,{scale:1});
+  const coffeeHit=engine.findPlacement('beginning',item,{scale:1,position:[-2.8,.51,.70]});
   assert.equal(coffeeHit?.parentId,'base_beginning_coffee-table',`Real coffee top fits ${item} at full size`);
   assert.equal(coffeeHit.surface,'table');
 }

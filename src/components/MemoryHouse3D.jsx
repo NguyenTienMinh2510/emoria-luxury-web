@@ -6,7 +6,7 @@ import {
   addDecorationInstance,
   updateDecorationInstance,
   removeDecorationInstance,
-  generateInstanceId, getRoomBoundingBox, houseLighting, withHouseLighting
+  generateInstanceId, getRoomBoundingBox, houseLighting, withHouseLighting, planCozyHouseUpgrade
 } from '../services/house3d.js';
 import { createMusicBoxPlayer, MUSIC_TRACKS } from '../services/musicBoxPlayer.js';
 import MemoryHouse2D from './MemoryHouse2D.jsx';
@@ -160,7 +160,8 @@ export default function MemoryHouse3D({
   onUploadPhoto,
   uploading = false,
   readOnly = false,
-  onRegisterCapture
+  onRegisterCapture,
+  onRegisterLayoutPlanner
 }) {
   const host = useRef(null), engine = useRef(null), latest = useRef({});
   const fileInput = useRef(null), uploadTarget = useRef(null), tourTimer = useRef(null);
@@ -328,7 +329,14 @@ export default function MemoryHouse3D({
             }
           },
           onSurfaceTap: (hit, draggedId) => latest.current.onSurfaceTap?.(hit, draggedId),
-          onReady: () => { if (!cancelled) setStatus('ready'); },
+          onReady: () => { if (!cancelled) { setStatus('ready'); onRegisterLayoutPlanner?.(async (rooms,options)=>{
+            const plans=[];
+            for(const room of rooms) {
+              await new Promise(resolve=>setTimeout(resolve,0));
+              plans.push(planCozyHouseUpgrade([room],(...args)=>engine.current.findPlacement(...args),options));
+            }
+            return {rooms:plans.flatMap(p=>p.rooms),skipped:plans.flatMap(p=>p.skipped),added:plans.reduce((n,p)=>n+p.added,0)};
+          }); } },
           onError: message => { if (!cancelled) { setError(message); setStatus('error'); } }
         });
         engine.current.update(latest.current);
@@ -349,6 +357,7 @@ export default function MemoryHouse3D({
     return () => {
       cancelled = true;
       if (onRegisterCapture) onRegisterCapture(null);
+      onRegisterLayoutPlanner?.(null);
       engine.current?.dispose();
       engine.current = null;
     };
