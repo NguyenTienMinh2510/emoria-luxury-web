@@ -30,6 +30,7 @@ Forward migrations:
   20261003100000_house_complete_catalog.sql (46 items, v2 provenance, private backup/restore)
   20261003110000_house_cozy_surfaces.sql (v2 surfaces match the frontend catalog)
   20261003120000_house_legacy_surface_preservation.sql (unchanged legacy surfaces stay valid)
+  20261003130000_house_baseline_upsert.sql (immutable baseline across edited UPSERT saves)
 Old migrations are preserved. Version 1 retains legacy compatibility.
 
 Checks:

@@ -4,6 +4,7 @@ Blender 5.2.2 LTS exported actual house and 46 distinct decoration roots.
 46 rendered model thumbnails and 2D silhouettes; all 57 source hashes retained.
 Exact dimensions/pivots and GLB hashes are recorded in asset-info.json.
 H05 defaults and placement geometry pass room-shell penetration checks.
+Edited-transform UPSERT saves retain the original provenance baseline.
 230 real room/model placement cases cover supports, rotation, scale and collisions.
 Regression covers floor-plane float rounding, saved deletion preservation,
 idempotent upgrades and unchanged photo/text/story content.
@@ -11,7 +12,7 @@ idempotent upgrades and unchanged photo/text/story content.
 Isolated local PostgreSQL: 46 catalog items, H05 persistence, private layout
 backup/restore, stale revision rejection, owner-only access, repeat restore and
 published snapshot isolation verified. Strict publication regression also passed.
-The three forward migrations were transactionally checked and applied to project
+The four forward migrations were transactionally checked and applied to project
 svbmupgifhafrehdfomx. Private cloud backups and actual rollout/browser evidence
 remain outside Git under ignored .local/house-completion.
 
