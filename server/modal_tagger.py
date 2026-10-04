@@ -5,6 +5,7 @@ import base64
 import tempfile
 import time
 import unicodedata
+import subprocess
 from pathlib import Path
 
 import modal
@@ -38,10 +39,25 @@ image = (
         # Public project origin, supplied by the deployment environment.
         "MODAL_STORAGE_ORIGIN": os.environ.get("MODAL_STORAGE_ORIGIN") or os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL") or "",
     })
+    .add_local_file(str(Path(__file__).with_name("media_preprocess.py")), "/opt/emoria/media_preprocess.py")
 )
 
 MODEL_NAME = "Qwen/Qwen3-VL-4B-Instruct"
 MAX_MEDIA_BYTES = 50 * 1024 * 1024
+
+def preprocess_media(kind, source, destination):
+    import sys
+    helper = Path("/opt/emoria/media_preprocess.py")
+    if not helper.exists():
+        helper = Path(__file__).with_name("media_preprocess.py")
+    environment = dict(os.environ, OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1")
+    result = subprocess.run([sys.executable, str(helper), kind, str(source), str(destination)],
+                            timeout=25, capture_output=True, env=environment)
+    if result.returncode:
+        diagnostic = result.stderr.decode("utf-8", errors="replace")
+        if any(word in diagnostic for word in ("exceeds", "budget exceeded", "DecompressionBomb", "Invalid video")):
+            raise ValueError("Media exceeds the supported processing limits")
+        raise RuntimeError("Media preprocessing failed")
 
 
 def validate_media_url(value):
@@ -130,60 +146,20 @@ def unique_labels(labels, max_labels=8):
     return cleaned[:max_labels]
 
 def extract_frames_from_video(video_path, max_frames=16, edge=448):
-    import av
-    import numpy as np
-
-    images = []
-    times = []
-    with av.open(str(video_path)) as container:
-        if not container.streams.video:
-            raise ValueError("Tệp không có luồng video")
-        stream = container.streams.video[0]
-        fps = float(stream.average_rate or 30)
-        
-        if max_frames < 1 or edge < 32:
-            raise ValueError("Invalid frame budget")
-        start = float((stream.start_time or 0) * stream.time_base)
-        duration = float(stream.duration * stream.time_base) if stream.duration else 0
-        if not duration:
-            # WebM often lacks stream duration. Count timestamps without retaining decoded frames.
-            for frame in container.decode(stream):
-                if frame.time is not None:
-                    duration = max(duration, float(frame.time) - start + 1 / fps)
-        if duration <= 0:
-            raise ValueError("Không thể giải mã khung hình video")
-
-        # ponytail: 16 uniform samples can miss brief events; use denser segmented review if required.
-        end = max(0, duration - 1 / fps)
-        for offset in np.linspace(0, end, max_frames):
-            target = start + float(offset)
-            container.seek(int(target / stream.time_base), stream=stream, backward=True)
-            selected = None
-            for frame in container.decode(stream):
-                if frame.time is not None:
-                    selected = frame
-                    if float(frame.time) >= target - 0.5 / fps:
-                        break
-            if selected is None:
-                raise ValueError("Không thể giải mã khung hình video")
-            frame = selected
-            if times and float(frame.time) - start <= times[-1]:
-                continue
-            scale = min(1.0, edge / max(frame.width, frame.height))
-            width = max(32, round(frame.width * scale / 32) * 32)
-            height = max(32, round(frame.height * scale / 32) * 32)
-            img = frame.reformat(width=width, height=height, format="rgb24").to_ndarray()
-            images.append(img)
-            times.append(float(frame.time) - start)
-
-    return np.stack(images), times, fps, duration
+    # Compatibility entry point; production uses the same bounded helper in a child process.
+    try:
+        from media_preprocess import extract_frames_from_video as bounded
+    except ImportError:
+        from server.media_preprocess import extract_frames_from_video as bounded
+    return bounded(video_path, max_frames=max_frames, edge=edge)
 
 # 3. Class Service chạy mô hình Qwen trên GPU đám mây
 @app.cls(
     gpu="T4",
     image=image,
     volumes={"/cache": model_volume},
-    timeout=300,
+    timeout=150,
+    max_containers=2,
     scaledown_window=600, # Giữ GPU thức 10 phút sau lượt chạy để phản hồi tức thì các lượt tiếp theo
 )
 class QwenTagger:
@@ -339,7 +315,9 @@ class QwenTagger:
             stage = "preprocess"
             if media_type == "image" or tmp_path.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp"]:
                 # Xử lý ảnh tĩnh
-                pil_img = Image.open(tmp_path).convert("RGB")
+                prepared_path = tmp_path.with_suffix(".review.png")
+                preprocess_media("image", tmp_path, prepared_path)
+                pil_img = Image.open(prepared_path).convert("RGB")
                 prompt_text = self.processor.apply_chat_template(
                     [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": PROMPT}]}],
                     tokenize=False,
@@ -348,7 +326,12 @@ class QwenTagger:
                 inputs = self.processor(text=[prompt_text], images=[pil_img], return_tensors="pt").to("cuda:0")
             else:
                 # Xử lý video động
-                images, times, fps, duration = extract_frames_from_video(tmp_path, max_frames=16, edge=448)
+                prepared_path = tmp_path.with_suffix(".review.npz")
+                preprocess_media("video", tmp_path, prepared_path)
+                with np.load(prepared_path, allow_pickle=False) as reviewed:
+                    images = reviewed["frames"]
+                    times = reviewed["times"].tolist()
+                    fps, duration = float(reviewed["fps"]), float(reviewed["duration"])
                 metadata = {
                     "fps": fps,
                     "total_num_frames": max(len(images), round(duration * fps)),
@@ -420,7 +403,7 @@ class QwenTagger:
             return {
                 "success": False,
                 "approved": False,
-                "error_code": "GPU_MEMORY" if isinstance(e, torch.cuda.OutOfMemoryError) else "MEDIA_PROCESSING",
+                "error_code": "GPU_MEMORY" if isinstance(e, torch.cuda.OutOfMemoryError) else "MEDIA_LIMIT" if isinstance(e, ValueError) else "MEDIA_PROCESSING",
                 "error": "Media processing failed",
                 "labels": [],
                 "violations": [],
@@ -430,3 +413,5 @@ class QwenTagger:
             torch.cuda.empty_cache()
             if tmp_path.exists():
                 tmp_path.unlink()
+            for extension in (".review.png", ".review.npz"):
+                tmp_path.with_suffix(extension).unlink(missing_ok=True)

@@ -48,7 +48,8 @@ Object.assign(globalThis, {
   cancelAnimationFrame: id => raf.delete(id),
 });
 const flush = () => {now+=1000/60;const callbacks=[...raf.values()];raf.clear();callbacks.forEach(fn=>fn(now));};
-const runToEnd = () => {let ticks=0;for(;ticks<650&&raf.size;ticks++)flush();assert.equal(raf.size,0,'Playback stops at its endpoint');return ticks;};
+const finishPending = async () => {for(const image of ImageFixture.created)if(image.onload)await image.finish();};
+const runToEnd = async () => {let ticks=0;for(;ticks<650&&raf.size;ticks++){flush();await finishPending();}assert.equal(raf.size,0,'Playback stops at its endpoint');return ticks;};
 const find = (node,predicate) => {
   if (!node || typeof node!=='object') return;
   if (predicate(node)) return node;
@@ -96,18 +97,18 @@ try {
   assert.equal(lastFrame(),stalledFrame,'A stalled network holds the visible image');
   assert.ok(raf.size>0,'The held pointer remains active while waiting for a frame');
   for(let i=30;i<ImageFixture.created.length;i++)await ImageFixture.created[i].finish();
-  assert.equal(ImageFixture.created.length,150,'Only the evenly sampled sequence is downloaded');
+  assert.equal(ImageFixture.created.length,60,'Initial desktop prefetch is bounded to its decoded window');
   const beforeWrites=fixture.writes.length;
-  const openingTicks=runToEnd();
+  const openingTicks=await runToEnd();
   assert.ok(openingTicks<=252,'The remaining sequence retains the original 4.2-second playback rate');
   assert.ok(draws.at(-1).url.includes('frame-299.webp'));
   assert.ok(fixture.writes.length-beforeWrites<=6,'Animation updates React only for five layer boundaries and the endpoint');
-  assert.ok(fixture.writes.some(([index,value])=>index===2&&value===5),'All five cards appear at the expanded frame');
+  assert.ok(fixture.writes.some(([index,value])=>index===3&&value===5),'All five cards appear at the expanded frame');
   assert.equal(layoutReads,1,'Playback never measures layout');
   assert.equal(draws.at(-1).geometry[0],(1600-1600*1.28)/2,'The original contain scale and center are retained');
-  hotspot.onPointerLeave(event());runToEnd();
+  hotspot.onPointerLeave(event());await runToEnd();
   assert.ok(draws.at(-1).url.includes('frame-000.webp'),'Leaving the image plays back to the closed frame');
-  assert.equal(fixture.writes.filter(([index])=>index===2).at(-1)[1],0,'Closing also hides every layer card');
+  assert.equal(fixture.writes.filter(([index])=>index===3).at(-1)[1],0,'Closing also hides every layer card');
   hotspot.onPointerEnter(event('touch'));flush();
   assert.equal(raf.size,0,'Touch hover alone does not open the image');
   hotspot.onPointerDown(event('touch'));
@@ -130,44 +131,44 @@ try {
   listeners.get('touchmove')(touchEvent([secondary,primary]));
   listeners.get('touchend')(touchEvent([primary],[secondary]));
   listeners.get('touchcancel')(touchEvent([primary],[secondary]));
-  runToEnd();assert.equal(lastFrame(),299,'Secondary touch starts, movement order, releases and cancellations cannot replace the held finger');
-  listeners.get('touchend')(touchEvent([secondary],[primary]));runToEnd();
+  await runToEnd();assert.equal(lastFrame(),299,'Secondary touch starts, movement order, releases and cancellations cannot replace the held finger');
+  listeners.get('touchend')(touchEvent([secondary],[primary]));await runToEnd();
   assert.ok(draws.length>expandedDraws);assert.equal(lastFrame(),0,'Physical primary-finger release reverses even while a secondary finger remains');
   hotspot.onFocus(focusEvent(false));flush();
   assert.equal(lastFrame(),0);assert.equal(raf.size,0,'Touch-generated focus cannot reopen after release');
-  hotspot.onTouchStart(touchEvent([primary]));runToEnd();
-  listeners.get('touchmove')(touchEvent([touch(7,{clientY:500})]));runToEnd();
+  hotspot.onTouchStart(touchEvent([primary]));await runToEnd();
+  listeners.get('touchmove')(touchEvent([touch(7,{clientY:500})]));await runToEnd();
   assert.equal(lastFrame(),0,'Moving the held finger outside collapses');
-  listeners.get('touchmove')(touchEvent([primary]));runToEnd();
+  listeners.get('touchmove')(touchEvent([primary]));await runToEnd();
   assert.equal(lastFrame(),299,'Moving the same held finger back inside resumes');
-  hotspotRect={left:100,right:300,top:-400,bottom:-100};listeners.get('scroll')();runToEnd();
+  hotspotRect={left:100,right:300,top:-400,bottom:-100};listeners.get('scroll')();await runToEnd();
   assert.equal(lastFrame(),0,'Scrolling uses current image bounds rather than the touch-start rectangle');
-  hotspotRect={left:100,right:300,top:100,bottom:400};listeners.get('scroll')();runToEnd();
+  hotspotRect={left:100,right:300,top:100,bottom:400};listeners.get('scroll')();await runToEnd();
   assert.equal(lastFrame(),299,'The held finger resumes when scrolling puts the image back under it');
-  listeners.get('touchcancel')(touchEvent([secondary],[primary]));runToEnd();
+  listeners.get('touchcancel')(touchEvent([secondary],[primary]));await runToEnd();
   assert.equal(lastFrame(),0,'Actual primary touch cancellation closes the image');
   listeners.get('touchmove')(touchEvent([primary]));flush();
   assert.equal(raf.size,0,'A cancelled session cannot be revived by further touch movement');
   hotspot.onPointerDown(event('pen'));for(let i=0;i<30;i++){hotspot.onPointerMove(event('pen'));flush();}
   const penFrame=lastFrame();hotspot.onPointerUp(event('pen',{isPrimary:false}));flush();
   assert.ok(lastFrame()>=penFrame,'Secondary pen input cannot interrupt playback');
-  hotspot.onPointerMove(event('pen',{clientY:500}));runToEnd();assert.equal(lastFrame(),0);
-  hotspot.onPointerMove(event('pen'));runToEnd();assert.equal(lastFrame(),299,'Pen movement back into the image still opens');
-  hotspot.onPointerUp(event('pen'));runToEnd();assert.equal(lastFrame(),0,'Pen release still closes');
+  hotspot.onPointerMove(event('pen',{clientY:500}));await runToEnd();assert.equal(lastFrame(),0);
+  hotspot.onPointerMove(event('pen'));await runToEnd();assert.equal(lastFrame(),299,'Pen movement back into the image still opens');
+  hotspot.onPointerUp(event('pen'));await runToEnd();assert.equal(lastFrame(),0,'Pen release still closes');
   for(const stop of [()=>listeners.get('scroll')(),()=>listeners.get('blur')(),()=>hotspot.onPointerCancel(event()),()=>hotspot.onBlur(),()=>hotspot.onKeyDown({key:'Escape'})]) {
-    hotspot.onFocus(focusEvent());for(let i=0;i<30;i++)flush();stop();runToEnd();
+    hotspot.onFocus(focusEvent());for(let i=0;i<30;i++)flush();stop();await runToEnd();
     assert.ok(draws.at(-1).url.includes('frame-000.webp'),'Scroll, lost focus, cancellation and Escape collapse');
   }
   for(const stop of [()=>listeners.get('blur')(),()=>{document.hidden=true;documentListeners.get('visibilitychange')();},()=>hotspot.onKeyDown({key:'Escape'})]) {
-    hotspot.onTouchStart(touchEvent([primary]));for(let i=0;i<30;i++)flush();stop();runToEnd();
+    hotspot.onTouchStart(touchEvent([primary]));for(let i=0;i<30;i++)flush();stop();await runToEnd();
     assert.equal(lastFrame(),0,'Window blur, hidden tab and Escape close a held touch session');
     listeners.get('touchmove')(touchEvent([primary]));flush();assert.equal(raf.size,0,'Hard exits clear the held finger');
     document.hidden=false;
   }
-  hotspot.onClick({detail:0});runToEnd();
+  hotspot.onClick({detail:0});await runToEnd();
   assert.ok(draws.at(-1).url.includes('frame-299.webp'),'Assistive technology can activate without pointer input');
-  hotspot.onKeyDown({key:'Escape'});runToEnd();
-  hotspot.onKeyDown({key:'Enter',preventDefault(){}});runToEnd();
+  hotspot.onKeyDown({key:'Escape'});await runToEnd();
+  hotspot.onKeyDown({key:'Enter',preventDefault(){}});await runToEnd();
   assert.ok(draws.at(-1).url.includes('frame-299.webp'),'Enter replays after Escape');
   rect={width:400,height:350};resized();flush();
   assert.equal(canvas.width,800);assert.equal(canvas.height,700);
@@ -177,7 +178,7 @@ try {
   fixture.effects=[];fixture.writes=[];fixture.nextState=0;
   Showcase({});
   const cachedCleanups=fixture.effects.map(effect=>effect()).filter(fn=>typeof fn==='function');flush();
-  assert.equal(ImageFixture.created.length,preparedImages,'Home remount reuses the decoded sequence without new downloads');
+  await finishPending();flush();assert.ok(ImageFixture.created.length-preparedImages<=60,'Home remount reuses the sequence and reloads only its initial decoded window');
   assert.ok(fixture.writes.some(([index,value])=>index===0&&value),'Cached-ready home initializes readiness immediately');
   cachedCleanups.forEach(fn=>fn());
   fixture.effects=[];fixture.writes=[];fixture.nextState=0;ImageFixture.created=[];
@@ -188,9 +189,9 @@ try {
   const mobileCleanups=fixture.effects.map(effect=>effect()).filter(fn=>typeof fn==='function');
   assert.ok(ImageFixture.created.every(image=>image.url.includes('-640.webp')),'Phones prepare the lighter full sequence');
   for(let i=0;i<ImageFixture.created.length;i++)await ImageFixture.created[i].finish();flush();
-  mobileHotspot.onFocus(focusEvent());flush();
+  mobileHotspot.onFocus(focusEvent());await finishPending();flush();
   assert.ok(draws.at(-1).url.includes('frame-299-640.webp'),'Reduced motion shows the endpoint immediately');
-  mobileHotspot.onBlur();flush();assert.ok(draws.at(-1).url.includes('frame-000-640.webp'));
+  mobileHotspot.onBlur();await finishPending();flush();assert.ok(draws.at(-1).url.includes('frame-000-640.webp'));
   mobileCleanups.forEach(fn=>fn());
   fixture.effects=[];fixture.writes=[];fixture.nextState=0;ImageFixture.created=[];
   const {default:MissingShowcase}=await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}#missing`);
@@ -201,7 +202,7 @@ try {
   const beforeMissing=draws.length;
   for(let i=0;i<ImageFixture.created.length;i++){ImageFixture.created[i].onerror();ImageFixture.created[i].onerror();}
   flush();
-  assert.equal(ImageFixture.created.length,150,'Terminal failures still finish the bounded queue');
+  assert.equal(ImageFixture.created.length,48,'Terminal failures finish only the bounded mobile window');
   assert.equal(draws.length,beforeMissing);
   assert.ok(!fixture.writes.some(([index,value])=>index===0&&value),'Missing images never enable playback');
   missingCleanups.forEach(fn=>fn());

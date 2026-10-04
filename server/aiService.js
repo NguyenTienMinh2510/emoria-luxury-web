@@ -1,4 +1,5 @@
 import { VIOLATION_LABELS, moderationResult } from '../src/services/videoLabels.js';
+import {reserveAiWork,releaseAiWork} from './aiAdmission.js';
 
 const MODAL_TAGGER_ENDPOINT = process.env.MODAL_TAGGER_URL || 'https://nguyentienminh2510--emoria-qwen-tagger-qwentagger-tag-video.modal.run';
 const MODAL_LETTER_ENDPOINT = process.env.MODAL_LETTER_URL || process.env.MODAL_TAGGER_URL?.replace(/tag-video\/?$/, 'craft-letter') || 'https://nguyentienminh2510--emoria-qwen-tagger-qwentagger-craft-letter.modal.run';
@@ -74,7 +75,7 @@ function getFallbackLetter({ occasion = 'anniversary', tone = 'romantic', recipi
  * @param {Object} options
  * @returns {Promise<{ approved: boolean, labels: string[], violations: string[], reason: string|null, model: string }>}
  */
-export async function labelWithQwen(media, { fetchImpl = fetch, type, url } = {}) {
+export async function labelWithQwen(media, { fetchImpl = fetch, type, url, timeoutMs=120000 } = {}) {
   let base64;
   let mediaType = type;
 
@@ -110,7 +111,7 @@ export async function labelWithQwen(media, { fetchImpl = fetch, type, url } = {}
       ...(url ? {url} : {video_base64: base64}),
       type: mediaType || 'image'
     }),
-    signal: AbortSignal.timeout(120000)
+    signal: AbortSignal.timeout(Math.max(1000,Math.min(120000,Math.floor(timeoutMs))))
   });
 
   if (!response.ok) {
@@ -124,6 +125,7 @@ export async function labelWithQwen(media, { fetchImpl = fetch, type, url } = {}
     mod = moderationResult(result);
     if (result.approved === false && mod.approved) throw new Error('Conflicting moderation');
   } catch {
+    if(result?.success===false&&result.error_code==='MEDIA_LIMIT')throw failure('Ảnh tối đa 16 megapixel; video tối đa 4K và 3 phút. Hãy giảm kích thước hoặc thời lượng tệp.',422);
     if (result?.success === false && result.error_code === 'GPU_MEMORY') {
       throw failure('Hệ thống AI thiếu bộ nhớ khi xử lý. Phương tiện chưa được duyệt; vui lòng thử lại.', 503);
     }
@@ -244,6 +246,7 @@ export async function craftLetter(c) {
 
   const fallback = getFallbackLetter({ occasion, tone, recipient, author, memoryHint });
 
+  const lease=await reserveAiWork(c.user.id,'letter',crypto.randomUUID());
   try {
     const response = await fetch(MODAL_LETTER_ENDPOINT, {
       method: 'POST',
@@ -272,6 +275,8 @@ export async function craftLetter(c) {
   } catch (err) {
     console.warn('[AI Service] Craft letter fallback:', err.message);
     return { letter: fallback };
+  } finally {
+    await releaseAiWork(lease);
   }
 }
 

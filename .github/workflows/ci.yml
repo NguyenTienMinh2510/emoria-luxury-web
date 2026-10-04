@@ -25,3 +25,36 @@ jobs:
       - run: npm ci
       - run: npm run test:ci
       - run: npm run build
+  database-migrations:
+    name: Fresh PostgreSQL migrations and event regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Start dedicated PostgreSQL 17 test container
+        run: >-
+          docker run --detach --name emoria-test-db
+          --env POSTGRES_PASSWORD=test-local-only
+          --health-cmd='pg_isready -U postgres'
+          --health-interval=2s --health-timeout=2s --health-retries=30
+          postgres:17-alpine
+      - name: Wait for PostgreSQL
+        run: |
+          for attempt in $(seq 1 30); do
+            if docker exec emoria-test-db pg_isready -U postgres; then exit 0; fi
+            sleep 2
+          done
+          docker logs emoria-test-db
+          exit 1
+      - name: Apply every migration to a fresh isolated database
+        run: node scripts/test-migrations.mjs
+      - name: Run event SQL regressions on another isolated database
+        run: node tests/event_studios_database.test.js
+      - name: Remove dedicated test container
+        if: always()
+        run: docker rm --force emoria-test-db

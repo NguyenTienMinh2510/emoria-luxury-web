@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-04",
+  "commit": "16c0601d09edd5676d7a6fd6d64dcac820a7855c",
+  "checks": [
+    {"command":"npm run test:ci", "result":"PASS", "note":"Includes mocked/component/source checks and, on this machine, local Supabase Mismatch fixtures. First sandbox attempt stopped because esbuild could not read a parent directory; completed with approved local execution."},
+    {"command":"npm run build", "result":"PASS", "note":"Vite 6.4.3; 2459 transformed modules; pinned AR assets verified."},
+    {"command":"node docs/resilience-audit-2026-10-04/database-reproduce.mjs", "result":"PASS", "note":"Five checks; disposable local PostgreSQL 16.15 database; source-extracted functions and schema shims described in harness. Cloud not accessed; Storage checked as SQL metadata authorization, not actual byte upload."},
+    {"command":"node docs/resilience-audit-2026-10-04/frontend-repro.mjs", "result":"PASS", "note":"Offline actual source/SDK with mocked Auth/Image; invalid persisted cart, auth-before-deadline, pre-aborted token wait, stalled entry frame queue; memory is arithmetic estimate, not measured OOM."},
+    {"command":"node docs/resilience-audit-2026-10-04/gateway-reproduce.mjs", "result":"PASS", "note":"Offline actual functions with synthetic HTTP/Realtime; duplicate inference, download before quota denial, 51/40 photo mismatch, 50 metadata fanout, 60 simultaneous SSE channels and cleanup."},
+    {"command":"python docs/resilience-audit-2026-10-04/gateway-decoder-reproduce.py", "result":"PASS", "note":"Actual sampler AST with stdlib mocks; 16 retained frames, 1000 decoded in duration pass, 1108 decoded overall. No GPU, network or large allocations."},
+    {"command":"node docs/resilience-audit-2026-10-04/collect-runtime.mjs", "result":"PASS", "note":"Six bounded read-only checks; no login, data mutation, private media or load test."},
+    {"check":"Configured server-secret exact-value scan of generated dist text assets", "result":"No matches", "note":"Only configured values available locally; not a full secret-history or dependency advisory audit."}
+  ],
+  "not_run":["production load/DoS test","production schema/grants inspection","production restore drill","real GPU malicious media decode","mobile/Safari memory profiling","full dependency vulnerability database scan","git history secret scan"],
+  "application_source_modified":false,
+  "production_modified":false
+}

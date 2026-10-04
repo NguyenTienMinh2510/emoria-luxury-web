@@ -53,21 +53,19 @@ const scenarios = [
     assert.deepEqual(result.data.studio_media.map(item=>item.path),['emo-test/photo','emo-test/pending']);
     assert.equal(result.data.audio_url,'https://signed.example/song');assert.equal(result.data.audio_path,'storage://emo-test/song');
   `],
-  ['maintenance RPC and REST fallback preserve fail-closed behavior', true, `
+  ['public status bypasses Auth and distinguishes outage from maintenance', true, `
     const {supabase}=await import('./src/lib/supabaseClient.js');
     const auth=await import('./src/services/authRoleService.js');
     supabase.auth.getSession=async()=>{throw new Error('Public status must not wait for Auth');};
     let rpcCalls=0,restCalls=0;
-    supabase.rpc=()=>({abortSignal:async signal=>{rpcCalls++;assert.ok(signal instanceof AbortSignal);return {data:{success:true,is_maintenance_mode:true,maintenance_message:'Planned maintenance'},error:null};}});
-    globalThis.fetch=async()=>{restCalls++;throw new Error('Unexpected REST request');};
+    globalThis.fetch=async(url,init)=>{rpcCalls++;assert.ok(url.endsWith('/rest/v1/rpc/rpc_get_system_status'));assert.ok(init.signal instanceof AbortSignal);return Response.json({success:true,is_maintenance_mode:true,maintenance_message:'Planned maintenance'});};
     assert.equal((await auth.fetchSystemStatus()).success,true);assert.equal(restCalls,0);assert.equal(rpcCalls,1);
     assert.equal(auth.getSystemAvailability().isMaintenanceMode,true);
-    supabase.rpc=()=>({abortSignal:async()=>{throw new Error('RPC unavailable');}});
-    globalThis.fetch=async(url,init)=>{restCalls++;assert.equal(url,'/api/v1/system/status');assert.equal(init.headers.Authorization,undefined);return Response.json({success:true,is_maintenance_mode:false});};
+    globalThis.fetch=async(url,init)=>{if(url.endsWith('/rest/v1/rpc/rpc_get_system_status'))throw new Error('RPC unavailable');restCalls++;assert.equal(url,'/api/v1/system/status');assert.equal(init.headers.Authorization,undefined);return Response.json({success:true,is_maintenance_mode:false});};
     assert.equal((await auth.fetchSystemStatus()).success,true);assert.equal(auth.getSystemAvailability().isMaintenanceMode,false);
     globalThis.fetch=async()=>{throw new Error('Offline');};
     assert.equal((await auth.fetchSystemStatus()).success,false);
-    assert.equal(auth.getSystemAvailability().isMaintenanceMode,true);assert.equal(auth.getSystemAvailability().vipPasscode,'');
+    assert.equal(auth.getSystemAvailability().isMaintenanceMode,false);assert.equal(auth.getSystemAvailability().isUnavailable,true);assert.equal(auth.getSystemAvailability().vipPasscode,'');
   `],
   ['API cancellation and timeout both remain effective', true, `
     const {apiRequest}=await import('./src/services/apiClient.js');

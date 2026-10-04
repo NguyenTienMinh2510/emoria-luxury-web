@@ -5,7 +5,8 @@
  */
 
 import {apiRequest} from './apiClient.js';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
+import { supabase, isSupabaseConfigured, fetchPublicSystemStatus } from '../lib/supabaseClient.js';
+import {createRequestBudget} from './requestBudget.js';
 
 export const ROLES = {
   ADMIN: 'admin',
@@ -23,40 +24,41 @@ const DEFAULT_SYSTEM_AVAILABILITY = {
 
 let memorySystemAvailability = { ...DEFAULT_SYSTEM_AVAILABILITY };
 const UNAVAILABLE_SYSTEM = {
-  isMaintenanceMode: true,
-  maintenanceMessage: 'Không thể đọc trạng thái hệ thống từ máy chủ. Vui lòng thử lại sau.',
+  isMaintenanceMode: false,
+  isUnavailable: true,
+  maintenanceMessage: 'Kết nối máy chủ đang gián đoạn. Bạn vẫn có thể xem trang; các thao tác cần máy chủ sẽ được kiểm tra khi kết nối lại.',
   vipPasscode: '',
 };
 let serverSystemAvailability = { ...UNAVAILABLE_SYSTEM };
 
 /** Đọc trạng thái thật; lỗi server không được chuyển sang cấu hình Demo. */
-export async function fetchSystemStatus() {
+export async function fetchSystemStatus({signal,timeoutMs=12000}={}) {
   if (!isSupabaseConfigured()) return { success: true, ...getSystemAvailability(), isDemo: true };
+  const budget=createRequestBudget({signal,timeoutMs});
   try {
     let data;
     try {
-      // This public RPC returns only maintenance status; no Vercel/Auth round trip is needed.
-      const result = await supabase.rpc('rpc_get_system_status').abortSignal(AbortSignal.timeout(8000));
-      if (result.error || result.data?.success !== true || typeof result.data.is_maintenance_mode !== 'boolean') {
-        throw result.error || new Error('Phản hồi máy chủ không hợp lệ.');
-      }
-      data = result.data;
+      data = await budget.wait(fetchPublicSystemStatus({signal:budget.signal,timeoutMs:8000}));
+      if (data?.success !== true || typeof data.is_maintenance_mode !== 'boolean') throw new Error('Phản hồi máy chủ không hợp lệ.');
     } catch {
-      data = await apiRequest('/system/status', { anonymous: true });
+      budget.signal.throwIfAborted();
+      data = await budget.wait(apiRequest('/system/status', { anonymous: true,signal:budget.signal }));
     }
     if (data?.success !== true || typeof data.is_maintenance_mode !== 'boolean') {
       throw new Error(data?.message || 'Phản hồi máy chủ không hợp lệ.');
     }
     serverSystemAvailability = {
       isMaintenanceMode: data.is_maintenance_mode,
+      isUnavailable: false,
       maintenanceMessage: data.maintenance_message || '',
       vipPasscode: '',
     };
     return { success: true, ...serverSystemAvailability };
   } catch (error) {
-    serverSystemAvailability = { ...UNAVAILABLE_SYSTEM };
+    // A confirmed maintenance state remains closed during a later outage.
+    serverSystemAvailability = { ...serverSystemAvailability, ...UNAVAILABLE_SYSTEM, isMaintenanceMode:serverSystemAvailability.isMaintenanceMode };
     return { success: false, ...serverSystemAvailability, error: error.message };
-  }
+  } finally {budget.dispose();}
 }
 
 /**

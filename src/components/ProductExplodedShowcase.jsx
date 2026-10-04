@@ -29,8 +29,10 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
   const touchBoundsRef = useRef(null);
   const activeTouchRef = useRef(null);
   const visibleLayersRef = useRef(0);
+  const frameVisibleRef=useRef(false), readinessRef=useRef(false);
 
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasFrame,setHasFrame]=useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [visibleLayers, setVisibleLayers] = useState(0);
   const activeLayer = SHOWCASE_LAYERS[Math.max(0, visibleLayers - 1)];
@@ -48,6 +50,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
       while (frameIndex >= 0 && !loader.ready[frameIndex]) frameIndex--;
       if (frameIndex < 0) frameIndex = loader.ready.findIndex(Boolean);
       if (frameIndex < 0 || paintedIndexRef.current === frameIndex) return;
+      loader.request(frameIndex);
       const ctx = canvas.getContext('2d', { alpha: false });
       if (!ctx) return;
       const img = loader.images[frameIndex];
@@ -69,6 +72,7 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
       const yOffset = -canvas.height * 0.035 * Math.min(1, Math.max(0, (layerFrame - 40) / 8));
       const drawY = (canvas.height - drawH) / 2 + yOffset;
       ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      if(!frameVisibleRef.current){frameVisibleRef.current=true;setHasFrame(true);}
       if (layerFrame < 80) {
         ctx.fillStyle = '#060608';
         ctx.fillRect(drawX + drawW * 1680 / 1920, drawY + drawH * 840 / 1080,
@@ -101,6 +105,8 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
       const frame = direction > 0 ? Math.min(target, next) : Math.max(target, next);
       const loader = frameLoaderRef.current;
       const index = Math.floor(frame);
+      loader.request(index);
+      loader.preload(direction>0?Math.max(0,index-8):Math.max(0,index-24),direction>0?Math.min(TOTAL_FRAMES,index+25):Math.min(TOTAL_FRAMES,index+9));
       // Hold the last decoded frame during a network stall; resume without skipping time.
       if (!loader.ready[index] && !loader.settled[index]) loader.request(index);
       else drawFrame(frame);
@@ -117,10 +123,11 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
     reducedMotionRef.current = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false;
     const sequence = prepareShowcaseFrames();
     frameLoaderRef.current = sequence.loader;
+    sequence.loader.request(0);sequence.loader.preload(0,sequence.loader.maxCached);
     const sync = () => {
       const { loadedCount, ready } = sequence.getSnapshot();
       preparedRef.current = ready;
-      setIsLoaded(ready);
+      if(readinessRef.current!==ready){readinessRef.current=ready;setIsLoaded(ready);}
       if (loadedCount) drawFrame(currentFrameRef.current);
       if (ready) animateTo(targetFrameRef.current);
     };
@@ -316,9 +323,10 @@ export default function ProductExplodedShowcase({ currentUser, onOpenAuth }) {
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 2%, black 98%, transparent 100%)'
           }}
         >
+          {!hasFrame && <img src="/assets/animation-optimized/frame-000-640.webp?v=3" alt="Kỷ vật EMORIA" className="absolute inset-0 h-full w-full object-contain" />}
           <canvas
             ref={canvasRef}
-            style={{ width: '100%', height: '100%' }}
+            style={{ width: '100%', height: '100%',opacity:hasFrame?1:0 }}
             className="absolute inset-0 w-full h-full block pointer-events-none"
           />
 

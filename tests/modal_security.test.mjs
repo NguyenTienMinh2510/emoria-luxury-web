@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {labelWithQwen, craftLetter, warmupAi} from '../server/aiService.js';
 
 const originalFetch = globalThis.fetch;
-const names = ['MODAL_PROXY_TOKEN_ID', 'MODAL_PROXY_TOKEN_SECRET', 'MODAL_STORAGE_ORIGIN'];
+const names = ['MODAL_PROXY_TOKEN_ID', 'MODAL_PROXY_TOKEN_SECRET', 'MODAL_STORAGE_ORIGIN','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY'];
 const previous = Object.fromEntries(names.map(name => [name, process.env[name]]));
 const origin = 'https://offline-fixture.supabase.co';
 const signed = origin + '/storage/v1/object/sign/emoria-memory/owner/photo.jpg?token=offline.jwt.signature';
@@ -53,8 +53,12 @@ try {
   globalThis.fetch = async () => { throw new Error('private internal diagnostic fixture'); };
   assert.deepEqual(await warmupAi(), {success:false,warmed:false,message:'Dịch vụ AI chưa sẵn sàng. Hãy thử lại sau.'});
 
-  const context = {body: {consent: true}, client: {rpc: name => { assert.equal(name, 'reserve_letter_generation'); return true; }}, db: async value => value};
-  globalThis.fetch = async (url, options) => { calls.push({url, options}); return Response.json({success: true, letter: 'A sufficiently long offline letter fixture.'}); };
+  process.env.SUPABASE_URL=origin;process.env.SUPABASE_SERVICE_ROLE_KEY='fixture-service';
+  const context = {user:{id:'fixture-owner'},body: {consent: true}, client: {rpc: name => { assert.equal(name, 'reserve_letter_generation'); return true; }}, db: async value => value};
+  globalThis.fetch = async (url, options) => {
+    if(String(url).endsWith('/rpc/rpc_reserve_ai_work')){assert.equal(JSON.parse(options.body).p_user,'fixture-owner');return Response.json({allowed:true,lease_id:'fixture-lease'});}
+    if(String(url).endsWith('/rpc/rpc_release_ai_work'))return Response.json(null);
+    calls.push({url, options}); return Response.json({success: true, letter: 'A sufficiently long offline letter fixture.'}); };
   assert.match((await craftLetter(context)).letter, /offline/);
   assert.deepEqual(calls.at(-1).options.headers, headers);
   delete process.env.MODAL_PROXY_TOKEN_SECRET;

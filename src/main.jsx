@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+import AppRecoveryBoundary from './components/AppRecoveryBoundary.jsx';
 import StoreProvider from './components/StoreProvider.jsx';
 import LanguageProvider from './i18n/LanguageProvider.jsx';
 import { Analytics } from '@vercel/analytics/react';
@@ -10,6 +11,7 @@ import './styles/index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
+    <AppRecoveryBoundary>
       <LanguageProvider>
         <StoreProvider>
           <App />
@@ -30,5 +32,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           />
         </StoreProvider>
       </LanguageProvider>
+    </AppRecoveryBoundary>
   </React.StrictMode>,
 );

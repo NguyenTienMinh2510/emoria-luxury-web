@@ -10,6 +10,19 @@ export function eventAdmin(){
 }
 const serviceKey=()=>process.env.SUPABASE_SERVICE_ROLE_KEY||'emoria-event-private-seed-key';
 const privateKey=value=>createHmac('sha256',serviceKey()).update(String(value)).digest('hex');
+export const gatewayIdentity=c=>privateKey(c.ip||'local');
+export function requestIp(req){
+  // Vercel supplies this header from its trusted edge. Local servers use the
+  // socket, so caller-supplied x-forwarded-for cannot rotate quota identities.
+  const raw=process.env.VERCEL==='1'?(req.headers['x-vercel-forwarded-for']||req.headers['x-forwarded-for']||req.socket?.remoteAddress):req.socket?.remoteAddress;
+  const candidate=String(Array.isArray(raw)?raw[0]:raw||'127.0.0.1').split(',')[0].trim();
+  return /^[0-9a-fA-F:.]+$/.test(candidate)?candidate.slice(0,45):'127.0.0.1';
+}
+export async function admitGateway(c,action='public_read'){
+  const {data,error}=await eventAdmin().rpc('rpc_gateway_admit',{p_identity:gatewayIdentity(c),p_action:action});
+  if(error||typeof data?.allowed!=='boolean')throw Object.assign(new Error('Chưa kiểm tra được giới hạn truy cập.'),{status:503});
+  if(!data.allowed)throw Object.assign(new Error('Bạn thao tác hơi nhanh. Hãy thử lại sau.'),{status:429,retryAfter:data.retry_after||60});
+}
 export async function eventRpc(c,name,args={}){
   const client=eventAdmin();
   const identity=privateKey(c.user?.id||c.ip||'local');
@@ -42,8 +55,11 @@ export async function streamMatch(c){
   const args={p_match_id:c.params[0],p_invite_token:c.body.invite_token||null};
   await eventRpc(c,'rpc_match_get_view',args);
   const client=eventAdmin();let closed=false,busy=false;
+  const lease=await c.db(client.rpc('rpc_reserve_event_stream',{p_identity:privateKey(c.user?.id||c.ip||'local'),p_resource:c.params[0]}));
+  if(!lease)throw Object.assign(new Error('Đã đạt giới hạn kết nối trực tiếp. Hãy thử lại sau.'),{status:429,retryAfter:5});
   const channel=client.channel(`emoria-match:${c.params[0]}`,{config:{private:true}});
   const res=c.res;
+  try{
   res.setHeader('Content-Type','text/event-stream');res.setHeader('Cache-Control','no-cache, no-transform');res.setHeader('X-Accel-Buffering','no');
   res.flushHeaders?.();
   await new Promise(resolve=>{
@@ -65,5 +81,7 @@ export async function streamMatch(c){
     }).subscribe(status=>{if(status==='SUBSCRIBED')check();else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')close();});
     timeout=setTimeout(close,25000);res.on('close',close);
   });
-  await client.removeChannel(channel);
+  }finally{
+    await Promise.allSettled([client.removeChannel(channel),client.rpc('rpc_release_event_stream',{p_lease:lease})]);
+  }
 }

@@ -1,5 +1,6 @@
 import {createClient} from '@supabase/supabase-js';
 import {labelWithQwen} from './aiService.js';
+import {reserveAiWork,releaseAiWork} from './aiAdmission.js';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 const serverClient=()=>{
   if(!process.env.SUPABASE_SERVICE_ROLE_KEY)throw fail(503,'Server chưa cấu hình phân tích video.');
@@ -36,7 +37,9 @@ export async function analyzeVideo(c) {
   const client=serverClient();
   const lease=await c.db(client.rpc('reserve_video_labels',{p_user:c.user.id,p_tag:tag,p_path:path}));
   if(lease.cached)return publicResult(lease,view.is_admin===true&&c.body.include_labels===true);
+  let workLease;
   try {
+    workLease=await reserveAiWork(c.user.id,'media',path);
     const storage=client.storage.from('emoria-memory');
     const info=await c.db(storage.info(path));
     const mime=info.contentType||info.metadata?.mimetype;
@@ -58,5 +61,7 @@ export async function analyzeVideo(c) {
     console.warn('[Media review failed]',{name:error.name,status:error.status||503});
     await client.from('memory_video_labels').update({status:'failed',reason:'Chưa hoàn tất kiểm duyệt do lỗi kỹ thuật; không kết luận vi phạm.'}).eq('path',path).eq('request_id',lease.request_id).eq('status','processing');
     throw error.status?error:fail(503,'Kiểm duyệt bị gián đoạn. Phương tiện chưa được sử dụng; hãy thử lại sau.');
+  }finally{
+    await releaseAiWork(workLease);
   }
 }

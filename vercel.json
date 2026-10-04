@@ -1,7 +1,14 @@
 {
   "buildCommand": "npm run test:ci && npm run build",
   "regions": ["syd1"],
-  "functions": {"api/v1.js": {"maxDuration": 180}, "api/share.js": {"includeFiles": "dist/index.html"}},
+  "functions": {"api/v1.js": {"maxDuration": 180}, "api/resilience-worker.js": {"maxDuration": 180}, "api/share.js": {"includeFiles": "dist/index.html"}},
+  "headers": [{"source":"/(.*)","headers":[
+    {"key":"X-Content-Type-Options","value":"nosniff"},
+    {"key":"X-Frame-Options","value":"DENY"},
+    {"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"},
+    {"key":"Content-Security-Policy","value":"object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"},
+    {"key":"Permissions-Policy","value":"camera=(self), accelerometer=(self), gyroscope=(self), microphone=(), geolocation=(), payment=(), usb=()"}
+  ]}],
   "redirects": [
     { "source": "/", "has": [{"type":"query","key":"view","value":"memory-(house|match)"}], "destination": "/share", "permanent": false },
     { "source": "/", "has": [{"type":"query","key":"share"}], "destination": "/share", "permanent": false },
@@ -21,6 +28,7 @@
     { "source": "/api/sepay-webhook", "destination": "/api/sepay-webhook" },
     { "source": "/api/memory-media", "destination": "/api/memory-media" },
     { "source": "/api/analytics", "destination": "/api/analytics" },
+    { "source": "/api/resilience-worker", "destination": "/api/resilience-worker" },
     {
       "source": "/(.*)",
       "destination": "/index.html"

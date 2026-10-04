@@ -9,6 +9,14 @@ const originalFetch=globalThis.fetch;
 let calls=[],dbError=null,isAdmin=false,dbResult={success:true},userId='owner-a';
 globalThis.fetch=async(input,init={})=>{
   const url=String(input),headers=new Headers(init.headers);
+  const serviceRpc=url.split('/rpc/')[1];
+  if(['rpc_gateway_admit','rpc_reserve_ai_work','rpc_release_ai_work'].includes(serviceRpc)){
+    assert.equal(headers.get('apikey'),'MUST-NOT-USE','Only explicit admission RPCs use service credentials');
+    const args=JSON.parse(init.body);
+    if(serviceRpc==='rpc_gateway_admit'){assert.match(args.p_identity,/^[a-f0-9]{64}$/);return Response.json({allowed:true});}
+    if(serviceRpc==='rpc_reserve_ai_work'){assert.equal(args.p_user,'owner-a');return Response.json({allowed:true,lease_id:'fixture-lease'});}
+    return Response.json(null);
+  }
   if(url.endsWith('/rpc/rpc_check_rate_limit')){
     assert.equal(headers.get('apikey'),'MUST-NOT-USE');
     assert.equal(JSON.parse(init.body).p_key,'ai_warmup:owner-a','Only the verified caller quota uses the isolated service client');

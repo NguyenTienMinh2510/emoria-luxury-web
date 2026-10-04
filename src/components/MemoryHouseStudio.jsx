@@ -185,6 +185,7 @@ export default function MemoryHouseStudio({
   const [isSaving, setIsSaving] = useState(false);
   const [publishStage, setPublishStage] = useState('');
   const [publishElapsed, setPublishElapsed] = useState(0);
+  const [publishProgress,setPublishProgress]=useState(null);
   const isPublishing = Boolean(publishStage);
   const publishDialogRef = useRef(null);
   useEffect(() => {
@@ -436,7 +437,7 @@ export default function MemoryHouseStudio({
       if (!isCurrent()) return;
       if(JSON.stringify(payload)!==JSON.stringify(latestHouse.current))throw new Error('Bạn vừa chỉnh sửa thêm. Hãy chờ lưu rồi xuất bản lại.');
       setPublishStage('reviewing');
-      const res = await publishHouse(tagUid);
+      const res = await publishHouse(tagUid,{onProgress:progress=>{if(isCurrent())setPublishProgress(progress);}});
       if (!isCurrent()) return;
       setIsPublished(true);
       if (res.share_id) {
@@ -448,6 +449,7 @@ export default function MemoryHouseStudio({
       setError(err?.message || 'Không thể xuất bản ngôi nhà.');
     } finally {
       setPublishStage('');
+      setPublishProgress(null);
     }
     });
   };
@@ -1031,9 +1033,9 @@ export default function MemoryHouseStudio({
           {publishStage === 'capturing' ? 'Đang tạo ảnh toàn cảnh ngôi nhà 3D để hiển thị khi chia sẻ liên kết.' : publishStage === 'saving' ? 'Đang lưu những thay đổi mới nhất trước khi xuất bản.' : 'Hệ thống đang kiểm tra ảnh trước khi chia sẻ công khai. Lần đầu có thể lâu hơn vì AI cần khởi động.'}
         </p>
         {/* ponytail: broad estimate; use measured per-image timings when available. */}
-        <p className="mt-3 text-sm text-amber-200">{publishStage === 'reviewing' ? 'Ước tính: khoảng 30 giây–3 phút, tùy số ảnh và thời gian khởi động AI.' : 'Ước tính: vài giây.'}</p>
+        <p className="mt-3 text-sm text-amber-200">{publishStage === 'reviewing' ? publishProgress ? `Đã duyệt ${publishProgress.completed}/${publishProgress.total} ảnh. Tiến độ được lưu tự động.` : 'Đang chuẩn bị lượt kiểm tra ảnh.' : 'Ước tính: vài giây.'}</p>
         <p className="mt-2 text-xs tabular-nums text-slate-400">Đã chờ {publishElapsed} giây</p>
-        <p className="mt-3 text-xs text-amber-200">Vui lòng giữ trang này mở. Kết quả sẽ hiển thị khi hoàn tất.</p>
+        <p className="mt-3 text-xs text-amber-200">Bạn có thể đóng trang và quay lại. Hệ thống tiếp tục xử lý và giữ tiến độ.</p>
       </dialog>
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Top Header Bar with Multi-Page Navigation & Studio Switcher */}

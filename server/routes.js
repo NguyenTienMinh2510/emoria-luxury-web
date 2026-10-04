@@ -1,13 +1,14 @@
 // Explicit resource routes. SQL functions remain the transaction boundary.
 import {createClient} from '@supabase/supabase-js';
-import {eventRpc,eventAdmin,isEventRpc,streamMatch} from './eventGateway.js';
+import {eventRpc,eventAdmin,isEventRpc,streamMatch,gatewayIdentity,admitGateway} from './eventGateway.js';
 import {normalizeCheckout} from '../src/services/checkoutPayload.js';
 import {analyzeVideo,readVideoLabels,readVideoUploads} from './videoLabels.js';
 import {craftLetter,warmupAi} from './aiService.js';
 import {tryOnConfig} from './tryOn.js';
 import {signEventPaths,signPublishedHousePaths,enrichMatchQuestionsWithSignedUrls,enrichHouseRoomsWithSignedUrls} from './eventMedia.js';
 import {signMemoryMedia} from './memoryMedia.js';
-import {moderateHousePhotos} from './houseModeration.js';
+import {moderateHousePhotos,enqueueHousePublish,readHousePublishJob,processHouseJobs} from './houseModeration.js';
+import {reserveAiWork,releaseAiWork} from './aiAdmission.js';
 import {validateHousePreview,attachHousePreview} from './housePreview.js';
 const route=(method,path,access,run,status)=>({method,pattern:new RegExp(`^${path}$`),access,run,status});
 const rpc=(c,name,args={})=>isEventRpc(name)?eventRpc(c,name,args):c.db(c.client.rpc(name,args));
@@ -25,7 +26,8 @@ export const routes=[
   route('POST','/ai/warmup','user',async c=>{
     const limit=await c.db(eventAdmin().rpc('rpc_check_rate_limit',{p_key:`ai_warmup:${c.user.id}`,p_max_burst:3,p_window_seconds:3600}));
     if(!limit?.allowed)throw Object.assign(new Error('Hãy thử lại sau.'),{status:429});
-    return warmupAi();
+    const lease=await reserveAiWork(c.user.id,'warmup',c.user.id);
+    try{return await warmupAi();}finally{await releaseAiWork(lease);}
   }),
   route('POST','/ai/craft-letter','user',craftLetter),
   route('GET','/admin/accounts','admin',c=>rpc(c,'rpc_admin_accounts',{p_search:(c.query.get('search')||'').slice(0,120)})),
@@ -124,7 +126,7 @@ export const routes=[
     if (!name || name.length > 100) throw Object.assign(new Error('Họ và tên phải từ 1 đến 100 ký tự.'),{status:400});
     if (!phone || !/^[0-9+() -]{8,20}$/.test(phone)) throw Object.assign(new Error('Số điện thoại không hợp lệ.'),{status:400});
     if (note.length > 2000) throw Object.assign(new Error('Ghi chú tối đa 2000 ký tự.'),{status:400});
-    return rpc(c,'rpc_contact',{p_name:name,p_phone:phone,p_note:note||null});
+    return c.db(eventAdmin().rpc('rpc_contact_guarded',{p_name:name,p_phone:phone,p_note:note||null,p_source:gatewayIdentity(c),p_caller:c.user?.id||null}));
   },201),
   route('GET','/admin/contacts','admin',c=>c.db(c.client.from('contact_requests').select('*').order('created_at',{ascending:false}).limit(100))),
   route('PATCH','/admin/contacts/([^/]+)','admin',c=>c.db(c.client.from('contact_requests').update({resolved:c.body.resolved===true}).eq('id',c.params[0]).select('id').single())),
@@ -145,6 +147,7 @@ export const routes=[
   route('GET','/me/saved-articles','user',c=>rpc(c,'rpc_saved_articles')),
   route('POST','/memories/([^/]+)/access','public',async c=>{
     const data=await rpc(c,'rpc_get_memory_view',{p_tag_uid:c.params[0],p_grant_token:c.body.grant??null});
+    try{await eventAdmin().rpc('rpc_record_memory_tap',{p_tag_uid:c.params[0],p_source:gatewayIdentity(c),p_caller:c.user?.id||null});}catch{/* Telemetry never blocks access. */}
     if(data.is_unlocked&&(data.intro_video_path||data.audio_url?.startsWith('storage://')||data.media_gallery?.some(m=>m.url?.startsWith('storage://')))){
       data.media_signing=await signMemoryMedia(data,String(c.params[0]).toLowerCase().trim());
     }
@@ -154,7 +157,7 @@ export const routes=[
     if(!c.params[0]||!/^[a-zA-Z0-9_-]{1,64}$/.test(c.params[0]))throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'),{status:400});
     const pin = typeof c.body.pin === 'string' || typeof c.body.pin === 'number' ? String(c.body.pin).trim() : '';
     if (!pin || pin.length > 32) throw Object.assign(new Error('Mã PIN không hợp lệ.'),{status:400});
-    return rpc(c,'rpc_verify_memory_pin',{p_tag_uid:c.params[0],p_pin:pin});
+    return c.db(eventAdmin().rpc('rpc_verify_memory_pin_guarded',{p_tag_uid:c.params[0],p_pin:pin,p_source:gatewayIdentity(c),p_caller:c.user?.id||null}));
   },201),
   route('POST','/memories/([^/]+)/claims','user',c=>{
     if(!c.params[0]||!/^[a-zA-Z0-9_-]{1,64}$/.test(c.params[0]))throw Object.assign(new Error('Mã kỷ vật không hợp lệ.'),{status:400});
@@ -365,10 +368,23 @@ export const routes=[
   route('POST','/memories/([^/]+)/house/publish','user',async c=>{
     const draft=await rpc(c,'rpc_house_get_draft',{p_tag_uid:c.params[0]});
     await validateHousePreview(draft?.rooms,c.params[0],c.client);
+    if(process.env.NODE_ENV!=='test'&&!(process.env.SUPABASE_URL||'').startsWith('http://127.0.0.1:'))return enqueueHousePublish(c,c.params[0]);
     await moderateHousePhotos(c,c.params[0],draft);
     const res=await rpc(c,'rpc_house_publish',{p_tag_uid:c.params[0],expected_revision:draft.draft_revision});
 
     return res;
+    },200),
+  route('GET','/memories/([^/]+)/house/jobs/([^/]+)','user',async c=>{
+    const job=await readHousePublishJob(c,c.params[1]);
+    if(job.tag!==c.params[0])throw Object.assign(new Error('Không tìm thấy lượt xuất bản.'),{status:404});
+    return job;
+  }),
+  route('POST','/memories/([^/]+)/house/jobs/([^/]+)/run','user',async c=>{
+    const job=await readHousePublishJob(c,c.params[1]);
+    if(job.tag!==c.params[0])throw Object.assign(new Error('Không tìm thấy lượt xuất bản.'),{status:404});
+    await admitGateway(c,'job_run');
+    if(['queued','processing','ready'].includes(job.status))await processHouseJobs({jobId:c.params[1]});
+    return readHousePublishJob(c,c.params[1]);
   }),
   route('POST','/memories/([^/]+)/house/unpublish','user',c=>{
     return rpc(c,'rpc_house_unpublish',{p_tag_uid:c.params[0]});
@@ -452,6 +468,8 @@ export const routes=[
   }),
 
   route('POST','/events/matches/([^/]+)/stream','public',streamMatch),
+  route('POST','/storage/uploads/reserve','user',c=>c.db(eventAdmin().rpc('rpc_reserve_storage_upload',{p_bucket:c.body.bucket,p_path:c.body.path,p_bytes:c.body.bytes,p_mime:c.body.mime,p_caller:c.user.id})),201),
+  route('POST','/storage/uploads/cancel','user',c=>c.db(eventAdmin().rpc('rpc_cancel_storage_upload',{p_bucket:c.body.bucket,p_path:c.body.path,p_caller:c.user.id}))),
   route('POST','/events/houses/replies','public',async c=>{
     const {share_id, tag_uid, kind, name, message, request_id} = c.body || {};
     if (!request_id || typeof request_id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request_id)) {

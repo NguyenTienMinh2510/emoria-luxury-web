@@ -24,8 +24,9 @@ async function apiCall(method, path, body, token, options = {}) {
   const req = Readable.from(payloadStr === undefined ? [] : [payloadStr]);
   const contentType = options.contentType !== undefined ? options.contentType : (payloadStr === undefined ? undefined : 'application/json');
   Object.assign(req, {
-    method,
-    url: path,
+      method,
+      url: path,
+      socket: {remoteAddress:options.ip||'127.0.0.1'},
     headers: {
       ...(contentType ? {'content-type': contentType} : {}),
       ...(token ? {authorization: `Bearer ${token}`} : {}),
@@ -105,6 +106,10 @@ const state = {
 
   // Simulated RPC runner reproducing exact PostgreSQL semantics from 20260928072518_event_studios.sql & 20260929060533_event_studios_completion.sql
   function runSimulatedRpc(name, args, callerUserId) {
+    if(name==='rpc_gateway_admit')return {data:{allowed:true}};
+    if(name==='rpc_reserve_event_stream')return {data:crypto.randomUUID()};
+    if(name==='rpc_release_event_stream')return {data:null};
+    if(name==='rpc_house_approved_paths')return {data:args.p_paths.filter(path=>path.startsWith(args.p_tag+'/')&&state.housePhotoReviews[path]?.status==='ready'&&state.housePhotoReviews[path]?.content_version==='fixture-version-1')};
     if (name === 'rpc_house_photo_review_namespace') {
       return {data: args.p_path.startsWith(args.p_tag + '/') && state.storageObjects['emoria-event-media'].has(args.p_path)};
     }
@@ -1667,7 +1672,7 @@ async function runTests() {
       resource_id: houseShareId,
       reason: 'inappropriate_content',
       details: 'Chứa hình ảnh chưa phù hợp'
-    }, null, { headers: { 'x-forwarded-for': '192.168.1.50' } });
+    }, null, { ip: '192.168.1.50' });
     assert.equal(reportHouseRes.status, 201, 'Gửi báo cáo thành công với status 201');
     const repId = reportHouseRes.body.report_id;
     assert.ok(repId, 'Nhận được report_id');
@@ -1722,7 +1727,7 @@ async function runTests() {
       resource_id: dMatchId,
       dedupe_key: `dedupe:match:${dMatchId}:open:test-client-1`,
       metadata: { referrer: 'zalo' }
-    }, null, { headers: { 'x-forwarded-for': '192.168.1.80' } });
+    }, null, { ip: '192.168.1.80' });
     assert.equal(track1.status, 200, 'Ghi nhận event analytics thành công');
     assert.equal(track1.body.tracked, true);
 
@@ -1733,7 +1738,7 @@ async function runTests() {
       resource_id: dMatchId,
       dedupe_key: `dedupe:match:${dMatchId}:open:test-client-1`,
       metadata: { referrer: 'zalo' }
-    }, null, { headers: { 'x-forwarded-for': '192.168.1.80' } });
+    }, null, { ip: '192.168.1.80' });
     assert.equal(track1Dup.status, 200, 'Gửi lại event trùng lặp thành công');
     assert.equal(track1Dup.body.deduped, true, 'Hệ thống nhận diện đã khử trùng lặp (deduped)');
 
@@ -1742,13 +1747,13 @@ async function runTests() {
       event_name: 'house_opened_share',
       resource_type: 'house',
       resource_id: houseShareId
-    }, null, { headers: { 'x-forwarded-for': '192.168.1.81' } });
+    }, null, { ip: '192.168.1.81' });
 
     await apiCall('POST', '/api/v1/events/analytics/track', {
       event_name: 'house_postcard_shared',
       resource_type: 'house',
       resource_id: houseShareId
-    }, null, { headers: { 'x-forwarded-for': '192.168.1.82' } });
+    }, null, { ip: '192.168.1.82' });
 
     // Non-admin truy cập thống kê -> 403
     const nonAdminSummary = await apiCall('GET', '/api/v1/admin/events/analytics/summary', undefined, 'token-owner-a');

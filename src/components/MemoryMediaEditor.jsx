@@ -6,6 +6,7 @@ import {Images, UploadCloud, RefreshCw, Trash2, CheckCircle2, AlertTriangle, Mus
 import MediaModerationModal from './MediaModerationModal.jsx';
 import {mediaProgress, runMediaBatch} from '../services/mediaUploadProgress.js';
 import { triggerAiWarmup } from '../services/aiWarmup.js';
+import {uploadReservedMedia} from '../services/storageUpload.js';
 
 export default function MemoryMediaEditor({tag, items, onChange, audio, onAudio, videoConsent=false, onBusy=()=>{}}){
   const {t}=useLanguage();
@@ -44,8 +45,7 @@ export default function MemoryMediaEditor({tag, items, onChange, audio, onAudio,
     if(file.type.startsWith('audio/')){
       updateProgress(mediaProgress(file,'uploading'));
       const path=`${tag}/audio-${crypto.randomUUID()}.${file.type.split('/')[1]||'mp3'}`;
-      const res=await supabase.storage.from('emoria-memory').upload(path,file,{upsert:false,contentType:file.type});
-      if(res.error)throw res.error;
+      await uploadReservedMedia('emoria-memory',path,file);
       return {audio:'storage://'+path};
     }
 

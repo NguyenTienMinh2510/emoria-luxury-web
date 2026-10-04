@@ -67,31 +67,39 @@ try {
   now+=10000;
   for(let i=30;i<GateImage.created.length;i++)await GateImage.created[i].finish();
   assert.equal(sequence.getSnapshot().ready,true,'Readiness is retained through later throughput changes');
-  assert.equal(GateImage.created.length,150);
+  assert.equal(GateImage.created.length,48,'Initial mobile prefetch retains a bounded decoded window');
+  sequence.loader.request(149);sequence.loader.preload(48,150);
+  for(let i=48;i<GateImage.created.length;i++){now+=15;await GateImage.created[i].finish();}
+  assert.equal(sequence.getSnapshot().loadedCount,150,'All 150 samples remain available to playback');
+  assert.ok(sequence.loader.ready.filter(Boolean).length<=48,'The whole sequence is never retained decoded at once');
   const indices=GateImage.created.map(image=>Number(image.url.match(/frame-(\d+)/)[1]));
   assert.equal(new Set(indices).size,150);
-  assert.equal(indices[0],0);assert.equal(indices.at(-1),299);
-  assert.ok(indices.slice(1).every((index,i)=>index-indices[i]>=2&&index-indices[i]<=3),'Sampling preserves the whole original sequence evenly');
+  const sortedIndices=[...indices].sort((a,b)=>a-b);
+  assert.equal(sortedIndices[0],0);assert.equal(sortedIndices.at(-1),299);
+  assert.ok(sortedIndices.slice(1).every((index,i)=>index-sortedIndices[i]>=2&&index-sortedIndices[i]<=3),'Sampling preserves the whole original sequence evenly');
   window.innerWidth=1440;
   assert.equal(prepareShowcaseFrames(),sequence,'Remounts and viewport changes reuse the decoded mobile variant');
-  assert.ok(GateImage.created.every(image=>image.url.includes('-640.webp')&&!image.cancelled));
+  assert.ok(GateImage.created.every(image=>image.url.includes('-640.webp')));
+  assert.ok(GateImage.created.some(image=>image.cancelled),'Frames outside the playback window are released');
+  sequence.dispose();
 
   GateImage.created=[];now=0;
   const failure=await import(`${moduleUrl}#failed-visit`);
   failure.Gate({children:'WEBSITE'});
   for(let i=1;i<GateImage.created.length;i++){now+=50;await GateImage.created[i].finish();}
   const failedSequence=failure.prepareShowcaseFrames();
-  assert.equal(failedSequence.getSnapshot().loadedCount,149);
+  assert.equal(failedSequence.getSnapshot().loadedCount,59);
   assert.equal(failedSequence.getSnapshot().bufferedCount,0);
-  assert.equal(failedSequence.getSnapshot().ready,false,'149 out-of-order frames cannot substitute for a contiguous initial buffer');
+  assert.equal(failedSequence.getSnapshot().ready,false,'Out-of-order frames cannot substitute for a contiguous initial buffer');
   GateImage.created[0].onerror();GateImage.created[0].onerror();
   const failedGate=failure.Gate({children:'WEBSITE'});
   assert.equal(failedGate.props['aria-busy'],false);
   assert.ok(text(failedGate).includes('Kết nối chưa hoàn tất. Vui lòng thử lại.'));
-  find(failedGate,'button').props.onClick();
-  assert.equal(GateImage.created.length,151,'Retry keeps all decoded frames and reloads only the missing first image');
-  await GateImage.created[150].finish();
+  failedSequence.retry();
+  assert.equal(GateImage.created.length,61,'Retry keeps decoded frames and reloads the missing first image');
+  await GateImage.created[60].finish();
   assert.equal(failure.Gate({children:'WEBSITE'}),'WEBSITE');
+  failedSequence.dispose();
   const main=fs.readFileSync('src/main.jsx','utf8'),app=fs.readFileSync('src/App.jsx','utf8');
   assert.ok(!main.includes('MotionEntryGate'),'Providers, system status and NFC routing mount without a global frame dependency');
   assert.ok(app.includes("<MotionEntryGate pending waitForFrames={currentView === 'home'} />"));

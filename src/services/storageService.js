@@ -81,43 +81,7 @@ export async function uploadMedia(file, pathFolder = 'memories') {
     };
   }
 
-  try {
-    const { data, error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: true,
-      });
-
-    if (error) {
-      console.error('[Storage Upload Error]', error);
-      // Fallback to local Object URL if bucket doesn't exist yet so user isn't blocked
-      if (error.message && (error.message.includes('Bucket not found') || error.statusCode === '404')) {
-        console.warn(`[Storage] Bucket '${BUCKET_NAME}' chưa được tạo trên Supabase. Dùng Local Preview URL.`);
-        return {
-          publicUrl: URL.createObjectURL(file),
-          filePath,
-          fileType: isImage ? 'image' : 'video',
-          warning: `Bucket '${BUCKET_NAME}' chưa được khởi tạo trên Supabase Dashboard.`,
-        };
-      }
-      throw new Error(`Tải file thất bại: ${error.message}`);
-    }
-
-    // Retrieve public URL from bucket
-    const { data: urlData } = supabase.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(data.path || filePath);
-
-    return {
-      publicUrl: urlData.publicUrl,
-      filePath: data.path || filePath,
-      fileType: isImage ? 'image' : 'video',
-    };
-  } catch (err) {
-    console.error('[Storage Service Error]', err);
-    throw err;
-  }
+  throw new Error('Vui lòng chỉnh sửa album trong Memory Space để kiểm tra quyền tải lên và duyệt ảnh an toàn.');
 }
 
 /**

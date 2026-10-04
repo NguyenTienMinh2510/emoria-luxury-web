@@ -17,6 +17,7 @@ scratch/
 # AI Guides, Prompts, and Handoff Documentation
 *.md
 !docs/MISMATCH-200-QUESTIONS.md
+!docs/resilience-audit-2026-10-04/*.md
 *.zip
 *.zip.sha256
 PROMPT-*.txt

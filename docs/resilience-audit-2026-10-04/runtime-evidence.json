@@ -1,0 +1,57 @@
+{
+  "checkedAt": "2026-10-04T05:12:43.565Z",
+  "site": "https://emoria-luxury-web.vercel.app",
+  "scope": "read-only; no auth, mutations, media access or load testing",
+  "results": [
+    {
+      "label": "homepage",
+      "status": 200,
+      "elapsedMs": 700,
+      "contentType": "text/html; charset=utf-8",
+      "scriptAssets": [
+        "/assets/main-Dzxj91QX.js"
+      ],
+      "securityHeaders": {
+        "content-security-policy": null,
+        "x-frame-options": null,
+        "x-content-type-options": null,
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "referrer-policy": null
+      },
+      "localScriptAssets": [
+        "/assets/main-B1OnzZTv.js"
+      ],
+      "assetsMatchLocalBuild": false
+    },
+    {
+      "label": "catalog",
+      "status": 200,
+      "elapsedMs": 2104,
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "label": "system status",
+      "status": 200,
+      "elapsedMs": 493,
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "label": "analytics rejects anonymous",
+      "status": 401,
+      "elapsedMs": 874,
+      "contentType": "application/json"
+    },
+    {
+      "label": "Supabase Auth health",
+      "status": 200,
+      "elapsedMs": 1350,
+      "contentType": "application/json"
+    },
+    {
+      "label": "Supabase catalog schema",
+      "status": 200,
+      "elapsedMs": 873,
+      "contentType": "application/json; charset=utf-8"
+    }
+  ]
+}

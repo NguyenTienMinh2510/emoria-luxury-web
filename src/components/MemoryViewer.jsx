@@ -29,7 +29,7 @@ import { uploadMedia } from '../services/storageService';
 import { supabase } from '../lib/supabaseClient';
 import {createShareUrl} from '../services/shareLinks.js';
 
-export default function MemoryViewer({ tagUid: propTag, token: propToken, onClose, currentUser }) {
+export default function MemoryViewer({ tagUid: propTag, token: propToken, onClose, currentUser, onEditMedia }) {
   // Read params from URL query or props
   const [tagUid, setTagUid] = useState(propTag || 'emoria-lumen');
   const [token, setToken] = useState(propToken || null);
@@ -367,14 +367,14 @@ export default function MemoryViewer({ tagUid: propTag, token: propToken, onClos
                     Bộ Sưu Tập Ảnh &amp; Video (Supabase Storage)
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Lưu trữ vào bucket <code className="text-slate-200 font-mono">emoria-media</code> (Ảnh &lt;15MB, Video &lt;50MB)
+                    Chỉnh sửa album và tải tệp an toàn trong Memory Space.
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  disabled={isUploading}
-                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!onEditMedia}
+                  onClick={()=>onEditMedia?.(tagUid)}
                   className="px-4 py-2 rounded-xl bg-white text-dark-950 font-bold text-xs hover:bg-slate-200 transition-colors flex items-center gap-2 shadow-silver-glow"
                 >
                   {isUploading ? (

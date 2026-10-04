@@ -3,6 +3,7 @@ import DeferredContent from './components/DeferredContent';
 import Navbar from './components/Navbar';
 import AnalyticsConsent from './components/AnalyticsConsent';
 import {trackShopEvent} from './services/analyticsService';
+import {readStoredCart} from './services/cartStorage.js';
 import { useStore } from './components/StoreProvider';
 import ArticlesSection from './components/ArticlesSection';
 import HeroSection from './components/HeroSection';
@@ -81,6 +82,8 @@ export default function App() {
   const [recovery, setRecovery] = useState(false);
   const [routeReady, setRouteReady] = useState(false);
   const [systemReady,setSystemReady]=useState(false);
+  const [systemRetrying,setSystemRetrying]=useState(false);
+  const systemRetryRef=useRef(null);
   const [chipId,setChipId]=useState('');
   const [currentTag, setCurrentTag] = useState('');
   const [selectedArticleSlug, setSelectedArticleSlug] = useState('nghe-thuat-che-tac-da-quy-emoria');
@@ -107,14 +110,7 @@ export default function App() {
   const [vipBypassed, setVipBypassed] = useState(false);
 
   // Persistent Cart via localStorage
-  const [cartItems, setCartItems] = useState(() => {
-    try {
-      const raw = localStorage.getItem('emoria_cart_v1');
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  const [cartItems, setCartItems] = useState(() => readStoredCart());
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -173,9 +169,23 @@ export default function App() {
 
   // Listen to Supabase Auth State on mount
   useEffect(() => {
-    let active = true;
-    fetchSystemStatus().then(() => { if (active) setSystemConfig(getSystemAvailability()); }).finally(()=>{if(active)setSystemReady(true);});
-    return () => { active = false; };
+    let active = true, pending = false, timer, controller;
+    const refresh = async () => {
+      if (!active || pending) return;
+      clearTimeout(timer);pending=true;controller=new AbortController();setSystemRetrying(true);
+      let result;
+      try {
+        result=await fetchSystemStatus({signal:controller.signal});
+        if(active)setSystemConfig(getSystemAvailability());
+      } finally {
+        pending=false;
+        if(active){setSystemReady(true);setSystemRetrying(false);timer=setTimeout(refresh,result?.success?60000:15000);}
+      }
+    };
+    systemRetryRef.current=refresh;
+    refresh();
+    window.addEventListener('online',refresh);window.addEventListener('focus',refresh);
+    return () => { active=false;clearTimeout(timer);controller?.abort();systemRetryRef.current=null;window.removeEventListener('online',refresh);window.removeEventListener('focus',refresh); };
   }, []);
 
   // Listen to Supabase Auth State on mount
@@ -393,6 +403,7 @@ export default function App() {
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6 font-light">
             {systemConfig.maintenanceMessage}
           </p>
+          <button type="button" disabled={systemRetrying} className="mb-5 text-sm underline disabled:opacity-50" onClick={()=>systemRetryRef.current?.()}>{systemRetrying?'Đang kiểm tra…':'Kiểm tra kết nối lại'}</button>
 
           <form onSubmit={handleVipSubmit} className="space-y-3 max-w-xs mx-auto mb-6">
             <input
@@ -454,6 +465,9 @@ export default function App() {
       />
 
       {store.settings?.sandbox && <div className="fixed top-0 inset-x-0 z-[60] bg-amber-200 text-black text-center text-xs py-1">CỬA HÀNG THỬ NGHIỆM · Dữ liệu được lưu thật · Không thu tiền / giao hàng</div>}
+      {systemConfig.isUnavailable && <div role="status" className="relative z-[60] mt-20 border-y border-amber-200/20 bg-dark-900 px-4 py-3 text-center text-sm text-amber-100">
+        {systemConfig.maintenanceMessage} <button type="button" disabled={systemRetrying} className="ml-2 underline disabled:opacity-50" onClick={()=>systemRetryRef.current?.()}>{systemRetrying?'Đang kiểm tra…':'Thử kết nối lại'}</button>
+      </div>}
       <AnalyticsConsent settings={store.settings} view={currentView} isAdmin={authSession.isAdmin}/>
       {store.error&&<div role="alert" className="fixed bottom-4 left-4 right-4 z-[70] p-4 bg-dark-900 border border-red-300/30 rounded-xl text-sm">{store.error} <button className="underline ml-3" onClick={store.refresh}>Thử lại</button></div>}
       {/* Main Dynamic View Area */}
@@ -841,6 +855,7 @@ export default function App() {
           token={memoryViewerState.token}
           onClose={handleCloseMemoryViewer}
           currentUser={currentUser}
+          onEditMedia={tag=>{if(!navigateTo('memory'))return;setCurrentTag(tag);setMemoryViewerState(previous=>({...previous,isOpen:false}));}}
         />
       )}
 

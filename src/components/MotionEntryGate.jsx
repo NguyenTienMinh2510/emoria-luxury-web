@@ -36,7 +36,10 @@ export default function MotionEntryGate({ children, pending = false, waitForFram
             <progress value={sequence ? Math.min(bufferedCount, preloadCount) : undefined} max={preloadCount} aria-label="Chuẩn bị trải nghiệm" aria-describedby="entry-status"
               className="block h-1 w-full overflow-hidden rounded-full bg-white/10 accent-amber-200 [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-amber-200 [&::-moz-progress-bar]:bg-amber-200" />
           </div>
-          {failed && <button type="button" onClick={sequence.retry} className="cta-luxury-gold mt-7 w-full">Thử lại</button>}
+          {!pending && sequence && <div className="mt-7 space-y-3">
+            <button type="button" onClick={sequence.bypass} className="cta-luxury-gold w-full">Tiếp tục xem trang</button>
+            {failed && <button type="button" onClick={sequence.retry} className="w-full text-sm underline">Thử lại</button>}
+          </div>}
           <p className="mt-7 text-[11px] leading-relaxed text-slate-400">Cảm ơn bạn đã dành thời gian chờ.</p>
         </div>
       </div>

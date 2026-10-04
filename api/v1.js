@@ -1,5 +1,6 @@
 import {createClient} from '@supabase/supabase-js';
 import {routes} from '../server/routes.js';
+import {admitGateway,requestIp} from '../server/eventGateway.js';
 
 const fail=(status,message,code)=>Object.assign(new Error(message),{status,code});
 async function readBody(req) {
@@ -40,7 +41,7 @@ export default async function handler(req,res) {
     const base=process.env.SUPABASE_URL||process.env.VITE_SUPABASE_URL;
     const key=process.env.SUPABASE_PUBLISHABLE_KEY||process.env.VITE_SUPABASE_ANON_KEY||process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     if(!base||!key)throw fail(503,'Server chưa cấu hình database.');
-    const authorization=req.headers.authorization;
+    const authorization=['/catalog','/system/status'].includes(path)?undefined:req.headers.authorization;
     if(authorization&&!/^Bearer \S+$/i.test(authorization))throw fail(401,'Phiên đăng nhập không hợp lệ.');
     // Never use service-role here: the caller's JWT preserves ownership and RLS.
     const client=createClient(base,key,{auth:{persistSession:false,autoRefreshToken:false},global:{
@@ -50,7 +51,11 @@ export default async function handler(req,res) {
     if(authorization){const result=await client.auth.getUser(authorization.slice(7));if(result.error||!result.data.user)throw fail(401,'Phiên đăng nhập hết hạn.');user=result.data.user;}
     if(route.access!=='public'&&!user)throw fail(401,'Vui lòng đăng nhập.');
     if(route.access==='admin'){const role=await client.rpc('is_admin');if(role.error)throw fail(503,'Chưa kiểm tra được quyền quản trị.');if(role.data!==true)throw fail(403,'Chỉ quản trị viên được thực hiện thao tác này.');}
+    const ip=requestIp(req);let admitted=false;
     const db=async query=>{
+      if(!admitted&&route.access==='public'&&!path.startsWith('/events/')&&!/\/(grants|guestbook)$|^\/contacts$/.test(path)){
+        await admitGateway({ip});admitted=true;
+      }
       const {data,error}=await query;
       if(error){
         console.error('[API Database Error]', error.code, error.message);
@@ -60,12 +65,10 @@ export default async function handler(req,res) {
         if(/^22|^23/.test(error.code||''))throw fail(422,error.message||'Dữ liệu không hợp lệ hoặc xung đột với dữ liệu hiện có.',error.code);
         throw fail(503,'Database chưa trả kết quả. Vui lòng thử lại.');
       }
+      if(data?.success===false&&['RATE_LIMIT_EXCEEDED','STORAGE_QUOTA_EXCEEDED'].includes(data.code))throw Object.assign(fail(429,data.message||'Bạn thao tác hơi nhanh. Hãy thử lại sau.',data.code),{retryAfter:data.retry_after||60});
       if(data?.success===false)throw fail(409,data.message||'Không thể thực hiện thao tác.');
       return data;
     };
-    const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
-    const candidateIp = String(Array.isArray(rawIp) ? rawIp[0] : rawIp).split(',')[0].trim();
-    const ip = /^[0-9a-fA-F:.]+$/.test(candidateIp) ? candidateIp.slice(0, 45) : '127.0.0.1';
     const result=await route.run({client,db,user,body,params,query:url.searchParams,ip,req,res});
     if(res.writableEnded)return;
     send(route.status||200,result??{success:true});

@@ -2,6 +2,7 @@ import {apiRequest} from './apiClient.js';
 import {supabase} from '../lib/supabaseClient.js';
 import {serializeHouseRooms} from './house3d.js';
 import {getAnalyticsConsent} from './analyticsService.js';
+import {uploadReservedMedia} from './storageUpload.js';
 
 import {getTopicQuestions} from './matchQuestionBank.js';
 
@@ -196,14 +197,35 @@ export async function saveHouseDraft(tagUid, { title, theme, rooms, expected_rev
 /**
  * Xuất bản Memory House (đóng băng snapshot, sinh share_id)
  */
-export async function publishHouse(tagUid) {
+export async function publishHouse(tagUid,{onProgress=()=>{},signal}={}) {
   if (!tagUid) throw new Error('Vui lòng cung cấp mã kỷ vật.');
-  return apiRequest(`/memories/${encodeURIComponent(tagUid)}/house/publish`, {
+  let job=await apiRequest(`/memories/${encodeURIComponent(tagUid)}/house/publish`, {
     method: 'POST',
     body: {},
-    // Publishing waits for photo moderation; match the server's 180s budget.
-    timeoutMs: 180000
+    signal
   });
+  if(!job.job_id)return job;
+  const base=`/memories/${encodeURIComponent(tagUid)}/house/jobs/${encodeURIComponent(job.job_id)}`;
+  // Each HTTP call handles one durable task. Cron also progresses the job when
+  // the page closes; reopening/resubmitting this revision returns the same job.
+  const end=Date.now()+30*60*1000;
+  while(Date.now()<end){
+    signal?.throwIfAborted();
+    onProgress(job);
+    if(job.status==='published')return job.result;
+    if(['failed','superseded'].includes(job.status))throw new Error(job.reason==='technical'?'AI tạm thời chưa xử lý được ảnh. Tiến độ đã lưu; hãy xuất bản lại để tiếp tục.':job.reason||'Bản nháp đã thay đổi. Hãy xuất bản lại.');
+    try {job=await apiRequest(base+'/run',{method:'POST',body:{},timeoutMs:170000,signal});}
+    catch(error){if(signal?.aborted)throw error;if(![429,502,503,504].includes(error.status))throw error;}
+    onProgress(job);
+    if(job.status==='published')return job.result;
+    await new Promise((resolve,reject)=>{
+      const stop=()=>{clearTimeout(timer);signal?.removeEventListener('abort',stop);reject(signal.reason);};
+      const timer=setTimeout(()=>{signal?.removeEventListener('abort',stop);resolve();},Math.max(2,Math.min(60,job.retry_after||5))*1000);
+      signal?.addEventListener('abort',stop,{once:true});
+    });
+    job=await apiRequest(base,{signal});
+  }
+  throw new Error('Tiến độ xuất bản đã lưu và vẫn được xử lý. Bạn có thể quay lại để xem kết quả.');
 }
 
 export const restoreHouseLayout=(tagUid,expected_revision)=>apiRequest(`/memories/${encodeURIComponent(tagUid)}/house/restore-layout`,{method:'POST',body:{expected_revision}});
@@ -270,11 +292,7 @@ export async function uploadEventPhoto(tagUid, file) {
   const filename = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}.${ext}`;
   const path = `${cleanTag}/${filename}`;
 
-  const { error } = await supabase.storage.from('emoria-event-media').upload(path, file, {
-    contentType: file.type,
-    upsert: false
-  });
-  if (error) throw error;
+  await uploadReservedMedia('emoria-event-media',path,file);
 
   let signedUrl = null;
   try {

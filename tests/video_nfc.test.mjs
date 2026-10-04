@@ -78,6 +78,8 @@ const originalFetch=globalThis.fetch;
 let reserveError=false,owner=true,unlocked=true,cached=false,isAdmin=false,dbCalls=[],modelCalls=0,storedLabels,malformedQwen=false;
 globalThis.fetch=async(input,options={})=>{
   const url=String(input);dbCalls.push(url);
+  if(url.endsWith('/rpc/rpc_reserve_ai_work'))return Response.json({allowed:true,lease_id:'ai-lease'});
+  if(url.endsWith('/rpc/rpc_release_ai_work'))return Response.json(null);
   if(url.startsWith('https://generativelanguage.googleapis.com')){modelCalls++;return googleResponse();}
   if(url.includes('.modal.run')){modelCalls++;assert.deepEqual(JSON.parse(options.body),{url:signedUrl,type:'video'});return malformedQwen?Response.json({error:'incomplete'}):qwenResponse();}
   if(url.endsWith('/auth/v1/user'))return Response.json({id:'owner-id'});

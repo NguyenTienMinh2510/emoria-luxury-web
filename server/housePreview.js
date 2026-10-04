@@ -56,17 +56,8 @@ export async function approvedHousePhotoPaths(paths,view,identity,client=null) {
   try {
     const admin=client || eventAdmin(), ownerTag=await ownerTagForHouse(identity,admin);
     if (!ownerTag) return [];
-    const {data,error}=await admin.from('house_photo_reviews').select('path,status,violations,content_version').eq('tag',ownerTag).eq('status','ready').in('path',requested);
-    if (error) return [];
-    const approvals=new Map((data || []).filter(row => row.content_version && !row.violations?.length).map(row => [row.path,row.content_version]));
-    const checked=await Promise.all(requested.map(async path => {
-      if (!approvals.has(path)) return null;
-      try {
-        const photo=await readHousePhoto(path,ownerTag,admin);
-        return frozenBeforePublish(photo,view) && photo.version===approvals.get(path) ? path : null;
-      } catch { return null; }
-    }));
-    return checked.filter(Boolean);
+    const {data,error}=await admin.rpc('rpc_house_approved_paths',{p_tag:ownerTag,p_paths:requested,p_published_at:view.published_at});
+    return error||!Array.isArray(data)?[]:data.filter(path=>requested.includes(path));
   } catch { return []; }
 }
 
@@ -78,12 +69,9 @@ export async function attachHousePreview(view, {shareId, tagUid}, client = null)
     const admin = client || eventAdmin();
     const ownerTag = await ownerTagForHouse({shareId,tagUid},admin);
     if (!ownerTag) return view;
-    const preview = await readHousePreview(view.rooms,ownerTag,admin);
-    // A label belongs to reviewed bytes, and an existing snapshot cannot acquire a
-    // later replacement even if that replacement is separately approved.
-    if (!frozenBeforePublish(preview,view)) return view;
-    const {data, error} = await admin.from('house_photo_reviews').select('status, violations, content_version').eq('tag',ownerTag).eq('path',path).eq('status','ready').maybeSingle();
-    if (error || data?.status !== 'ready' || data.content_version !== preview.version || data.violations?.length) return view;
+    if(typeof path!=='string'||!/^[-a-zA-Z0-9_]+\/[-a-zA-Z0-9_]+\.(jpg|png|webp)$/.test(path)||path.split('/')[0]!==ownerTag)return view;
+    const {data,error}=await admin.rpc('rpc_house_approved_paths',{p_tag:ownerTag,p_paths:[path],p_published_at:view.published_at});
+    if(error||!Array.isArray(data)||!data.includes(path))return view;
     const signed = await signEventPaths([path],120);
     if (signed[path]) view.preview_image = signed[path];
   } catch { /* Missing/invalid/unapproved previews use the labeled illustration. */ }

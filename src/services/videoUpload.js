@@ -1,6 +1,7 @@
 import {supabase} from '../lib/supabaseClient.js';
 import {apiRequest} from './apiClient.js';
 import {estimateMediaSeconds, mediaProgress, recordMediaTiming} from './mediaUploadProgress.js';
+import {uploadReservedMedia} from './storageUpload.js';
 
 export async function moderateUploadedMedia(tag,path,consent,onProgress=()=>{},file={type:/\.(jpg|jpeg|png|webp)$/i.test(path)?'image/jpeg':'video/mp4'}) {
   if(!consent)throw new Error('Bạn cần đồng ý kiểm duyệt bằng AI trước khi tải lên.');
@@ -30,8 +31,7 @@ export async function uploadModeratedMedia(tag,file,consent,role='intro',onProgr
   const path=`${tag}/${prefix}${crypto.randomUUID()}.${ext}`;
   onProgress(mediaProgress(file,'uploading'));
   const startedAt=Date.now();
-  const {error}=await supabase.storage.from('emoria-memory').upload(path,file,{contentType:file.type,upsert:false});
-  if(error)throw error;
+  await uploadReservedMedia('emoria-memory',path,file);
   recordMediaTiming(file,'uploading',(Date.now()-startedAt)/1000);
   let mod;
   try { mod=await moderateUploadedMedia(tag,path,true,onProgress,file); }

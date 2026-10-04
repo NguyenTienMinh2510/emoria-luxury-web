@@ -36,13 +36,14 @@ assert.equal(formatMatchQuestion('{owner} hỏi {partner}', 'An', 'an'),'An (ng�
 assert.equal(formatMatchQuestion('{owner} hỏi {partner}','',''),'[Tên người tạo] hỏi [Tên người được mời]');
 console.log('PASS 200 questions: fixed names, valid strings, independent snapshots and replay rotation.');
 
-if (!fs.existsSync('.local/supabase.json')) {
+const localConfig=process.env.EMORIA_TEST_SUPABASE_CONFIG||'.local/supabase.json';
+if (!fs.existsSync(localConfig)) {
   console.log('[NOT RUN] Local isolated Supabase not found (.local/supabase.json missing); skipping local DB integration on CI/Vercel.');
   process.exit(0);
 }
 
-const config=JSON.parse(fs.readFileSync('.local/supabase.json','utf8'));
-assert.equal(config.API_URL,'http://127.0.0.1:55321','Only isolated local Supabase is allowed');
+const config=JSON.parse(fs.readFileSync(localConfig,'utf8'));
+assert.ok(['http://127.0.0.1:55321','http://127.0.0.1:56321'].includes(config.API_URL),'Only isolated local Supabase is allowed');
 
 try {
   const ping = await fetch(`${config.API_URL}/auth/v1/health`, { signal: AbortSignal.timeout(1500) });
@@ -87,6 +88,7 @@ try {
   const image=fs.readFileSync('tests/fixtures/house-cat.png');
   for(let i=0;i<2;i++) {
     const photo=`match_${accounts[i].id}/fixture.png`;
+    await api('POST','/storage/uploads/reserve',{bucket:'emoria-event-media',path:photo,bytes:image.length,mime:'image/png'},sessions[i],201);
     await ok(clients[i].storage.from('emoria-event-media').upload(photo,image,{contentType:'image/png'}));photos.push(photo);
   }
   assert.ok((await clients[1].storage.from('emoria-event-media').download(photos[0])).error);
@@ -291,6 +293,7 @@ try {
   }
 } finally {
   await browser?.close();
+  for(const user of accounts)await ok(root.from('memory_matches').delete().eq('creator_id',user.id));
   if(photos.length)await ok(root.storage.from('emoria-event-media').remove(photos));
   for(const user of accounts)await ok(root.auth.admin.deleteUser(user.id));
   server.closeAllConnections();await new Promise(resolve=>server.close(resolve));

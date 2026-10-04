@@ -10,6 +10,7 @@ const originalFetch=globalThis.fetch;
 let unlocked=true,missingTable=false,brokenImage=false,signs=[],checks=0,viewReads=0,signBatches=0;
 globalThis.fetch=async(input,init={})=>{
   const url=String(input);
+  if(url.endsWith('/rpc/rpc_gateway_admit'))return Response.json({allowed:true});
   if(url.includes('/rpc/rpc_get_memory_view')){viewReads++;return Response.json({success:true,is_unlocked:unlocked,letter:unlocked?'Private letter':null,media_gallery:[
     {type:'video',url:'storage://emo-test/ready'},
     {type:'video',url:'storage://emo-test/pending'},

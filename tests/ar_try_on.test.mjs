@@ -160,8 +160,8 @@ const customExplicit=tryOnConfig('custom-custom',{details:{ar:{type:'ring',model
 assert.equal(customExplicit.type,'ring');assert.equal(customExplicit.defaultSize,18);assert.equal(customExplicit.finger,'index');
 assert.equal(createHash('sha256').update(fs.readFileSync('public/ar/hand_landmarker.task')).digest('hex'),'fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1');
 assert.equal(createHash('sha256').update(fs.readFileSync('public/ar/pose_landmarker_lite.task')).digest('hex'),'59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a');
-const actualFetch=globalThis.fetch;process.env.SUPABASE_URL='https://ar-test.supabase.co';process.env.SUPABASE_PUBLISHABLE_KEY='fixture';let active=true,requests=0;
-globalThis.fetch=async(url,options)=>{requests++;assert.equal(options.method,'GET');assert.ok(String(url).includes('/checkout_products?select='));return Response.json({id:'emoria-lumen',active,name:'EMORIA LUMEN',image_url:'/ar/lumen.svg'});};
+const actualFetch=globalThis.fetch;process.env.SUPABASE_URL='https://ar-test.supabase.co';process.env.SUPABASE_PUBLISHABLE_KEY='fixture';process.env.SUPABASE_SERVICE_ROLE_KEY='fixture-service';let active=true,requests=0;
+globalThis.fetch=async(url,options)=>{if(String(url).endsWith('/rpc/rpc_gateway_admit'))return Response.json({allowed:true});requests++;assert.equal(options.method,'GET');assert.ok(String(url).includes('/checkout_products?select='));return Response.json({id:'emoria-lumen',active,name:'EMORIA LUMEN',image_url:'/ar/lumen.svg'});};
 async function get(id,method='GET') {let result;await handler({method,url:'/api/v1/products/'+id+'/try-on',headers:method==='GET'?{}:{'content-type':'application/json'},body:method==='GET'?undefined:{}},{setHeader(){},end(raw){result={status:this.statusCode,data:JSON.parse(raw)};}});return result;}
 try{
  const solaris=await get('emoria-solaris-keyring');assert.equal(solaris.status,404);

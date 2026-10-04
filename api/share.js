@@ -20,7 +20,8 @@ const imageUrl = (value, origin) => {
 async function readPublicResource(path, method, body, req) {
   let result;
   await restHandler({ method: method || 'GET', url: `/api/v1${path}`, body,
-    headers: { 'content-type': 'application/json', 'x-forwarded-for': req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1' },
+    socket:req.socket,
+    headers: { 'content-type': 'application/json', 'x-vercel-forwarded-for':req.headers['x-vercel-forwarded-for'], 'x-forwarded-for': req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1' },
   }, { setHeader() {}, end(raw) { result = { status: this.statusCode, data: JSON.parse(raw) }; } });
   if (result.status !== 200 || result.data?.success === false) throw new Error('Shared content unavailable');
   return result.data;
