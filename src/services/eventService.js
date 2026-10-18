@@ -8,6 +8,18 @@ import {getTopicQuestions} from './matchQuestionBank.js';
 
 export const DEFAULT_MATCH_QUESTIONS = getTopicQuestions('lifestyle',7);
 
+export function getGuestHouseStatus() {
+  return apiRequest('/events/guest-house/status', {anonymous:true});
+}
+
+export function openGuestHouse() {
+  return apiRequest('/events/guest-house/open', {method:'POST'});
+}
+
+export function setGuestHouseEnabled(enabled) {
+  return apiRequest('/admin/system/guest-house', {method:'PATCH', body:{enabled}});
+}
+
 /**
  * 5 góc/phòng cố định trong Memory House Studio
  */

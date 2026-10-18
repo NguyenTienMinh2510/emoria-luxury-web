@@ -140,6 +140,10 @@ export async function resolveCurrentSessionRole() {
 
     const user = session.user;
 
+    if (user.is_anonymous === true) {
+      return {role:ROLES.GUEST, user:null, isAdmin:false, isAnonymous:true, anonymousUserId:user.id};
+    }
+
     let isAdmin = false;
     let profile = null;
     try {

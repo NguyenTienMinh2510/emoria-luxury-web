@@ -97,6 +97,11 @@ const THEME_STYLES = {
   }
 };
 
+function houseErrorMessage(error, fallback = 'Không thể cập nhật ngôi nhà. Vui lòng thử lại.') {
+  if (error?.code === 'GUEST_EVENT_CLOSED') return 'Sự kiện Guest xây nhà đã đóng. Ngôi nhà đã đăng ký được giữ lại ở chế độ chỉ xem; nhà của khách chưa đăng ký đã bị xóa.';
+  return error?.message || fallback;
+}
+
 export default function MemoryHouseStudio({
   tagUid,
   shareId: initialShareId,
@@ -106,7 +111,9 @@ export default function MemoryHouseStudio({
   onNavigateMemory,
   onSwitchStudio,
   navigationDirtyRef,
-  currentUser
+  currentUser,
+  isAnonymous = false,
+  onOpenAuth
 }) {
   const [canEdit, setCanEdit] = useState(Boolean(currentUser) && !initialShareId);
   const isPublicVisitor = Boolean(initialShareId) || !currentUser || !canEdit;
@@ -116,6 +123,14 @@ export default function MemoryHouseStudio({
   const [loadError, setLoadError] = useState('');
   const loadSequence = useRef(0);
   const [error, setError] = useState('');
+  const requireAccount = () => {
+    if (!isAnonymous) return false;
+    const message = 'Đăng nhập/đăng ký để tải ảnh & chia sẻ; ngôi nhà của bạn sẽ được giữ lại';
+    setIsPostcardModalOpen(false);
+    if (onOpenAuth) onOpenAuth(message);
+    else setError(message);
+    return true;
+  };
   const [successMsg, setSuccessMsg] = useState('');
   const [activeTab, setActiveTab] = useState(isPublicVisitor ? 'preview' : 'edit'); // 'edit' | 'preview'
   const [activeRoomIndex, setActiveRoomIndex] = useState(0);
@@ -294,7 +309,7 @@ export default function MemoryHouseStudio({
           setCanRestoreLayout(Boolean(draft.can_restore_layout));
         } catch (draftErr) {
           if (sequence !== loadSequence.current) return;
-          if (draftErr.status !== 403) throw draftErr;
+          if (draftErr.status !== 403 || draftErr.code === 'GUEST_EVENT_CLOSED') throw draftErr;
           // Fallback to public published view if not owner of draft
           try {
             const publicData = await getPublicHouseByTag(tagUid);
@@ -363,7 +378,7 @@ export default function MemoryHouseStudio({
           setAutosaveState('saved');
         }
       } catch (err) {
-        setError(err.message);
+        setError(houseErrorMessage(err));
         if (currentRev === saveRevision.current) {
           setAutosaveState('error');
         }
@@ -400,7 +415,7 @@ export default function MemoryHouseStudio({
       return true;
     } catch (err) {
       setAutosaveState('error');
-      setError(err?.message || 'Lỗi khi lưu bản nháp.');
+      setError(houseErrorMessage(err, 'Lỗi khi lưu bản nháp.'));
       return false;
     } finally {
       setIsSaving(false);
@@ -410,6 +425,7 @@ export default function MemoryHouseStudio({
 
   // Publish House
   const handlePublish = async () => {
+    if (requireAccount()) return;
     if (!tagUid || !canMutate()) return;
     return presetSession.current.run(async isCurrent => {
     clearTimeout(autosaveTimer.current);
@@ -446,7 +462,7 @@ export default function MemoryHouseStudio({
       setSuccessMsg('Ngôi nhà đã được xuất bản! Bạn có thể chia sẻ liên kết này.');
     } catch (err) {
       if (isDirty.current) setAutosaveState('error');
-      setError(err?.message || 'Không thể xuất bản ngôi nhà.');
+      setError(houseErrorMessage(err, 'Không thể xuất bản ngôi nhà.'));
     } finally {
       setPublishStage('');
       setPublishProgress(null);
@@ -466,7 +482,7 @@ export default function MemoryHouseStudio({
     if (!canMutate() || presetDisabled) return;
     setError(''); setSuccessMsg('');
     try { await presetSession.current.preview(presetId, roomId); }
-    catch (err) { if (isDirty.current) setAutosaveState('error'); setError(err.message); }
+    catch (err) { if (isDirty.current) setAutosaveState('error'); setError(houseErrorMessage(err)); }
   }
 
   async function applyLayoutPreview() {
@@ -476,7 +492,7 @@ export default function MemoryHouseStudio({
         setSuccessMsg('Đã lưu mẫu bài trí. Bạn có thể hoàn tác; bản công khai chỉ đổi khi xuất bản.');
         await refreshLayoutBackup();
       }
-    } catch (err) { setAutosaveState('error'); setError(err.message || 'Chưa lưu được mẫu. Hãy thử áp dụng lại.'); }
+    } catch (err) { setAutosaveState('error'); setError(houseErrorMessage(err, 'Chưa lưu được mẫu. Hãy thử áp dụng lại.')); }
   }
 
   async function undoPreset() {
@@ -487,7 +503,7 @@ export default function MemoryHouseStudio({
         setSuccessMsg('Đã hoàn tác lần đổi mẫu gần nhất. Ảnh và lời nhắn hiện tại được giữ nguyên.');
         await refreshLayoutBackup();
       }
-    } catch (err) { setAutosaveState('error'); setError(err.message); }
+    } catch (err) { setAutosaveState('error'); setError(houseErrorMessage(err)); }
   }
 
   async function restoreLayout() {
@@ -502,12 +518,13 @@ export default function MemoryHouseStudio({
         if (!isCurrent()) return;
         await loadHouse();
         setSuccessMsg('Đã khôi phục bố cục đã sao lưu; ảnh và lời nhắn hiện tại vẫn được giữ.');
-      } catch (err) { setError(err.message); }
+      } catch (err) { setError(houseErrorMessage(err)); }
     });
   }
 
   // Unpublish House
   const handleUnpublish = async () => {
+    if (requireAccount()) return;
     if (!tagUid || !canMutate()) return;
     return presetSession.current.run(async isCurrent => {
     setError('');
@@ -520,13 +537,14 @@ export default function MemoryHouseStudio({
       setSuccessMsg('Ngôi nhà đã được chuyển về chế độ riêng tư.');
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
-      setError(err?.message || 'Không thể gỡ xuất bản.');
+      setError(houseErrorMessage(err, 'Không thể gỡ xuất bản.'));
     }
     });
   };
 
   // Revoke Share ID
   const handleRevokeShare = async () => {
+    if (requireAccount()) return;
     if (!tagUid || !canMutate()) return;
     return presetSession.current.run(async isCurrent => {
     setError('');
@@ -542,7 +560,7 @@ export default function MemoryHouseStudio({
       setIsPublished(false);
       setSuccessMsg('Đã thu hồi liên kết cũ và cấp mã liên kết mới an toàn.');
     } catch (err) {
-      setError(err?.message || 'Không thể thu hồi liên kết.');
+      setError(houseErrorMessage(err, 'Không thể thu hồi liên kết.'));
     }
     });
   };
@@ -595,7 +613,7 @@ export default function MemoryHouseStudio({
       return createdMemory;
     } catch (err) {
       setAutosaveState('error');
-      setError(err?.message || 'Không thể tải ảnh lên phòng.');
+      setError(houseErrorMessage(err, 'Không thể tải ảnh lên phòng.'));
     } finally {
       setUploadingRoomId(null);
     }
@@ -690,7 +708,7 @@ export default function MemoryHouseStudio({
   const replyRequest = useRef(null);
   const handleSendVisitorHeart = async () => {
     try{await sendHouseReply({share_id:currentShareId,tag_uid:tagUid,kind:'heart',name:'Khách ghé thăm',message:'',request_id:crypto.randomUUID()});setHasSentHeart(true);setSuccessMsg('Đã gửi trái tim đến chủ nhà!');}
-    catch(err){setError(err.message);}
+    catch(err){setError(houseErrorMessage(err));}
   };
   const handleSendGuestMessage = async e => {
     e.preventDefault();if(!guestName.trim()||!guestMessage.trim())return;
@@ -698,9 +716,9 @@ export default function MemoryHouseStudio({
     try{
       await sendHouseReply({share_id:currentShareId,tag_uid:tagUid,kind:'message',name:guestName.trim(),message:guestMessage.trim(),request_id:replyRequest.current});
       setGuestSubmitted(true);replyRequest.current=null;setGuestName('');setGuestMessage('');
-    }catch(err){setError(err.message);setGuestSubmitted(false);}
+    }catch(err){setError(houseErrorMessage(err));setGuestSubmitted(false);}
   };
-  useEffect(()=>{if(canEdit&&tagUid)getHouseReplies(tagUid).then(setGuestEntries).catch(err=>setError(err.message));},[canEdit,tagUid,isGuestbookModalOpen]);
+  useEffect(()=>{if(canEdit&&tagUid)getHouseReplies(tagUid).then(setGuestEntries).catch(err=>setError(houseErrorMessage(err)));},[canEdit,tagUid,isGuestbookModalOpen]);
 
   // Share URL
   const shareUrl = currentShareId
@@ -708,6 +726,7 @@ export default function MemoryHouseStudio({
     : '';
 
   const handleCopyShareLink = () => {
+    if (requireAccount()) return;
     if (!shareUrl) return;
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopiedLink(true);
@@ -721,6 +740,7 @@ export default function MemoryHouseStudio({
 
   // Postcard handlers (Chặng D)
   const openPostcardModal = useCallback(() => {
+    if (requireAccount()) return;
     if (isPublicVisitor && !isPublished) {
       setError('Ngôi nhà này hiện đang ở chế độ riêng tư, chưa thể tạo thiệp chia sẻ.');
       return;
@@ -747,7 +767,7 @@ export default function MemoryHouseStudio({
     }
 
     setIsPostcardModalOpen(true);
-  }, [isPublicVisitor, isPublished, currentRoom, rooms, houseTitle]);
+  }, [isPublicVisitor, isPublished, currentRoom, rooms, houseTitle, isAnonymous, onOpenAuth]);
 
   // Live Canvas Postcard preview update
   useEffect(() => {
@@ -797,6 +817,7 @@ export default function MemoryHouseStudio({
   ]);
 
   const handleSharePostcard = async () => {
+    if (requireAccount()) return;
     if (!postcardCanvasRef.current) return;
     setPostcardShareStatus('sharing');
     try {
@@ -824,6 +845,7 @@ export default function MemoryHouseStudio({
   };
 
   const handleDownloadPostcard = () => {
+    if (requireAccount()) return;
     if (!postcardCanvasRef.current) return;
     const nameSlug = (postcardCoupleNames || 'emoria').toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
     downloadPostcardFile(postcardCanvasRef.current, `emoria-postcard-${nameSlug}-${Date.now()}.png`);
@@ -1651,8 +1673,8 @@ export default function MemoryHouseStudio({
                       <option value="off">Tắt lời nhắn</option><option value="visitors">Người có liên kết nhà</option><option value="signed_in">Người đã đăng nhập</option>
                     </select>
                   </label><p className="text-xs text-stone-400">Thay đổi có hiệu lực với khách sau khi xuất bản. Chỉ bạn xem được lời hồi đáp.</p>
-                  <button type="button" onClick={()=>getHouseReplies(tagUid).then(setGuestEntries).catch(e=>setError(e.message))} className="text-sm text-amber-200">Làm mới lời hồi đáp</button>
-                  {guestEntries.map(entry=><article key={entry.id} className="border-t border-white/10 py-2 text-sm"><strong>{entry.name}</strong><p>{entry.is_hidden?'Lời nhắn đã được ẩn':entry.kind==='heart'?'♥':entry.message}</p><button type="button" className="text-xs text-rose-300" onClick={()=>submitContentReport('guestbook',entry.id,'other','Chủ nhà báo cáo lời nhắn').then(()=>setSuccessMsg('Đã gửi báo cáo')).catch(e=>setError(e.message))}>Báo cáo lời nhắn</button></article>)}
+                  <button type="button" onClick={()=>getHouseReplies(tagUid).then(setGuestEntries).catch(e=>setError(houseErrorMessage(e)))} className="text-sm text-amber-200">Làm mới lời hồi đáp</button>
+                  {guestEntries.map(entry=><article key={entry.id} className="border-t border-white/10 py-2 text-sm"><strong>{entry.name}</strong><p>{entry.is_hidden?'Lời nhắn đã được ẩn':entry.kind==='heart'?'♥':entry.message}</p><button type="button" className="text-xs text-rose-300" onClick={()=>submitContentReport('guestbook',entry.id,'other','Chủ nhà báo cáo lời nhắn').then(()=>setSuccessMsg('Đã gửi báo cáo')).catch(e=>setError(houseErrorMessage(e)))}>Báo cáo lời nhắn</button></article>)}
                 </details>
                 {/* Bottom Actions Bar */}
                 <div className="space-y-3 pt-4 border-t border-white/10">
