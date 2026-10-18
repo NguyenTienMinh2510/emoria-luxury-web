@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import AnalyticsConsent from './components/AnalyticsConsent';
 import {trackShopEvent} from './services/analyticsService';
 import {readStoredCart} from './services/cartStorage.js';
+import {getGuestHouseStatus, openGuestHouse} from './services/eventService.js';
 import { useStore } from './components/StoreProvider';
 import ArticlesSection from './components/ArticlesSection';
 import HeroSection from './components/HeroSection';
@@ -115,6 +116,11 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authNotice, setAuthNotice] = useState('');
+  const [guestHouseEnabled, setGuestHouseEnabled] = useState(false);
+  const [openingGuestHouse, setOpeningGuestHouse] = useState(false);
+  const [guestHouseError, setGuestHouseError] = useState('');
+  const guestHouseOpening = useRef(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -155,6 +161,39 @@ export default function App() {
       setCurrentUser(resolved.user.fullName || resolved.user.email);
     } else {
       setCurrentUser(null);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    getGuestHouseStatus().then(status => { if (active) setGuestHouseEnabled(status.enabled === true); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const handleOpenGuestHouse = async () => {
+    if (guestHouseOpening.current) return;
+    guestHouseOpening.current = true;
+    setOpeningGuestHouse(true);
+    setGuestHouseError('');
+    try {
+      const {data:{session}, error} = await supabase.auth.getSession();
+      if (error) throw error;
+      if (!session) {
+        const {error:signInError} = await supabase.auth.signInAnonymously();
+        if (signInError) throw signInError;
+      }
+      const {tag_uid} = await openGuestHouse();
+      if (!tag_uid) throw new Error('Máy chủ chưa trả mã ngôi nhà. Vui lòng thử lại.');
+      await refreshSessionRole();
+      if (!navigateTo('memory-house')) return;
+      setCurrentTag(tag_uid);
+      setHouseShareId(null);
+      window.scrollTo({top:0, behavior:'smooth'});
+    } catch (error) {
+      setGuestHouseError(error.code === 'GUEST_EVENT_CLOSED' || error.status === 403 ? 'Sự kiện Guest xây nhà đã đóng. Hiện không thể mở ngôi nhà.' : error.message);
+    } finally {
+      guestHouseOpening.current = false;
+      setOpeningGuestHouse(false);
     }
   };
 
@@ -484,6 +523,14 @@ export default function App() {
               onExploreClick={handleExploreClick}
               onOpenNfcDemo={handleOpenNfcDemo}
             />
+            {guestHouseEnabled && <section aria-label="Sự kiện Guest xây nhà" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-3">
+              <h2 className="font-serif text-2xl text-white">Ngôi nhà kỷ niệm của bạn</h2>
+              <p className="text-sm text-slate-300">Tự tay xây nhà miễn phí. Đăng ký để giữ nhà; nhà của khách chưa đăng ký sẽ bị xóa khi sự kiện đóng.</p>
+              <button type="button" className="cta-luxury-primary min-h-11 disabled:opacity-50" disabled={openingGuestHouse} aria-busy={openingGuestHouse} onClick={handleOpenGuestHouse}>
+                {openingGuestHouse ? 'Đang mở ngôi nhà…' : 'Xây ngôi nhà của bạn'}
+              </button>
+              {guestHouseError && <p role="alert" className="text-sm text-red-300">{guestHouseError}</p>}
+            </section>}
             <CollectionShowcase
               onSelectProduct={(id) => {
                 setSelectedProductId(id);
@@ -647,6 +694,7 @@ export default function App() {
             }}
             onRefresh={() => {
               setSystemConfig(getSystemAvailability());
+              getGuestHouseStatus().then(status => setGuestHouseEnabled(status.enabled === true)).catch(() => {});
               store.refresh();
             }}
           />
@@ -691,10 +739,12 @@ export default function App() {
         {currentView === 'memory-house' && (currentTag || houseShareId) && (
           <MemoryHouseStudio
             navigationDirtyRef={navigationDirtyRef}
-            key={`${authSession.user?.id || 'guest'}:${currentTag}:${houseShareId || ''}`}
+            key={`${authSession.user?.id || authSession.anonymousUserId || 'guest'}:${currentTag}:${houseShareId || ''}`}
             tagUid={currentTag || null}
             shareId={houseShareId}
-            currentUser={authSession.user?.id || null}
+            currentUser={authSession.user?.id || authSession.anonymousUserId || null}
+            isAnonymous={authSession.isAnonymous === true}
+            onOpenAuth={(message) => {setAuthNotice(message);setIsAuthOpen(true);}}
             onBack={() => {
               if (!navigateTo('memory')) return;
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -903,10 +953,12 @@ export default function App() {
       {/* Auth Modal */}
       {isAuthOpen && <AuthModal
         onBeforeSignOut={confirmSignOut}
+        onLoginSuccess={refreshSessionRole}
+        notice={authNotice}
         recovery={recovery}
         currentUser={currentUser}
         isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
+        onClose={() => {setIsAuthOpen(false);setAuthNotice('');}}
         onNavigateToMemory={() => {
           if (!navigateTo('memory')) return;
           setIsAuthOpen(false);
