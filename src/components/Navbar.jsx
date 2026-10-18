@@ -16,6 +16,7 @@ export default function Navbar({
   currentView = 'shop',
   onSelectView,
   sandbox=false,
+  onOpenGuestHouse,
 }) {
   const {t}=useLanguage();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -163,6 +164,21 @@ export default function Navbar({
             <Sparkles className="w-3 h-3 text-amber-300/80" />
             <span>Match Studio</span>
           </button>
+          {onOpenGuestHouse && (
+            <button
+              type="button"
+              onClick={onOpenGuestHouse}
+              aria-current={currentView === 'memory-house' ? 'page' : undefined}
+              className={`hidden xl:inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all duration-200 cursor-pointer ${
+                currentView === 'memory-house'
+                  ? 'bg-white text-dark-950 shadow-silver-glow'
+                  : 'text-amber-100 hover:text-white bg-amber-400/10 hover:bg-amber-400/20 border border-amber-300/30'
+              }`}
+            >
+              <Sparkles className="w-3 h-3 text-amber-300/80" />
+              <span>House Studio</span>
+            </button>
+          )}
 
           {/* Right Action Bar: Search, Cart, User Profile */}
           <div className="flex items-center gap-2 sm:gap-3">
@@ -328,6 +344,24 @@ export default function Navbar({
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                 <span>Match Studio · {t('Trắc nghiệm đôi','Couple Quiz')}</span>
               </button>
+              {onOpenGuestHouse && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenGuestHouse();
+                  }}
+                  aria-current={currentView === 'memory-house' ? 'page' : undefined}
+                  className={`w-full min-h-[44px] px-4 rounded-xl text-xs font-semibold tracking-wider uppercase flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    currentView === 'memory-house'
+                      ? 'bg-white text-dark-950 shadow-silver-glow'
+                      : 'bg-amber-400/10 hover:bg-amber-400/20 text-amber-100 border border-amber-300/30'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>House Studio · {t('Xây nhà miễn phí','Build your house free')}</span>
+                </button>
+              )}
               {isAdmin && (
                 <button
                   type="button"

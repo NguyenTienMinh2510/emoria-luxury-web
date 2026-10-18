@@ -166,7 +166,17 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    getGuestHouseStatus().then(status => { if (active) setGuestHouseEnabled(status.enabled === true); }).catch(() => {});
+    getGuestHouseStatus().then(status => {
+      if (!active) return;
+      setGuestHouseEnabled(status.enabled === true);
+      // Shareable event link: /?event=house opens the guest studio directly.
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('event') === 'house') {
+        url.searchParams.delete('event');
+        window.history.replaceState({}, '', url);
+        if (status.enabled === true) handleOpenGuestHouse();
+      }
+    }).catch(() => {});
     return () => { active = false; };
   }, []);
 
@@ -482,6 +492,7 @@ export default function App() {
       {/* Top Fixed Navigation with Mode Switcher */}
       <Navbar
         sandbox={store.settings?.sandbox}
+        onOpenGuestHouse={guestHouseEnabled ? handleOpenGuestHouse : undefined}
         activeSection={activeSection}
         currentUser={currentUser}
         isAdmin={authSession.isAdmin}
