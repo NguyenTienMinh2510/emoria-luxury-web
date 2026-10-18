@@ -27,6 +27,7 @@ export default function AuthDialog({
   onLoginSuccess, 
   onBeforeSignOut,
   currentUser, 
+  notice = '',
   recovery = false, 
   initialMode = 'login',
   onNavigateToMemory
@@ -232,6 +233,17 @@ export default function AuthDialog({
         setMode('login');
         onLoginSuccess?.(data.user.user_metadata?.full_name || data.user.email);
       } else if (mode === 'register') {
+        const {data:{session}, error:sessionErr} = await supabase.auth.getSession();
+        if (sessionErr) throw sessionErr;
+        if (session?.user?.is_anonymous === true) {
+          const {error:updateErr} = await supabase.auth.updateUser({
+            email:email.trim(), password, data:{full_name:name.trim()},
+          });
+          if (updateErr) throw updateErr;
+          setMessage('Hãy mở email để xác minh và hoàn tất đăng ký. Ngôi nhà của bạn được giữ lại trên tài khoản này.');
+          setPassword('');
+          return;
+        }
         const { data, error: signUpErr } = await supabase.auth.signUp({
           email: email.trim(),
           password,
@@ -249,6 +261,9 @@ export default function AuthDialog({
           setMessage('Hãy mở email để xác minh và kích hoạt tài khoản của bạn.');
         }
       } else {
+        const {data:{session}, error:sessionErr} = await supabase.auth.getSession();
+        if (sessionErr) throw sessionErr;
+        if (session?.user?.is_anonymous === true && !window.confirm('Đăng nhập tài khoản có sẵn sẽ không gộp ngôi nhà của thiết bị này vào tài khoản đó. Đăng ký mới để giữ ngôi nhà. Bạn vẫn muốn đăng nhập?')) return;
         const { data, error: signInErr } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
@@ -606,6 +621,7 @@ export default function AuthDialog({
   // Render Logged-Out Authentication Form
   return (
     <ModalFrame title="Tài khoản EMORIA" onClose={onClose}>
+      {notice && <p role="status" className="p-3 mb-4 bg-amber-500/10 text-amber-200 rounded-xl text-sm">{notice}</p>}
       {error && <p role="alert" className="p-3 mb-4 bg-red-500/10 text-red-300 rounded-xl text-sm">{error}</p>}
       {message && <p role="status" className="p-3 mb-4 bg-emerald-500/10 text-emerald-200 rounded-xl text-sm">{message}</p>}
 

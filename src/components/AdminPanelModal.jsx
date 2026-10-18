@@ -17,6 +17,7 @@ import StoreAdminPanel from './StoreAdminPanel';
 import MarkdownContent from './MarkdownContent';
 import ArticleEditor from './ArticleEditor';
 import { callStore } from '../services/catalogService';
+import {getGuestHouseStatus, setGuestHouseEnabled as updateGuestHouseEnabled} from '../services/eventService';
 import { listOrdersForAdmin, updateOrderStatus } from '../services/orderBackendService';
 import {
   getSystemAvailability,
@@ -50,6 +51,8 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
   // System Availability State
   const [systemConfig, setSystemConfig] = useState(getSystemAvailability());
   const [saveMessage, setSaveMessage] = useState('');
+  const [guestHouseEnabled, setGuestHouseEnabled] = useState(null);
+  const [guestHouseBusy, setGuestHouseBusy] = useState(false);
 
   // NFC Memories State
   const [memories, setMemories] = useState([]);
@@ -95,6 +98,15 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
       setSaveMessage('');
     }
   }, [isOpen,orderPage,orderSearch]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    setGuestHouseEnabled(null);
+    getGuestHouseStatus().then(status => { if (active) setGuestHouseEnabled(status.enabled === true); })
+      .catch(error => { if (active) setSaveMessage(error.message); });
+    return () => { active = false; };
+  }, [isOpen]);
 
   // Helpers cho Bài viết
   const handleOpenCreateArticle = () => {
@@ -226,6 +238,19 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
       setTimeout(() => setSaveMessage(''), 3000);
       if (onRefresh) onRefresh();
     } catch (error) { setSaveMessage(error.message); }
+  };
+
+  const handleToggleGuestHouse = async () => {
+    if (guestHouseBusy || guestHouseEnabled === null) return;
+    if (guestHouseEnabled && !window.confirm('Tắt Sự kiện Guest xây nhà sẽ xóa vĩnh viễn ngôi nhà, ảnh và tài khoản của khách anonymous chưa đăng ký. Nhà của người đã đăng ký được giữ lại ở chế độ chỉ xem. Bạn có chắc muốn tắt?')) return;
+    setGuestHouseBusy(true);
+    try {
+      await updateGuestHouseEnabled(!guestHouseEnabled);
+      setGuestHouseEnabled(!guestHouseEnabled);
+      setSaveMessage('Đã cập nhật Sự kiện Guest xây nhà.');
+      if (onRefresh) onRefresh();
+    } catch (error) { setSaveMessage(error.message); }
+    finally { setGuestHouseBusy(false); }
   };
 
   // Handle Save VIP Passcode
@@ -484,6 +509,18 @@ export default function AdminPanelModal({ isOpen, onClose, onRefresh }) {
                   >
                     <Power className="w-4 h-4" />
                     <span>{systemConfig.isMaintenanceMode ? 'ĐANG BẬT BẢO TRÌ' : 'ĐANG MỞ CÔNG KHAI'}</span>
+                  </button>
+                </div>
+
+                <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-white text-sm">Sự kiện Guest xây nhà</h3>
+                    <p className="text-xs text-slate-400 mt-1">Cho khách xây nhà miễn phí. Khi tắt, nhà của khách chưa đăng ký sẽ bị xóa vĩnh viễn.</p>
+                  </div>
+                  <button type="button" role="switch" aria-checked={guestHouseEnabled === true} aria-label="Sự kiện Guest xây nhà"
+                    disabled={guestHouseBusy || guestHouseEnabled === null} onClick={handleToggleGuestHouse}
+                    className="min-h-11 px-4 py-2 rounded-xl bg-white/10 text-slate-200 text-xs font-bold disabled:opacity-50">
+                    {guestHouseBusy ? 'Đang cập nhật…' : guestHouseEnabled === null ? 'Chưa tải trạng thái' : guestHouseEnabled ? 'ĐANG BẬT' : 'ĐANG TẮT'}
                   </button>
                 </div>
 
