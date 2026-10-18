@@ -10,7 +10,25 @@ import {signMemoryMedia} from './memoryMedia.js';
 import {moderateHousePhotos,enqueueHousePublish,readHousePublishJob,processHouseJobs} from './houseModeration.js';
 import {reserveAiWork,releaseAiWork} from './aiAdmission.js';
 import {validateHousePreview,attachHousePreview} from './housePreview.js';
-const route=(method,path,access,run,status)=>({method,pattern:new RegExp(`^${path}$`),access,run,status});
+const route=(method,path,access,run,status)=>({method,pattern:new RegExp(`^${path}$`),access,status,
+  run:(method!=='GET'&&path.includes('/house/'))||path==='/storage/uploads/reserve'?async c=>{
+    const tag=path==='/storage/uploads/reserve'?(typeof c.body.path==='string'?c.body.path.split('/')[0]:null):c.params[0];
+    try{
+      if(typeof tag==='string'&&tag.trim().toLowerCase().startsWith('guest-'))await requireGuestHouseEvent(c);
+      if(path.includes('/house/')&&(/\/(publish|unpublish|revoke)$/.test(path)||path.endsWith('/run'))&&c.user?.is_anonymous===true){
+        throw Object.assign(new Error('Đăng ký tài khoản để chia sẻ ngôi nhà.'),{status:403,code:'GUEST_LOGIN_REQUIRED'});
+      }
+      return await run(c);
+    }catch(error){throw guestHouseError(error);}
+  }:run});
+function guestHouseError(error){
+  for(const code of ['GUEST_EVENT_CLOSED','GUEST_LOGIN_REQUIRED'])if(error.status===403&&error.message.includes(code))error.code=code;
+  return error;
+}
+async function requireGuestHouseEvent(c){
+  const status=await c.db(c.client.rpc('rpc_guest_house_status'));
+  if(status?.enabled!==true)throw Object.assign(new Error('Sự kiện ngôi nhà đã đóng.'),{status:403,code:'GUEST_EVENT_CLOSED'});
+}
 const rpc=(c,name,args={})=>isEventRpc(name)?eventRpc(c,name,args):c.db(c.client.rpc(name,args));
 const integer=(value,fallback,max=10000)=>{const n=Number(value??fallback);if(!Number.isInteger(n)||n<0||n>max)throw Object.assign(new Error('Tham số phân trang không hợp lệ.'),{status:400});return n;};
 const pick=(body,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(body,k)).map(k=>[k,body[k]]));
@@ -70,6 +88,25 @@ export const routes=[
     if('isMaintenanceMode' in c.body)value.is_maintenance_mode=c.body.isMaintenanceMode===true;
     if('maintenanceMessage' in c.body)value.maintenance_message=String(c.body.maintenanceMessage).slice(0,2000);
     return c.db(c.client.from('system_settings').update({value,updated_at:new Date().toISOString()}).eq('key','maintenance_config').select('key').single());
+  }),
+  route('GET','/events/guest-house/status','public',c=>rpc(c,'rpc_guest_house_status')),
+  route('POST','/events/guest-house/open','user',async c=>{
+    await requireGuestHouseEvent(c);
+    const limit=await c.db(eventAdmin().rpc('rpc_check_rate_limit',{p_key:`guest_house_open:${c.user.id}`,p_max_burst:3,p_window_seconds:60}));
+    if(!limit||typeof limit.allowed!=='boolean')throw Object.assign(new Error('Chưa kiểm tra được giới hạn truy cập.'),{status:503});
+    if(!limit.allowed)throw Object.assign(new Error('Hãy thử lại sau.'),{status:429,code:'RATE_LIMIT_EXCEEDED',retryAfter:limit.retry_after||60});
+    try{return await rpc(c,'rpc_guest_house_open');}catch(error){throw guestHouseError(error);}
+  }),
+  route('PATCH','/admin/system/guest-house','admin',async c=>{
+    if(typeof c.body.enabled!=='boolean')throw Object.assign(new Error('enabled phải là boolean.'),{status:400});
+    const admin=eventAdmin();
+    const result=await c.db(admin.rpc('rpc_guest_house_set_enabled',{p_enabled:c.body.enabled}));
+    // shortcut: cleanup runs in this request; use a durable worker if event volume exceeds request limits.
+    for(const guest of result.cleanup||[]){
+      for(let i=0;i<guest.paths.length;i+=100)await c.db(admin.storage.from('emoria-event-media').remove(guest.paths.slice(i,i+100)));
+      await c.db(admin.rpc('rpc_guest_house_finish_cleanup',{p_user:guest.user_id}));
+    }
+    return {enabled:result.enabled};
   }),
   route('GET','/catalog','public',async c=>{
     const [products,settings]=await Promise.all([c.db(c.client.from('checkout_products').select('*, checkout_variants(*)').order('id')),c.db(c.client.from('store_settings').select('*').eq('id',true).single())]);
