@@ -20,6 +20,7 @@ import StoreAdminPanel from '../components/StoreAdminPanel';
 import MarkdownContent from '../components/MarkdownContent';
 import ArticleEditor from '../components/ArticleEditor';
 import { callStore } from '../services/catalogService';
+import {getGuestHouseStatus, setGuestHouseEnabled as updateGuestHouseEnabled} from '../services/eventService';
 import { listOrdersForAdmin, updateOrderStatus } from '../services/orderBackendService';
 import {
   getSystemAvailability,
@@ -61,6 +62,29 @@ export default function AdminView({
   // System Availability State
   const [systemConfig, setSystemConfig] = useState(getSystemAvailability());
   const [saveMessage, setSaveMessage] = useState('');
+  const [guestHouseEnabled, setGuestHouseEnabled] = useState(null);
+  const [guestHouseBusy, setGuestHouseBusy] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let active = true;
+    getGuestHouseStatus().then(status => { if (active) setGuestHouseEnabled(status.enabled === true); })
+      .catch(error => { if (active) setSaveMessage(error.message); });
+    return () => { active = false; };
+  }, [isAdmin]);
+
+  const handleToggleGuestHouse = async () => {
+    if (guestHouseBusy || guestHouseEnabled === null) return;
+    if (guestHouseEnabled && !window.confirm('Tắt Sự kiện Guest xây nhà sẽ xóa vĩnh viễn ngôi nhà, ảnh và tài khoản của khách anonymous chưa đăng ký. Nhà của người đã đăng ký được giữ lại ở chế độ chỉ xem. Bạn có chắc muốn tắt?')) return;
+    setGuestHouseBusy(true);
+    try {
+      await updateGuestHouseEnabled(!guestHouseEnabled);
+      setGuestHouseEnabled(!guestHouseEnabled);
+      setSaveMessage('Đã cập nhật Sự kiện Guest xây nhà.');
+      if (onRefresh) onRefresh();
+    } catch (error) { setSaveMessage(error.message); }
+    finally { setGuestHouseBusy(false); }
+  };
   const [settingsSubSection, setSettingsSubSection] = useState('settings');
 
   // Articles & Moderation State
@@ -545,6 +569,17 @@ export default function AdminView({
                     {t("Yêu Cầu Liên Hệ","Contact requests")}
                   </button>
                 </div>
+              </div>
+              <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold text-white text-sm">Sự kiện Guest xây nhà</h3>
+                  <p className="text-xs text-slate-400 mt-1">Cho khách xây nhà miễn phí. Khi tắt, nhà của khách chưa đăng ký sẽ bị xóa vĩnh viễn.</p>
+                </div>
+                <button type="button" role="switch" aria-checked={guestHouseEnabled === true} aria-label="Sự kiện Guest xây nhà"
+                  disabled={guestHouseBusy || guestHouseEnabled === null} onClick={handleToggleGuestHouse}
+                  className={`min-h-11 px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50 ${guestHouseEnabled ? 'bg-emerald-500/20 text-emerald-200' : 'bg-white/10 text-slate-200'}`}>
+                  {guestHouseBusy ? 'Đang cập nhật…' : guestHouseEnabled === null ? 'Chưa tải trạng thái' : guestHouseEnabled ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+                </button>
               </div>
               <div className="p-6 rounded-3xl bg-white/[0.03] border border-white/10">
                 <StoreAdminPanel section={settingsSubSection} />
