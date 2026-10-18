@@ -6,7 +6,7 @@ process.env.VITE_SUPABASE_ANON_KEY = 'fixture-publishable-key';
 const {supabase} = await import('../src/lib/supabaseClient.js');
 const service = await import('../src/services/eventService.js');
 const {resolveCurrentSessionRole} = await import('../src/services/authRoleService.js');
-const sources = Object.fromEntries(['App', 'components/AuthDialog', 'components/MemoryHouseStudio', 'components/AdminPanelModal'].map(file => [file.split('/').at(-1), fs.readFileSync(`src/${file}.jsx`, 'utf8')]));
+const sources = Object.fromEntries(['App', 'components/AuthDialog', 'components/MemoryHouseStudio', 'views/AdminView'].map(file => [file.split('/').at(-1), fs.readFileSync(`src/${file}.jsx`, 'utf8')]));
 const originalFetch = globalThis.fetch;
 const originalSession = supabase.auth.getSession;
 
@@ -158,7 +158,7 @@ try {
   assert.ok(house.includes('setError(houseErrorMessage(err))'), 'Autosave failures translate closed-event errors');
   console.log('PASS House gates: publish/unpublish/revoke/copy, all postcard image/share entry points, registered bypass and closed-event feedback.');
 
-  const toggle = handler(sources.AdminPanelModal, 'handleToggleGuestHouse');
+  const toggle = handler(sources.AdminView,'handleToggleGuestHouse');
   for (const enabled of [true,false]) {
     const effects = [];
     const scope = {
