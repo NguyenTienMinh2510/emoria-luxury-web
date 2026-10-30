@@ -62,10 +62,10 @@ export default function Navbar({
           {/* Logo */}
           <div 
             onClick={() => handleSwitchView('home')}
-            className="flex items-center gap-2.5 group relative cursor-pointer"
+            className="flex shrink-0 items-center gap-2.5 group relative cursor-pointer"
           >
             <div className="flex items-center gap-1.5">
-              <img src="/assets/logo.png" alt="EMORIA" width="666" height="250" className="h-10 sm:h-14 w-auto group-hover:brightness-125 transition-all" />
+              <img src="/assets/logo.png" alt="EMORIA" width="666" height="250" className="h-10 sm:h-14 w-auto shrink-0 object-contain group-hover:brightness-125 transition-all" />
             </div>
           </div>
 
