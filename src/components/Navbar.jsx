@@ -65,12 +65,7 @@ export default function Navbar({
             className="flex items-center gap-2.5 group relative cursor-pointer"
           >
             <div className="flex items-center gap-1.5">
-              <span className="font-serif text-xl sm:text-3xl font-bold tracking-[0.12em] sm:tracking-[0.2em] text-metallic group-hover:brightness-125 transition-all">
-                EMORIA
-              </span>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/10 border border-white/30 text-[10px] text-white/90 shadow-silver-glow animate-pulse">
-                ✦
-              </span>
+              <img src="/assets/logo.png" alt="EMORIA" width="666" height="250" className="h-10 sm:h-14 w-auto group-hover:brightness-125 transition-all" />
             </div>
           </div>
 
